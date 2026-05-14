@@ -1,0 +1,191 @@
+/* ========================================================================
+   VenueBook Design System — Colors & Typography
+   Sourced from the Venue Book.fig file (UI + Component-Style-Guide pages).
+   ======================================================================== */
+
+/* Webfonts (substituted from Google Fonts — see README VISUAL FOUNDATIONS) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=Be+Vietnam+Pro:wght@400;500;600;700&family=Nunito:wght@700;800;900&family=Lexend:wght@500;700&display=swap");
+
+:root {
+  /* ── Brand purples ─────────────────────────────────────────────────── */
+  --vb-purple-900: #2E1A82;     /* deepest accent */
+  --vb-purple-800: #3D2BB8;     /* login gradient end #490099 → mapped */
+  --vb-purple-700: #463EE3;     /* primary brand — active sidebar text/border, links */
+  --vb-purple-600: #574EFA;     /* "primary action" purple — buttons, hero stripe */
+  --vb-purple-500: #7839EE;     /* dashed callouts in style guide */
+  --vb-purple-300: #B0A9FF;
+  --vb-purple-200: #C7C3FF;
+  --vb-purple-100: #ECEBFF;     /* selected sidebar row bg, info pill bg */
+  --vb-purple-50:  #F4F3FF;
+
+  --vb-login-grad-start: #5B00C0;
+  --vb-login-grad-end:   #4900A0;
+
+  /* ── Accent blue (used in headers / link icon files) ───────────────── */
+  --vb-blue-700: #155DFC;
+  --vb-blue-600: #375DFF;     /* style-guide page header strip */
+  --vb-blue-500: #0A77FF;     /* file-item card border (info) */
+  --vb-blue-100: #ECF4FC;     /* file-item card bg (info) */
+
+  /* ── Neutrals ──────────────────────────────────────────────────────── */
+  --vb-ink-900:    #0F172B;   /* darkest text */
+  --vb-ink-800:    #070B11;
+  --vb-ink-700:    #101828;   /* shadow color base */
+  --vb-ink-600:    #323539;   /* primary body text */
+  --vb-ink-500:    #45556C;
+  --vb-ink-400:    #62748E;
+  --vb-gray-500:   #858C95;   /* secondary text / icon stroke (most common color) */
+  --vb-gray-400:   #979AA0;   /* hint text, tertiary */
+  --vb-gray-350:   #90A1B9;
+  --vb-gray-300:   #99A1AF;
+  --vb-gray-250:   #C8D0DA;
+  --vb-gray-200:   #E2E8F0;   /* table row dividers */
+  --vb-gray-150:   #EAEBF0;   /* card outer borders (alt) */
+  --vb-gray-100:   #E5E5E7;   /* card / input borders */
+  --vb-gray-75:    #EFEFF1;   /* card header band */
+  --vb-gray-50:    #F1F5F9;   /* shadows, subtle fills */
+  --vb-bg-soft:    #F7F8FA;   /* canvas background (master shell) */
+  --vb-bg-softer:  #F8F9FB;
+  --vb-bg-softest: #F8FAFC;
+  --vb-bg-page:    #F9FAFB;   /* page background */
+  --vb-bg-header:  #FAFBFC;   /* style-guide header bg */
+  --vb-white:      #FFFFFF;
+
+  /* ── Semantic / status ─────────────────────────────────────────────── */
+  --vb-success-700: #1F8A4C;
+  --vb-success-500: #2EBF43;   /* file-item border (groups/events) */
+  --vb-success-100: #F3FFF6;   /* file-item bg */
+  --vb-warn-500:    #EEA23E;   /* file-item border (quantities) */
+  --vb-warn-100:    #FFFAF2;   /* file-item bg */
+  --vb-danger-700:  #C8322B;
+  --vb-danger-600:  #E7000B;   /* required-field stroke marker */
+  --vb-danger-300:  #FFC9C9;
+  --vb-danger-50:   #FEF2F2;
+  --vb-info-500:    #6366F1;
+  --vb-neutral-pill: #EFEFF1;  /* file-item bg (default tag) */
+
+  /* ── Shadows ───────────────────────────────────────────────────────── */
+  --vb-shadow-card:  0px 1px 2px 0 rgba(16, 24, 40, 0.04);
+  --vb-shadow-pop:   0px 4px 16px 0 rgba(16, 24, 40, 0.08);
+  --vb-shadow-modal: 0px 12px 32px -8px rgba(16, 24, 40, 0.18);
+  --vb-shadow-row:   0px 1px 0 0 rgba(0, 0, 0, 0.05);
+
+  /* ── Radii ─────────────────────────────────────────────────────────── */
+  --vb-radius-xs:    4px;
+  --vb-radius-sm:    6px;
+  --vb-radius-md:    8px;    /* default input + button radius */
+  --vb-radius-lg:    12px;
+  --vb-radius-xl:    16px;   /* card radius (most cards) */
+  --vb-radius-2xl:   20px;
+  --vb-radius-pill:  100px;
+
+  /* ── Spacing scale (4px base) ──────────────────────────────────────── */
+  --vb-space-1: 4px;
+  --vb-space-2: 8px;
+  --vb-space-3: 12px;
+  --vb-space-4: 16px;
+  --vb-space-5: 20px;
+  --vb-space-6: 24px;
+  --vb-space-8: 32px;
+  --vb-space-10: 40px;
+  --vb-space-12: 48px;
+  --vb-space-16: 64px;
+
+  /* ── Type families ─────────────────────────────────────────────────── */
+  --vb-font-display: "Sora", "Inter", system-ui, sans-serif;          /* brand mark, lockup */
+  --vb-font-body:    "Inter", "Be Vietnam Pro", system-ui, sans-serif;/* default UI */
+  --vb-font-vn:      "Be Vietnam Pro", "Inter", sans-serif;           /* Vietnamese-heavy labels */
+  --vb-font-meta:    "DM Sans", "Inter", sans-serif;                  /* "Admin Panel" subtitle, micro */
+  --vb-font-hero:    "Nunito", "Sora", sans-serif;                    /* huge dashboard wordmarks */
+  --vb-font-num:     "Lexend", "Inter", sans-serif;                   /* large stat numerals */
+  --vb-font-mono:    "Menlo", ui-monospace, monospace;
+
+  /* ── Type tokens — display / hero ──────────────────────────────────── */
+  --vb-text-hero-xl-size: 160px; --vb-text-hero-xl-weight: 700; --vb-text-hero-xl-lh: 100%;
+  --vb-text-hero-lg-size: 64px;  --vb-text-hero-lg-weight: 700; --vb-text-hero-lg-lh: 1.05;
+
+  /* Headings (Inter Bold, tight tracking) */
+  --vb-h1-size: 40px; --vb-h1-weight: 700; --vb-h1-lh: 48px; --vb-h1-track: -0.02em;
+  --vb-h2-size: 32px; --vb-h2-weight: 700; --vb-h2-lh: 40px; --vb-h2-track: -0.015em;
+  --vb-h3-size: 28px; --vb-h3-weight: 700; --vb-h3-lh: 42px;
+  --vb-h4-size: 24px; --vb-h4-weight: 700; --vb-h4-lh: 32px; --vb-h4-track: -0.01em;
+  --vb-h5-size: 20px; --vb-h5-weight: 700; --vb-h5-lh: 28px; --vb-h5-track: -0.01em;
+  --vb-h6-size: 16px; --vb-h6-weight: 700; --vb-h6-lh: 24px; --vb-h6-track: -0.01em;
+
+  /* Body */
+  --vb-body-lg-size: 16px; --vb-body-lg-weight: 500; --vb-body-lg-lh: 24px;
+  --vb-body-md-size: 14px; --vb-body-md-weight: 500; --vb-body-md-lh: 21px; /* THE workhorse */
+  --vb-body-sm-size: 12px; --vb-body-sm-weight: 500; --vb-body-sm-lh: 16px;
+  --vb-body-xs-size: 10px; --vb-body-xs-weight: 500; --vb-body-xs-lh: 14px;
+
+  /* Labels / micro */
+  --vb-label-size: 14px; --vb-label-weight: 700; --vb-label-lh: 21px;
+  --vb-caption-size: 12px; --vb-caption-weight: 400; --vb-caption-lh: 16px;
+
+  /* ── Foreground / background semantic ──────────────────────────────── */
+  --fg-1: var(--vb-ink-600);     /* primary text */
+  --fg-2: var(--vb-gray-500);    /* secondary */
+  --fg-3: var(--vb-gray-400);    /* tertiary / hint */
+  --fg-brand: var(--vb-purple-700);
+  --fg-on-brand: var(--vb-white);
+
+  --bg-1: var(--vb-white);       /* surface */
+  --bg-2: var(--vb-bg-page);     /* page bg */
+  --bg-3: var(--vb-bg-soft);     /* shell bg */
+  --bg-brand: var(--vb-purple-600);
+  --bg-brand-soft: var(--vb-purple-100);
+
+  --border-1: var(--vb-gray-100);
+  --border-2: var(--vb-gray-150);
+  --border-strong: var(--vb-gray-300);
+  --border-brand: var(--vb-purple-700);
+
+  --focus-ring: 0 0 0 3px rgba(87, 78, 250, 0.25);
+}
+
+/* ========================================================================
+   Semantic element styles — apply by default, components can override.
+   ======================================================================== */
+html, body {
+  font-family: var(--vb-font-body);
+  font-size: 14px;
+  color: var(--fg-1);
+  background: var(--bg-2);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1 { font: var(--vb-h1-weight) var(--vb-h1-size)/var(--vb-h1-lh) var(--vb-font-body); letter-spacing: var(--vb-h1-track); color: var(--fg-1); margin: 0; }
+h2 { font: var(--vb-h2-weight) var(--vb-h2-size)/var(--vb-h2-lh) var(--vb-font-body); letter-spacing: var(--vb-h2-track); color: var(--fg-1); margin: 0; }
+h3 { font: var(--vb-h3-weight) var(--vb-h3-size)/var(--vb-h3-lh) var(--vb-font-body); color: var(--fg-1); margin: 0; }
+h4 { font: var(--vb-h4-weight) var(--vb-h4-size)/var(--vb-h4-lh) var(--vb-font-body); letter-spacing: var(--vb-h4-track); color: var(--fg-1); margin: 0; }
+h5 { font: var(--vb-h5-weight) var(--vb-h5-size)/var(--vb-h5-lh) var(--vb-font-body); letter-spacing: var(--vb-h5-track); color: var(--fg-1); margin: 0; }
+h6 { font: var(--vb-h6-weight) var(--vb-h6-size)/var(--vb-h6-lh) var(--vb-font-body); letter-spacing: var(--vb-h6-track); color: var(--fg-1); margin: 0; }
+
+p  { font: var(--vb-body-md-weight) var(--vb-body-md-size)/var(--vb-body-md-lh) var(--vb-font-body); color: var(--fg-1); margin: 0; }
+small, .vb-caption {
+  font: var(--vb-caption-weight) var(--vb-caption-size)/var(--vb-caption-lh) var(--vb-font-meta);
+  color: var(--fg-2);
+}
+code, pre { font-family: var(--vb-font-mono); font-size: 12px; color: var(--fg-1); }
+
+.vb-brand-mark {
+  font-family: var(--vb-font-display);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--vb-ink-700);
+  letter-spacing: -0.005em;
+}
+.vb-brand-mark--lg { font-size: 20px; line-height: 28px; }
+.vb-brand-sub {
+  font-family: var(--vb-font-meta);
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--vb-gray-300);
+}
+
+.vb-label   { font: 700 14px/21px var(--vb-font-vn); color: var(--vb-ink-600); letter-spacing: 0; }
+.vb-hint    { font: 500 14px/21px var(--vb-font-vn); color: var(--vb-gray-400); }
+.vb-stat-num{ font: 700 32px/40px var(--vb-font-num); color: var(--fg-1); letter-spacing: -0.01em; }
