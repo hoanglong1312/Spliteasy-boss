@@ -111,7 +111,8 @@ function App() {
       case 'new-group':       return <ScreenNewGroup pop={pop}/>;
       case 'notifications':   return <ScreenNotifications pop={pop} tweaks={t}/>;
       case 'session-detail':  return <ScreenSessionDetail params={p} pop={pop} tweaks={t}/>;
-      case 'add-session-expense': return <ScreenAddSessionExpense pop={pop} tweaks={t}/>;
+      case 'add-session-expense': return <ScreenAddSessionExpense params={p} pop={pop} tweaks={t}/>;
+      case 'add-external-ticket':   return <ScreenAddExternalTicket pop={pop} tweaks={t}/>;
       case 'settings':        return <ScreenSettings pop={pop}/>;
       default: return null;
     }

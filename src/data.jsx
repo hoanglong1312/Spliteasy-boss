@@ -200,23 +200,24 @@ const PICKLE = {
 };
 
 // Compute member's monthly pickleball cost
-function pickleSummary() {
-  const fixed = PICKLE.fixedMembers;
-  const courtPerMember = Math.round(PICKLE.monthlyCourtFee / fixed.length);
+function pickleSummary(pickle = PICKLE) {
+  const fixed = pickle.fixedMembers;
+  const courtPerMember = Math.round(pickle.monthlyCourtFee / fixed.length);
   // Guest fees collected this month
-  const totalGuests = PICKLE.sessions.reduce((a, s) => a + s.guests.length, 0);
-  const guestRevenue = totalGuests * PICKLE.guestFeePerSession;
+  const totalGuests = pickle.sessions.reduce((a, s) => a + s.guests.length, 0);
+  const guestRevenue = totalGuests * pickle.guestFeePerSession;
   const guestCreditPer = Math.round(guestRevenue / fixed.length);
   // Per-member expense reimbursements from session expenses (paid by, split among attendees)
   const memberOwes = Object.fromEntries(fixed.map(id => [id, 0]));
-  for (const s of PICKLE.sessions) {
-    const splitAmong = s.attended;
+  for (const s of pickle.sessions) {
+    const splitAmong = s.attendees || s.attended || [];
     for (const ex of s.expenses) {
       const per = Math.round(ex.amount / splitAmong.length);
       for (const id of splitAmong) {
         if (memberOwes[id] !== undefined) memberOwes[id] = (memberOwes[id]||0) - per;
       }
-      if (memberOwes[ex.paidBy] !== undefined) memberOwes[ex.paidBy] = (memberOwes[ex.paidBy]||0) + ex.amount;
+      const payerId = ex.payerId || ex.paidBy;
+      if (memberOwes[payerId] !== undefined) memberOwes[payerId] = (memberOwes[payerId]||0) + ex.amount;
     }
   }
   return { courtPerMember, totalGuests, guestRevenue, guestCreditPer, memberOwes };

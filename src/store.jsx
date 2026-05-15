@@ -118,6 +118,20 @@ function appReducer(state, action) {
       };
     }
 
+    case 'TOGGLE_UPCOMING': {
+      const upcoming = (state.pickle.upcoming || []).map(s =>
+        s.id === action.sessionId
+          ? {
+              ...s,
+              going: (s.going || []).includes(action.memberId)
+                ? (s.going || []).filter(id => id !== action.memberId)
+                : [...new Set([...(s.going || []), action.memberId])]
+            }
+          : s
+      );
+      return { ...state, pickle: { ...state.pickle, upcoming } };
+    }
+
     case 'ADD_PICKLE_MEMBER': {
       const fixedMembers = state.pickle.fixedMembers || [];
       if (fixedMembers.includes(action.memberId)) return state;
