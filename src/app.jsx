@@ -243,4 +243,4 @@ function Mount() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<Mount/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<AppProvider><Mount/></AppProvider>);
