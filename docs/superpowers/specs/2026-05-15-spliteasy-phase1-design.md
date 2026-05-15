@@ -7,12 +7,13 @@
 
 ## 1. Mục tiêu (Goals)
 
-### Phase 1 — Demo đầy đủ chức năng
+### Phase 1 — Demo đầy đủ chức năng (1 người quản lý)
 - Toàn bộ CRUD (Create, Read, Update, Delete — tạo, đọc, sửa, xóa) hoạt động thật
-- Cả nhóm pickleball dùng chung app trên nhiều thiết bị
-- Mỗi người chọn "tôi là ai" khi mở app (profile selection — chọn hồ sơ)
+- **1 người duy nhất** (bạn) nhập và quản lý toàn bộ data trên thiết bị của mình
+- Các thành viên xem kết quả qua thiết bị của bạn hoặc được bạn chia sẻ màn hình
 - Data (dữ liệu) lưu vào localStorage (bộ nhớ cục bộ trình duyệt) — không mất khi đóng/mở app
 - Không cần backend (máy chủ), không cần đăng nhập
+- **Giới hạn rõ:** Không sync (đồng bộ) giữa các thiết bị — mục tiêu hoàn thiện nhanh để tiến sang Phase 2
 
 ### Phase 2 — App thật có backend (máy chủ)
 - Supabase: authentication (xác thực), database (cơ sở dữ liệu) PostgreSQL, realtime sync (đồng bộ thời gian thực)
@@ -139,7 +140,53 @@ Thành viên bấm "Sửa" → xin quyền → nhóm trưởng nhận notificati
 
 ---
 
-## 7. Lộ trình Phase 2 — Backend (Máy chủ)
+## 7. Kết quả Screen Tour (Đánh giá giao diện thực tế)
+
+*Ngày test: 2026-05-15 — Đánh giá toàn bộ 4 screen bằng cách điều khiển trực tiếp trên trình duyệt*
+
+### Những điểm hoạt động tốt ✅
+
+| Screen | Chức năng | Ghi chú |
+|--------|-----------|---------|
+| Trang chủ | Hiển thị số dư, tab "Ai nợ ai" / "Số dư" | UI (giao diện người dùng) đẹp |
+| Nhóm | Danh sách nhóm, xem expense (chi tiêu) | Cơ bản xong |
+| Pickleball | Tab navigation (4 tab) chuyển mượt | Không lag |
+| Pickleball | Card "Đã diễn ra" → mở detail page (trang chi tiết) | **Đẹp nhất app** — đủ: tổng chi, ai trả, có mặt/vắng lai, tiền chia |
+| Pickleball | Nút `<` back từ detail page | Hoạt động đúng |
+| Cá nhân | ⚙️ Settings mở trang Cài đặt | Điều hướng OK |
+| Cá nhân | 4 ô stats + bar chart (biểu đồ cột) chi tiêu theo loại | Thiết kế rất xịn |
+
+### Các nút no-op cần implement (triển khai) Phase 1 ❌
+
+**Screen Nhóm:**
+- ⋯ menu → cần dropdown: Sửa nhóm · Thêm thành viên · Xóa nhóm
+- ✏️ edit trong expense → cần mở form sửa chi tiêu
+
+**Screen Pickleball:**
+- Nút "Tham gia" buổi sắp tới
+- "Xem lịch →"
+- Click card "Sắp diễn ra" → cần mở detail (nhất quán với card "Đã diễn ra")
+- Badge "Có mặt" → cần toggle được
+- "Thêm buổi vé lẻ" → cần mở form
+- Click card vé lẻ → cần mở detail
+- "Thêm" thành viên → cần mở form
+- Click card thành viên → cần mở detail
+
+**Screen Cá nhân:**
+- Filter "Tháng 5" trong Chi tiêu theo loại
+- Card bạn bè "Hay chia tiền cùng"
+
+### Quyết định thiết kế từ screen tour ⚠️
+
+**1. Thiếu nút "Đổi người dùng"** — Phase 1 cần nút này, hiện không có trên bất kỳ screen nào. Cần thêm vào Screen Cá nhân.
+
+**2. Profile screen có nhiều mục Phase 2** — Phương thức thanh toán, Nhắc qua Zalo, Lời mời là Phase 2 features. Phase 1: hiển thị với label "Sắp ra mắt" (coming soon), không implement.
+
+**3. UX (trải nghiệm người dùng) không nhất quán** — Card "Đã diễn ra" click được mở detail nhưng card "Sắp diễn ra" thì không. Phase 1 cần làm nhất quán: card sắp tới cũng mở detail (chỉ xem, không edit).
+
+---
+
+## 8. Lộ trình Phase 2 — Backend (Máy chủ)
 
 **Stack:** Supabase
 
@@ -157,7 +204,7 @@ Thành viên bấm "Sửa" → xin quyền → nhóm trưởng nhận notificati
 
 ---
 
-## 8. Quyết định kỹ thuật đã thống nhất
+## 9. Quyết định kỹ thuật đã thống nhất
 
 | Hạng mục | Quyết định |
 |----------|-----------|
