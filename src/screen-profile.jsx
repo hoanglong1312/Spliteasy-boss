@@ -1,34 +1,37 @@
 // Profile / Cá nhân tab — personal stats + settings
 
 function ScreenProfile({ tweaks, push, setTweak }) {
-  const totals = useMemo(() => totalBalances(), []);
+  const { state, dispatch } = useApp();
+  const meId = state.currentUserId || ME;
+  const me = state.members.find(m => m.id === meId) || M[ME];
+  const totals = useMemo(() => totalBalances(state.groups), [state.groups]);
   const owed = Object.values(totals).filter(v => v > 0).reduce((a,b)=>a+b, 0);
   const owe = Math.abs(Object.values(totals).filter(v => v < 0).reduce((a,b)=>a+b, 0));
 
   // total spent across all groups, paid by me, plus my share where I didn't pay
   const stats = useMemo(() => {
     let paid = 0; let share = 0; let count = 0;
-    for (const g of GROUPS) {
+    for (const g of state.groups) {
       for (const e of g.expenses) {
         const per = Math.round(e.amount / e.participants.length);
-        if (e.paidBy === ME) paid += e.amount;
-        if (e.participants.includes(ME)) { share += per; count++; }
+        if (e.paidBy === meId) paid += e.amount;
+        if (e.participants.includes(meId)) { share += per; count++; }
       }
     }
     return { paid, share, count };
-  }, []);
+  }, [state.groups, meId]);
 
   const categorySpend = useMemo(() => {
     const acc = {};
-    for (const g of GROUPS) {
+    for (const g of state.groups) {
       for (const e of g.expenses) {
-        if (!e.participants.includes(ME)) continue;
+        if (!e.participants.includes(meId)) continue;
         const per = Math.round(e.amount / e.participants.length);
         acc[e.cat] = (acc[e.cat] || 0) + per;
       }
     }
     return Object.entries(acc).sort((a,b)=>b[1]-a[1]);
-  }, []);
+  }, [state.groups, meId]);
   const maxCat = categorySpend.length > 0 ? categorySpend[0][1] : 1;
   const catLabels = { food: 'Ăn uống', drink: 'Đồ uống', travel: 'Đi lại', gift: 'Quà tặng' };
 
@@ -40,14 +43,18 @@ function ScreenProfile({ tweaks, push, setTweak }) {
         background: 'linear-gradient(180deg, var(--brand-soft) 0%, transparent 100%)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Avatar member={M[ME]} size={64} style={tweaks.avatarStyle}/>
+          <Avatar member={me} size={64} style={tweaks.avatarStyle}/>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>Nam Anh</div>
-            <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500, marginTop: 2 }}>namanh@spliteasy.vn</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{me.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500, marginTop: 2 }}>{me.short?.toLowerCase()}@spliteasy.vn</div>
             <div style={{ marginTop: 6 }}><Pill bg="var(--brand-soft)" color="var(--brand-1)" size="xs">Thành viên • 3 tháng</Pill></div>
           </div>
           <button onClick={() => push('settings')} style={iconBtnStyle()}><Icon name="settings" size={20} color="var(--text-1)"/></button>
         </div>
+        <button onClick={() => dispatch({ type: 'SET_CURRENT_USER', userId: null })} style={{
+          appearance: 'none', cursor: 'pointer', background: 'transparent', border: 0,
+          color: 'var(--text-2)', fontSize: 12, fontWeight: 600, padding: '4px 0',
+        }}>Đổi người dùng</button>
       </div>
 
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -103,8 +110,8 @@ function ScreenProfile({ tweaks, push, setTweak }) {
         <div>
           <SectionHeader title="Hay chia tiền cùng"/>
           <div style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '4px 4px 8px', marginLeft: -4, marginRight: -4 }}>
-            {MEMBERS.filter(m => !m.isMe).slice(0, 6).map(m => {
-              const count = GROUPS.reduce((acc, g) => acc + g.expenses.filter(e => e.participants.includes(m.id) && e.participants.includes(ME)).length, 0);
+            {state.members.filter(m => m.id !== meId).slice(0, 6).map(m => {
+              const count = state.groups.reduce((acc, g) => acc + g.expenses.filter(e => e.participants.includes(m.id) && e.participants.includes(meId)).length, 0);
               return (
                 <div key={m.id} style={{
                   flexShrink: 0, width: 110, padding: '14px 10px',
@@ -124,9 +131,9 @@ function ScreenProfile({ tweaks, push, setTweak }) {
         <div>
           <SectionHeader title="Tài khoản"/>
           <Card>
-            <ListRow left={<MenuIcon name="wallet" bg="var(--brand-soft)" c="var(--brand-1)"/>} title="Phương thức thanh toán" subtitle="Momo, ZaloPay, ngân hàng" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>} onClick={() => {}}/>
-            <ListRow left={<MenuIcon name="bell" bg="#FFF7E0" c="#A05C0C"/>} title="Thông báo" subtitle="Cài đặt nhắc nợ qua Zalo" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>} onClick={() => {}}/>
-            <ListRow left={<MenuIcon name="users" bg="var(--vb-success-100)" c="var(--vb-success-700)"/>} title="Lời mời" subtitle="0 lời mời đang chờ" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>} onClick={() => {}}/>
+            <ListRow left={<MenuIcon name="wallet" bg="var(--brand-soft)" c="var(--brand-1)"/>} title="Phương thức thanh toán" subtitle="Momo, ZaloPay, ngân hàng" right={<Pill bg="var(--brand-soft)" color="var(--brand-1)" size="xs">Sắp ra mắt</Pill>} onClick={() => alert('Tính năng này sắp ra mắt!')}/>
+            <ListRow left={<MenuIcon name="bell" bg="#FFF7E0" c="#A05C0C"/>} title="Thông báo" subtitle="Cài đặt nhắc nợ qua Zalo" right={<Pill bg="var(--brand-soft)" color="var(--brand-1)" size="xs">Sắp ra mắt</Pill>} onClick={() => alert('Tính năng này sắp ra mắt!')}/>
+            <ListRow left={<MenuIcon name="users" bg="var(--vb-success-100)" c="var(--vb-success-700)"/>} title="Lời mời" subtitle="0 lời mời đang chờ" right={<Pill bg="var(--brand-soft)" color="var(--brand-1)" size="xs">Sắp ra mắt</Pill>} onClick={() => alert('Tính năng này sắp ra mắt!')}/>
             <ListRow left={<MenuIcon name="settings" bg="var(--surface-2)" c="var(--text-1)"/>} title="Cài đặt chung" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>} onClick={() => push('settings')} divider={false}/>
           </Card>
         </div>

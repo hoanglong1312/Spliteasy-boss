@@ -25,8 +25,49 @@ const FONTS = {
   system: { body: 'system-ui, -apple-system, "Helvetica Neue", sans-serif', display: 'system-ui, -apple-system, sans-serif' },
 };
 
+function ScreenSelectUser() {
+  const { state, dispatch } = useApp();
+  return (
+    <div style={{
+      minHeight: '100%', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '40px 24px', background: 'var(--surface-2)',
+    }}>
+      <div style={{
+        width: 64, height: 64, borderRadius: 20, marginBottom: 20,
+        background: 'var(--brand-soft)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon name="users" size={32} color="var(--brand-1)"/>
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', marginBottom: 8 }}>Bạn là ai?</div>
+      <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 28, textAlign: 'center' }}>
+        Chọn tài khoản để xem số dư và lịch sử chia tiền
+      </div>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {MEMBERS.map(m => (
+          <button key={m.id} onClick={() => dispatch({ type: 'SET_CURRENT_USER', userId: m.id })} style={{
+            appearance: 'none', cursor: 'pointer',
+            width: '100%', padding: '14px 16px',
+            background: 'var(--surface-1)', border: '1px solid var(--border-1)',
+            borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12,
+            textAlign: 'left',
+          }}>
+            <Avatar member={m} size={44} style="initials"/>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{m.name}</div>
+              {m.isMe && <div style={{ fontSize: 12, color: 'var(--brand-1)', fontWeight: 600, marginTop: 2 }}>Mặc định</div>}
+            </div>
+            <Icon name="chevron-right" size={18} color="var(--text-3)"/>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const { state } = useApp();
 
   // Nav state — each tab has its own stack
   const initStacks = () => ({
@@ -124,6 +165,14 @@ function App() {
     ...(t.showPickleball ? [{ id: 'pickle', label: 'Pickleball', icon: 'pickle' }] : []),
     { id: 'me', label: 'Cá nhân', icon: 'user' },
   ];
+
+  if (state.currentUserId === null) {
+    return (
+      <div style={{ ...themeVars, fontFamily: 'var(--vb-font-body)', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface-2)', overflowY: 'auto' }}>
+        <ScreenSelectUser/>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...themeVars, fontFamily: 'var(--vb-font-body)', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface-2)' }}>
