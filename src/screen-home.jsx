@@ -5,6 +5,9 @@ function ScreenHome({ tweaks, push, switchTab }) {
   const { state } = useApp();
   const { groups, members, currentUserId } = state;
 
+  const [searchOpen, setSearchOpen] = React.useState(false);
+  const [searchQuery, setSearchQuery] = React.useState('');
+
   const totals = useMemo(() => totalBalances(groups), [groups]);
   const youAreOwed = Object.values(totals).filter(v => v > 0).reduce((a,b) => a+b, 0);
   const youOwe = Object.values(totals).filter(v => v < 0).reduce((a,b) => a+b, 0);
@@ -12,6 +15,13 @@ function ScreenHome({ tweaks, push, switchTab }) {
   const layout = tweaks.homeLayout || 'overview';
 
   const activity = useMemo(() => recentActivity(groups, 20), [groups]);
+
+  const filteredGroups = searchQuery.trim()
+    ? groups.filter(g =>
+        g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (g.expenses || []).some(e => e.title.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : groups;
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -22,7 +32,29 @@ function ScreenHome({ tweaks, push, switchTab }) {
           <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>Nam Anh 👋</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button style={iconBtnStyle()}><Icon name="search" size={20} color="var(--text-1)"/></button>
+          {searchOpen ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Tìm nhóm, chi tiêu..."
+                style={{
+                  appearance: 'none', height: 40, padding: '0 12px',
+                  background: 'var(--surface-2)', border: '1px solid var(--border-1)',
+                  borderRadius: 12, fontFamily: 'var(--vb-font-body)', fontSize: 14,
+                  color: 'var(--text-1)', outline: 'none', width: 180,
+                }}
+              />
+              <button style={iconBtnStyle()} onClick={() => { setSearchOpen(false); setSearchQuery(''); }}>
+                <Icon name="x" size={18} color="var(--text-1)"/>
+              </button>
+            </div>
+          ) : (
+            <button style={iconBtnStyle()} onClick={() => setSearchOpen(true)}>
+              <Icon name="search" size={20} color="var(--text-1)"/>
+            </button>
+          )}
           <button style={iconBtnStyle()} onClick={() => push('notifications')}>
             <Icon name="bell" size={20} color="var(--text-1)"/>
             <span style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: '50%', background: 'var(--vb-danger-600)', boxShadow: '0 0 0 2px var(--surface-1)' }}></span>
@@ -35,9 +67,9 @@ function ScreenHome({ tweaks, push, switchTab }) {
         <BalanceHero net={net} youAreOwed={youAreOwed} youOwe={youOwe} push={push}/>
       </div>
 
-      {layout === 'overview' && <OverviewLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={groups}/>}
-      {layout === 'feed' && <FeedLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={groups}/>}
-      {layout === 'compact' && <CompactLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={groups}/>}
+      {layout === 'overview' && <OverviewLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
+      {layout === 'feed' && <FeedLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
+      {layout === 'compact' && <CompactLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
     </div>
   );
 }
