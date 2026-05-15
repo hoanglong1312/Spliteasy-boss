@@ -16,7 +16,7 @@ function buildInitialState() {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
@@ -138,7 +138,8 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
-  } catch {
+  } catch (e) {
+    console.warn('[store] Failed to load state from localStorage:', e);
     return null;
   }
 }
@@ -155,8 +156,7 @@ function saveState(state) {
 const AppContext = createContext(null);
 
 function AppProvider({ children }) {
-  const saved = loadState();
-  const [state, dispatch] = useReducer(appReducer, saved || buildInitialState());
+  const [state, dispatch] = useReducer(appReducer, undefined, () => loadState() || buildInitialState());
 
   // Sync xuống localStorage mỗi khi state thay đổi
   useEffect(() => {
