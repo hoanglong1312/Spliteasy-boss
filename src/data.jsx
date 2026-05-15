@@ -99,8 +99,7 @@ const GROUPS = [
 ];
 
 // Compute balances for a group from "me" perspective
-function groupBalance(g) {
-  const me = ME;
+function groupBalance(g, me = ME) {
   const bal = {}; // memberId -> +/- amount (positive = they owe me)
   g.members.forEach(id => { if (id !== me) bal[id] = 0; });
   for (const e of g.expenses) {
@@ -121,26 +120,24 @@ function groupBalance(g) {
   const settlements = g.settlements || [];
   for (const s of settlements) {
     if (s.fromId === me) {
-      // I paid s.toId → I owe them less (or they owe me more)
       bal[s.toId] = (bal[s.toId] || 0) + s.amount;
     } else if (s.toId === me) {
-      // s.fromId paid me → they owe me less
       bal[s.fromId] = (bal[s.fromId] || 0) - s.amount;
     }
   }
   return bal; // positive = they owe you; negative = you owe them
 }
 
-function groupNet(g) {
-  const b = groupBalance(g);
+function groupNet(g, me = ME) {
+  const b = groupBalance(g, me);
   return Object.values(b).reduce((a,b)=>a+b, 0);
 }
 
 // All-up balance per member
-function totalBalances(groups = GROUPS) {
+function totalBalances(groups = GROUPS, me = ME) {
   const totals = {};
   for (const g of groups) {
-    const b = groupBalance(g);
+    const b = groupBalance(g, me);
     for (const id in b) {
       totals[id] = (totals[id] || 0) + b[id];
     }

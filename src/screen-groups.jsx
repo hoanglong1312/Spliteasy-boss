@@ -605,7 +605,8 @@ function CheckMark({ on }) {
 // ── Settle screens ──────────────────────────────────────────────────────────
 function ScreenSettleAll({ pop, tweaks }) {
   const { state } = useApp();
-  const totals = useMemo(() => totalBalances(state.groups), [state.groups]);
+  const meId = state.currentUserId || ME;
+  const totals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId]);
   const owed = Object.entries(totals).filter(([,v]) => v > 0);
   const owe  = Object.entries(totals).filter(([,v]) => v < 0);
 

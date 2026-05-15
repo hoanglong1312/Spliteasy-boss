@@ -4,11 +4,12 @@
 function ScreenHome({ tweaks, push, switchTab }) {
   const { state } = useApp();
   const { groups, members, currentUserId } = state;
+  const meId = currentUserId || ME;
 
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  const totals = useMemo(() => totalBalances(groups), [groups]);
+  const totals = useMemo(() => totalBalances(groups, meId), [groups, meId]);
   const youAreOwed = Object.values(totals).filter(v => v > 0).reduce((a,b) => a+b, 0);
   const youOwe = Object.values(totals).filter(v => v < 0).reduce((a,b) => a+b, 0);
   const net = youAreOwed + youOwe;
@@ -156,7 +157,9 @@ function SubBalance({ label, amount, positive = false }) {
 
 // ── OVERVIEW layout (default) — groups + ai nợ ai + recent ──────────────────
 function OverviewLayout({ push, switchTab, tweaks, activity, groups }) {
-  const balances = useMemo(() => totalBalances(groups), [groups]);
+  const { state: _s } = useApp();
+  const meId = (_s.currentUserId || ME);
+  const balances = useMemo(() => totalBalances(groups, meId), [groups, meId]);
   const ranked = Object.entries(balances).filter(([id, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 
   return (
@@ -250,7 +253,9 @@ function FeedLayout({ push, switchTab, tweaks, activity, groups }) {
 
 // ── COMPACT layout — minimal, list-driven ──────────────────────────────────
 function CompactLayout({ push, switchTab, tweaks, activity, groups }) {
-  const balances = useMemo(() => totalBalances(groups), [groups]);
+  const { state: _s } = useApp();
+  const meId = (_s.currentUserId || ME);
+  const balances = useMemo(() => totalBalances(groups, meId), [groups, meId]);
   const ranked = Object.entries(balances).filter(([id, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
 
   return (

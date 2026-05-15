@@ -4,7 +4,7 @@ function ScreenProfile({ tweaks, push, setTweak }) {
   const { state, dispatch } = useApp();
   const meId = state.currentUserId || ME;
   const me = state.members.find(m => m.id === meId) || M[ME];
-  const totals = useMemo(() => totalBalances(state.groups), [state.groups]);
+  const totals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId]);
   const owed = Object.values(totals).filter(v => v > 0).reduce((a,b)=>a+b, 0);
   const owe = Math.abs(Object.values(totals).filter(v => v < 0).reduce((a,b)=>a+b, 0));
 
