@@ -148,29 +148,33 @@ function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle
       <div>
         <SectionHeader title="Buổi đánh sắp tới" action="Xem lịch →" onAction={() => {}}/>
         <Card>
-          <div style={{
-            padding: 16, display: 'flex', alignItems: 'center', gap: 14,
-            background: style === 'sporty' ? 'linear-gradient(90deg, rgba(122,199,79,0.06), transparent)' : 'transparent',
-          }}>
+          {next ? (
             <div style={{
-              width: 52, height: 56, borderRadius: 12, flexShrink: 0,
-              background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              padding: 16, display: 'flex', alignItems: 'center', gap: 14,
+              background: style === 'sporty' ? 'linear-gradient(90deg, rgba(122,199,79,0.06), transparent)' : 'transparent',
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{next.day}</div>
-              <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 18, fontWeight: 700, color: accent }}>{next.date.split('/')[0]}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{next.time} • {next.court}</div>
-              <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AvatarStack ids={next.going} size={22} overlap={7} avatarStyle={tweaks.avatarStyle} max={5}/>
-                <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{(next.going || []).length} người tham gia</span>
+              <div style={{
+                width: 52, height: 56, borderRadius: 12, flexShrink: 0,
+                background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{next.day}</div>
+                <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 18, fontWeight: 700, color: accent }}>{next.date.split('/')[0]}</div>
               </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{next.time} • {next.court}</div>
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AvatarStack ids={next.going} size={22} overlap={7} avatarStyle={tweaks.avatarStyle} max={5}/>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{(next.going || []).length} người tham gia</span>
+                </div>
+              </div>
+              <button onClick={() => dispatch({ type: 'TOGGLE_UPCOMING', sessionId: next.id, memberId: meId })} style={{
+                appearance: 'none', cursor: 'pointer', height: 36, padding: '0 14px',
+                background: accent, color: style === 'sporty' ? '#0E1726' : '#fff', border: 0, borderRadius: 10, fontWeight: 700, fontSize: 13,
+              }}>{isGoing ? 'Huỷ' : 'Tham gia'}</button>
             </div>
-            <button onClick={() => dispatch({ type: 'TOGGLE_UPCOMING', sessionId: next.id, memberId: meId })} style={{
-              appearance: 'none', cursor: 'pointer', height: 36, padding: '0 14px',
-              background: accent, color: style === 'sporty' ? '#0E1726' : '#fff', border: 0, borderRadius: 10, fontWeight: 700, fontSize: 13,
-            }}>{isGoing ? 'Huỷ' : 'Tham gia'}</button>
-          </div>
+          ) : (
+            <div style={{ padding: 16, color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>Không có buổi đánh sắp tới</div>
+          )}
         </Card>
       </div>
 
