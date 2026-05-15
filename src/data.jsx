@@ -123,9 +123,9 @@ function groupNet(g) {
 }
 
 // All-up balance per member
-function totalBalances() {
+function totalBalances(groups = GROUPS) {
   const totals = {};
-  for (const g of GROUPS) {
+  for (const g of groups) {
     const b = groupBalance(g);
     for (const id in b) {
       totals[id] = (totals[id] || 0) + b[id];
@@ -135,9 +135,9 @@ function totalBalances() {
 }
 
 // Recent activity feed (across groups)
-function recentActivity(limit = 8) {
+function recentActivity(groups = GROUPS, limit = 8) {
   const out = [];
-  for (const g of GROUPS) {
+  for (const g of groups) {
     for (const e of g.expenses) {
       out.push({ ...e, groupName: g.name, groupEmoji: g.emoji, groupColor: g.color, groupId: g.id });
     }
