@@ -104,14 +104,17 @@ function groupBalance(g) {
   const bal = {}; // memberId -> +/- amount (positive = they owe me)
   g.members.forEach(id => { if (id !== me) bal[id] = 0; });
   for (const e of g.expenses) {
+    if (!e.participants || e.participants.length === 0) continue;
     const splits = splitEqual(e.amount, e.participants);
     const share = Object.fromEntries(splits.map(s => [s.memberId, s.amount]));
     if (e.paidBy === me) {
       for (const id of e.participants) {
-        if (id !== me) bal[id] = (bal[id] || 0) + share[id];
+        if (id !== me) bal[id] = (bal[id] || 0) + (share[id] || 0);
       }
-    } else if (e.participants.includes(me)) {
-      bal[e.paidBy] = (bal[e.paidBy] || 0) - share[me];
+    } else if (e.participants && e.participants.includes(me)) {
+      if (g.members.includes(e.paidBy)) {
+        bal[e.paidBy] = (bal[e.paidBy] || 0) - (share[me] || 0);
+      }
     }
   }
   // Apply settlements (subtract from owed amounts)

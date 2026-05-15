@@ -67,7 +67,7 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
 
   React.useEffect(() => {
     if (!menuOpen) return;
-    const close = (e) => { e.stopPropagation(); setMenuOpen(false); };
+    const close = () => setMenuOpen(false);
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [menuOpen]);
@@ -174,7 +174,11 @@ function GroupActivity({ g, push, avatarStyle }) {
   // Group expenses by date
   const byDate = {};
   for (const e of g.expenses) { (byDate[e.date] = byDate[e.date] || []).push(e); }
-  const dates = Object.keys(byDate);
+  const dates = Object.keys(byDate).sort((a, b) => {
+    // dates are 'DD/MM' — convert to MM/DD for comparison
+    const [da, ma] = a.split('/'); const [db, mb] = b.split('/');
+    return (mb - ma) || (db - da);
+  });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {dates.map(d => (
@@ -388,6 +392,17 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
     pop();
   }
 
+  if (!g) {
+    return (
+      <div style={{ paddingBottom: 32 }}>
+        <NavHeader title="Thêm chi tiêu" onBack={pop}/>
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-2)' }}>
+          Chưa có nhóm nào. Hãy tạo nhóm trước.
+        </div>
+      </div>
+    );
+  }
+
   const Header = () => (
     <NavHeader title={useWizard ? `Bước ${step+1}/3` : (existing ? 'Sửa chi tiêu' : 'Thêm chi tiêu')} onBack={() => useWizard && step > 0 ? setStep(step-1) : pop()}
       right={<button onClick={handleSave} style={{
@@ -440,7 +455,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
           </FormRow>
 
           <FormRow label="Nhóm" icon="users">
-            <select value={g.id} onChange={(e) => { const ng = state.groups.find(x=>x.id===e.target.value); setG(ng); setParticipants(ng.members); }} style={inputStyle()}>
+            <select value={g.id} onChange={(e) => { const ng = state.groups.find(x=>x.id===e.target.value); setG(ng); setParticipants(ng.members); setPaidBy(ME); }} style={inputStyle()}>
               {state.groups.map(gr => <option key={gr.id} value={gr.id}>{gr.emoji} {gr.name}</option>)}
             </select>
           </FormRow>
