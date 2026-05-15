@@ -60,11 +60,10 @@ function ScreenGroups({ tweaks, push }) {
 function ScreenGroupDetail({ params, tweaks, push, pop }) {
   const { state, dispatch } = useApp();
   const g = state.groups.find(x => x.id === params.groupId);
-  if (!g) return null;
   const [tab, setTab] = useState('activity');
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const balance = useMemo(() => groupBalance(g), [g]);
-  const net = useMemo(() => groupNet(g), [g]);
+  const balance = useMemo(() => g ? groupBalance(g) : {}, [g]);
+  const net = useMemo(() => g ? groupNet(g) : 0, [g]);
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -72,6 +71,8 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, [menuOpen]);
+
+  if (!g) return null;
 
   function handleDeleteGroup() {
     if (!window.confirm(`Xóa nhóm "${g.name}"? Không thể hoàn tác.`)) return;
