@@ -114,6 +114,17 @@ function groupBalance(g) {
       bal[e.paidBy] = (bal[e.paidBy] || 0) - share[me];
     }
   }
+  // Apply settlements (subtract from owed amounts)
+  const settlements = g.settlements || [];
+  for (const s of settlements) {
+    if (s.fromId === me) {
+      // I paid s.toId → I owe them less (or they owe me more)
+      bal[s.toId] = (bal[s.toId] || 0) + s.amount;
+    } else if (s.toId === me) {
+      // s.fromId paid me → they owe me less
+      bal[s.fromId] = (bal[s.fromId] || 0) - s.amount;
+    }
+  }
   return bal; // positive = they owe you; negative = you owe them
 }
 
