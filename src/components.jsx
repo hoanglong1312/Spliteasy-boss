@@ -44,6 +44,7 @@ function Icon({ name, size = 20, color = 'currentColor', stroke = 1.75 }) {
     case 'percent': return <svg {...p}><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/><path d="M19 5L5 19"/></svg>;
     case 'fraction': return <svg {...p}><path d="M5 19l14-14"/><circle cx="8" cy="8" r="2"/><circle cx="16" cy="16" r="2"/></svg>;
     case 'check-circle': return <svg {...p}><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>;
+    case 'log-out': return <svg {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
     case 'logo-spark':
       return <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
         <rect width="24" height="24" rx="6" fill={color}/>
