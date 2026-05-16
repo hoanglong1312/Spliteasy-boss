@@ -165,27 +165,27 @@ function OverviewLayout({ push, pushToTab, switchTab, tweaks, activity, groups }
   return (
     <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Quick chips */}
-      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: '0 4px', marginLeft: -4, marginRight: -4 }}>
+      <HScroll style={{ padding: '0 4px', marginLeft: -4, marginRight: -4 }}>
         {[
           { label: 'Chia đều', icon: 'split' },
           { label: 'Thanh toán', icon: 'card' },
           { label: 'Nhắc nợ', icon: 'send' },
           { label: 'Pickleball', icon: 'pickle', onClick: () => switchTab('pickle') },
-          { label: 'Thống kê', icon: 'sparkle', onClick: () => switchTab('me') },
         ].map((q, i) => (
-          <button key={i} onClick={q.onClick} style={{
+          <button key={i} onClick={q.onClick || undefined} style={{
             appearance: 'none', flexShrink: 0,
             padding: '10px 14px', height: 40,
             background: 'var(--surface-1)', border: '1px solid var(--border-1)',
             borderRadius: 'var(--vb-radius-pill)',
             display: 'inline-flex', alignItems: 'center', gap: 6,
             fontFamily: 'var(--vb-font-body)', fontWeight: 600, fontSize: 13, color: 'var(--text-1)',
-            cursor: 'pointer',
+            cursor: q.onClick ? 'pointer' : 'default',
+            opacity: q.onClick ? 1 : 0.5,
           }}>
             <Icon name={q.icon} size={16} color="var(--brand-1)"/>{q.label}
           </button>
         ))}
-      </div>
+      </HScroll>
 
       {/* Ai nợ ai */}
       <div>
@@ -223,7 +223,7 @@ function FeedLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
       {/* Active groups strip */}
       <div>
         <SectionHeader title="Nhóm" action="Xem tất cả →" onAction={() => switchTab('groups')}/>
-        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginLeft: -4, marginRight: -4, paddingLeft: 4, paddingRight: 4 }}>
+        <HScroll gap={10} pb={4} style={{ marginLeft: -4, marginRight: -4, paddingLeft: 4, paddingRight: 4 }}>
           {groups.map(g => (
             <button key={g.id} onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })} style={{
               appearance: 'none', cursor: 'pointer', flexShrink: 0, textAlign: 'left',
@@ -237,7 +237,7 @@ function FeedLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
               </div>
             </button>
           ))}
-        </div>
+        </HScroll>
       </div>
 
       {/* Activity feed */}
@@ -359,7 +359,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
 
   // cards (default): horizontal scroll cards
   return (
-    <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginLeft: -16, marginRight: -16, padding: '4px 16px 8px' }}>
+    <HScroll gap={10} pb={8} style={{ marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16, paddingTop: 4 }}>
       {ranked.map(([id, v]) => {
         const m = M[id]; const positive = v > 0;
         return (
@@ -385,7 +385,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
           </div>
         );
       })}
-    </div>
+    </HScroll>
   );
 }
 
