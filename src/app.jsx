@@ -192,7 +192,7 @@ function App() {
       <TabBar tabs={tabs} active={activeTab} onSwitch={switchTab} onAdd={() => push('add-expense')}/>
 
       {/* Tweaks */}
-      <SpliteasyTweaks t={t} setTweak={setTweak}/>
+      <SpliteasyTweaks t={t} setTweak={setTweak} activeTab={activeTab} switchTab={switchTab}/>
     </div>
   );
 }
@@ -247,7 +247,7 @@ function TabBar({ tabs, active, onSwitch, onAdd }) {
 }
 
 // ── Tweaks panel ───────────────────────────────────────────────────────────
-function SpliteasyTweaks({ t, setTweak }) {
+function SpliteasyTweaks({ t, setTweak, activeTab, switchTab }) {
   return (
     <TweaksPanel title="Tweaks · Spliteasy">
       <TweakSection label="Giao diện"/>
@@ -285,7 +285,14 @@ function SpliteasyTweaks({ t, setTweak }) {
       />
       <TweakRadio label="Flow thêm chi" value={t.addExpenseFlow} options={['single','wizard']} onChange={(v) => setTweak('addExpenseFlow', v)}/>
       <TweakRadio label="Style Pickleball" value={t.pickleballStyle} options={['sporty','consistent']} onChange={(v) => setTweak('pickleballStyle', v)}/>
-      <TweakToggle label="Bật tab Pickleball" value={t.showPickleball} onChange={(v) => setTweak('showPickleball', v)}/>
+      <TweakToggle
+        label="Bật tab Pickleball"
+        value={t.showPickleball}
+        onChange={(v) => {
+          setTweak('showPickleball', v);
+          if (!v && activeTab === 'pickle') switchTab('home');
+        }}
+      />
     </TweaksPanel>
   );
 }
