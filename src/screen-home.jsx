@@ -5,7 +5,13 @@ function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
   const { state } = useApp();
   const { groups, members, currentUserId } = state;
   const meId = currentUserId || ME;
-  const meMember = members.find(m => m.id === meId) || M[ME];
+  const meMember = members.find(m => m.id === meId) || {
+    name: state.currentUserName || 'Bạn',
+    short: state.currentUserName || 'Bạn',
+    initials: (state.currentUserName || 'B')[0].toUpperCase(),
+    color: '#574EFA',
+    isMe: true,
+  };
 
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -421,6 +427,7 @@ function GroupCard({ g, onClick, avatarStyle }) {
 function ActivityRow({ e, divider, avatarStyle, showGroup }) {
   const { state: _s } = useApp();
   const me = _s.currentUserId || ME;
+  const M = getMemberMap(_s.members);
   const myShare = e.participants.includes(me) ? Math.round(e.amount / e.participants.length) : 0;
   const balance = e.paidBy === me ? e.amount - myShare : -myShare;
   return (
@@ -434,7 +441,10 @@ function ActivityRow({ e, divider, avatarStyle, showGroup }) {
         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
         <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {showGroup ? <>{e.groupEmoji} {e.groupName} • </> : null}
-          {M[e.paidBy].short === 'Bạn' ? 'Bạn trả' : `${M[e.paidBy].short} trả`} {fmtVND(e.amount)} • {e.date}
+          {(() => {
+            const payer = M[e.paidBy] || { short: '?' };
+            return payer.short === 'Bạn' || e.paidBy === me ? 'Bạn trả' : `${payer.short} trả`;
+          })()} {fmtVND(e.amount)} • {e.date}
         </div>
       </div>
       <div style={{ textAlign: 'right' }}>
