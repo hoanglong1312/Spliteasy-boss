@@ -51,14 +51,8 @@ function ScreenGroups({ tweaks, push }) {
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '48px 24px',
-          color: 'var(--text-3)', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', gap: 10,
-        }}>
-          <Icon name="users" size={36} color="var(--text-3)"/>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Chưa có nhóm nào</div>
-          <div style={{ fontSize: 13 }}>Bấm + để tạo nhóm mới</div>
+        <div style={{ padding: '0 16px' }}>
+          <EmptyState icon="users" title="Chưa có nhóm nào" subtitle="Bấm + để tạo nhóm mới"/>
         </div>
       ) : (
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>

@@ -309,12 +309,7 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId })
   if (tickets.length === 0) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-3)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <Icon name="ticket" size={32} color="var(--text-3)"/>
-          <div style={{ fontSize: 14, fontWeight: 600 }}>Chưa có vé lẻ nào</div>
-          <div style={{ fontSize: 12 }}>Bấm "Thêm buổi vé lẻ" để ghi lại</div>
-        </div>
+        <EmptyState icon="sparkle" title="Chưa có vé lẻ nào" subtitle={'Bấm "Thêm buổi vé lẻ" để ghi lại'}/>
         <Button variant="primary" full size="lg" icon="plus" onClick={() => push('add-external-ticket')}>Thêm buổi vé lẻ</Button>
       </div>
     );
