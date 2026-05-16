@@ -25,8 +25,17 @@ const FONTS = {
   system: { body: 'system-ui, -apple-system, "Helvetica Neue", sans-serif', display: 'system-ui, -apple-system, sans-serif' },
 };
 
-function ScreenSelectUser() {
-  const { state, dispatch } = useApp();
+function ScreenEnterName() {
+  const { dispatch } = useApp();
+  const [name, setName] = React.useState('');
+
+  function handleStart() {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const userId = 'u_' + Math.random().toString(36).slice(2, 10);
+    dispatch({ type: 'SET_CURRENT_USER', userId, userName: trimmed });
+  }
+
   return (
     <div style={{
       minHeight: '100%', display: 'flex', flexDirection: 'column',
@@ -34,32 +43,56 @@ function ScreenSelectUser() {
       padding: '40px 24px', background: 'var(--surface-2)',
     }}>
       <div style={{
-        width: 64, height: 64, borderRadius: 20, marginBottom: 20,
-        background: 'var(--brand-soft)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 72, height: 72, borderRadius: 24, marginBottom: 20,
+        background: 'var(--brand-soft)', display: 'flex',
+        alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon name="users" size={32} color="var(--brand-1)"/>
+        <Icon name="split" size={36} color="var(--brand-1)"/>
       </div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', marginBottom: 8 }}>Bạn là ai?</div>
-      <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 28, textAlign: 'center' }}>
-        Chọn tài khoản để xem số dư và lịch sử chia tiền
+      <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-1)', marginBottom: 6 }}>
+        SpliteasyBoss
       </div>
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {MEMBERS.map(m => (
-          <button key={m.id} onClick={() => dispatch({ type: 'SET_CURRENT_USER', userId: m.id })} style={{
-            appearance: 'none', cursor: 'pointer',
-            width: '100%', padding: '14px 16px',
-            background: 'var(--surface-1)', border: '1px solid var(--border-1)',
-            borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12,
-            textAlign: 'left',
-          }}>
-            <Avatar member={m} size={44} style="initials"/>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{m.name}</div>
-              {m.isMe && <div style={{ fontSize: 12, color: 'var(--brand-1)', fontWeight: 600, marginTop: 2 }}>Mặc định</div>}
-            </div>
-            <Icon name="chevron-right" size={18} color="var(--text-3)"/>
-          </button>
-        ))}
+      <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 36, textAlign: 'center' }}>
+        Chia tiền nhóm dễ dàng
+      </div>
+      <div style={{ width: '100%', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+          Tên của bạn
+        </div>
+        <input
+          type="text"
+          placeholder="VD: Nguyễn Văn A"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleStart()}
+          autoFocus
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '12px 14px', borderRadius: 12,
+            border: '1.5px solid var(--border-1)',
+            fontSize: 15, fontWeight: 500,
+            background: 'var(--surface-1)', color: 'var(--text-1)',
+            outline: 'none', fontFamily: 'var(--vb-font-body)',
+          }}
+        />
+      </div>
+      <button
+        onClick={handleStart}
+        disabled={!name.trim()}
+        style={{
+          width: '100%', height: 48, borderRadius: 14, border: 0,
+          background: name.trim() ? 'var(--brand-1)' : 'var(--border-1)',
+          color: name.trim() ? '#fff' : 'var(--text-3)',
+          fontSize: 15, fontWeight: 700,
+          cursor: name.trim() ? 'pointer' : 'default',
+          fontFamily: 'var(--vb-font-body)',
+          transition: 'background .15s',
+        }}
+      >
+        Bắt đầu →
+      </button>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 20, textAlign: 'center' }}>
+        Tài khoản đầy đủ sẽ có ở phiên bản tiếp theo
       </div>
     </div>
   );
@@ -175,7 +208,7 @@ function App() {
   if (state.currentUserId === null) {
     return (
       <div style={{ ...themeVars, fontFamily: 'var(--vb-font-body)', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface-2)', overflowY: 'auto' }}>
-        <ScreenSelectUser/>
+        <ScreenEnterName/>
       </div>
     );
   }
