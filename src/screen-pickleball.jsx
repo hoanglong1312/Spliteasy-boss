@@ -226,6 +226,8 @@ function BreakdownRow({ label, sub, value, icon, positive = false, accent }) {
 
 // ── Sessions tab — list of all sessions this month ──────────────────────────
 function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -307,6 +309,8 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
 
 // ── External tab — vé lẻ outside the club ───────────────────────────────────
 function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId }) {
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
   const tickets = [...(pickle.external || []), ...(pickle.externalTickets || [])];
   const total = tickets.reduce((a,e)=>a+e.amount, 0);
 
@@ -354,7 +358,7 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId })
                 }}><Icon name="ball" size={18} color="#A05C0C"/></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{ex.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>{ex.date}/2026 • {M[ex.paidBy].short} trả</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>{ex.date}/2026 • {(M[ex.paidBy] || { short: '?' }).short} trả</div>
                 </div>
                 <Money value={ex.amount} size={14}/>
               </div>
