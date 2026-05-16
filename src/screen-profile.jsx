@@ -3,6 +3,7 @@
 function ScreenProfile({ tweaks, push, setTweak }) {
   const { state, dispatch } = useApp();
   const meId = state.currentUserId || ME;
+  const userName = state.currentUserName || 'Bạn';
   const now = new Date();
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}`;
   const me = state.members.find(m => m.id === meId) || M[ME];
@@ -47,7 +48,7 @@ function ScreenProfile({ tweaks, push, setTweak }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Avatar member={me} size={64} style={tweaks.avatarStyle}/>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{me.name}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{userName || me.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500, marginTop: 2 }}>{me.short?.toLowerCase()}@spliteasy.vn</div>
             <div style={{ marginTop: 6 }}><Pill bg="var(--brand-soft)" color="var(--brand-1)" size="xs">Thành viên • 3 tháng</Pill></div>
           </div>
@@ -170,18 +171,39 @@ function StatCard({ icon, iconColor, iconBg, label, value }) {
 }
 
 function ScreenSettings({ pop }) {
+  const { dispatch } = useApp();
   return (
     <div style={{ paddingBottom: 32 }}>
       <NavHeader title="Cài đặt" onBack={pop}/>
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Card>
           <ListRow left={<MenuIcon name="user" bg="var(--brand-soft)" c="var(--brand-1)"/>} title="Thông tin cá nhân" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>}/>
-          <ListRow left={<MenuIcon name="card" bg="var(--vb-success-100)" c="var(--vb-success-700)"/>} title="Tiền tệ" subtitle="VND" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>}/>
-          <ListRow left={<MenuIcon name="bell" bg="#FFF7E0" c="#A05C0C"/>} title="Nhắc qua Zalo" subtitle="Đang bật" right={<Icon name="chevron-right" size={18} color="var(--text-3)"/>} divider={false}/>
+          <ListRow left={<MenuIcon name="card" bg="var(--vb-success-100)" c="var(--vb-success-700)"/>} title="Tiền tệ" subtitle="VND" right={<span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--vb-warn-100)', color: '#B45309' }}>Sắp ra mắt</span>}/>
+          <ListRow left={<MenuIcon name="bell" bg="#FFF7E0" c="#A05C0C"/>} title="Nhắc qua Zalo" subtitle="Đang bật" right={<span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--vb-warn-100)', color: '#B45309' }}>Sắp ra mắt</span>} divider={false}/>
         </Card>
         <Card>
           <ListRow left={<MenuIcon name="sparkle" bg="var(--brand-soft)" c="var(--brand-1)"/>} title="Phiên bản" subtitle="Spliteasy 1.0.0 (build 2026.05)" divider={false}/>
         </Card>
+        {/* Logout */}
+        <div style={{ padding: '8px 16px 32px' }}>
+          <button
+            onClick={() => {
+              if (window.confirm('Đăng xuất khỏi SpliteasyBoss?')) {
+                dispatch({ type: 'LOGOUT' });
+              }
+            }}
+            style={{
+              appearance: 'none', width: '100%', height: 48,
+              borderRadius: 14, border: 0, cursor: 'pointer',
+              background: 'var(--vb-danger-50)', color: 'var(--vb-danger-700)',
+              fontSize: 15, fontWeight: 700, fontFamily: 'var(--vb-font-body)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            <Icon name="log-out" size={18} color="var(--vb-danger-700)"/>
+            Đăng xuất
+          </button>
+        </div>
       </div>
     </div>
   );
