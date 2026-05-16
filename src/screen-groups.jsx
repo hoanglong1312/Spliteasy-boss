@@ -207,7 +207,8 @@ function GroupActivity({ g, push, avatarStyle }) {
 }
 
 function GroupBalance({ g, balance, avatarStyle, meId }) {
-  const { dispatch, genId } = useApp();
+  const { state, dispatch, genId } = useApp();
+  const M = getMemberMap(state.members);
   const [confirmId, setConfirmId] = useState(null);
   // simplify debts: for each non-zero balance, show pairs
   const entries = Object.entries(balance).filter(([, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
@@ -295,6 +296,8 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
 }
 
 function GroupMembers({ g, balance, avatarStyle }) {
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
   return (
     <Card>
       {g.members.map((id, i) => {
@@ -316,6 +319,7 @@ function GroupMembers({ g, balance, avatarStyle }) {
 // ── Expense Detail ──────────────────────────────────────────────────────────
 function ScreenExpenseDetail({ params, push, pop, tweaks }) {
   const { state, dispatch } = useApp();
+  const M = getMemberMap(state.members);
   const g = state.groups.find(x => x.id === params.groupId);
   if (!g) return null;
   const e = (g.expenses || []).find(x => x.id === params.expenseId);
@@ -374,6 +378,7 @@ function ScreenExpenseDetail({ params, push, pop, tweaks }) {
 // ── Add expense — 2 variants: single screen vs wizard ───────────────────────
 function ScreenAddExpense({ params, push, pop, tweaks }) {
   const { state, dispatch, genId } = useApp();
+  const M = getMemberMap(state.members);
   const existing = params?.expenseId
     ? (state.groups.find(x => x.id === params?.groupId)?.expenses || []).find(e => e.id === params.expenseId)
     : null;
@@ -780,10 +785,29 @@ function ScreenNewGroup({ params, pop }) {
   const [name, setName] = useState(existingGroup?.name || '');
   const [emoji, setEmoji] = useState(existingGroup?.emoji || '🎯');
   const [selected, setSelected] = useState(existingGroup?.members || [myId]);
+  const [newMemberName, setNewMemberName] = useState('');
   const toggle = (id) => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
 
+  function handleAddMember() {
+    const trimmed = newMemberName.trim();
+    if (!trimmed) return;
+    const newId = 'u_' + Math.random().toString(36).slice(2, 10);
+    const words = trimmed.split(' ');
+    const newMem = {
+      id: newId,
+      name: trimmed,
+      short: words[words.length - 1],
+      initials: words.map(w => w[0]).join('').slice(0, 2).toUpperCase(),
+      color: ['#574EFA','#E040FB','#F4511E','#0B8043','#039BE5'][Math.floor(Math.random()*5)],
+      isMe: false,
+    };
+    dispatch({ type: 'ADD_MEMBER', member: newMem });
+    setSelected(s => [...s, newId]);
+    setNewMemberName('');
+  }
+
   function handleCreate() {
-    if (!name.trim() || selected.length < 2) return;
+    if (!name.trim() || selected.length < 1) return;
     if (existingGroup) {
       dispatch({
         type: 'EDIT_GROUP',
@@ -814,8 +838,8 @@ function ScreenNewGroup({ params, pop }) {
     <div style={{ paddingBottom: 32 }}>
       <NavHeader title={existingGroup ? 'Sửa nhóm' : 'Tạo nhóm mới'} onBack={pop} right={<button onClick={handleCreate} style={{
         appearance: 'none', height: 32, padding: '0 12px', cursor: 'pointer',
-        background: name && selected.length > 1 ? 'var(--brand-1)' : 'var(--surface-2)',
-        color: name && selected.length > 1 ? '#fff' : 'var(--text-3)',
+        background: name && selected.length >= 1 ? 'var(--brand-1)' : 'var(--surface-2)',
+        color: name && selected.length >= 1 ? '#fff' : 'var(--text-3)',
         border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13,
       }}>{existingGroup ? 'Lưu' : 'Tạo'}</button>}/>
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -858,6 +882,36 @@ function ScreenNewGroup({ params, pop }) {
               </div>
               );
             })}
+            {/* Inline add member by name */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 16px',
+              borderTop: '1px solid var(--border-1)',
+            }}>
+              <input
+                value={newMemberName}
+                onChange={e => setNewMemberName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddMember()}
+                placeholder="Thêm thành viên bằng tên..."
+                style={{
+                  flex: 1, height: 34, padding: '0 10px',
+                  background: 'var(--surface-2)', border: '1px solid var(--border-1)',
+                  borderRadius: 8, fontFamily: 'var(--vb-font-body)', fontSize: 13,
+                  color: 'var(--text-1)', outline: 'none',
+                }}
+              />
+              <button
+                onClick={handleAddMember}
+                disabled={!newMemberName.trim()}
+                style={{
+                  appearance: 'none', height: 34, padding: '0 12px',
+                  background: newMemberName.trim() ? 'var(--brand-1)' : 'var(--surface-2)',
+                  color: newMemberName.trim() ? '#fff' : 'var(--text-3)',
+                  border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13,
+                  cursor: newMemberName.trim() ? 'pointer' : 'default',
+                }}
+              >+</button>
+            </div>
           </Card>
         </FormRow>
       </div>
@@ -866,26 +920,34 @@ function ScreenNewGroup({ params, pop }) {
 }
 
 function ScreenNotifications({ pop, tweaks }) {
-  const items = [
-    { id: 'n1', who: 'u3', text: 'đã ghi 285.000₫ trà sữa', group: 'Ăn trưa team Eng', when: '2 giờ trước', kind: 'add' },
-    { id: 'n2', who: 'u9', text: 'đã thanh toán 1.800.000₫ cho bạn', group: 'Du lịch Đà Lạt', when: '4 giờ trước', kind: 'pay' },
-    { id: 'n3', who: 'u4', text: 'đã nhắc bạn trả 360.000₫', group: 'Ăn trưa team Eng', when: 'hôm qua', kind: 'remind' },
-    { id: 'n4', who: 'u2', text: 'đã thêm bạn vào nhóm', group: 'Team building Vũng Tàu', when: '2 ngày trước', kind: 'invite' },
-  ];
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
+  const items = state.notifications || [];
   return (
     <div style={{ paddingBottom: 32 }}>
       <NavHeader title="Thông báo" onBack={pop}/>
       <div style={{ padding: 16 }}>
-        <Card>
-          {items.map((n, i) => (
-            <ListRow key={n.id}
-              left={<Avatar member={M[n.who]} size={40} style={tweaks.avatarStyle}/>}
-              title={<><b>{M[n.who].name}</b> {n.text}</>}
-              subtitle={`${n.group} • ${n.when}`}
-              divider={i < items.length - 1}
-            />
-          ))}
-        </Card>
+        {items.length === 0 ? (
+          <EmptyState
+            icon="bell"
+            title="Chưa có thông báo"
+            subtitle="Hoạt động của nhóm sẽ xuất hiện ở đây"
+          />
+        ) : (
+          <Card>
+            {items.map((n, i) => {
+              const member = M[n.who] || { name: n.who || 'Ai đó', initials: '?', color: '#999', short: '?' };
+              return (
+                <ListRow key={n.id}
+                  left={<Avatar member={member} size={40} style={tweaks.avatarStyle}/>}
+                  title={<><b>{member.name}</b> {n.text}</>}
+                  subtitle={`${n.group} • ${n.when}`}
+                  divider={i < items.length - 1}
+                />
+              );
+            })}
+          </Card>
+        )}
       </div>
     </div>
   );
