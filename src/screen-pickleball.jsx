@@ -4,7 +4,7 @@
 function ScreenPickleball({ tweaks, push }) {
   const { state, dispatch } = useApp();
   const [tab, setTab] = useState('overview'); // overview | sessions | members | external
-  const summary = useMemo(() => pickleSummary(state.pickle), [state.pickle]);
+  const summary = useMemo(() => pickleSummary(state.pickle || {}), [state.pickle]);
   const style = tweaks.pickleballStyle || 'sporty';
   const accent = style === 'sporty' ? '#7AC74F' : 'var(--brand-1)';
   const accentBg = style === 'sporty' ? 'rgba(122,199,79,0.12)' : 'var(--brand-soft)';
@@ -13,6 +13,10 @@ function ScreenPickleball({ tweaks, push }) {
     : 'linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%)';
 
   const meId = state.currentUserId || ME;
+  const pickle = state.pickle || {
+    sessions: [], upcoming: [], fixedMembers: [],
+    externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0,
+  };
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -55,7 +59,7 @@ function ScreenPickleball({ tweaks, push }) {
             <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>
               Tháng 5 / 2026
             </div>
-            <div style={{ fontSize: 12, opacity: 0.78, marginTop: 2 }}>{state.pickle.sessions.length} buổi cố định • {state.pickle.fixedMembers.length} thành viên</div>
+            <div style={{ fontSize: 12, opacity: 0.78, marginTop: 2 }}>{pickle.sessions.length} buổi cố định • {pickle.fixedMembers.length} thành viên</div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
               <PickleHeroStat label="Tiền sân/người" value={summary.courtPerMember}/>
@@ -85,10 +89,10 @@ function ScreenPickleball({ tweaks, push }) {
       </div>
 
       <div style={{ padding: 16 }}>
-        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle} dispatch={dispatch} meId={meId}/>}
-        {tab === 'sessions' && <PickleSessions push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
-        {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle} meId={meId}/>}
-        {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
+        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} dispatch={dispatch} meId={meId}/>}
+        {tab === 'sessions' && <PickleSessions push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
+        {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId}/>}
+        {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
       </div>
     </div>
   );
@@ -438,7 +442,8 @@ function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
 // ── Pickleball session detail ───────────────────────────────────────────────
 function ScreenSessionDetail({ params, pop, tweaks }) {
   const { state } = useApp();
-  const allSessions = [...(state.pickle.sessions || []), ...(state.pickle.upcoming || [])];
+  const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
+  const allSessions = [...(pickle.sessions || []), ...(pickle.upcoming || [])];
   const s = allSessions.find(x => x.id === params.sessionId);
   if (!s) return null;
   const attended = s.attendees || s.attended || s.going || [];
@@ -493,7 +498,7 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
               <ListRow key={name}
                 left={<div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--vb-warn-100)', color: '#A05C0C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{name.split(' ').map(p=>p[0]).join('').slice(-2)}</div>}
                 title={name}
-                right={<Money value={state.pickle.guestFeePerSession} size={13}/>}
+                right={<Money value={pickle.guestFeePerSession} size={13}/>}
                 divider={i < (s.guests || []).length - 1}
               />
             ))}
@@ -506,11 +511,12 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
 
 function ScreenAddSessionExpense({ params, pop, tweaks }) {
   const { state, dispatch, genId } = useApp();
+  const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
   const [kind, setKind] = useState('ball');
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [paidBy, setPaidBy] = useState(ME);
-  const [sessionId, setSessionId] = useState(() => (state.pickle.sessions[0] || {}).id || '');
+  const [sessionId, setSessionId] = useState(() => (pickle.sessions[0] || {}).id || '');
   const num = Number((amount || '0').replace(/[^0-9]/g, ''));
   return (
     <div style={{ paddingBottom: 32 }}>
@@ -580,13 +586,13 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
 
         <FormRow label="Người trả" icon="user">
           <select value={paidBy} onChange={(e)=>setPaidBy(e.target.value)} style={inputStyle()}>
-            {state.pickle.fixedMembers.map(id => <option key={id} value={id}>{M[id].name}</option>)}
+            {pickle.fixedMembers.map(id => <option key={id} value={id}>{M[id].name}</option>)}
           </select>
         </FormRow>
 
         <FormRow label="Buổi đánh" icon="calendar">
           <select value={sessionId} onChange={(e)=>setSessionId(e.target.value)} style={inputStyle()}>
-            {state.pickle.sessions.map(s => <option key={s.id} value={s.id}>{s.date} • {s.time} • {s.court}</option>)}
+            {pickle.sessions.map(s => <option key={s.id} value={s.id}>{s.date} • {s.time} • {s.court}</option>)}
           </select>
         </FormRow>
       </div>
@@ -596,6 +602,7 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
 
 function ScreenAddExternalTicket({ pop, tweaks }) {
   const { state, dispatch, genId } = useApp();
+  const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
   const meId = state.currentUserId || ME;
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
@@ -655,13 +662,13 @@ function ScreenAddExternalTicket({ pop, tweaks }) {
 
         <FormRow label="Người trả" icon="user">
           <select value={paidBy} onChange={(e)=>setPaidBy(e.target.value)} style={inputStyle()}>
-            {state.pickle.fixedMembers.map(id => <option key={id} value={id}>{M[id].name}</option>)}
+            {pickle.fixedMembers.map(id => <option key={id} value={id}>{M[id].name}</option>)}
           </select>
         </FormRow>
 
         <FormRow label="Người tham gia" icon="users">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {state.pickle.fixedMembers.map(id => (
+            {pickle.fixedMembers.map(id => (
               <button key={id} onClick={() => toggleParticipant(id)} style={{
                 appearance: 'none', cursor: 'pointer',
                 padding: '6px 12px', borderRadius: 20,
