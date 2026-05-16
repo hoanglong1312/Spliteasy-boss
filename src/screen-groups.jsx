@@ -386,7 +386,8 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
   const [paidBy, setPaidBy] = useState(existing?.paidBy || (state.currentUserId || ME));
   const [participants, setParticipants] = useState(existing?.participants || g?.members || []);
-  const [splitMode, setSplitMode] = useState(existing?.splitMode || 'equal');
+  const [splitMode, setSplitMode] = useState(existing?.splitMode === 'custom' ? 'custom' : 'equal');
+  const [customAmounts, setCustomAmounts] = useState({});
   const [cat, setCat] = useState(existing?.cat || 'food');
   const [step, setStep] = useState(0);
   const useWizard = (tweaks.addExpenseFlow || 'single') === 'wizard';
@@ -394,18 +395,43 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
   const toggleP = (id) => setParticipants(p => p.includes(id) ? p.filter(x=>x!==id) : [...p, id]);
   const num = Number((amount || '0').replace(/[^0-9]/g, ''));
   const per = participants.length > 0 ? Math.round(num / participants.length) : 0;
+  const customValid = splitMode !== 'custom' ||
+    participants.reduce((s, id) => s + (customAmounts[id] || 0), 0) === num;
+  const canSave = num > 0 && !!title.trim() && participants.length > 0 && customValid;
+
+  useEffect(() => {
+    if (splitMode === 'custom' && participants.length > 0 && num > 0) {
+      const per = Math.round(num / participants.length);
+      const init = {};
+      participants.forEach((id, i) => {
+        init[id] = customAmounts[id] !== undefined ? customAmounts[id]
+          : (i === participants.length - 1
+              ? num - per * (participants.length - 1)
+              : per);
+      });
+      setCustomAmounts(init);
+    }
+  }, [splitMode, participants.join(','), num]);
 
   function handleSave() {
     if (!title.trim() || num <= 0) return;
     if (participants.length === 0) return;
+    if (splitMode === 'custom') {
+      const total = participants.reduce((s, id) => s + (customAmounts[id] || 0), 0);
+      if (total !== num) return;
+    }
     const now = new Date();
     const date = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}`;
     let splits;
-    const per2 = Math.round(num / participants.length);
-    splits = participants.map((id, i) => ({
-      memberId: id,
-      amount: i === participants.length - 1 ? num - per2 * (participants.length - 1) : per2,
-    }));
+    if (splitMode === 'custom') {
+      splits = participants.map(id => ({ memberId: id, amount: customAmounts[id] || 0 }));
+    } else {
+      const per2 = Math.round(num / participants.length);
+      splits = participants.map((id, i) => ({
+        memberId: id,
+        amount: i === participants.length - 1 ? num - per2 * (participants.length - 1) : per2,
+      }));
+    }
     const expense = {
       id: existing?.id || genId(),
       title: title.trim(),
@@ -440,10 +466,10 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
 
   const Header = () => (
     <NavHeader title={useWizard ? `Bước ${step+1}/3` : (existing ? 'Sửa chi tiêu' : 'Thêm chi tiêu')} onBack={() => useWizard && step > 0 ? setStep(step-1) : pop()}
-      right={<button onClick={handleSave} style={{
-        appearance: 'none', height: 32, padding: '0 12px', cursor: 'pointer',
-        background: num > 0 && title ? 'var(--brand-1)' : 'var(--surface-2)',
-        color: num > 0 && title ? '#fff' : 'var(--text-3)',
+      right={<button onClick={handleSave} disabled={!canSave} style={{
+        appearance: 'none', height: 32, padding: '0 12px', cursor: canSave ? 'pointer' : 'not-allowed',
+        background: canSave ? 'var(--brand-1)' : 'var(--surface-2)',
+        color: canSave ? '#fff' : 'var(--text-3)',
         border: 0, borderRadius: 8, fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 13,
       }}>Lưu</button>}/>
   );
@@ -538,8 +564,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {[
                 { id: 'equal', label: 'Chia đều', icon: 'split' },
-                { id: 'parts', label: 'Theo phần', icon: 'fraction' },
-                { id: 'percent', label: '%', icon: 'percent' },
+                { id: 'custom', label: 'Tự chọn', icon: 'edit' },
               ].map(m => (
                 <button key={m.id} onClick={() => setSplitMode(m.id)} style={{
                   appearance: 'none', flex: 1, height: 36, cursor: 'pointer',
@@ -562,17 +587,60 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
                     <Avatar member={M[id]} size={36} style={tweaks.avatarStyle}/>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{M[id].name}</div>
-                      {on && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{fmtVNDFull(per)}</div>}
+                      {on && splitMode === 'equal' && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{fmtVNDFull(per)}</div>}
                     </div>
                     <CheckMark on={on}/>
                   </div>
                 );
               })}
             </Card>
-            <div style={{ marginTop: 10, padding: '12px 14px', background: 'var(--brand-soft)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand-1)' }}>Mỗi người trả</span>
-              <Money value={per} size={16} color="var(--brand-1)"/>
-            </div>
+            {splitMode === 'equal' && (
+              <div style={{ marginTop: 10, padding: '12px 14px', background: 'var(--brand-soft)', borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand-1)' }}>Mỗi người trả</span>
+                <Money value={per} size={16} color="var(--brand-1)"/>
+              </div>
+            )}
+            {splitMode === 'custom' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 0' }}>
+                {participants.map(id => (
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Avatar member={M[id]} size={32} style={tweaks.avatarStyle}/>
+                    <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
+                      {M[id]?.short || M[id]?.name || id}
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={customAmounts[id] !== undefined ? customAmounts[id] : ''}
+                      onChange={(e) => {
+                        const val = Number(e.target.value.replace(/[^0-9]/g, '')) || 0;
+                        setCustomAmounts(prev => ({ ...prev, [id]: val }));
+                      }}
+                      style={{
+                        width: 100, textAlign: 'right',
+                        padding: '6px 10px', borderRadius: 8,
+                        border: '1px solid var(--border-1)',
+                        fontSize: 13, fontWeight: 600,
+                        background: 'var(--surface-1)', color: 'var(--text-1)',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                ))}
+                {(() => {
+                  const total = participants.reduce((s, id) => s + (customAmounts[id] || 0), 0);
+                  const diff = num - total;
+                  return (
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, textAlign: 'right', marginTop: 4,
+                      color: diff === 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)',
+                    }}>
+                      {diff === 0 ? `✓ Đủ ${fmtVND(num)}` : diff > 0 ? `Còn thiếu ${fmtVND(diff)}` : `Vượt quá ${fmtVND(Math.abs(diff))}`}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </FormRow>
         </>}
 
@@ -580,11 +648,11 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             {step > 0 && <Button variant="secondary" full onClick={() => setStep(step-1)}>Quay lại</Button>}
             {step < 2 && <Button variant="primary" full onClick={() => setStep(step+1)} iconRight="arrow-right">Tiếp tục</Button>}
-            {step === 2 && <Button variant="primary" full onClick={handleSave} icon="check">Lưu chi tiêu</Button>}
+            {step === 2 && <Button variant="primary" full onClick={handleSave} icon="check" disabled={!canSave}>Lưu chi tiêu</Button>}
           </div>
         )}
         {!useWizard && (
-          <Button variant="primary" full size="lg" icon="check" onClick={handleSave}>Lưu chi tiêu</Button>
+          <Button variant="primary" full size="lg" icon="check" onClick={handleSave} disabled={!canSave}>Lưu chi tiêu</Button>
         )}
       </div>
     </div>
