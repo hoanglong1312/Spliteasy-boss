@@ -529,7 +529,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
           </FormRow>
 
           <FormRow label="Phân loại" icon="filter">
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }}>
+            <HScroll>
               {[
                 { id: 'food', label: 'Ăn uống' },
                 { id: 'drink', label: 'Đồ uống' },
@@ -546,7 +546,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
                   display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                 }}><CategoryIcon cat={c.id} size={20}/>{c.label}</button>
               ))}
-            </div>
+            </HScroll>
           </FormRow>
         </>}
 
