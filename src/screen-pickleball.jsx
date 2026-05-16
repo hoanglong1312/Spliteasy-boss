@@ -118,7 +118,7 @@ function PickleHeroStat({ label, value, positive = false, accent }) {
 // ── Overview tab ────────────────────────────────────────────────────────────
 function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle, dispatch, meId }) {
   const totalCourt = pickle.monthlyCourtFee;
-  const guestCount = pickle.sessions.reduce((a,s)=>a+s.guests.length,0);
+  const guestCount = pickle.sessions.reduce((a,s)=>a+(s.guests||[]).length,0);
 
   // Compute "what you contributed vs what you owe" for me
   const myCourt = summary.courtPerMember;

@@ -207,7 +207,12 @@ function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const s = JSON.parse(raw);
+    // Migrate: ensure pickle is never null (older saves had pickle: null)
+    if (s && s.pickle == null) {
+      s.pickle = buildInitialState().pickle;
+    }
+    return s;
   } catch (e) {
     console.warn('[store] Failed to load state from localStorage:', e);
     return null;
