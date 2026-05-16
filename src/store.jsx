@@ -11,7 +11,14 @@ function buildInitialState() {
     currentUserName: null,
     members: [],
     groups: [],
-    pickle: null,
+    pickle: {
+      sessions: [],
+      upcoming: [],
+      fixedMembers: [],
+      externalTickets: [],
+      monthlyCourtFee: 0,
+      guestFeePerSession: 0,
+    },
     notifications: [],
   };
 }
@@ -44,6 +51,16 @@ function appReducer(state, action) {
         currentUserId: action.userId,
         currentUserName: action.userName.trim(),
         members: alreadyExists ? state.members : [...state.members, newMember],
+      };
+    }
+
+    // ── Members ───────────────────────────────────────────────────────────────
+    case 'ADD_MEMBER': {
+      const { member } = action;
+      const alreadyExists = state.members.some(m => m.id === member.id);
+      return {
+        ...state,
+        members: alreadyExists ? state.members : [...state.members, member],
       };
     }
 
