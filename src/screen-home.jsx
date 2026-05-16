@@ -308,6 +308,8 @@ function CompactLayout({ push, pushToTab, switchTab, tweaks, activity, groups })
 
 // ── Who owes who — 3 visual variants ────────────────────────────────────────
 function WhoOwesView({ ranked, variant, avatarStyle, push }) {
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
   if (ranked.length === 0) {
     return <Card><EmptyState icon="check-circle" title="Mọi người đã thanh toán hết!" subtitle="Không có khoản nào chưa quyết toán"/></Card>;
   }
