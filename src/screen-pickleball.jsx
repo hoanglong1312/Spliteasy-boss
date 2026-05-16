@@ -87,7 +87,7 @@ function ScreenPickleball({ tweaks, push }) {
       <div style={{ padding: 16 }}>
         {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle} dispatch={dispatch} meId={meId}/>}
         {tab === 'sessions' && <PickleSessions push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
-        {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
+        {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle} meId={meId}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
       </div>
     </div>
@@ -302,7 +302,7 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
 }
 
 // ── External tab — vé lẻ outside the club ───────────────────────────────────
-function PickleExternal({ push, tweaks, accent, accentBg, style, pickle }) {
+function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId }) {
   const tickets = pickle.externalTickets || pickle.external || [];
   const total = tickets.reduce((a,e)=>a+e.amount, 0);
   return (
@@ -327,8 +327,8 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle }) {
         </div>
         {tickets.map((ex, i) => {
           const per = Math.round(ex.amount / ex.participants.length);
-          const inIt = ex.participants.includes(ME);
-          const myDelta = ex.paidBy === ME ? ex.amount - per : (inIt ? -per : 0);
+          const inIt = ex.participants.includes(meId);
+          const myDelta = ex.paidBy === meId ? ex.amount - per : (inIt ? -per : 0);
           return (
             <div key={ex.id} style={{
               padding: 14, borderBottom: i < tickets.length - 1 ? '1px solid var(--border-1)' : 'none',

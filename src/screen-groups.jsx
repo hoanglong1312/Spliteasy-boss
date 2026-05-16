@@ -4,13 +4,14 @@
 // ── Groups list ─────────────────────────────────────────────────────────────
 function ScreenGroups({ tweaks, push }) {
   const { state } = useApp();
+  const meId = state.currentUserId || ME;
   const [filter, setFilter] = useState('all');
   const filtered = useMemo(() => {
-    if (filter === 'owe') return state.groups.filter(g => groupNet(g) < 0);
-    if (filter === 'owed') return state.groups.filter(g => groupNet(g) > 0);
-    if (filter === 'settled') return state.groups.filter(g => groupNet(g) === 0);
+    if (filter === 'owe') return state.groups.filter(g => groupNet(g, meId) < 0);
+    if (filter === 'owed') return state.groups.filter(g => groupNet(g, meId) > 0);
+    if (filter === 'settled') return state.groups.filter(g => groupNet(g, meId) === 0);
     return state.groups;
-  }, [filter, state.groups]);
+  }, [filter, state.groups, meId]);
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -59,11 +60,12 @@ function ScreenGroups({ tweaks, push }) {
 // ── Group detail — tabs: Hoạt động / Số dư / Thành viên ────────────────────
 function ScreenGroupDetail({ params, tweaks, push, pop }) {
   const { state, dispatch } = useApp();
+  const meId = state.currentUserId || ME;
   const g = state.groups.find(x => x.id === params.groupId);
   const [tab, setTab] = useState('activity');
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const balance = useMemo(() => g ? groupBalance(g) : {}, [g]);
-  const net = useMemo(() => g ? groupNet(g) : 0, [g]);
+  const balance = useMemo(() => g ? groupBalance(g, meId) : {}, [g, meId]);
+  const net = useMemo(() => g ? groupNet(g, meId) : 0, [g, meId]);
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -163,7 +165,7 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
 
       <div style={{ padding: 16 }}>
         {tab === 'activity' && <GroupActivity g={g} push={push} avatarStyle={tweaks.avatarStyle}/>}
-        {tab === 'balance' && <GroupBalance g={g} balance={balance} avatarStyle={tweaks.avatarStyle}/>}
+        {tab === 'balance' && <GroupBalance g={g} balance={balance} avatarStyle={tweaks.avatarStyle} meId={meId}/>}
         {tab === 'members' && <GroupMembers g={g} balance={balance} avatarStyle={tweaks.avatarStyle}/>}
       </div>
     </div>
@@ -197,7 +199,7 @@ function GroupActivity({ g, push, avatarStyle }) {
   );
 }
 
-function GroupBalance({ g, balance, avatarStyle }) {
+function GroupBalance({ g, balance, avatarStyle, meId }) {
   const { dispatch, genId } = useApp();
   // simplify debts: for each non-zero balance, show pairs
   const entries = Object.entries(balance).filter(([, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
@@ -221,9 +223,9 @@ function GroupBalance({ g, balance, avatarStyle }) {
               {positive ? <>
                 <Avatar member={M[id]} size={32} style={avatarStyle}/>
                 <Icon name="arrow-right" size={16} color="var(--text-2)"/>
-                <Avatar member={M[ME]} size={32} style={avatarStyle}/>
+                <Avatar member={M[meId]} size={32} style={avatarStyle}/>
               </> : <>
-                <Avatar member={M[ME]} size={32} style={avatarStyle}/>
+                <Avatar member={M[meId]} size={32} style={avatarStyle}/>
                 <Icon name="arrow-right" size={16} color="var(--text-2)"/>
                 <Avatar member={M[id]} size={32} style={avatarStyle}/>
               </>}
@@ -238,7 +240,7 @@ function GroupBalance({ g, balance, avatarStyle }) {
                 groupId: g.id,
                 settlement: {
                   id: genId(),
-                  fromId: ME,
+                  fromId: meId,
                   toId: id,
                   amount: Math.abs(v),
                   date: `${String(new Date().getDate()).padStart(2,'0')}/${String(new Date().getMonth()+1).padStart(2,'0')}`,
@@ -349,7 +351,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
   );
   const [title, setTitle] = useState(existing?.title || '');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
-  const [paidBy, setPaidBy] = useState(existing?.paidBy || ME);
+  const [paidBy, setPaidBy] = useState(existing?.paidBy || (state.currentUserId || ME));
   const [participants, setParticipants] = useState(existing?.participants || g?.members || []);
   const [splitMode, setSplitMode] = useState(existing?.splitMode || 'equal');
   const [cat, setCat] = useState(existing?.cat || 'food');
@@ -666,7 +668,7 @@ function ScreenNewGroup({ params, pop }) {
   const { state, dispatch, genId } = useApp();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('🎯');
-  const [selected, setSelected] = useState([ME]);
+  const [selected, setSelected] = useState([state.currentUserId || ME]);
   const toggle = (id) => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
 
   function handleCreate() {

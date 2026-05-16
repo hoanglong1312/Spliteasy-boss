@@ -5,6 +5,7 @@ function ScreenHome({ tweaks, push, switchTab }) {
   const { state } = useApp();
   const { groups, members, currentUserId } = state;
   const meId = currentUserId || ME;
+  const meMember = members.find(m => m.id === meId) || M[ME];
 
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -30,7 +31,7 @@ function ScreenHome({ tweaks, push, switchTab }) {
       <div style={{ padding: '8px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontFamily: 'var(--vb-font-meta)', fontWeight: 500, fontSize: 13, color: 'var(--text-2)' }}>Xin chào,</div>
-          <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>Nam Anh 👋</div>
+          <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>{meMember.name} 👋</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {searchOpen ? (
@@ -216,6 +217,8 @@ function OverviewLayout({ push, switchTab, tweaks, activity, groups }) {
 
 // ── FEED layout — emphasize activity ──────────────────────────────────────
 function FeedLayout({ push, switchTab, tweaks, activity, groups }) {
+  const { state: _s } = useApp();
+  const meId = _s.currentUserId || ME;
   return (
     <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Active groups strip */}
@@ -231,7 +234,7 @@ function FeedLayout({ push, switchTab, tweaks, activity, groups }) {
               <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 14, color: 'var(--text-1)', marginTop: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 600 }}>{g.members.length} thành viên</div>
               <div style={{ marginTop: 8 }}>
-                <Money value={groupNet(g)} size={14} color={groupNet(g) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
+                <Money value={groupNet(g, meId)} size={14} color={groupNet(g, meId) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
               </div>
             </button>
           ))}
@@ -287,7 +290,7 @@ function CompactLayout({ push, switchTab, tweaks, activity, groups }) {
               left={<div style={{ width: 36, height: 36, borderRadius: 10, background: hexA(g.color, 0.12), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{g.emoji}</div>}
               title={g.name}
               subtitle={`${g.members.length} thành viên • ${g.expenses.length} giao dịch`}
-              right={<Money value={groupNet(g)} size={14} color={groupNet(g) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>}
+              right={<Money value={groupNet(g, meId)} size={14} color={groupNet(g, meId) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>}
               onClick={() => { switchTab('groups'); setTimeout(() => push('group-detail', { groupId: g.id }), 50); }}
               divider={i < groups.length - 1}
             />
@@ -389,7 +392,9 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
 
 // ── Group Card ──────────────────────────────────────────────────────────────
 function GroupCard({ g, onClick, avatarStyle }) {
-  const net = groupNet(g);
+  const { state: _s } = useApp();
+  const meId = _s.currentUserId || ME;
+  const net = groupNet(g, meId);
   return (
     <Card interactive onClick={onClick}>
       <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -415,7 +420,8 @@ function GroupCard({ g, onClick, avatarStyle }) {
 
 // ── Activity row ────────────────────────────────────────────────────────────
 function ActivityRow({ e, divider, avatarStyle, showGroup }) {
-  const me = ME;
+  const { state: _s } = useApp();
+  const me = _s.currentUserId || ME;
   const myShare = e.participants.includes(me) ? Math.round(e.amount / e.participants.length) : 0;
   const balance = e.paidBy === me ? e.amount - myShare : -myShare;
   return (
