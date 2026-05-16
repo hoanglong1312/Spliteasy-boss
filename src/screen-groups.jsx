@@ -7,10 +7,11 @@ function ScreenGroups({ tweaks, push }) {
   const meId = state.currentUserId || ME;
   const [filter, setFilter] = useState('all');
   const filtered = useMemo(() => {
-    if (filter === 'owe') return state.groups.filter(g => groupNet(g, meId) < 0);
-    if (filter === 'owed') return state.groups.filter(g => groupNet(g, meId) > 0);
-    if (filter === 'settled') return state.groups.filter(g => groupNet(g, meId) === 0);
-    return state.groups;
+    const myGroups = state.groups.filter(g => Array.isArray(g.members) && g.members.includes(meId));
+    if (filter === 'owe') return myGroups.filter(g => groupNet(g, meId) < 0);
+    if (filter === 'owed') return myGroups.filter(g => groupNet(g, meId) > 0);
+    if (filter === 'settled') return myGroups.filter(g => groupNet(g, meId) === 0);
+    return myGroups;
   }, [filter, state.groups, meId]);
 
   return (
