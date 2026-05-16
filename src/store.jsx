@@ -1,16 +1,18 @@
 // store.jsx — "Kho trạng thái trung tâm" của toàn bộ app
 const { createContext, useContext, useReducer, useEffect } = React;
 
-const STORAGE_KEY = 'spliteasy_v2_state';
+const STORAGE_KEY = 'spliteasy_v3_state';
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 // Dùng mock data từ data.jsx làm dữ liệu mẫu ban đầu
 function buildInitialState() {
   return {
-    currentUserId: null,   // null = chưa chọn "tôi là ai"
-    members: MEMBERS,      // từ data.jsx
-    groups: GROUPS,        // từ data.jsx
-    pickle: PICKLE,        // từ data.jsx
+    currentUserId: null,
+    currentUserName: null,
+    members: [],
+    groups: [],
+    pickle: null,
+    notifications: [],
   };
 }
 
@@ -24,8 +26,26 @@ function appReducer(state, action) {
   switch (action.type) {
 
     // ── User ──────────────────────────────────────────────────────────────────
-    case 'SET_CURRENT_USER':
-      return { ...state, currentUserId: action.userId };
+    case 'SET_CURRENT_USER': {
+      const shortName = action.userName.trim().split(' ').pop();
+      const initials = action.userName.trim().split(' ')
+        .map(w => w[0]).join('').slice(0, 2).toUpperCase();
+      const newMember = {
+        id: action.userId,
+        name: action.userName.trim(),
+        short: shortName,
+        initials,
+        color: '#574EFA',
+        isMe: true,
+      };
+      const alreadyExists = state.members.some(m => m.id === action.userId);
+      return {
+        ...state,
+        currentUserId: action.userId,
+        currentUserName: action.userName.trim(),
+        members: alreadyExists ? state.members : [...state.members, newMember],
+      };
+    }
 
     // ── Groups ────────────────────────────────────────────────────────────────
     case 'ADD_GROUP':
@@ -156,6 +176,9 @@ function appReducer(state, action) {
         pickle: { ...state.pickle, fixedMembers: [...fixedMembers, action.memberId] }
       };
     }
+
+    case 'LOGOUT':
+      return buildInitialState();
 
     default:
       return state;
