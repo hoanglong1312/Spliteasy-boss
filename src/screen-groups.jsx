@@ -50,9 +50,21 @@ function ScreenGroups({ tweaks, push }) {
         ))}
       </div>
 
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {filtered.map(g => <GroupCard key={g.id} g={g} avatarStyle={tweaks.avatarStyle} onClick={() => push('group-detail', { groupId: g.id })}/>)}
-      </div>
+      {filtered.length === 0 ? (
+        <div style={{
+          textAlign: 'center', padding: '48px 24px',
+          color: 'var(--text-3)', display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 10,
+        }}>
+          <Icon name="users" size={36} color="var(--text-3)"/>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Chưa có nhóm nào</div>
+          <div style={{ fontSize: 13 }}>Bấm + để tạo nhóm mới</div>
+        </div>
+      ) : (
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {filtered.map(g => <GroupCard key={g.id} g={g} avatarStyle={tweaks.avatarStyle} onClick={() => push('group-detail', { groupId: g.id })}/>)}
+        </div>
+      )}
     </div>
   );
 }
