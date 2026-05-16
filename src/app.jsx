@@ -86,6 +86,12 @@ function App() {
     setAnimKey(k => k + 1);
     setStacks(s => ({ ...s, [activeTab]: [...s[activeTab], { name, params }] }));
   };
+  const pushToTab = (tab, name, params) => {
+    setNavDir('forward');
+    setAnimKey(k => k + 1);
+    setActiveTab(tab);
+    setStacks(s => ({ ...s, [tab]: [...s[tab], { name, params }] }));
+  };
   const pop = () => {
     setNavDir('backward');
     setAnimKey(k => k + 1);
@@ -140,7 +146,7 @@ function App() {
   const renderScreen = () => {
     const p = current.params || {};
     switch (current.name) {
-      case 'home':     return <ScreenHome tweaks={t} push={push} switchTab={switchTab}/>;
+      case 'home':     return <ScreenHome tweaks={t} push={push} pushToTab={pushToTab} switchTab={switchTab}/>;
       case 'groups':   return <ScreenGroups tweaks={t} push={push}/>;
       case 'pickle':   return <ScreenPickleball tweaks={t} push={push}/>;
       case 'me':       return <ScreenProfile tweaks={t} push={push} setTweak={setTweak}/>;
@@ -148,8 +154,8 @@ function App() {
       case 'expense-detail':  return <ScreenExpenseDetail params={p} tweaks={t} push={push} pop={pop}/>;
       case 'add-expense':     return <ScreenAddExpense params={p} tweaks={t} push={push} pop={pop}/>;
       case 'settle-all':      return <ScreenSettleAll tweaks={t} pop={pop}/>;
-      case 'settle-group':    return <ScreenSettleAll tweaks={t} pop={pop}/>;
-      case 'new-group':       return <ScreenNewGroup pop={pop}/>;
+      case 'settle-group':    return <ScreenSettleAll params={p} tweaks={t} pop={pop}/>;
+      case 'new-group':       return <ScreenNewGroup params={p} pop={pop}/>;
       case 'notifications':   return <ScreenNotifications pop={pop} tweaks={t}/>;
       case 'session-detail':  return <ScreenSessionDetail params={p} pop={pop} tweaks={t}/>;
       case 'add-session-expense': return <ScreenAddSessionExpense params={p} pop={pop} tweaks={t}/>;

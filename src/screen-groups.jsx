@@ -457,7 +457,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
           </FormRow>
 
           <FormRow label="Nhóm" icon="users">
-            <select value={g.id} onChange={(e) => { const ng = state.groups.find(x=>x.id===e.target.value); setG(ng); setParticipants(ng.members); setPaidBy(ME); }} style={inputStyle()}>
+            <select value={g.id} onChange={(e) => { const ng = state.groups.find(x=>x.id===e.target.value); setG(ng); setParticipants(ng.members); setPaidBy(state.currentUserId || ME); }} style={inputStyle()}>
               {state.groups.map(gr => <option key={gr.id} value={gr.id}>{gr.emoji} {gr.name}</option>)}
             </select>
           </FormRow>
@@ -666,35 +666,50 @@ function ScreenSettleAll({ pop, tweaks }) {
 
 function ScreenNewGroup({ params, pop }) {
   const { state, dispatch, genId } = useApp();
-  const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('🎯');
-  const [selected, setSelected] = useState([state.currentUserId || ME]);
+  const myId = state.currentUserId || ME;
+  const editGroupId = params?.editGroupId;
+  const existingGroup = editGroupId ? state.groups.find(g => g.id === editGroupId) : null;
+  const [name, setName] = useState(existingGroup?.name || '');
+  const [emoji, setEmoji] = useState(existingGroup?.emoji || '🎯');
+  const [selected, setSelected] = useState(existingGroup?.members || [myId]);
   const toggle = (id) => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
 
   function handleCreate() {
     if (!name.trim() || selected.length < 2) return;
-    const group = {
-      id: genId(),
-      name: name.trim(),
-      emoji: emoji,
-      color: '#574EFA',
-      members: selected,
-      expenses: [],
-      settlements: [],
-      createdAt: new Date().toISOString(),
-    };
-    dispatch({ type: 'ADD_GROUP', group });
+    if (existingGroup) {
+      dispatch({
+        type: 'EDIT_GROUP',
+        group: {
+          ...existingGroup,
+          name: name.trim(),
+          emoji: emoji,
+          members: selected,
+        },
+      });
+    } else {
+      const group = {
+        id: genId(),
+        name: name.trim(),
+        emoji: emoji,
+        color: '#574EFA',
+        members: selected,
+        expenses: [],
+        settlements: [],
+        createdAt: new Date().toISOString(),
+      };
+      dispatch({ type: 'ADD_GROUP', group });
+    }
     pop();
   }
 
   return (
     <div style={{ paddingBottom: 32 }}>
-      <NavHeader title="Tạo nhóm mới" onBack={pop} right={<button onClick={handleCreate} style={{
+      <NavHeader title={existingGroup ? 'Sửa nhóm' : 'Tạo nhóm mới'} onBack={pop} right={<button onClick={handleCreate} style={{
         appearance: 'none', height: 32, padding: '0 12px', cursor: 'pointer',
         background: name && selected.length > 1 ? 'var(--brand-1)' : 'var(--surface-2)',
         color: name && selected.length > 1 ? '#fff' : 'var(--text-3)',
         border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13,
-      }}>Tạo</button>}/>
+      }}>{existingGroup ? 'Lưu' : 'Tạo'}</button>}/>
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center', padding: 8 }}>
           <div style={{
@@ -719,19 +734,22 @@ function ScreenNewGroup({ params, pop }) {
         </FormRow>
         <FormRow label={`Thành viên (${selected.length})`} icon="users">
           <Card>
-            {state.members.map((m, i) => (
-              <div key={m.id} onClick={() => !m.isMe && toggle(m.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 12, cursor: m.isMe ? 'default' : 'pointer',
+            {state.members.map((m, i) => {
+              const isMe = m.id === myId;
+              return (
+              <div key={m.id} onClick={() => !isMe && toggle(m.id)} style={{
+                display: 'flex', alignItems: 'center', gap: 12, cursor: isMe ? 'default' : 'pointer',
                 padding: '12px 16px', borderBottom: i < state.members.length - 1 ? '1px solid var(--border-1)' : 'none',
-                opacity: m.isMe ? 0.7 : 1,
+                opacity: isMe ? 0.7 : 1,
               }}>
                 <Avatar member={m} size={36}/>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{m.name}</div>
                 </div>
-                {m.isMe ? <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>Bạn</span> : <CheckMark on={selected.includes(m.id)}/>}
+                {isMe ? <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>Bạn</span> : <CheckMark on={selected.includes(m.id)}/>}
               </div>
-            ))}
+              );
+            })}
           </Card>
         </FormRow>
       </div>

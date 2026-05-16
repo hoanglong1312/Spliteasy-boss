@@ -51,15 +51,31 @@ function appReducer(state, action) {
         ),
       };
 
-    case 'EDIT_EXPENSE':
+    case 'EDIT_EXPENSE': {
+      const { groupId, expense } = action;
+      // Find the group that currently contains this expense so moving groups
+      // removes the stale copy from the source group.
+      const sourceGroup = state.groups.find(g => g.expenses.some(e => e.id === expense.id));
+      const sourceGroupId = sourceGroup?.id;
+      if (sourceGroupId && sourceGroupId !== groupId) {
+        return {
+          ...state,
+          groups: state.groups.map(g => {
+            if (g.id === sourceGroupId) return { ...g, expenses: g.expenses.filter(e => e.id !== expense.id) };
+            if (g.id === groupId) return { ...g, expenses: [...g.expenses, expense] };
+            return g;
+          }),
+        };
+      }
       return {
         ...state,
         groups: state.groups.map(g =>
-          g.id === action.groupId
-            ? { ...g, expenses: g.expenses.map(e => e.id === action.expense.id ? action.expense : e) }
+          g.id === groupId
+            ? { ...g, expenses: g.expenses.map(e => e.id === expense.id ? expense : e) }
             : g
         ),
       };
+    }
 
     case 'DELETE_EXPENSE':
       return {

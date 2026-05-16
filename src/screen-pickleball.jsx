@@ -303,7 +303,7 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
 
 // ── External tab — vé lẻ outside the club ───────────────────────────────────
 function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId }) {
-  const tickets = pickle.externalTickets || pickle.external || [];
+  const tickets = [...(pickle.external || []), ...(pickle.externalTickets || [])];
   const total = tickets.reduce((a,e)=>a+e.amount, 0);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -586,10 +586,11 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
 
 function ScreenAddExternalTicket({ pop, tweaks }) {
   const { state, dispatch, genId } = useApp();
+  const meId = state.currentUserId || ME;
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
-  const [paidBy, setPaidBy] = useState(ME);
-  const [participants, setParticipants] = useState([ME]);
+  const [paidBy, setPaidBy] = useState(meId);
+  const [participants, setParticipants] = useState([meId]);
   const num = Number((amount || '0').replace(/[^0-9]/g, ''));
 
   const toggleParticipant = (id) => {

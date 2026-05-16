@@ -1,7 +1,7 @@
 // Home tab — dashboard with balance summary, recent activity, group cards
 // Has 3 layout variations exposed via Tweaks: 'overview' | 'feed' | 'compact'
 
-function ScreenHome({ tweaks, push, switchTab }) {
+function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
   const { state } = useApp();
   const { groups, members, currentUserId } = state;
   const meId = currentUserId || ME;
@@ -69,9 +69,9 @@ function ScreenHome({ tweaks, push, switchTab }) {
         <BalanceHero net={net} youAreOwed={youAreOwed} youOwe={youOwe} push={push}/>
       </div>
 
-      {layout === 'overview' && <OverviewLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
-      {layout === 'feed' && <FeedLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
-      {layout === 'compact' && <CompactLayout push={push} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
+      {layout === 'overview' && <OverviewLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
+      {layout === 'feed' && <FeedLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
+      {layout === 'compact' && <CompactLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
     </div>
   );
 }
@@ -157,7 +157,7 @@ function SubBalance({ label, amount, positive = false }) {
 }
 
 // ── OVERVIEW layout (default) — groups + ai nợ ai + recent ──────────────────
-function OverviewLayout({ push, switchTab, tweaks, activity, groups }) {
+function OverviewLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
   const { state: _s } = useApp();
   const meId = (_s.currentUserId || ME);
   const balances = useMemo(() => totalBalances(groups, meId), [groups, meId]);
@@ -198,7 +198,7 @@ function OverviewLayout({ push, switchTab, tweaks, activity, groups }) {
       <div>
         <SectionHeader title="Nhóm của bạn" action="Xem tất cả →" onAction={() => switchTab('groups')}/>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {groups.slice(0, 3).map(g => <GroupCard key={g.id} g={g} onClick={() => { switchTab('groups'); setTimeout(() => push('group-detail', { groupId: g.id }), 50); }} avatarStyle={tweaks.avatarStyle}/>)}
+          {groups.slice(0, 3).map(g => <GroupCard key={g.id} g={g} onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })} avatarStyle={tweaks.avatarStyle}/>)}
         </div>
       </div>
 
@@ -216,7 +216,7 @@ function OverviewLayout({ push, switchTab, tweaks, activity, groups }) {
 }
 
 // ── FEED layout — emphasize activity ──────────────────────────────────────
-function FeedLayout({ push, switchTab, tweaks, activity, groups }) {
+function FeedLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
   const { state: _s } = useApp();
   const meId = _s.currentUserId || ME;
   return (
@@ -226,7 +226,7 @@ function FeedLayout({ push, switchTab, tweaks, activity, groups }) {
         <SectionHeader title="Nhóm" action="Xem tất cả →" onAction={() => switchTab('groups')}/>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, marginLeft: -4, marginRight: -4, paddingLeft: 4, paddingRight: 4 }}>
           {groups.map(g => (
-            <button key={g.id} onClick={() => { switchTab('groups'); setTimeout(() => push('group-detail', { groupId: g.id }), 50); }} style={{
+            <button key={g.id} onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })} style={{
               appearance: 'none', cursor: 'pointer', flexShrink: 0, textAlign: 'left',
               width: 152, padding: 12, background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 14,
             }}>
@@ -255,7 +255,7 @@ function FeedLayout({ push, switchTab, tweaks, activity, groups }) {
 }
 
 // ── COMPACT layout — minimal, list-driven ──────────────────────────────────
-function CompactLayout({ push, switchTab, tweaks, activity, groups }) {
+function CompactLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
   const { state: _s } = useApp();
   const meId = (_s.currentUserId || ME);
   const balances = useMemo(() => totalBalances(groups, meId), [groups, meId]);
@@ -291,7 +291,7 @@ function CompactLayout({ push, switchTab, tweaks, activity, groups }) {
               title={g.name}
               subtitle={`${g.members.length} thành viên • ${g.expenses.length} giao dịch`}
               right={<Money value={groupNet(g, meId)} size={14} color={groupNet(g, meId) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>}
-              onClick={() => { switchTab('groups'); setTimeout(() => push('group-detail', { groupId: g.id }), 50); }}
+              onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })}
               divider={i < groups.length - 1}
             />
           ))}
