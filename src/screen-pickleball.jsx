@@ -12,6 +12,8 @@ function ScreenPickleball({ tweaks, push }) {
     ? 'linear-gradient(135deg, #0E1726 0%, #1F3A47 60%, #2F5347 100%)'
     : 'linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%)';
 
+  const meId = state.currentUserId || ME;
+
   return (
     <div style={{ paddingBottom: 96 }}>
       {/* Hero — different shape for sporty vs consistent */}
@@ -83,7 +85,7 @@ function ScreenPickleball({ tweaks, push }) {
       </div>
 
       <div style={{ padding: 16 }}>
-        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle} dispatch={dispatch}/>}
+        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle} dispatch={dispatch} meId={meId}/>}
         {tab === 'sessions' && <PickleSessions push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
         {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={state.pickle}/>}
@@ -110,18 +112,17 @@ function PickleHeroStat({ label, value, positive = false, accent }) {
 }
 
 // ── Overview tab ────────────────────────────────────────────────────────────
-function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle, dispatch }) {
+function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle, dispatch, meId }) {
   const totalCourt = pickle.monthlyCourtFee;
   const guestCount = pickle.sessions.reduce((a,s)=>a+s.guests.length,0);
 
   // Compute "what you contributed vs what you owe" for me
   const myCourt = summary.courtPerMember;
   const myCredit = summary.guestCreditPer;
-  const myExpenses = summary.memberOwes[ME] || 0;
+  const myExpenses = summary.memberOwes[meId] || 0;
   const myNet = -myCourt + myCredit + myExpenses;
 
   const next = pickle.upcoming[0];
-  const meId = ME;
   const isGoing = next && (next.going || []).includes(meId);
 
   return (
@@ -427,10 +428,12 @@ function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
 // ── Pickleball session detail ───────────────────────────────────────────────
 function ScreenSessionDetail({ params, pop, tweaks }) {
   const { state } = useApp();
-  const s = (state.pickle.sessions || []).find(x => x.id === params.sessionId);
+  const allSessions = [...(state.pickle.sessions || []), ...(state.pickle.upcoming || [])];
+  const s = allSessions.find(x => x.id === params.sessionId);
   if (!s) return null;
-  const attended = s.attendees || s.attended || [];
-  const total = s.expenses.reduce((a,e)=>a+e.amount, 0);
+  const attended = s.attendees || s.attended || s.going || [];
+  const expenses = s.expenses || [];
+  const total = expenses.reduce((a,e)=>a+e.amount, 0);
   const per = attended.length > 0 ? Math.round(total / attended.length) : 0;
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -441,7 +444,7 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Tổng chi</span>
             <Money value={total} size={18}/>
           </div>
-          {s.expenses.map((ex, i) => {
+          {expenses.map((ex, i) => {
             const cat = ex.category || ex.kind;
             const lbl = ex.title || ex.label;
             const payer = M[ex.payerId || ex.paidBy];
@@ -451,7 +454,7 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
                 title={lbl}
                 subtitle={`${payer ? payer.name : ''} đã trả`}
                 right={<Money value={ex.amount} size={14}/>}
-                divider={i < s.expenses.length - 1}
+                divider={i < expenses.length - 1}
               />
             );
           })}
