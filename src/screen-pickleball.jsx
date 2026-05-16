@@ -378,6 +378,8 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId })
 
 // ── Members tab ────────────────────────────────────────────────────────────
 function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
@@ -442,6 +444,7 @@ function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
 // ── Pickleball session detail ───────────────────────────────────────────────
 function ScreenSessionDetail({ params, pop, tweaks }) {
   const { state } = useApp();
+  const M = getMemberMap(state.members);
   const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
   const allSessions = [...(pickle.sessions || []), ...(pickle.upcoming || [])];
   const s = allSessions.find(x => x.id === params.sessionId);
@@ -511,6 +514,7 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
 
 function ScreenAddSessionExpense({ params, pop, tweaks }) {
   const { state, dispatch, genId } = useApp();
+  const M = getMemberMap(state.members);
   const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
   const [kind, setKind] = useState('ball');
   const [label, setLabel] = useState('');
@@ -602,6 +606,7 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
 
 function ScreenAddExternalTicket({ pop, tweaks }) {
   const { state, dispatch, genId } = useApp();
+  const M = getMemberMap(state.members);
   const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
   const meId = state.currentUserId || ME;
   const [label, setLabel] = useState('');
