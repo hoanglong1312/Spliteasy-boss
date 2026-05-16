@@ -1,5 +1,25 @@
 # SpliteasyBoss App Ver2.0 — Orchestration Guide
 
+## Quy tắc review code (Code Review Rules)
+
+- **Bắt buộc review chéo trước khi báo cáo kết quả** — bất kỳ việc gì liên quan đến code, database schema, kiến trúc (architecture):
+  1. Codex làm/viết trước
+  2. Claude review lại output của Codex (hoặc ngược lại)
+  3. Nếu có vấn đề → sửa → review lại
+  4. Chỉ khi cả hai đồng thuận mới tổng hợp gửi cho người dùng
+- **Người dùng chỉ nhận bản tóm tắt cuối** — không cần đọc toàn bộ output thô của từng agent
+- **Phân công mặc định:**
+  - Codex: đọc file, viết code, tạo migration, implement tính năng
+  - Claude: phân tích, review, tổng hợp, commit
+
+## Quy tắc giao tiếp (Communication Rules)
+
+- **Luôn dùng tiếng Việt** khi giải thích với người dùng
+- **Từ chuyên ngành kỹ thuật**: phải viết tiếng Việt trước, kèm tiếng Anh trong ngoặc
+  - Ví dụ: "Kho lưu trữ trạng thái (state store)", "Thành phần giao diện (component)", "Hàm xử lý sự kiện (event handler)"
+- **Tên file, tên hàm, tên biến**: giữ nguyên tiếng Anh (vì đó là tên trong code)
+- **Mục tiêu**: người dùng mới tiếp quản dự án, cần hiểu cả nghĩa lẫn thuật ngữ kỹ thuật
+
 ## Kiến trúc Multi-Agent
 
 ```
