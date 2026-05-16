@@ -4,7 +4,7 @@ const { createContext, useContext, useReducer, useEffect } = React;
 const STORAGE_KEY = 'spliteasy_v3_state';
 
 // ─── Initial State ────────────────────────────────────────────────────────────
-// Dùng mock data từ data.jsx làm dữ liệu mẫu ban đầu
+// Trạng thái ban đầu — rỗng, user phải đăng nhập để tạo dữ liệu
 function buildInitialState() {
   return {
     currentUserId: null,

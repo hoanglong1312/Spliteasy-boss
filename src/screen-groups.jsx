@@ -31,7 +31,7 @@ function ScreenGroups({ tweaks, push }) {
       </div>
 
       {/* Filter pills */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 16px 16px', overflowX: 'auto' }}>
+      <HScroll style={{ padding: '0 16px 16px' }}>
         {[
           { id: 'all', label: 'Tất cả' },
           { id: 'owed', label: 'Được nhận' },
@@ -49,7 +49,7 @@ function ScreenGroups({ tweaks, push }) {
             cursor: 'pointer',
           }}>{f.label}</button>
         ))}
-      </div>
+      </HScroll>
 
       {filtered.length === 0 ? (
         <div style={{ padding: '0 16px' }}>
