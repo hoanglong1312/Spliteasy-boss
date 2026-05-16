@@ -59,7 +59,6 @@ function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
           )}
           <button style={iconBtnStyle()} onClick={() => push('notifications')}>
             <Icon name="bell" size={20} color="var(--text-1)"/>
-            <span style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: '50%', background: 'var(--vb-danger-600)', boxShadow: '0 0 0 2px var(--surface-1)' }}></span>
           </button>
         </div>
       </div>

@@ -3,6 +3,8 @@
 function ScreenProfile({ tweaks, push, setTweak }) {
   const { state, dispatch } = useApp();
   const meId = state.currentUserId || ME;
+  const now = new Date();
+  const currentMonthLabel = `Tháng ${now.getMonth() + 1}`;
   const me = state.members.find(m => m.id === meId) || M[ME];
   const totals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId]);
   const owed = Object.values(totals).filter(v => v > 0).reduce((a,b)=>a+b, 0);
@@ -80,7 +82,7 @@ function ScreenProfile({ tweaks, push, setTweak }) {
 
         {/* Category breakdown */}
         <div>
-          <SectionHeader title="Chi tiêu theo loại" action="Tháng 5" onAction={() => {}}/>
+          <SectionHeader title="Chi tiêu theo loại" action={currentMonthLabel} onAction={() => {}}/>
           <Card>
             <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
               {categorySpend.map(([cat, v]) => (
