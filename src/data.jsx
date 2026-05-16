@@ -32,14 +32,23 @@ const splitEqual = (amount, ids) => {
   return ids.map((id, i) => ({ memberId: id, amount: i === ids.length - 1 ? amount - per * (ids.length - 1) : per }));
 };
 
+// Returns { memberId: amount } for one expense.
+// Uses expense.splits if present (custom split), otherwise splits equally.
+function getShareMap(e) {
+  if (e.splits && e.splits.length > 0) {
+    return Object.fromEntries(e.splits.map(s => [s.memberId, s.amount]));
+  }
+  const splits = splitEqual(e.amount, e.participants);
+  return Object.fromEntries(splits.map(s => [s.memberId, s.amount]));
+}
+
 // Compute balances for a group from "me" perspective
 function groupBalance(g, me = ME) {
   const bal = {}; // memberId -> +/- amount (positive = they owe me)
   g.members.forEach(id => { if (id !== me) bal[id] = 0; });
   for (const e of g.expenses) {
     if (!e.participants || e.participants.length === 0) continue;
-    const splits = splitEqual(e.amount, e.participants);
-    const share = Object.fromEntries(splits.map(s => [s.memberId, s.amount]));
+    const share = getShareMap(e);
     if (e.paidBy === me) {
       for (const id of e.participants) {
         if (id !== me) bal[id] = (bal[id] || 0) + (share[id] || 0);
