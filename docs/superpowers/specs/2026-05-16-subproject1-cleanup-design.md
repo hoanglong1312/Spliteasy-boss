@@ -165,18 +165,18 @@ case 'LOGOUT':
 
 ### 3a. Fix nhãn "Bạn" (`src/screen-groups.jsx` + các screen khác)
 
-**Xóa hoàn toàn** field `isMe` khỏi mọi chỗ dùng. Thay bằng so sánh dynamic:
+**Xóa hoàn toàn** field `isMe` khỏi mọi chỗ dùng. Thay bằng so sánh dynamic — khai báo local ở đầu mỗi component cần dùng:
 
 ```js
-const isMe = (memberId) => memberId === state.currentUserId;
+const meId = state.currentUserId;
+const isMe = (memberId) => memberId === meId;
 // Dùng: isMe(m.id) thay vì m.isMe
 ```
 
-Áp dụng cho tất cả các chỗ hiển thị "Bạn" trong:
-- `GroupBalance`
-- `ActivityRow`  
-- `ExpenseDetail`
-- `ScreenHome`
+Áp dụng trong các file:
+- `src/screen-groups.jsx` — `GroupBalance`, `ActivityRow`, `ScreenAddExpense`
+- `src/screen-home.jsx` — phần "Hay chia tiền cùng", balance summary
+- `src/screen-profile.jsx` — hiển thị tên user hiện tại dùng `state.currentUserName`
 
 ### 3b. Fix `groupBalance` tính đúng Custom Split (`src/screen-groups.jsx`)
 
@@ -221,7 +221,7 @@ Badge "Sắp ra mắt":
 
 ### 4a. Scroll Fade Indicator (4 chỗ)
 
-Wrapper component `HScroll` dùng CSS mask để tạo hiệu ứng mờ dần bên phải — không chặn scroll/touch:
+Wrapper component `HScroll` thêm vào **`src/components.jsx`** (cuối file) — dùng CSS mask để tạo hiệu ứng mờ dần bên phải, không chặn scroll/touch:
 
 ```jsx
 function HScroll({ children, style }) {
