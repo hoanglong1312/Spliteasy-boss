@@ -6,7 +6,13 @@ function ScreenProfile({ tweaks, push, setTweak }) {
   const userName = state.currentUserName || 'Bạn';
   const now = new Date();
   const currentMonthLabel = `Tháng ${now.getMonth() + 1}`;
-  const me = state.members.find(m => m.id === meId) || M[ME];
+  const me = state.members.find(m => m.id === meId) || {
+    name: state.currentUserName || 'Bạn',
+    short: state.currentUserName || 'Bạn',
+    initials: (state.currentUserName || 'B')[0].toUpperCase(),
+    color: '#574EFA',
+    isMe: true,
+  };
   const totals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId]);
   const owed = Object.values(totals).filter(v => v > 0).reduce((a,b)=>a+b, 0);
   const owe = Math.abs(Object.values(totals).filter(v => v < 0).reduce((a,b)=>a+b, 0));
@@ -54,7 +60,7 @@ function ScreenProfile({ tweaks, push, setTweak }) {
           </div>
           <button onClick={() => push('settings')} style={iconBtnStyle()}><Icon name="settings" size={20} color="var(--text-1)"/></button>
         </div>
-        <button onClick={() => dispatch({ type: 'SET_CURRENT_USER', userId: null })} style={{
+        <button onClick={() => { if (window.confirm('Đăng xuất để đổi tài khoản?')) dispatch({ type: 'LOGOUT' }); }} style={{
           appearance: 'none', cursor: 'pointer', background: 'transparent', border: 0,
           color: 'var(--text-2)', fontSize: 12, fontWeight: 600, padding: '4px 0',
         }}>Đổi người dùng</button>
