@@ -23,6 +23,14 @@ const fmtDate = (d) => {
 const MEMBERS = []; // Cleared — users are now dynamic via state.members
 
 const M = Object.fromEntries(MEMBERS.map(m => [m.id, m]));
+
+// Build a member lookup map from a members array.
+// Call this at the top of any component that needs M:
+//   const M = getMemberMap(state.members);
+function getMemberMap(members) {
+  return Object.fromEntries((members || []).map(m => [m.id, m]));
+}
+
 const ME = ''; // fallback — not used after login
 
 
@@ -127,7 +135,7 @@ function pickleSummary(pickle = {}) {
 }
 
 Object.assign(window, {
-  MEMBERS, M, ME,
+  MEMBERS, M, ME, getMemberMap,
   fmtVND, fmtVNDFull, fmtDate,
   splitEqual, groupBalance, groupNet, totalBalances, recentActivity, pickleSummary,
 });
