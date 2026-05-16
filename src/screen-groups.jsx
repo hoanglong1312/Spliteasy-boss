@@ -387,7 +387,12 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
   const [paidBy, setPaidBy] = useState(existing?.paidBy || (state.currentUserId || ME));
   const [participants, setParticipants] = useState(existing?.participants || g?.members || []);
   const [splitMode, setSplitMode] = useState(existing?.splitMode === 'custom' ? 'custom' : 'equal');
-  const [customAmounts, setCustomAmounts] = useState({});
+  const [customAmounts, setCustomAmounts] = useState(() => {
+    if (existing?.splitMode === 'custom' && Array.isArray(existing?.splits)) {
+      return Object.fromEntries(existing.splits.map(s => [s.memberId, s.amount]));
+    }
+    return {};
+  });
   const [cat, setCat] = useState(existing?.cat || 'food');
   const [step, setStep] = useState(0);
   const useWizard = (tweaks.addExpenseFlow || 'single') === 'wizard';
@@ -402,14 +407,16 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
   useEffect(() => {
     if (splitMode === 'custom' && participants.length > 0 && num > 0) {
       const per = Math.round(num / participants.length);
-      const init = {};
-      participants.forEach((id, i) => {
-        init[id] = customAmounts[id] !== undefined ? customAmounts[id]
-          : (i === participants.length - 1
-              ? num - per * (participants.length - 1)
-              : per);
+      setCustomAmounts(prev => {
+        const init = {};
+        participants.forEach((id, i) => {
+          init[id] = prev[id] !== undefined ? prev[id]
+            : (i === participants.length - 1
+                ? num - per * (participants.length - 1)
+                : per);
+        });
+        return init;
       });
-      setCustomAmounts(init);
     }
   }, [splitMode, participants.join(','), num]);
 
