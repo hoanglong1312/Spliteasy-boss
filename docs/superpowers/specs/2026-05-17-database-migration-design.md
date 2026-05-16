@@ -107,10 +107,10 @@ short           text                     -- tên ngắn hiển thị
 initials        text                     -- chữ viết tắt (tối đa 2 ký tự)
 color           text                     -- màu avatar
 role            text NOT NULL CHECK (role IN ('treasurer','member','viewer'))
-is_active       boolean default true
+is_active       boolean default true    -- false = đã rời nhóm (soft delete)
 display_order   int
 joined_at       timestamptz default now()
-left_at         timestamptz
+left_at         timestamptz              -- thời điểm rời nhóm, null nếu còn trong nhóm
 created_at      timestamptz default now()
 updated_at      timestamptz default now()
 ```
@@ -164,7 +164,8 @@ updated_at            timestamptz default now()
 **Ràng buộc nghiệp vụ (Business Constraints):**
 - Khi `status = 'pending'`: `reviewed_by_member_id` phải là NULL
 - Khi `status IN ('approved','declined')`: `reviewed_by_member_id` và `reviewed_at` bắt buộc có
-- Thủ quỹ không được tự duyệt chi tiêu của chính mình (`reviewed_by ≠ submitted_by`) — tùy chọn theo quyết định nhóm
+- **Thủ quỹ tự thêm chi tiêu → tự động approved ngay** — không cần duyệt, `status = 'approved'` và `reviewed_by = submitted_by` được set luôn khi tạo
+- Thành viên thường thêm chi tiêu → `status = 'pending'`, chờ thủ quỹ duyệt
 
 ---
 
@@ -180,6 +181,44 @@ PRIMARY KEY (expense_id, member_id)
 
 ---
 
+#### `expense_disputes` — Báo sai sót chi tiêu (Dispute/Flag)
+
+Thành viên phát hiện số liệu sai có thể ghi chú lại để thủ quỹ xem xét và chỉnh sửa. Đây **không phải** thêm chi tiêu mới — chỉ là gắn cờ (flag) vào chi tiêu đã có.
+
+```sql
+id              uuid PRIMARY KEY default gen_random_uuid()
+expense_id      uuid NOT NULL REFERENCES expenses(id) ON DELETE CASCADE
+raised_by       uuid NOT NULL REFERENCES members(id)   -- ai phát hiện sai
+note            text NOT NULL                           -- mô tả sai sót cụ thể
+status          text NOT NULL default 'open'
+                CHECK (status IN ('open','resolved','dismissed'))
+                -- open: chưa xử lý | resolved: đã sửa | dismissed: thủ quỹ bác bỏ
+resolved_by     uuid REFERENCES members(id)            -- thủ quỹ xử lý
+resolved_note   text                                   -- giải thích khi resolve/dismiss
+resolved_at     timestamptz
+created_at      timestamptz default now()
+```
+
+**Luồng xử lý sai sót:**
+```
+Thành viên bấm "Báo sai" trên chi tiêu → điền lý do
+        │
+        ▼
+expense_disputes.status = 'open'
+        │
+        ├── Thủ quỹ thấy badge "X sai sót cần xem lại"
+        │
+        ├─► RESOLVED (Đã sửa)
+        │     Thủ quỹ chỉnh sửa expense + ghi chú đã fix
+        │     → Thông báo cho người báo sai
+        │
+        └─► DISMISSED (Bác bỏ)
+              Thủ quỹ giải thích tại sao không sửa
+              → Thông báo + lý do cho người báo sai
+```
+
+---
+
 #### `settlements` — Thanh toán bù trừ
 ```sql
 id                    uuid PRIMARY KEY default gen_random_uuid()
@@ -190,18 +229,16 @@ amount                numeric NOT NULL CHECK (amount > 0)
 method                text     -- cash, bank_transfer, momo, ...
 notes                 text
 
-status                text NOT NULL default 'pending'
-                      CHECK (status IN ('pending','confirmed','cancelled'))
-confirmed_by_member_id uuid REFERENCES members(id)
-confirmed_at          timestamptz
 created_by_member_id  uuid REFERENCES members(id)
 settlement_date       date NOT NULL
-
 created_at            timestamptz default now()
 updated_at            timestamptz default now()
 
 CHECK (from_member_id <> to_member_id)
 ```
+
+**Quy tắc:** Thủ quỹ ghi nhận là xong — không cần người nhận xác nhận.
+Thành viên sẽ thấy settlement trong **bảng tổng kết cuối tháng** hoặc **phần chú ý nổi bật** trên dashboard cá nhân để tự đối chiếu.
 
 ---
 
@@ -341,14 +378,18 @@ expenses.status = 'pending'
 | Hành động | Treasurer | Member | Viewer |
 |-----------|:---------:|:------:|:------:|
 | Xem chi tiêu đã duyệt | ✅ | ✅ | ✅ |
-| Đề xuất chi tiêu | ✅ | ✅ | ❌ |
+| Thêm chi tiêu (tự động approved) | ✅ | ❌ | ❌ |
+| Đề xuất chi tiêu (chờ duyệt) | ✅ | ✅ | ❌ |
 | Duyệt/từ chối chi tiêu | ✅ | ❌ | ❌ |
-| Sửa/xóa chi tiêu | ✅ | Của mình (pending) | ❌ |
+| Sửa chi tiêu | ✅ | Của mình (pending) | ❌ |
+| Báo sai sót chi tiêu (dispute) | ✅ | ✅ | ❌ |
+| Xử lý sai sót (resolve/dismiss) | ✅ | ❌ | ❌ |
 | Tạo thanh toán bù trừ | ✅ | ❌ | ❌ |
-| Xác nhận nhận tiền | ✅ | ✅ | ❌ |
 | Quản lý thành viên | ✅ | ❌ | ❌ |
+| Xóa thành viên (soft delete) | ✅ | ❌ | ❌ |
 | RSVP buổi chơi | ✅ | ✅ | ❌ |
 | Xem dashboard cá nhân | Của mình | Của mình | Của mình |
+| Xem tổng kết cuối tháng | ✅ | ✅ | ✅ |
 
 ---
 
@@ -369,11 +410,12 @@ expenses.status = 'pending'
 
 ---
 
-## 9. Các quyết định chưa xác định (Open Decisions)
+## 9. Các quyết định đã xác định (Closed Decisions)
 
-- [ ] Thủ quỹ có được tự duyệt chi tiêu của chính mình không?
-- [ ] Settlement có cần người nhận xác nhận không, hay thủ quỹ ghi nhận là xong?
-- [ ] Khi thành viên rời nhóm, chi tiêu cũ của họ xử lý thế nào?
+- [x] **Thủ quỹ tự thêm chi tiêu → auto-approved**, không cần duyệt
+- [x] **Settlement:** thủ quỹ ghi là xong, thành viên tự đối chiếu qua tổng kết cuối tháng
+- [x] **Thành viên rời nhóm:** soft delete — đổi `is_active = false`, giữ nguyên toàn bộ lịch sử
+- [x] **Báo sai sót:** thành viên flag + ghi note → thủ quỹ resolve/dismiss, không tạo chi tiêu mới
 
 ---
 
