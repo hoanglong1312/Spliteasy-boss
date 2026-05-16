@@ -208,6 +208,7 @@ function GroupActivity({ g, push, avatarStyle }) {
 
 function GroupBalance({ g, balance, avatarStyle, meId }) {
   const { dispatch, genId } = useApp();
+  const [confirmId, setConfirmId] = useState(null);
   // simplify debts: for each non-zero balance, show pairs
   const entries = Object.entries(balance).filter(([, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   if (entries.length === 0) {
@@ -242,24 +243,49 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
                 </div>
                 <Money value={Math.abs(v)} size={13} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
               </div>
-              <button onClick={positive ? undefined : () => dispatch({
-                type: 'SETTLE_DEBT',
-                groupId: g.id,
-                settlement: {
-                  id: genId(),
-                  fromId: meId,
-                  toId: id,
-                  amount: Math.abs(v),
-                  date: `${String(new Date().getDate()).padStart(2,'0')}/${String(new Date().getMonth()+1).padStart(2,'0')}`,
-                  createdAt: new Date().toISOString(),
-                }
-              })} style={{
-                appearance: 'none', cursor: 'pointer',
-                height: 32, padding: '0 12px',
-                background: positive ? 'var(--brand-soft)' : 'var(--brand-1)',
-                color: positive ? 'var(--brand-1)' : '#fff',
-                border: 0, borderRadius: 8, fontWeight: 700, fontSize: 12,
-              }}>{positive ? 'Nhắc' : 'Trả'}</button>
+              {positive ? (
+                <button onClick={undefined} style={{
+                  appearance: 'none', cursor: 'pointer',
+                  height: 32, padding: '0 12px',
+                  background: 'var(--brand-soft)',
+                  color: 'var(--brand-1)',
+                  border: 0, borderRadius: 8, fontWeight: 700, fontSize: 12,
+                }}>Nhắc</button>
+              ) : confirmId === id ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setConfirmId(null)}
+                    style={{
+                      padding: '4px 10px', fontSize: 12, fontWeight: 600,
+                      borderRadius: 8, border: '1px solid var(--border-1)',
+                      background: 'var(--surface-2)', color: 'var(--text-2)', cursor: 'pointer',
+                    }}
+                  >Hủy</button>
+                  <button
+                    onClick={() => {
+                      dispatch({ type: 'SETTLE_DEBT', groupId: g.id, settlement: {
+                        id: genId(), fromId: meId, toId: id,
+                        amount: Math.abs(v), date: new Date().toLocaleDateString('vi-VN'),
+                      }});
+                      setConfirmId(null);
+                    }}
+                    style={{
+                      padding: '4px 10px', fontSize: 12, fontWeight: 600,
+                      borderRadius: 8, border: 0,
+                      background: 'var(--brand-1)', color: '#fff', cursor: 'pointer',
+                    }}
+                  >Xác nhận trả {fmtVND(Math.abs(v))}</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmId(id)}
+                  style={{
+                    padding: '4px 12px', fontSize: 12, fontWeight: 600,
+                    borderRadius: 8, border: '1px solid var(--brand-1)',
+                    background: 'transparent', color: 'var(--brand-1)', cursor: 'pointer',
+                  }}
+                >Trả</button>
+              )}
             </div>
           );
         })}
