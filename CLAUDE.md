@@ -198,33 +198,36 @@ Phase 0: Phân tích & Thiết kế         ✅ XONG
 ├── Brainstorm kiến trúc mới
 └── Thiết kế database schema (đã duyệt)
 
-Phase 1: Setup Database Supabase       🔄 ĐANG LÀM
-├── Sub-plan 1: Tạo bảng + RLS        📋 Plan đã viết
+Phase 1: Thiết kế UI/UX                🔄 ĐANG LÀM
+├── Brainstorm user flow từng vai trò  📋 Đang brainstorm
+├── Wireframe màn hình chính           ⏳ Chưa làm
+├── Wireframe thủ quỹ / thành viên    ⏳ Chưa làm
+├── Thiết kế components mới           ⏳ Chưa làm
+└── Review & duyệt với chủ dự án      ⏳ Chưa làm
+
+Phase 2: Kế hoạch kỹ thuật đầy đủ    ⏳ SAU PHASE 1
+├── Sub-plan 1: Supabase DB + RLS     📋 Plan đã viết (chưa thực thi)
 ├── Sub-plan 2: Auth & Access layer   ⏳ Chưa viết
-└── Sub-plan 3: Frontend core         ⏳ Chưa viết
+├── Sub-plan 3: Frontend migration    ⏳ Chưa viết
+├── Sub-plan 4: Approval + Disputes   ⏳ Chưa viết
+└── Sub-plan 5: Pickleball module     ⏳ Chưa viết
 
-Phase 2: UI/UX Design                  ⏳ CHƯA BẮT ĐẦU
-├── Thiết kế wireframe (khung giao diện) từng màn hình
-├── Vẽ user flow (luồng người dùng): thủ quỹ / thành viên / viewer
-├── Thiết kế component mới: approval badge, dispute flag, personal dashboard
-└── Review với chủ dự án trước khi code
+Phase 3: Thực thi Database            ⏳ SAU PHASE 2
+├── Setup Supabase project
+├── Chạy migrations (12 bảng)
+└── Kiểm tra RLS + seed data
 
-Phase 3: Frontend Migration            ⏳ SAU PHASE 2
+Phase 4: Frontend Migration           ⏳ SAU PHASE 3
+├── Migrate Vite build (bỏ CDN Babel)
 ├── Thay store.jsx → Supabase client
 ├── Thay data.jsx → Supabase queries
-├── Migrate Vite build (bỏ CDN Babel)
-└── Kết nối toàn bộ màn hình với database
+└── Kết nối toàn bộ màn hình
 
-Phase 4: Tính năng mới                 ⏳ SAU PHASE 3
-├── Approval workflow (luồng duyệt chi tiêu)
-├── Dispute system (báo sai sót)
-├── Personal dashboard với token riêng
-└── Tổng kết cuối tháng
-
-Phase 5: Pickleball nâng cấp           ⏳ SAU PHASE 4
-├── Migrate module pickleball sang Supabase
-├── RSVP buổi chơi
-└── Tính toán chi phí tháng tự động
+Phase 5: Tính năng mới               ⏳ SAU PHASE 4
+├── Approval workflow + Disputes
+├── Personal dashboard + token riêng
+├── Tổng kết cuối tháng
+└── Pickleball nâng cấp
 ```
 
 ### Về Phase 2 — UI/UX Design
