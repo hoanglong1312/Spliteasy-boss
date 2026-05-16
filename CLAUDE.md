@@ -1,5 +1,26 @@
 # SpliteasyBoss App Ver2.0 — Orchestration Guide
 
+## Quy tắc bắt buộc khi bắt đầu dự án (Project Onboarding Rules)
+
+Trước khi làm bất kỳ việc gì trong dự án này, Claude PHẢI:
+
+1. **Đọc và hiểu các Superpowers (siêu năng lực) đã cài** — dùng lệnh `Skill` để xem danh sách skills có sẵn. Mỗi skill là một quy trình làm việc (workflow) bắt buộc cho từng loại task:
+   - Làm tính năng mới → dùng `brainstorming` trước
+   - Có spec rồi → dùng `writing-plans` để lập kế hoạch
+   - Gặp lỗi (bug) → dùng `systematic-debugging`
+   - Trước khi báo xong → dùng `verification-before-completion`
+   - Nhận feedback code → dùng `receiving-code-review`
+
+2. **RTK (Rust Token Killer - Công cụ tiết kiệm token) luôn được kích hoạt** qua hook tự động cho mọi lệnh Bash. Claude cần:
+   - Ưu tiên dùng Bash cho các lệnh hệ thống (git, ls, grep...) thay vì đọc file thủ công — RTK sẽ tự lọc output thừa
+   - Không dùng `cat` để đọc file lớn — dùng tool `Read` hoặc Bash với `head`/`grep` để RTK tối ưu được
+   - Kiểm tra hiệu quả tiết kiệm bằng `rtk gain` khi cần báo cáo
+
+3. **Đọc spec và plan hiện có** trước khi bắt đầu task mới:
+   - Specs: `docs/superpowers/specs/`
+   - Plans: `docs/superpowers/plans/`
+   - Data shapes: `docs/data-shapes.md`
+
 ## Quy tắc review code (Code Review Rules)
 
 - **Bắt buộc review chéo trước khi báo cáo kết quả** — bất kỳ việc gì liên quan đến code, database schema, kiến trúc (architecture):
