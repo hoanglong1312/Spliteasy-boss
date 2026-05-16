@@ -75,6 +75,8 @@ function Avatar({ member, size = 32, style: avatarStyle = 'initials', ring = fal
 }
 
 function AvatarStack({ ids, size = 26, overlap = 9, avatarStyle = 'initials', max = 5 }) {
+  const { state } = useApp();
+  const M = getMemberMap(state.members);
   const slice = ids.slice(0, max);
   const extra = ids.length - slice.length;
   return (
