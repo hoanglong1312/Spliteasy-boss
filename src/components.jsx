@@ -315,7 +315,28 @@ function EmptyState({ icon = 'sparkle', title, subtitle, action }) {
   );
 }
 
+// HScroll — horizontal scroll container with right-edge fade gradient
+// Visual only — does not block scroll or touch events
+function HScroll({ children, style, gap = 8, pb = 4 }) {
+  return (
+    <div style={{
+      overflowX: 'auto',
+      display: 'flex',
+      gap,
+      paddingBottom: pb,
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      WebkitOverflowScrolling: 'touch',
+      WebkitMaskImage: 'linear-gradient(to right, black 88%, transparent 100%)',
+      maskImage: 'linear-gradient(to right, black 88%, transparent 100%)',
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
 Object.assign(window, {
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
-  CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState,
+  CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
 });
