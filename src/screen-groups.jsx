@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup } from './components.jsx'
 
 // Groups tab — list / detail / add expense / settle
 // Several sub-screens, all driven by `push` from the nav stack.
@@ -135,32 +135,59 @@ function ActivityRow({ e, divider, avatarStyle, showGroup }) {
   const { state: _s } = useApp();
   const me = _s.currentUserId || ME;
   const M = getMemberMap(_s.members);
+  const [disputeOpen, setDisputeOpen] = React.useState(false);
   const participants = safeArray(e?.participants);
   const amount = Number(e?.amount) || 0;
   const myShare = participants.includes(me) && participants.length > 0 ? Math.round(amount / participants.length) : 0;
   const balance = e?.paidBy === me ? amount - myShare : -myShare;
   const payer = memberOrFallback(M, e?.paidBy);
+  const status = e?.status || 'approved';
+  const canDispute = status !== 'declined';
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 14px',
-      borderBottom: divider ? '1px solid var(--border-1)' : 'none',
-    }}>
-      <CategoryIcon cat={e?.cat} size={40}/>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e?.title || 'Chi tiêu'}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {showGroup ? <>{e?.groupEmoji} {e?.groupName} • </> : null}
-          {payer.short === 'Bạn' || e?.paidBy === me ? 'Bạn trả' : `${payer.short} trả`} {fmtVND(amount)} • {e?.date || '--/--'}
+    <>
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+        padding: '12px 14px',
+        borderBottom: divider ? '1px solid var(--border-1)' : 'none',
+      }}>
+        <CategoryIcon cat={e?.cat} size={40}/>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {e?.title || 'Chi tiêu'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {showGroup ? <>{e?.groupEmoji} {e?.groupName} • </> : null}
+            {payer.short === 'Bạn' || e?.paidBy === me ? 'Bạn trả' : `${payer.short} trả`} {fmtVND(amount)} • {e?.date || '--/--'}
+          </div>
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <StatusBadge status={status} declineReason={e?.declineReason}/>
+            {canDispute && (
+              <button
+                onClick={ev => { ev.stopPropagation(); setDisputeOpen(true); }}
+                style={{
+                  appearance: 'none', cursor: 'pointer', border: 'none', background: 'none',
+                  fontSize: 11, color: 'var(--text-2)', fontFamily: 'var(--vb-font-body)',
+                  padding: '2px 6px', borderRadius: 6,
+                  textDecoration: 'underline',
+                }}
+              >
+                Báo sai
+              </button>
+            )}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {balance > 0 ? 'Bạn cho mượn' : balance < 0 ? 'Bạn nợ' : '—'}
+          </div>
+          <Money value={Math.abs(balance)} size={13} color={balance > 0 ? 'var(--vb-success-700)' : balance < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>
         </div>
       </div>
-      <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 10, color: 'var(--text-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {balance > 0 ? 'Bạn cho mượn' : balance < 0 ? 'Bạn nợ' : '—'}
-        </div>
-        <Money value={Math.abs(balance)} size={13} color={balance > 0 ? 'var(--vb-success-700)' : balance < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>
-      </div>
-    </div>
+      {disputeOpen && (
+        <DisputePopup expenseId={e?.id} onClose={() => setDisputeOpen(false)}/>
+      )}
+    </>
   );
 }
 
