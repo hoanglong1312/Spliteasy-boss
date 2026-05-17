@@ -1,21 +1,53 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useApp } from './store.jsx'
-import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState } from './components.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances } from './data.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon } from './components.jsx'
 
 // Groups tab — list / detail / add expense / settle
 // Several sub-screens, all driven by `push` from the nav stack.
 
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function safeGroup(g) {
+  return {
+    ...g,
+    members: safeArray(g?.members),
+    expenses: safeArray(g?.expenses),
+    settlements: safeArray(g?.settlements),
+  };
+}
+
+function memberOrFallback(M, id) {
+  return M[id] || {
+    id,
+    name: id ? 'Không rõ' : 'Chưa chọn',
+    short: '?',
+    initials: '?',
+    color: '#99A1AF',
+    isMe: false,
+  };
+}
+
+function hexA(hex, a) {
+  const h = (typeof hex === 'string' && /^#?[0-9a-fA-F]{6}$/.test(hex))
+    ? hex.replace('#', '')
+    : '574EFA';
+  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
 // ── Groups list ─────────────────────────────────────────────────────────────
-function ScreenGroups({ tweaks, push }) {
+function ScreenGroups({ tweaks = {}, push }) {
   const { state } = useApp();
   const meId = state.currentUserId || ME;
   const [filter, setFilter] = useState('all');
   const filtered = useMemo(() => {
-    const myGroups = state.groups.filter(g => Array.isArray(g.members) && g.members.includes(meId));
-    if (filter === 'owe') return myGroups.filter(g => groupNet(g, meId) < 0);
-    if (filter === 'owed') return myGroups.filter(g => groupNet(g, meId) > 0);
-    if (filter === 'settled') return myGroups.filter(g => groupNet(g, meId) === 0);
+    const myGroups = safeArray(state.groups).filter(g => safeArray(g.members).includes(meId));
+    if (filter === 'owe') return myGroups.filter(g => groupNet(safeGroup(g), meId) < 0);
+    if (filter === 'owed') return myGroups.filter(g => groupNet(safeGroup(g), meId) > 0);
+    if (filter === 'settled') return myGroups.filter(g => groupNet(safeGroup(g), meId) === 0);
     return myGroups;
   }, [filter, state.groups, meId]);
 
@@ -24,7 +56,7 @@ function ScreenGroups({ tweaks, push }) {
       <div style={{ padding: '8px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>Nhóm</div>
-          <div style={{ fontFamily: 'var(--vb-font-body)', fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>{state.groups.length} nhóm đang hoạt động</div>
+          <div style={{ fontFamily: 'var(--vb-font-body)', fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>{safeArray(state.groups).length} nhóm đang hoạt động</div>
         </div>
         <button onClick={() => push('new-group')} style={{
           appearance: 'none', height: 40, padding: '0 14px', cursor: 'pointer',
@@ -69,15 +101,78 @@ function ScreenGroups({ tweaks, push }) {
   );
 }
 
+// ── Group Card ──────────────────────────────────────────────────────────────
+function GroupCard({ g, onClick, avatarStyle }) {
+  const { state: _s } = useApp();
+  const meId = _s.currentUserId || ME;
+  const group = safeGroup(g);
+  const net = groupNet(group, meId);
+  return (
+    <Card interactive onClick={onClick}>
+      <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+          background: hexA(group.color, 0.12),
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
+        }}>{group.emoji || '👥'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{group.name || 'Nhóm'}</div>
+          <div style={{ marginTop: 6 }}>
+            <AvatarStack ids={group.members} size={22} overlap={7} avatarStyle={avatarStyle} max={5}/>
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>{net === 0 ? 'Cân bằng' : net > 0 ? 'Nhận lại' : 'Còn nợ'}</div>
+          <Money value={Math.abs(net)} size={15} color={net >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// ── Activity row ────────────────────────────────────────────────────────────
+function ActivityRow({ e, divider, avatarStyle, showGroup }) {
+  const { state: _s } = useApp();
+  const me = _s.currentUserId || ME;
+  const M = getMemberMap(_s.members);
+  const participants = safeArray(e?.participants);
+  const amount = Number(e?.amount) || 0;
+  const myShare = participants.includes(me) && participants.length > 0 ? Math.round(amount / participants.length) : 0;
+  const balance = e?.paidBy === me ? amount - myShare : -myShare;
+  const payer = memberOrFallback(M, e?.paidBy);
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 14px',
+      borderBottom: divider ? '1px solid var(--border-1)' : 'none',
+    }}>
+      <CategoryIcon cat={e?.cat} size={40}/>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e?.title || 'Chi tiêu'}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {showGroup ? <>{e?.groupEmoji} {e?.groupName} • </> : null}
+          {payer.short === 'Bạn' || e?.paidBy === me ? 'Bạn trả' : `${payer.short} trả`} {fmtVND(amount)} • {e?.date || '--/--'}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 10, color: 'var(--text-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {balance > 0 ? 'Bạn cho mượn' : balance < 0 ? 'Bạn nợ' : '—'}
+        </div>
+        <Money value={Math.abs(balance)} size={13} color={balance > 0 ? 'var(--vb-success-700)' : balance < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>
+      </div>
+    </div>
+  );
+}
+
 // ── Group detail — tabs: Hoạt động / Số dư / Thành viên ────────────────────
-function ScreenGroupDetail({ params, tweaks, push, pop }) {
+function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   const { state, dispatch } = useApp();
   const meId = state.currentUserId || ME;
-  const g = state.groups.find(x => x.id === params.groupId);
+  const g = safeArray(state.groups).find(x => x.id === params?.groupId);
   const [tab, setTab] = useState('activity');
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const balance = useMemo(() => g ? groupBalance(g, meId) : {}, [g, meId]);
-  const net = useMemo(() => g ? groupNet(g, meId) : 0, [g, meId]);
+  const balance = useMemo(() => g ? groupBalance(safeGroup(g), meId) : {}, [g, meId]);
+  const net = useMemo(() => g ? groupNet(safeGroup(g), meId) : 0, [g, meId]);
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -87,9 +182,12 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
   }, [menuOpen]);
 
   if (!g) return null;
+  const group = safeGroup(g);
+  const groupMembers = group.members;
+  const groupExpenses = group.expenses;
 
   function handleDeleteGroup() {
-    if (!window.confirm(`Xóa nhóm "${g.name}"? Không thể hoàn tác.`)) return;
+    if (!window.confirm(`Xóa nhóm "${group.name || 'Nhóm'}"? Không thể hoàn tác.`)) return;
     dispatch({ type: 'DELETE_GROUP', groupId: g.id });
     pop();
   }
@@ -97,8 +195,8 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
   return (
     <div style={{ paddingBottom: 96 }}>
       <NavHeader
-        title={g.name}
-        subtitle={`${g.members.length} thành viên`}
+        title={group.name || 'Nhóm'}
+        subtitle={`${groupMembers.length} thành viên`}
         onBack={pop}
         right={<div style={{ position: 'relative' }}>
           <button
@@ -136,16 +234,16 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 56, height: 56, borderRadius: 16, flexShrink: 0,
-            background: hexA(g.color, 0.14),
+            background: hexA(group.color, 0.14),
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-          }}>{g.emoji}</div>
+          }}>{group.emoji || '👥'}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               {net === 0 ? 'Bạn đã cân bằng' : net > 0 ? 'Bạn được nhận' : 'Bạn còn nợ'}
             </div>
             <Money value={Math.abs(net)} size={26} color={net === 0 ? 'var(--text-1)' : net > 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>
-              {g.expenses.length} giao dịch • {fmtVND(g.expenses.reduce((a,e)=>a+e.amount,0))}
+              {groupExpenses.length} giao dịch • {fmtVND(groupExpenses.reduce((a,e)=>a+(Number(e.amount) || 0),0))}
             </div>
           </div>
         </div>
@@ -176,9 +274,9 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
       </div>
 
       <div style={{ padding: 16 }}>
-        {tab === 'activity' && <GroupActivity g={g} push={push} avatarStyle={tweaks.avatarStyle}/>}
-        {tab === 'balance' && <GroupBalance g={g} balance={balance} avatarStyle={tweaks.avatarStyle} meId={meId}/>}
-        {tab === 'members' && <GroupMembers g={g} balance={balance} avatarStyle={tweaks.avatarStyle}/>}
+        {tab === 'activity' && <GroupActivity g={group} push={push} avatarStyle={tweaks.avatarStyle}/>}
+        {tab === 'balance' && <GroupBalance g={group} balance={balance} avatarStyle={tweaks.avatarStyle} meId={meId}/>}
+        {tab === 'members' && <GroupMembers g={group} balance={balance} avatarStyle={tweaks.avatarStyle}/>}
       </div>
     </div>
   );
@@ -187,7 +285,7 @@ function ScreenGroupDetail({ params, tweaks, push, pop }) {
 function GroupActivity({ g, push, avatarStyle }) {
   // Group expenses by date
   const byDate = {};
-  for (const e of g.expenses) { (byDate[e.date] = byDate[e.date] || []).push(e); }
+  for (const e of safeArray(g?.expenses)) { (byDate[e.date || '--/--'] = byDate[e.date || '--/--'] || []).push(e); }
   const dates = Object.keys(byDate).sort((a, b) => {
     // dates are 'DD/MM' — convert to MM/DD for comparison
     const [da, ma] = a.split('/'); const [db, mb] = b.split('/');
@@ -214,7 +312,12 @@ function GroupActivity({ g, push, avatarStyle }) {
 function GroupBalance({ g, balance, avatarStyle, meId }) {
   const { state, dispatch, genId } = useApp();
   const M = getMemberMap(state.members);
+  const me = memberOrFallback(M, meId);
   const [confirmId, setConfirmId] = useState(null);
+  const handleRemind = (id, amount) => {
+    const m = memberOrFallback(M, id);
+    window.alert(`Nhắc ${m.name} thanh toán ${fmtVND(Math.abs(amount))}.`);
+  };
   // simplify debts: for each non-zero balance, show pairs
   const entries = Object.entries(balance).filter(([, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
   if (entries.length === 0) {
@@ -227,7 +330,7 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
           Cần thanh toán giữa thành viên
         </div>
         {entries.map(([id, v], i) => {
-          const m = M[id]; const positive = v > 0;
+          const m = memberOrFallback(M, id); const positive = v > 0;
           return (
             <div key={id} style={{
               display: 'flex', alignItems: 'center', gap: 12,
@@ -235,13 +338,13 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
               borderTop: '1px solid var(--border-1)',
             }}>
               {positive ? <>
-                <Avatar member={M[id]} size={32} style={avatarStyle}/>
+                <Avatar member={m} size={32} style={avatarStyle}/>
                 <Icon name="arrow-right" size={16} color="var(--text-2)"/>
-                <Avatar member={M[meId]} size={32} style={avatarStyle}/>
+                <Avatar member={me} size={32} style={avatarStyle}/>
               </> : <>
-                <Avatar member={M[meId]} size={32} style={avatarStyle}/>
+                <Avatar member={me} size={32} style={avatarStyle}/>
                 <Icon name="arrow-right" size={16} color="var(--text-2)"/>
-                <Avatar member={M[id]} size={32} style={avatarStyle}/>
+                <Avatar member={m} size={32} style={avatarStyle}/>
               </>}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
@@ -250,7 +353,7 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
                 <Money value={Math.abs(v)} size={13} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
               </div>
               {positive ? (
-                <button onClick={undefined} style={{
+                <button onClick={() => handleRemind(id, v)} style={{
                   appearance: 'none', cursor: 'pointer',
                   height: 32, padding: '0 12px',
                   background: 'var(--brand-soft)',
@@ -303,17 +406,18 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
 function GroupMembers({ g, balance, avatarStyle }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
+  const members = safeArray(g?.members);
   return (
     <Card>
-      {g.members.map((id, i) => {
-        const m = M[id]; const b = balance[id] || 0;
+      {members.map((id, i) => {
+        const m = memberOrFallback(M, id); const b = balance[id] || 0;
         return (
           <ListRow key={id}
             left={<Avatar member={m} size={40} style={avatarStyle}/>}
             title={m.isMe ? m.name + ' (bạn)' : m.name}
             subtitle={m.isMe ? 'Quản trị viên' : 'Thành viên'}
             right={m.isMe ? null : <Money value={b} size={13} color={b > 0 ? 'var(--vb-success-700)' : b < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>}
-            divider={i < g.members.length - 1}
+            divider={i < members.length - 1}
           />
         );
       })}
@@ -322,24 +426,28 @@ function GroupMembers({ g, balance, avatarStyle }) {
 }
 
 // ── Expense Detail ──────────────────────────────────────────────────────────
-function ScreenExpenseDetail({ params, push, pop, tweaks }) {
+function ScreenExpenseDetail({ params = {}, push, pop, tweaks = {} }) {
   const { state, dispatch } = useApp();
   const M = getMemberMap(state.members);
-  const g = state.groups.find(x => x.id === params.groupId);
+  const g = safeArray(state.groups).find(x => x.id === params?.groupId);
   if (!g) return null;
-  const e = (g.expenses || []).find(x => x.id === params.expenseId);
+  const group = safeGroup(g);
+  const e = group.expenses.find(x => x.id === params?.expenseId);
   if (!e) return null;
-  const per = Math.round(e.amount / e.participants.length);
+  const participants = safeArray(e.participants);
+  const amount = Number(e.amount) || 0;
+  const paidByMember = memberOrFallback(M, e.paidBy);
+  const per = participants.length > 0 ? Math.round(amount / participants.length) : 0;
 
   function handleDelete() {
     if (!window.confirm(`Xóa "${e.title}"? Không thể hoàn tác.`)) return;
-    dispatch({ type: 'DELETE_EXPENSE', groupId: params.groupId, expenseId: params.expenseId });
+    dispatch({ type: 'DELETE_EXPENSE', groupId: params?.groupId, expenseId: params?.expenseId });
     pop();
   }
   return (
     <div style={{ paddingBottom: 96 }}>
-      <NavHeader title="Chi tiết" subtitle={g.name} onBack={pop}
-        right={<button style={iconBtnStyle()} onClick={() => push('add-expense', { groupId: params.groupId, expenseId: params.expenseId })}><Icon name="edit" size={18} color="var(--text-1)"/></button>}
+      <NavHeader title="Chi tiết" subtitle={group.name || 'Nhóm'} onBack={pop}
+        right={<button style={iconBtnStyle()} onClick={() => push('add-expense', { groupId: params?.groupId, expenseId: params?.expenseId })}><Icon name="edit" size={18} color="var(--text-1)"/></button>}
       />
       <div style={{ padding: 16, textAlign: 'center' }}>
         <div style={{ margin: '8px auto 12px' }}>
@@ -347,28 +455,31 @@ function ScreenExpenseDetail({ params, push, pop, tweaks }) {
         </div>
         <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>{e.title}</div>
         <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 36, fontWeight: 700, color: 'var(--text-1)', letterSpacing: '-0.02em', marginTop: 4 }}>
-          {fmtVNDFull(e.amount)}
+          {fmtVNDFull(amount)}
         </div>
         <div style={{ marginTop: 6, display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>
-          <Avatar member={M[e.paidBy]} size={20} style={tweaks.avatarStyle}/>
-          <span><b style={{ color: 'var(--text-1)' }}>{M[e.paidBy].name}</b> đã trả • {e.date}/2026</span>
+          <Avatar member={paidByMember} size={20} style={tweaks.avatarStyle}/>
+          <span><b style={{ color: 'var(--text-1)' }}>{paidByMember.name}</b> đã trả • {e.date || '--/--'}/2026</span>
         </div>
       </div>
 
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Card>
           <div style={{ padding: '14px 16px', fontSize: 11, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.06em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-1)' }}>
-            Chia đều cho {e.participants.length} người
+            Chia đều cho {participants.length} người
           </div>
-          {e.participants.map((id, i) => (
+          {participants.map((id, i) => {
+            const member = memberOrFallback(M, id);
+            return (
             <ListRow key={id}
-              left={<Avatar member={M[id]} size={36} style={tweaks.avatarStyle}/>}
-              title={M[id].name}
+              left={<Avatar member={member} size={36} style={tweaks.avatarStyle}/>}
+              title={member.name}
               subtitle={id === e.paidBy ? 'Người trả' : 'Chia phần'}
               right={<Money value={per} size={14} color={id === e.paidBy ? 'var(--vb-success-700)' : 'var(--text-1)'}/>}
-              divider={i < e.participants.length - 1}
+              divider={i < participants.length - 1}
             />
-          ))}
+            );
+          })}
         </Card>
 
         <div style={{ display: 'flex', gap: 8 }}>
@@ -381,21 +492,22 @@ function ScreenExpenseDetail({ params, push, pop, tweaks }) {
 }
 
 // ── Add expense — 2 variants: single screen vs wizard ───────────────────────
-function ScreenAddExpense({ params, push, pop, tweaks }) {
+function ScreenAddExpense({ params = {}, push, pop, tweaks = {} }) {
   const { state, dispatch, genId } = useApp();
   const M = getMemberMap(state.members);
+  const groups = safeArray(state.groups);
   const existing = params?.expenseId
-    ? (state.groups.find(x => x.id === params?.groupId)?.expenses || []).find(e => e.id === params.expenseId)
+    ? safeArray(groups.find(x => x.id === params?.groupId)?.expenses).find(e => e.id === params.expenseId)
     : null;
   const [g, setG] = useState(
     params?.groupId
-      ? (state.groups.find(x => x.id === params?.groupId) || state.groups[0])
-      : state.groups[0]
+      ? (groups.find(x => x.id === params?.groupId) || groups[0])
+      : groups[0]
   );
   const [title, setTitle] = useState(existing?.title || '');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
   const [paidBy, setPaidBy] = useState(existing?.paidBy || (state.currentUserId || ME));
-  const [participants, setParticipants] = useState(existing?.participants || g?.members || []);
+  const [participants, setParticipants] = useState(existing?.participants || safeArray(g?.members));
   const [splitMode, setSplitMode] = useState(existing?.splitMode === 'custom' ? 'custom' : 'equal');
   const [customAmounts, setCustomAmounts] = useState(() => {
     if (existing?.splitMode === 'custom' && Array.isArray(existing?.splits)) {
@@ -480,6 +592,7 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
       </div>
     );
   }
+  const groupMembers = safeArray(g.members);
 
   const Header = () => (
     <NavHeader title={useWizard ? `Bước ${step+1}/3` : (existing ? 'Sửa chi tiêu' : 'Thêm chi tiêu')} onBack={() => useWizard && step > 0 ? setStep(step-1) : pop()}
@@ -533,8 +646,14 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
           </FormRow>
 
           <FormRow label="Nhóm" icon="users">
-            <select value={g.id} onChange={(e) => { const ng = state.groups.find(x=>x.id===e.target.value); setG(ng); setParticipants(ng.members); setPaidBy(state.currentUserId || ME); }} style={inputStyle()}>
-              {state.groups.map(gr => <option key={gr.id} value={gr.id}>{gr.emoji} {gr.name}</option>)}
+            <select value={g.id} onChange={(e) => {
+              const ng = groups.find(x=>x.id===e.target.value);
+              const members = safeArray(ng?.members);
+              setG(ng || groups[0]);
+              setParticipants(members);
+              setPaidBy(members.includes(state.currentUserId) ? state.currentUserId : (members[0] || state.currentUserId || ME));
+            }} style={inputStyle()}>
+              {groups.map(gr => <option key={gr.id} value={gr.id}>{gr.emoji || '👥'} {gr.name || 'Nhóm'}</option>)}
             </select>
           </FormRow>
 
@@ -563,15 +682,18 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
         {(!useWizard || step === 1) && <>
           <FormRow label="Ai đã trả?" icon="wallet">
             <Card>
-              {g.members.map((id, i) => (
+              {groupMembers.map((id, i) => {
+                const member = memberOrFallback(M, id);
+                return (
                 <ListRow key={id}
-                  left={<Avatar member={M[id]} size={36} style={tweaks.avatarStyle}/>}
-                  title={M[id].name}
+                  left={<Avatar member={member} size={36} style={tweaks.avatarStyle}/>}
+                  title={member.name}
                   right={<RadioMark on={paidBy === id}/>}
                   onClick={() => setPaidBy(id)}
-                  divider={i < g.members.length - 1}
+                  divider={i < groupMembers.length - 1}
                 />
-              ))}
+                );
+              })}
             </Card>
           </FormRow>
         </>}
@@ -594,16 +716,17 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
               ))}
             </div>
             <Card>
-              {g.members.map((id, i) => {
+              {groupMembers.map((id, i) => {
                 const on = participants.includes(id);
+                const member = memberOrFallback(M, id);
                 return (
                   <div key={id} onClick={() => toggleP(id)} style={{
                     display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-                    padding: '12px 16px', borderBottom: i < g.members.length - 1 ? '1px solid var(--border-1)' : 'none',
+                    padding: '12px 16px', borderBottom: i < groupMembers.length - 1 ? '1px solid var(--border-1)' : 'none',
                   }}>
-                    <Avatar member={M[id]} size={36} style={tweaks.avatarStyle}/>
+                    <Avatar member={member} size={36} style={tweaks.avatarStyle}/>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{M[id].name}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{member.name}</div>
                       {on && splitMode === 'equal' && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{fmtVNDFull(per)}</div>}
                     </div>
                     <CheckMark on={on}/>
@@ -621,9 +744,9 @@ function ScreenAddExpense({ params, push, pop, tweaks }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 0' }}>
                 {participants.map(id => (
                   <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Avatar member={M[id]} size={32} style={tweaks.avatarStyle}/>
+                    <Avatar member={memberOrFallback(M, id)} size={32} style={tweaks.avatarStyle}/>
                     <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
-                      {M[id]?.short || M[id]?.name || id}
+                      {memberOrFallback(M, id).short || memberOrFallback(M, id).name || id}
                     </div>
                     <input
                       type="text"
@@ -723,11 +846,11 @@ function CheckMark({ on }) {
 }
 
 // ── Settle screens ──────────────────────────────────────────────────────────
-function ScreenSettleAll({ pop, tweaks }) {
+function ScreenSettleAll({ pop, tweaks = {} }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
   const meId = state.currentUserId || ME;
-  const totals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId]);
+  const totals = useMemo(() => totalBalances(safeArray(state.groups).map(safeGroup), meId), [state.groups, meId]);
   const owed = Object.entries(totals).filter(([,v]) => v > 0);
   const owe  = Object.entries(totals).filter(([,v]) => v < 0);
 
@@ -739,10 +862,12 @@ function ScreenSettleAll({ pop, tweaks }) {
           <div>
             <SectionHeader title="Mọi người cần trả bạn"/>
             <Card>
-              {owed.map(([id, v], i) => (
+              {owed.map(([id, v], i) => {
+                const member = memberOrFallback(M, id);
+                return (
                 <ListRow key={id}
-                  left={<Avatar member={M[id]} size={40} style={tweaks.avatarStyle}/>}
-                  title={M[id].name}
+                  left={<Avatar member={member} size={40} style={tweaks.avatarStyle}/>}
+                  title={member.name}
                   subtitle="Nhắc trả qua Zalo"
                   right={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -752,7 +877,8 @@ function ScreenSettleAll({ pop, tweaks }) {
                   }
                   divider={i < owed.length - 1}
                 />
-              ))}
+                );
+              })}
             </Card>
           </div>
         )}
@@ -761,10 +887,12 @@ function ScreenSettleAll({ pop, tweaks }) {
           <div>
             <SectionHeader title="Bạn cần trả"/>
             <Card>
-              {owe.map(([id, v], i) => (
+              {owe.map(([id, v], i) => {
+                const member = memberOrFallback(M, id);
+                return (
                 <ListRow key={id}
-                  left={<Avatar member={M[id]} size={40} style={tweaks.avatarStyle}/>}
-                  title={M[id].name}
+                  left={<Avatar member={member} size={40} style={tweaks.avatarStyle}/>}
+                  title={member.name}
                   subtitle="Quét QR để thanh toán"
                   right={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -774,7 +902,8 @@ function ScreenSettleAll({ pop, tweaks }) {
                   }
                   divider={i < owe.length - 1}
                 />
-              ))}
+                );
+              })}
             </Card>
           </div>
         )}
@@ -783,14 +912,15 @@ function ScreenSettleAll({ pop, tweaks }) {
   );
 }
 
-function ScreenNewGroup({ params, pop }) {
+function ScreenNewGroup({ params = {}, pop }) {
   const { state, dispatch, genId } = useApp();
   const myId = state.currentUserId || ME;
   const editGroupId = params?.editGroupId;
-  const existingGroup = editGroupId ? state.groups.find(g => g.id === editGroupId) : null;
+  const members = safeArray(state.members);
+  const existingGroup = editGroupId ? safeArray(state.groups).find(g => g.id === editGroupId) : null;
   const [name, setName] = useState(existingGroup?.name || '');
   const [emoji, setEmoji] = useState(existingGroup?.emoji || '🎯');
-  const [selected, setSelected] = useState(existingGroup?.members || [myId]);
+  const [selected, setSelected] = useState(existingGroup?.members || (myId ? [myId] : []));
   const [newMemberName, setNewMemberName] = useState('');
   const toggle = (id) => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
 
@@ -872,12 +1002,12 @@ function ScreenNewGroup({ params, pop }) {
         </FormRow>
         <FormRow label={`Thành viên (${selected.length})`} icon="users">
           <Card>
-            {state.members.map((m, i) => {
+            {members.map((m, i) => {
               const isMe = m.id === myId;
               return (
               <div key={m.id} onClick={() => !isMe && toggle(m.id)} style={{
                 display: 'flex', alignItems: 'center', gap: 12, cursor: isMe ? 'default' : 'pointer',
-                padding: '12px 16px', borderBottom: i < state.members.length - 1 ? '1px solid var(--border-1)' : 'none',
+                padding: '12px 16px', borderBottom: i < members.length - 1 ? '1px solid var(--border-1)' : 'none',
                 opacity: isMe ? 0.7 : 1,
               }}>
                 <Avatar member={m} size={36}/>
@@ -925,10 +1055,10 @@ function ScreenNewGroup({ params, pop }) {
   );
 }
 
-function ScreenNotifications({ pop, tweaks }) {
+function ScreenNotifications({ pop, tweaks = {} }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
-  const items = state.notifications || [];
+  const items = safeArray(state.notifications);
   return (
     <div style={{ paddingBottom: 32 }}>
       <NavHeader title="Thông báo" onBack={pop}/>

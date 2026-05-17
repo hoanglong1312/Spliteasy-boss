@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, recentActivity, groupBalance, groupNet } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon } from './components.jsx'
 
 // Home tab — dashboard with balance summary, recent activity, group cards
 // Has 3 layout variations exposed via Tweaks: 'overview' | 'feed' | 'compact'
@@ -314,7 +314,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
     return (
       <Card>
         {ranked.map(([id, v], i) => {
-          const m = M[id]; const positive = v > 0;
+          const m = M[id] || { name: '?', short: '?', initials: '?', color: '#999' }; const positive = v > 0;
           return (
             <ListRow key={id}
               left={<Avatar member={m} size={40} style={avatarStyle}/>}
@@ -335,7 +335,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
       <Card>
         <div style={{ padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {ranked.map(([id, v]) => {
-            const m = M[id]; const positive = v > 0;
+            const m = M[id] || { name: '?', short: '?', initials: '?', color: '#999' }; const positive = v > 0;
             const pct = (Math.abs(v) / max) * 100;
             return (
               <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -365,7 +365,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
   return (
     <HScroll gap={10} pb={8} style={{ marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16, paddingTop: 4 }}>
       {ranked.map(([id, v]) => {
-        const m = M[id]; const positive = v > 0;
+        const m = M[id] || { name: '?', short: '?', initials: '?', color: '#999' }; const positive = v > 0;
         return (
           <div key={id} style={{
             flexShrink: 0, width: 168, padding: 14,

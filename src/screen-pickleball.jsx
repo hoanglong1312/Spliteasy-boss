@@ -1,16 +1,84 @@
 import React, { useState, useMemo } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, pickleSummary } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon } from './components.jsx'
 
 // Pickleball tab — special sub-app for the company's CLB Pickleball
 // Has 2 visual styles via Tweaks: 'sporty' (vibrant lime/orange) | 'consistent' (purple match)
 
-function ScreenPickleball({ tweaks, push }) {
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function memberOrFallback(M, id) {
+  return M[id] || {
+    id,
+    name: id ? 'Không rõ' : 'Chưa chọn',
+    short: '?',
+    initials: '?',
+    color: '#99A1AF',
+    isMe: false,
+  };
+}
+
+function normalizeSession(session = {}) {
+  const attendees = safeArray(session.attendees);
+  const attended = safeArray(session.attended);
+  const going = safeArray(session.going);
+  return {
+    ...session,
+    attendees: attendees.length > 0 ? attendees : (attended.length > 0 ? attended : going),
+    attended,
+    going,
+    guests: safeArray(session.guests),
+    expenses: safeArray(session.expenses),
+  };
+}
+
+function normalizePickle(pickle = {}) {
+  return {
+    sessions: safeArray(pickle.sessions).map(normalizeSession),
+    upcoming: safeArray(pickle.upcoming).map(normalizeSession),
+    fixedMembers: safeArray(pickle.fixedMembers),
+    external: safeArray(pickle.external),
+    externalTickets: safeArray(pickle.externalTickets),
+    monthlyCourtFee: Number(pickle.monthlyCourtFee) || 0,
+    guestFeePerSession: Number(pickle.guestFeePerSession) || 0,
+  };
+}
+
+function sessionMemberIds(session) {
+  if (!session) return [];
+  const going = safeArray(session.going);
+  if (going.length > 0) return going;
+  const attendees = safeArray(session.attendees);
+  if (attendees.length > 0) return attendees;
+  return safeArray(session.attended);
+}
+
+function dateDay(value) {
+  const s = String(value || '');
+  if (!s) return '--';
+  if (s.includes('/')) return s.split('/')[0] || '--';
+  if (s.includes('-')) return s.split('-').pop() || '--';
+  return s;
+}
+
+function guestName(guest) {
+  if (typeof guest === 'string') return guest;
+  return guest?.name || guest?.guest_name || guest?.displayName || 'Khách';
+}
+
+function initialsFromName(name) {
+  return String(name || '?').split(' ').filter(Boolean).map(p => p[0]).join('').slice(-2).toUpperCase() || '?';
+}
+
+function ScreenPickleball({ tweaks = {}, push }) {
   const { state, dispatch } = useApp();
   const [tab, setTab] = useState('overview'); // overview | sessions | members | external
-  const summary = useMemo(() => pickleSummary(state.pickle || {}), [state.pickle]);
-  const style = tweaks.pickleballStyle || 'sporty';
+  const pickle = useMemo(() => normalizePickle(state.pickle), [state.pickle]);
+  const summary = useMemo(() => pickleSummary(pickle), [pickle]);
+  const style = tweaks?.pickleballStyle || 'sporty';
   const accent = style === 'sporty' ? '#7AC74F' : 'var(--brand-1)';
   const accentBg = style === 'sporty' ? 'rgba(122,199,79,0.12)' : 'var(--brand-soft)';
   const heroGrad = style === 'sporty'
@@ -18,10 +86,6 @@ function ScreenPickleball({ tweaks, push }) {
     : 'linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%)';
 
   const meId = state.currentUserId || ME;
-  const pickle = state.pickle || {
-    sessions: [], upcoming: [], fixedMembers: [],
-    externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0,
-  };
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -94,7 +158,7 @@ function ScreenPickleball({ tweaks, push }) {
       </div>
 
       <div style={{ padding: 16 }}>
-        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} dispatch={dispatch} meId={meId}/>}
+        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} dispatch={dispatch} meId={meId} onShowSessions={() => setTab('sessions')}/>}
         {tab === 'sessions' && <PickleSessions push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
         {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
@@ -121,9 +185,9 @@ function PickleHeroStat({ label, value, positive = false, accent }) {
 }
 
 // ── Overview tab ────────────────────────────────────────────────────────────
-function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle, dispatch, meId }) {
+function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, pickle, dispatch, meId, onShowSessions }) {
   const totalCourt = pickle.monthlyCourtFee;
-  const guestCount = pickle.sessions.reduce((a,s)=>a+(s.guests||[]).length,0);
+  const guestCount = pickle.sessions.reduce((a,s)=>a+safeArray(s.guests).length,0);
 
   // Compute "what you contributed vs what you owe" for me
   const myCourt = summary.courtPerMember;
@@ -132,7 +196,8 @@ function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle
   const myNet = -myCourt + myCredit + myExpenses;
 
   const next = pickle.upcoming[0];
-  const isGoing = next && (next.going || []).includes(meId);
+  const nextGoing = sessionMemberIds(next);
+  const isGoing = nextGoing.includes(meId);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -156,7 +221,7 @@ function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle
 
       {/* Upcoming */}
       <div>
-        <SectionHeader title="Buổi đánh sắp tới" action="Xem lịch →" onAction={() => {}}/>
+        <SectionHeader title="Buổi đánh sắp tới" action="Xem lịch →" onAction={onShowSessions}/>
         <Card>
           {next ? (
             <div style={{
@@ -168,16 +233,16 @@ function PickleOverview({ push, tweaks, summary, accent, accentBg, style, pickle
                 background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{next.day}</div>
-                <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 18, fontWeight: 700, color: accent }}>{next.date.split('/')[0]}</div>
+                <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 18, fontWeight: 700, color: accent }}>{dateDay(next.date)}</div>
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{next.time} • {next.court}</div>
                 <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AvatarStack ids={next.going} size={22} overlap={7} avatarStyle={tweaks.avatarStyle} max={5}/>
-                  <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{(next.going || []).length} người tham gia</span>
+                  <AvatarStack ids={nextGoing} size={22} overlap={7} avatarStyle={tweaks?.avatarStyle} max={5}/>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{nextGoing.length} người tham gia</span>
                 </div>
               </div>
-              <button onClick={() => dispatch({ type: 'TOGGLE_UPCOMING', sessionId: next.id, memberId: meId })} style={{
+              <button onClick={() => dispatch({ type: 'CONFIRM_ATTENDANCE', sessionId: next.id, memberId: meId, attending: !isGoing })} style={{
                 appearance: 'none', cursor: 'pointer', height: 36, padding: '0 14px',
                 background: accent, color: style === 'sporty' ? '#0E1726' : '#fff', border: 0, borderRadius: 10, fontWeight: 700, fontSize: 13,
               }}>{isGoing ? 'Huỷ' : 'Tham gia'}</button>
@@ -230,7 +295,7 @@ function BreakdownRow({ label, sub, value, icon, positive = false, accent }) {
 }
 
 // ── Sessions tab — list of all sessions this month ──────────────────────────
-function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
+function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
   return (
@@ -238,7 +303,9 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
       <div>
         <SectionHeader title="Sắp diễn ra"/>
         <Card>
-          {pickle.upcoming.map((s, i) => (
+          {pickle.upcoming.map((s, i) => {
+            const going = sessionMemberIds(s);
+            return (
             <div key={s.id} onClick={() => push('session-detail', { sessionId: s.id })} style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: 14, borderBottom: i < pickle.upcoming.length - 1 ? '1px solid var(--border-1)' : 'none',
@@ -249,25 +316,29 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
                 background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               }}>
                 <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{s.day}</div>
-                <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{s.date.split('/')[0]}</div>
+                <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{dateDay(s.date)}</div>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{s.time} • {s.court}</div>
                 <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AvatarStack ids={s.going || []} size={20} overlap={6} avatarStyle={tweaks.avatarStyle} max={4}/>
-                  <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>{(s.going || []).length} người</span>
+                  <AvatarStack ids={going} size={20} overlap={6} avatarStyle={tweaks?.avatarStyle} max={4}/>
+                  <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>{going.length} người</span>
                 </div>
               </div>
               <Pill bg={accentBg} color={accent} size="xs">Sắp tới</Pill>
             </div>
-          ))}
+            );
+          })}
         </Card>
       </div>
 
       <div>
         <SectionHeader title="Đã diễn ra"/>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {pickle.sessions.map(s => (
+          {pickle.sessions.map(s => {
+            const attendees = sessionMemberIds(s);
+            const expenses = safeArray(s.expenses);
+            return (
             <Card key={s.id} interactive onClick={() => push('session-detail', { sessionId: s.id })}>
               <div style={{ padding: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
@@ -276,28 +347,28 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
                     background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   }}>
                     <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{s.day}</div>
-                    <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{s.date.split('/')[0]}</div>
+                    <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{dateDay(s.date)}</div>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{s.time} • {s.court}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>
-                      {(s.attendees || s.attended || []).length} có mặt{(s.guests || []).length > 0 ? ` • ${(s.guests || []).length} vãng lai` : ''}
+                      {attendees.length} có mặt{safeArray(s.guests).length > 0 ? ` • ${safeArray(s.guests).length} vãng lai` : ''}
                     </div>
                   </div>
                   <Icon name="chevron-right" size={18} color="var(--text-3)"/>
                 </div>
 
-                {s.expenses.length > 0 && (
+                {expenses.length > 0 && (
                   <div style={{ paddingTop: 10, borderTop: '1px dashed var(--border-1)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {s.expenses.map((ex, i) => {
+                    {expenses.map((ex, i) => {
                       const cat = ex.category || ex.kind;
                       const lbl = ex.title || ex.label;
-                      const payer = M[ex.payerId || ex.paidBy];
+                      const payer = memberOrFallback(M, ex.payerId || ex.paidBy);
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                           <Icon name={cat === 'ball' ? 'ball' : cat === 'food' ? 'food' : 'drink'} size={14} color="var(--text-2)"/>
-                          <span style={{ color: 'var(--text-2)', flex: 1 }}>{lbl} • {payer ? payer.short : ''} trả</span>
-                          <Money value={ex.amount} size={12} color="var(--text-1)" compact/>
+                          <span style={{ color: 'var(--text-2)', flex: 1 }}>{lbl || 'Chi phí'} • {payer.short} trả</span>
+                          <Money value={Number(ex.amount) || 0} size={12} color="var(--text-1)" compact/>
                         </div>
                       );
                     })}
@@ -305,7 +376,8 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
                 )}
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -313,11 +385,11 @@ function PickleSessions({ push, tweaks, accent, accentBg, style, pickle }) {
 }
 
 // ── External tab — vé lẻ outside the club ───────────────────────────────────
-function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId }) {
+function PickleExternal({ push, tweaks = {}, accent, accentBg, style, pickle, meId }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
   const tickets = [...(pickle.external || []), ...(pickle.externalTickets || [])];
-  const total = tickets.reduce((a,e)=>a+e.amount, 0);
+  const total = tickets.reduce((a,e)=>a+(Number(e.amount) || 0), 0);
 
   if (tickets.length === 0) {
     return (
@@ -349,9 +421,12 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId })
           <Money value={total} size={18}/>
         </div>
         {tickets.map((ex, i) => {
-          const per = Math.round(ex.amount / ex.participants.length);
-          const inIt = ex.participants.includes(meId);
-          const myDelta = ex.paidBy === meId ? ex.amount - per : (inIt ? -per : 0);
+          const amount = Number(ex.amount) || 0;
+          const participants = safeArray(ex.participants);
+          const per = participants.length > 0 ? Math.round(amount / participants.length) : 0;
+          const inIt = participants.includes(meId);
+          const myDelta = ex.paidBy === meId ? amount - per : (inIt ? -per : 0);
+          const payer = memberOrFallback(M, ex.paidBy);
           return (
             <div key={ex.id} style={{
               padding: 14, borderBottom: i < tickets.length - 1 ? '1px solid var(--border-1)' : 'none',
@@ -362,13 +437,13 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId })
                   background: 'var(--vb-warn-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 }}><Icon name="ball" size={18} color="#A05C0C"/></div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{ex.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>{ex.date}/2026 • {(M[ex.paidBy] || { short: '?' }).short} trả</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{ex.label || ex.title || 'Vé lẻ'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>{ex.date || '--/--'}/2026 • {payer.short} trả</div>
                 </div>
-                <Money value={ex.amount} size={14}/>
+                <Money value={amount} size={14}/>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <AvatarStack ids={ex.participants} size={22} overlap={7} avatarStyle={tweaks.avatarStyle} max={5}/>
+                <AvatarStack ids={participants} size={22} overlap={7} avatarStyle={tweaks?.avatarStyle} max={5}/>
                 {myDelta !== 0 && (
                   <Pill bg={myDelta > 0 ? 'var(--vb-success-100)' : 'var(--vb-danger-50)'} color={myDelta > 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} size="xs">
                     {myDelta > 0 ? `Nhận ${fmtVND(myDelta)}` : `Trả ${fmtVND(Math.abs(myDelta))}`}
@@ -386,16 +461,18 @@ function PickleExternal({ push, tweaks, accent, accentBg, style, pickle, meId })
 }
 
 // ── Members tab ────────────────────────────────────────────────────────────
-function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
+function PickleMembers({ tweaks = {}, summary, accent, accentBg, style, pickle }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div>
-        <SectionHeader title={`Thành viên cố định (${pickle.fixedMembers.length})`} action="Thêm" onAction={() => {}}/>
+        <SectionHeader title={`Thành viên cố định (${pickle.fixedMembers.length})`}/>
         <Card>
           {pickle.fixedMembers.map((id, i) => {
-            const attendedCount = pickle.sessions.filter(s => (s.attendees || s.attended || []).includes(id)).length;
+            const member = memberOrFallback(M, id);
+            const attendedCount = pickle.sessions.filter(s => sessionMemberIds(s).includes(id)).length;
+            const sessionCount = pickle.sessions.length;
             const myCourt = summary.courtPerMember;
             const myCredit = summary.guestCreditPer;
             const myExp = summary.memberOwes[id] || 0;
@@ -405,18 +482,18 @@ function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
                 padding: 14, borderBottom: i < pickle.fixedMembers.length - 1 ? '1px solid var(--border-1)' : 'none',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <Avatar member={M[id]} size={40} style={tweaks.avatarStyle}/>
+                  <Avatar member={member} size={40} style={tweaks?.avatarStyle}/>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{M[id].name}{M[id].isMe ? ' (bạn)' : ''}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{member.name}{member.isMe ? ' (bạn)' : ''}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>
-                      Đi {attendedCount}/{pickle.sessions.length} buổi
+                      Đi {attendedCount}/{sessionCount} buổi
                     </div>
                   </div>
                   <Money value={net} size={14} color={net >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
                 </div>
                 <div style={{ marginTop: 8, height: 5, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
                   <div style={{
-                    height: '100%', width: `${(attendedCount / pickle.sessions.length) * 100}%`,
+                    height: '100%', width: `${sessionCount > 0 ? (attendedCount / sessionCount) * 100 : 0}%`,
                     background: accent,
                     transition: 'width .6s cubic-bezier(.2,.7,.2,1)',
                   }}/>
@@ -432,11 +509,14 @@ function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
         <Card>
           {(() => {
             const guestMap = {};
-            for (const s of pickle.sessions) for (const g of (s.guests || [])) guestMap[g] = (guestMap[g] || 0) + 1;
+            for (const s of pickle.sessions) for (const g of safeArray(s.guests)) {
+              const name = guestName(g);
+              guestMap[name] = (guestMap[name] || 0) + 1;
+            }
             const entries = Object.entries(guestMap);
             return entries.map(([name, count], i) => (
               <ListRow key={name}
-                left={<div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--vb-warn-100)', color: '#A05C0C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{name.split(' ').map(p=>p[0]).join('').slice(-2)}</div>}
+                left={<div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--vb-warn-100)', color: '#A05C0C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{initialsFromName(name)}</div>}
                 title={name}
                 subtitle={`${count} buổi • ${fmtVNDFull(count * pickle.guestFeePerSession)}`}
                 right={<Pill bg="var(--vb-warn-100)" color="#A05C0C" size="xs">Vãng lai</Pill>}
@@ -451,16 +531,16 @@ function PickleMembers({ tweaks, summary, accent, accentBg, style, pickle }) {
 }
 
 // ── Pickleball session detail ───────────────────────────────────────────────
-function ScreenSessionDetail({ params, pop, tweaks }) {
+function ScreenSessionDetail({ params = {}, pop, tweaks = {} }) {
   const { state } = useApp();
   const M = getMemberMap(state.members);
-  const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
+  const pickle = normalizePickle(state.pickle);
   const allSessions = [...(pickle.sessions || []), ...(pickle.upcoming || [])];
-  const s = allSessions.find(x => x.id === params.sessionId);
+  const s = allSessions.find(x => x.id === params?.sessionId);
   if (!s) return null;
-  const attended = s.attendees || s.attended || s.going || [];
+  const attended = sessionMemberIds(s);
   const expenses = s.expenses || [];
-  const total = expenses.reduce((a,e)=>a+e.amount, 0);
+  const total = expenses.reduce((a,e)=>a+(Number(e.amount) || 0), 0);
   const per = attended.length > 0 ? Math.round(total / attended.length) : 0;
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -474,13 +554,13 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
           {expenses.map((ex, i) => {
             const cat = ex.category || ex.kind;
             const lbl = ex.title || ex.label;
-            const payer = M[ex.payerId || ex.paidBy];
+            const payer = memberOrFallback(M, ex.payerId || ex.paidBy);
             return (
               <ListRow key={i}
                 left={<div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-soft)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={cat === 'ball' ? 'ball' : cat === 'food' ? 'food' : 'drink'} size={18} color="var(--brand-1)"/></div>}
-                title={lbl}
-                subtitle={`${payer ? payer.name : ''} đã trả`}
-                right={<Money value={ex.amount} size={14}/>}
+                title={lbl || 'Chi phí'}
+                subtitle={`${payer.name} đã trả`}
+                right={<Money value={Number(ex.amount) || 0} size={14}/>}
                 divider={i < expenses.length - 1}
               />
             );
@@ -491,29 +571,35 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
           <div style={{ padding: '14px 16px', fontSize: 12, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-1)' }}>
             Có mặt — chia {fmtVND(per)} mỗi người
           </div>
-          {attended.map((id, i) => (
+          {attended.map((id, i) => {
+            const member = memberOrFallback(M, id);
+            return (
             <ListRow key={id}
-              left={<Avatar member={M[id]} size={36} style={tweaks.avatarStyle}/>}
-              title={M[id].name}
+              left={<Avatar member={member} size={36} style={tweaks?.avatarStyle}/>}
+              title={member.name}
               right={<Pill bg="var(--vb-success-100)" color="var(--vb-success-700)" size="xs" icon="check">Có mặt</Pill>}
               divider={i < attended.length - 1}
             />
-          ))}
+            );
+          })}
         </Card>
 
-        {(s.guests || []).length > 0 && (
+        {safeArray(s.guests).length > 0 && (
           <Card>
             <div style={{ padding: '14px 16px', fontSize: 12, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: '1px solid var(--border-1)' }}>
-              Vãng lai ({(s.guests || []).length})
+              Vãng lai ({safeArray(s.guests).length})
             </div>
-            {(s.guests || []).map((name, i) => (
+            {safeArray(s.guests).map((guest, i) => {
+              const name = guestName(guest);
+              return (
               <ListRow key={name}
-                left={<div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--vb-warn-100)', color: '#A05C0C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{name.split(' ').map(p=>p[0]).join('').slice(-2)}</div>}
+                left={<div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--vb-warn-100)', color: '#A05C0C', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{initialsFromName(name)}</div>}
                 title={name}
                 right={<Money value={pickle.guestFeePerSession} size={13}/>}
-                divider={i < (s.guests || []).length - 1}
+                divider={i < safeArray(s.guests).length - 1}
               />
-            ))}
+              );
+            })}
           </Card>
         )}
       </div>
@@ -521,21 +607,44 @@ function ScreenSessionDetail({ params, pop, tweaks }) {
   );
 }
 
-function ScreenAddSessionExpense({ params, pop, tweaks }) {
+function FormRow({ label, icon, children }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, color: 'var(--text-2)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {icon && <Icon name={icon} size={14} color="var(--text-2)"/>}{label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function inputStyle() {
+  return {
+    appearance: 'none', width: '100%', height: 44, padding: '0 14px',
+    background: 'var(--surface-1)', border: '1px solid var(--border-1)',
+    borderRadius: 10, fontFamily: 'var(--vb-font-body)', fontSize: 14, fontWeight: 500, color: 'var(--text-1)',
+    boxSizing: 'border-box', outline: 'none',
+  };
+}
+
+function ScreenAddSessionExpense({ params = {}, pop, tweaks = {} }) {
   const { state, dispatch, genId } = useApp();
   const M = getMemberMap(state.members);
-  const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
+  const pickle = normalizePickle(state.pickle);
+  const meId = state.currentUserId || ME;
+  const fixedMembers = pickle.fixedMembers;
   const [kind, setKind] = useState('ball');
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
-  const [paidBy, setPaidBy] = useState(ME);
+  const [paidBy, setPaidBy] = useState(() => fixedMembers.includes(meId) ? meId : (fixedMembers[0] || meId));
   const [sessionId, setSessionId] = useState(() => (pickle.sessions[0] || {}).id || '');
   const num = Number((amount || '0').replace(/[^0-9]/g, ''));
+  const canSave = num > 0 && !!sessionId && !!paidBy;
   return (
     <div style={{ paddingBottom: 32 }}>
       <NavHeader title="Thêm chi phí" subtitle="Buổi đánh Pickleball" onBack={pop} right={
         <button onClick={() => {
-          if (num > 0 && sessionId) {
+          if (!canSave) return;
             dispatch({
               type: 'ADD_PICKLE_EXPENSE',
               sessionId,
@@ -549,12 +658,11 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
                 createdAt: Date.now(),
               }
             });
-          }
           pop();
         }} style={{
-          appearance: 'none', height: 32, padding: '0 12px', cursor: 'pointer',
-          background: num > 0 ? 'var(--brand-1)' : 'var(--surface-2)',
-          color: num > 0 ? '#fff' : 'var(--text-3)',
+          appearance: 'none', height: 32, padding: '0 12px', cursor: canSave ? 'pointer' : 'not-allowed',
+          background: canSave ? 'var(--brand-1)' : 'var(--surface-2)',
+          color: canSave ? '#fff' : 'var(--text-3)',
           border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13,
         }}>Lưu</button>
       }/>
@@ -599,7 +707,7 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
 
         <FormRow label="Người trả" icon="user">
           <select value={paidBy} onChange={(e)=>setPaidBy(e.target.value)} style={inputStyle()}>
-            {pickle.fixedMembers.map(id => <option key={id} value={id}>{M[id].name}</option>)}
+            {fixedMembers.map(id => <option key={id} value={id}>{memberOrFallback(M, id).name}</option>)}
           </select>
         </FormRow>
 
@@ -613,16 +721,21 @@ function ScreenAddSessionExpense({ params, pop, tweaks }) {
   );
 }
 
-function ScreenAddExternalTicket({ pop, tweaks }) {
+function ScreenAddExternalTicket({ pop, tweaks = {} }) {
   const { state, dispatch, genId } = useApp();
   const M = getMemberMap(state.members);
-  const pickle = state.pickle || { sessions: [], upcoming: [], fixedMembers: [], externalTickets: [], monthlyCourtFee: 0, guestFeePerSession: 0 };
+  const pickle = normalizePickle(state.pickle);
   const meId = state.currentUserId || ME;
+  const fixedMembers = pickle.fixedMembers;
+  const defaultParticipants = fixedMembers.includes(meId)
+    ? [meId]
+    : (fixedMembers[0] ? [fixedMembers[0]] : (meId ? [meId] : []));
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
-  const [paidBy, setPaidBy] = useState(meId);
-  const [participants, setParticipants] = useState([meId]);
+  const [paidBy, setPaidBy] = useState(defaultParticipants[0] || meId);
+  const [participants, setParticipants] = useState(defaultParticipants);
   const num = Number((amount || '0').replace(/[^0-9]/g, ''));
+  const canSave = num > 0 && !!label.trim() && participants.length > 0;
 
   const toggleParticipant = (id) => {
     setParticipants(prev =>
@@ -634,13 +747,13 @@ function ScreenAddExternalTicket({ pop, tweaks }) {
     <div style={{ paddingBottom: 32 }}>
       <NavHeader title="Thêm vé lẻ" subtitle="Ngoài lịch cố định" onBack={pop} right={
         <button onClick={() => {
-          if (num > 0 && label && participants.length > 0) {
+          if (canSave) {
             dispatch({
               type: 'ADD_EXTERNAL_TICKET',
               ticket: {
                 id: genId(),
                 date: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
-                label,
+                label: label.trim(),
                 amount: num,
                 paidBy,
                 participants,
@@ -650,9 +763,9 @@ function ScreenAddExternalTicket({ pop, tweaks }) {
             pop();
           }
         }} style={{
-          appearance: 'none', height: 32, padding: '0 12px', cursor: 'pointer',
-          background: num > 0 && label ? 'var(--brand-1)' : 'var(--surface-2)',
-          color: num > 0 && label ? '#fff' : 'var(--text-3)',
+          appearance: 'none', height: 32, padding: '0 12px', cursor: canSave ? 'pointer' : 'not-allowed',
+          background: canSave ? 'var(--brand-1)' : 'var(--surface-2)',
+          color: canSave ? '#fff' : 'var(--text-3)',
           border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13,
         }}>Lưu</button>
       }/>
@@ -676,13 +789,15 @@ function ScreenAddExternalTicket({ pop, tweaks }) {
 
         <FormRow label="Người trả" icon="user">
           <select value={paidBy} onChange={(e)=>setPaidBy(e.target.value)} style={inputStyle()}>
-            {pickle.fixedMembers.map(id => <option key={id} value={id}>{M[id].name}</option>)}
+            {fixedMembers.map(id => <option key={id} value={id}>{memberOrFallback(M, id).name}</option>)}
           </select>
         </FormRow>
 
         <FormRow label="Người tham gia" icon="users">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {pickle.fixedMembers.map(id => (
+            {fixedMembers.map(id => {
+              const member = memberOrFallback(M, id);
+              return (
               <button key={id} onClick={() => toggleParticipant(id)} style={{
                 appearance: 'none', cursor: 'pointer',
                 padding: '6px 12px', borderRadius: 20,
@@ -690,8 +805,9 @@ function ScreenAddExternalTicket({ pop, tweaks }) {
                 border: '1px solid ' + (participants.includes(id) ? 'var(--brand-1)' : 'var(--border-1)'),
                 color: participants.includes(id) ? 'var(--brand-1)' : 'var(--text-1)',
                 fontSize: 13, fontWeight: 600,
-              }}>{M[id].short}</button>
-            ))}
+              }}>{member.short}</button>
+              );
+            })}
           </div>
         </FormRow>
       </div>

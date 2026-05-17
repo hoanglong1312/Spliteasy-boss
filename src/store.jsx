@@ -58,13 +58,14 @@ async function fetchGroupData(token) {
 function normalize(raw, currentMemberId) {
   const { members, groups, expenses, participants, settlements, pickleConfig, pickleSessions, pickleAttendees } = raw
   const group = groups[0]
-  if (!group) return buildEmptyState()
+  if (!group) return null  // signal: data empty but keep session
 
   const me = members.find(m => m.id === currentMemberId)
 
   const normalExpenses = expenses.map(e => ({
     id: e.id,
     title: e.description,
+    cat: e.cat || e.category || 'food',
     amount: Number(e.amount),
     paidBy: e.paid_by_member_id,
     participants: participants.filter(p => p.expense_id === e.id).map(p => p.member_id),
@@ -161,7 +162,13 @@ export function AppProvider({ children }) {
     try {
       const { member } = getStoredAuth()
       const raw = await fetchGroupData(t)
-      setState(normalize(raw, member?.id))
+      const next = normalize(raw, member?.id)
+      if (next) {
+        setState(next)
+      } else {
+        // groups empty — RLS / token issue, keep session, show error
+        setState(s => ({ ...s, _loading: false, _error: 'Không tải được dữ liệu nhóm. Kiểm tra kết nối.' }))
+      }
     } catch (err) {
       console.error('[store] refresh error:', err)
       setState(s => ({ ...s, _loading: false, _error: err.message }))

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, pickleSummary } from './data.jsx'
-import { Icon, Avatar, Money, Button, Card, Pill, iconBtnStyle, ListRow } from './components.jsx'
+import { Icon, Avatar, Money, Button, Card, Pill, iconBtnStyle, ListRow, SectionHeader, NavHeader, CategoryIcon } from './components.jsx'
 
 // Profile / Cá nhân tab — personal stats + settings
 

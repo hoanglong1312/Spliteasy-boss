@@ -1,4 +1,19 @@
 import React, { useState } from 'react'
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 20, color: 'red', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+          <b>Render Error:</b>{'\n'}{this.state.error?.message}{'\n'}{this.state.error?.stack}
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 import { useApp } from './store.jsx'
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakSelect, TweakToggle } from './tweaks-panel.jsx'
 import { Icon, ScreenTransition } from './components.jsx'
@@ -287,9 +302,30 @@ function App() {
 
   return (
     <div style={{ ...themeVars, fontFamily: 'var(--vb-font-body)', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface-2)' }}>
+      {state._error && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
+          padding: '10px 16px', background: '#FEF2F2',
+          color: '#C8322B', fontSize: 13, fontWeight: 600,
+          borderBottom: '1px solid #FECACA', textAlign: 'center',
+        }}>
+          ⚠️ {state._error}
+        </div>
+      )}
+      {state._loading && state.groups.length === 0 && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--surface-2)',
+        }}>
+          <div style={{ color: 'var(--text-2)', fontSize: 14, fontWeight: 600 }}>Đang tải dữ liệu…</div>
+        </div>
+      )}
       <div className="screen-scroll" data-screen-label={`${activeTab} • ${current.name}`} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: 60 }}>
         <ScreenTransition direction={navDir === 'tab' ? 'fade' : navDir} screenKey={`${activeTab}-${stack.length}-${animKey}`}>
-          {renderScreen()}
+          <ErrorBoundary>
+            {renderScreen()}
+          </ErrorBoundary>
         </ScreenTransition>
       </div>
       <TabBar tabs={tabs} active={activeTab} onSwitch={switchTab} onAdd={() => push('add-expense')}/>
