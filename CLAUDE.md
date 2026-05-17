@@ -1,248 +1,69 @@
-# CLAUDE.md — Hướng dẫn làm việc với Claude Code
+# CLAUDE.md — SpliteasyBoss
 
-> Phần 1–5 là **quy tắc chuẩn** áp dụng cho mọi dự án.
-> Phần 6–7 là **context riêng** của dự án này.
-
----
-
-## Phần 1 — Công cụ bắt buộc (Required Tools)
-
-### RTK — Rust Token Killer (Công cụ tiết kiệm token)
-- **GitHub:** https://github.com/obra/rtk
-- **Mục đích:** Tự động lọc output thừa của các lệnh shell, tiết kiệm 40–90% token
-- **Cài đặt:** `brew install obra/tap/rtk` (macOS) hoặc xem README trên GitHub
-- **Kiểm tra:** `rtk --version` và `rtk gain`
-
-RTK đã được kích hoạt tự động qua hook Bash trong `~/.claude/settings.json`. Claude PHẢI:
-- Ưu tiên dùng Bash cho lệnh hệ thống (git, ls, grep...) — RTK tự lọc output
-- Không dùng `cat` cho file lớn — dùng tool `Read` hoặc `head`/`grep` qua Bash
-- Chạy `rtk gain` để báo cáo hiệu quả khi được hỏi
-
-### Superpowers — Bộ quy trình làm việc (Workflow Skills)
-- **GitHub/Marketplace:** Cài qua Claude Code plugin marketplace — tìm `superpowers`
-- **Mục đích:** Mỗi skill là một quy trình (workflow) bắt buộc cho từng loại công việc — giúp Claude làm đúng quy trình thay vì tự ý quyết định
-
-Claude PHẢI tự động gọi đúng skill trước khi làm việc:
-
-| Tình huống | Skill bắt buộc |
-|-----------|---------------|
-| Bắt đầu tính năng (feature) mới | `brainstorming` — khám phá yêu cầu trước |
-| Có spec rồi, cần lập kế hoạch | `writing-plans` — chia nhỏ thành tasks |
-| Thực thi kế hoạch đã có | `executing-plans` hoặc `subagent-driven-development` |
-| Gặp lỗi (bug) bất kỳ | `systematic-debugging` — điều tra trước khi sửa |
-| Trước khi báo "đã xong" | `verification-before-completion` — chạy kiểm tra thực tế |
-| Nhận feedback về code | `receiving-code-review` — đánh giá kỹ trước khi sửa |
-| Hoàn thành branch, chuẩn bị merge | `finishing-a-development-branch` |
+> Quy tắc làm việc chung: xem `rules/` (multi-agent, RTK, superpowers, communication)
 
 ---
 
-## Phần 2 — Kiến trúc Multi-Agent (Multi-Agent Architecture)
-
-```
-Bạn (Product Owner)
-        │
-        ▼
-  Claude Code  ◄── Orchestrator (Điều phối viên)
-  ┌──────────────────────────────────────┐
-  │  • Đọc spec/plan hiện có            │
-  │  • Phân tích yêu cầu                │
-  │  • Gọi Codex hoặc Sub-agents        │
-  │  • Review chéo output               │
-  │  • Tổng hợp → báo cáo cho bạn      │
-  └──────────┬──────────────────────────┘
-             │
-      ┌──────┴──────┐
-      ▼             ▼
-Claude Sub-agents  Codex MCP
-(Agent tool)       (mcp__codex__codex)
-• Tìm kiếm code   • Viết code mới
-• Phân tích       • Sửa bugs
-• Cross-check     • Tạo migrations
-                  • Implement features
-```
-
-### Phân công mặc định
-| Việc | Agent |
-|------|-------|
-| Đọc file, tìm kiếm, phân tích | Claude Sub-agent hoặc Codex (read-only) |
-| Viết code, tạo file mới | Codex (`workspace-write`) |
-| Fix bug phức tạp | Codex → Claude review |
-| Review, tổng hợp, commit | Claude |
-
-### Codex MCP — Cách gọi
-```
-Tool: mcp__codex__codex
-sandbox: "read-only"       → chỉ đọc, không thay đổi gì
-sandbox: "workspace-write" → được phép viết file
-approval-policy: "never"   → chạy tự động không hỏi
-```
-
----
-
-## Phần 3 — Quy tắc Review Chéo (Cross-Review Rules)
-
-Bất kỳ việc gì liên quan đến **code, database schema, kiến trúc (architecture)**:
-
-1. **Codex làm/viết trước**
-2. **Claude review lại** — tìm lỗi logic, bảo mật, hiệu năng
-3. **Nếu có vấn đề** → sửa → review lại
-4. **Chỉ khi đồng thuận** mới tổng hợp gửi cho người dùng
-
-> Người dùng **chỉ nhận bản tóm tắt cuối** — không đọc output thô của từng agent.
-
----
-
-## Phần 4 — Quy tắc giao tiếp (Communication Rules)
-
-- **Luôn dùng tiếng Việt** khi giải thích với người dùng
-- **Từ chuyên ngành kỹ thuật** — viết tiếng Việt trước, kèm tiếng Anh trong ngoặc:
-  - ✅ "Kho lưu trữ trạng thái (state store)"
-  - ✅ "Thành phần giao diện (component)"
-  - ✅ "Hàm xử lý sự kiện (event handler)"
-- **Tên file, hàm, biến** — giữ nguyên tiếng Anh (đó là tên trong code)
-- **Người dùng mới tiếp quản dự án** — giải thích đủ ngữ cảnh, không giả định đã biết
-
----
-
-## Phần 5 — Tài liệu dự án (Project Docs — luôn đọc trước khi làm)
+## Tài liệu dự án (luôn đọc trước khi làm)
 
 ```
 docs/
-├── data-shapes.md                          ← Cấu trúc 7 thực thể dữ liệu
+├── data-shapes.md
 ├── superpowers/
 │   ├── specs/
-│   │   └── 2026-05-17-database-migration-design.md  ← Thiết kế database đã duyệt
+│   │   └── 2026-05-17-database-migration-design.md
 │   └── plans/
-│       ├── 2026-05-16-data-layer-analysis.md        ← Kế hoạch phân tích tầng data
-│       └── 2026-05-17-plan1-supabase-setup.md       ← Kế hoạch setup Supabase (hiện tại)
+│       ├── 2026-05-16-data-layer-analysis.md
+│       └── 2026-05-17-plan1-supabase-setup.md
 ```
 
 ---
 
-## Phần 6 — Context Dự Án: SpliteasyBoss (Project Context)
+## Context Dự Án: SpliteasyBoss
 
-### Bài toán đang giải quyết
+**SpliteasyBoss** là web app quản lý tài chính nhóm cho CLB pickleball Việt Nam.
 
-**SpliteasyBoss** là ứng dụng web (web app) quản lý tài chính nhóm — chuyên dùng cho nhóm bạn bè chơi pickleball ở Việt Nam.
+**Bài toán:** Nhóm 6–15 người chơi pickleball định kỳ cần chia tiền sân, tiền khách, theo dõi ai nợ ai — hiện giải quyết bằng Excel/Zalo, dễ mất dữ liệu.
 
-**Vấn đề thực tế:** Khi một nhóm 6–15 người chơi thể thao định kỳ, luôn phát sinh các bài toán tài chính:
-- Ai đã trả tiền sân? Bao nhiêu? Chia như thế nào?
-- Tháng này mỗi người phải đóng bao nhiêu?
-- Khách vãng lai tính tiền ra sao?
-- Cuối tháng ai còn nợ ai bao nhiêu?
+### Người dùng
 
-Hiện tại các nhóm giải quyết bằng Excel, nhắn tin Zalo — dễ mất dữ liệu, khó minh bạch, thủ quỹ mất nhiều công ghi chép.
+| Vai trò | Quyền |
+|---------|-------|
+| Thủ quỹ (Treasurer) | Thêm/sửa/xóa/duyệt tất cả |
+| Thành viên (Member) | Xem + đề xuất chi tiêu + RSVP |
+| Người xem (Viewer) | Chỉ xem |
 
-### Giải pháp
-
-Web app chạy trên điện thoại (giao diện mobile-first), không cần cài đặt, vào bằng link hoặc mã nhóm. Hệ thống tự động tính toán, minh bạch cho tất cả thành viên.
-
-### Người dùng (Users)
-
-| Vai trò | Mô tả | Quyền |
-|---------|-------|-------|
-| **Thủ quỹ (Treasurer)** | 1–2 người, người ghi chép chính | Thêm/sửa/xóa/duyệt tất cả |
-| **Thành viên (Member)** | Người chơi thường xuyên | Xem + đề xuất chi tiêu + RSVP |
-| **Người xem (Viewer)** | Thành viên ít hoạt động | Chỉ xem |
-
-### 3 Giao diện chính (Views)
+### Stack kỹ thuật
 
 ```
-1. Bảng nhóm chung (Group Dashboard)
-   → Tất cả thành viên cùng xem
-   → Tổng chi tiêu tháng, ai nợ ai, lịch buổi chơi
-
-2. Dashboard cá nhân (Personal Dashboard)
-   → Mỗi người có link riêng (personal token)
-   → Số dư cá nhân, chi phí pickleball của mình, tổng kết tháng
-
-3. Giao diện thủ quỹ (Treasurer View)
-   → Duyệt chi tiêu chờ xử lý
-   → Quản lý thành viên, cấu hình nhóm
+Frontend: React + Vite (đã migrate từ CDN Babel)
+Styles:   vb-tokens.css
+State:    Supabase (đã migrate từ localStorage)
+Backend:  Supabase — PostgreSQL + RLS + Realtime
 ```
 
-### Stack kỹ thuật hiện tại
+### File quan trọng
 
 ```
-Frontend:  React (JSX), không có build step — CDN + Babel Standalone
-           → CẦN MIGRATE sang Vite
-Styles:    vb-tokens.css (Design tokens)
-State:     localStorage → CẦN MIGRATE sang Supabase
-Backend:   Không có → Supabase (PostgreSQL + RLS + Realtime)
-```
-
-### Tệp quan trọng
-
-```
-index.html             ← Điểm vào app
-src/app.jsx            ← Shell chính, điều hướng màn hình
-src/store.jsx          ← Kho trạng thái (state store) — sẽ thay bằng Supabase
-src/data.jsx           ← Hàm tính tiền — sẽ chuyển thành Supabase queries
-src/components.jsx     ← Thành phần giao diện (UI components) dùng chung
-src/screen-home.jsx    ← Màn hình chính
-src/screen-groups.jsx  ← Màn hình nhóm chi tiêu
-src/screen-pickleball.jsx ← Màn hình CLB pickleball
-src/screen-profile.jsx ← Màn hình hồ sơ cá nhân
-src/vb-tokens.css      ← Design tokens (màu sắc, font, spacing)
+src/app.jsx            ← Shell chính, điều hướng
+src/store.jsx          ← State store (Supabase-backed)
+src/data.jsx           ← Hàm tính tiền
+src/components.jsx     ← UI components dùng chung
+src/screen-*.jsx       ← Các màn hình
+src/lib/supabase.js    ← Supabase client factory
+src/lib/auth.js        ← Token auth helpers
+supabase/migrations/   ← SQL migrations (đã chạy hết)
 ```
 
 ---
 
-## Phần 7 — Lộ trình phát triển (Development Roadmap)
-
-### Giai đoạn hiện tại: Phase 1 — Nền tảng dữ liệu
+## Lộ trình phát triển
 
 ```
-Phase 0: Phân tích & Thiết kế         ✅ XONG
-├── Bóc tách cấu trúc dữ liệu cũ
-├── Brainstorm kiến trúc mới
-└── Thiết kế database schema (đã duyệt)
-
-Phase 1: Thiết kế UI/UX                🔄 ĐANG LÀM
-├── Brainstorm user flow từng vai trò  📋 Đang brainstorm
-├── Wireframe màn hình chính           ⏳ Chưa làm
-├── Wireframe thủ quỹ / thành viên    ⏳ Chưa làm
-├── Thiết kế components mới           ⏳ Chưa làm
-└── Review & duyệt với chủ dự án      ⏳ Chưa làm
-
-Phase 2: Kế hoạch kỹ thuật đầy đủ    ⏳ SAU PHASE 1
-├── Sub-plan 1: Supabase DB + RLS     📋 Plan đã viết (chưa thực thi)
-├── Sub-plan 2: Auth & Access layer   ⏳ Chưa viết
-├── Sub-plan 3: Frontend migration    ⏳ Chưa viết
-├── Sub-plan 4: Approval + Disputes   ⏳ Chưa viết
-└── Sub-plan 5: Pickleball module     ⏳ Chưa viết
-
-Phase 3: Thực thi Database            ⏳ SAU PHASE 2
-├── Setup Supabase project
-├── Chạy migrations (12 bảng)
-└── Kiểm tra RLS + seed data
-
-Phase 4: Frontend Migration           ⏳ SAU PHASE 3
-├── Migrate Vite build (bỏ CDN Babel)
-├── Thay store.jsx → Supabase client
-├── Thay data.jsx → Supabase queries
-└── Kết nối toàn bộ màn hình
-
-Phase 5: Tính năng mới               ⏳ SAU PHASE 4
-├── Approval workflow + Disputes
-├── Personal dashboard + token riêng
-├── Tổng kết cuối tháng
-└── Pickleball nâng cấp
+Phase 0: Phân tích & Thiết kế    ✅ XONG
+Phase 1: UI/UX Design            🔄 ĐANG LÀM
+Phase 2: Kế hoạch kỹ thuật       ⏳ SAU PHASE 1
+Phase 3: Thực thi Database       ✅ XONG (migrations đã chạy)
+Phase 4: Frontend Migration      ✅ XONG (Vite + Supabase)
+Phase 5: Tính năng mới           ⏳ SAU PHASE 1
 ```
-
-### Về Phase 2 — UI/UX Design
-
-Trước khi viết một dòng code frontend (giao diện) nào, cần thiết kế trước:
-
-1. **Wireframe (Khung giao diện)** — vẽ sơ bộ từng màn hình trông như thế nào
-2. **User Flow (Luồng người dùng)** — mô tả hành trình của từng loại người dùng:
-   - Thủ quỹ: mở app → thấy gì → làm gì → kết thúc ở đâu
-   - Thành viên: nhận link → vào app → thấy gì → đề xuất chi tiêu như thế nào
-   - Người mới: nhập mã nhóm → join → trải nghiệm đầu tiên
-3. **Component mới cần thiết kế:**
-   - Badge "X chi tiêu chờ duyệt" của thủ quỹ
-   - Nút "Báo sai" trên từng chi tiêu
-   - Trang tổng kết cuối tháng của cá nhân
-   - Màn hình onboarding khi nhập mã nhóm lần đầu
-
-> Phase 2 dùng skill `brainstorming` kết hợp visual companion để thiết kế giao diện trước khi code.
