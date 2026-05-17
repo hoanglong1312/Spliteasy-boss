@@ -134,8 +134,8 @@ function pickleSummary(pickle = {}) {
   return { courtPerMember, totalGuests, guestRevenue, guestCreditPer, memberOwes };
 }
 
-Object.assign(window, {
+export {
   MEMBERS, M, ME, getMemberMap,
   fmtVND, fmtVNDFull, fmtDate,
   splitEqual, groupBalance, groupNet, totalBalances, recentActivity, pickleSummary,
-});
+}

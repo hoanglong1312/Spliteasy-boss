@@ -1,4 +1,25 @@
-// Main app shell + navigation + theme + tweaks wiring
+import React, { useState } from 'react'
+import { useApp } from './store.jsx'
+import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakSelect, TweakToggle } from './tweaks-panel.jsx'
+import { Icon, ScreenTransition } from './components.jsx'
+import { joinGroup } from './lib/auth.js'
+import ScreenHome from './screen-home.jsx'
+import ScreenGroups, {
+  ScreenGroupDetail, ScreenExpenseDetail, ScreenAddExpense,
+  ScreenSettleAll, ScreenNewGroup, ScreenNotifications,
+} from './screen-groups.jsx'
+import ScreenPickleball, {
+  ScreenSessionDetail, ScreenAddSessionExpense, ScreenAddExternalTicket,
+} from './screen-pickleball.jsx'
+import ScreenProfile, { ScreenSettings } from './screen-profile.jsx'
+
+// Helper: hex color with alpha — used for brand-soft in dark mode
+function hexA(hex, a) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${a})`
+}
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "palette": "purple",
@@ -25,16 +46,43 @@ const FONTS = {
   system: { body: 'system-ui, -apple-system, "Helvetica Neue", sans-serif', display: 'system-ui, -apple-system, sans-serif' },
 };
 
-function ScreenEnterName() {
-  const { dispatch } = useApp();
-  const [name, setName] = React.useState('');
+function ScreenJoinGroup() {
+  const { dispatch } = useApp()
+  const [code, setCode]   = useState('')
+  const [name, setName]   = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
-  function handleStart() {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const userId = 'u_' + Math.random().toString(36).slice(2, 10);
-    dispatch({ type: 'SET_CURRENT_USER', userId, userName: trimmed });
+  async function handleJoin() {
+    const trimCode = code.trim().toUpperCase()
+    const trimName = name.trim()
+    if (!trimCode || !trimName) return
+    setLoading(true)
+    setError('')
+    try {
+      const result = await joinGroup(trimCode, trimName)
+      await dispatch({
+        type: 'LOGIN',
+        token: result.token,
+        memberId: result.member_id,
+        groupId: result.group_id,
+        memberName: result.member_name,
+      })
+    } catch (err) {
+      const msg = err.message === 'invalid_invite_code'
+        ? 'Mã nhóm không đúng. Kiểm tra lại nhé!'
+        : err.message === 'invite_code_required'
+        ? 'Nhập mã nhóm để tiếp tục.'
+        : err.message === 'name_required'
+        ? 'Nhập tên của bạn.'
+        : 'Lỗi kết nối. Thử lại sau.'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const canJoin = code.trim() && name.trim() && !loading
 
   return (
     <div style={{
@@ -53,9 +101,32 @@ function ScreenEnterName() {
         SpliteasyBoss
       </div>
       <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 36, textAlign: 'center' }}>
-        Chia tiền nhóm dễ dàng
+        Nhập mã nhóm để vào nhóm của bạn
       </div>
+
       <div style={{ width: '100%', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+          Mã nhóm
+        </div>
+        <input
+          type="text"
+          placeholder="VD: PICKLE-TEST"
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          onKeyDown={e => e.key === 'Enter' && canJoin && handleJoin()}
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '12px 14px', borderRadius: 12,
+            border: '1.5px solid var(--border-1)',
+            fontSize: 15, fontWeight: 600, letterSpacing: '0.04em',
+            background: 'var(--surface-1)', color: 'var(--text-1)',
+            outline: 'none', fontFamily: 'var(--vb-font-body)',
+            textTransform: 'uppercase',
+          }}
+        />
+      </div>
+
+      <div style={{ width: '100%', marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
           Tên của bạn
         </div>
@@ -64,8 +135,7 @@ function ScreenEnterName() {
           placeholder="VD: Nguyễn Văn A"
           value={name}
           onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleStart()}
-          autoFocus
+          onKeyDown={e => e.key === 'Enter' && canJoin && handleJoin()}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '12px 14px', borderRadius: 12,
@@ -76,141 +146,143 @@ function ScreenEnterName() {
           }}
         />
       </div>
+
+      {error && (
+        <div style={{ width: '100%', marginBottom: 12, padding: '10px 14px',
+          borderRadius: 10, background: 'var(--vb-danger-50)',
+          color: 'var(--vb-danger-700)', fontSize: 13, fontWeight: 500 }}>
+          {error}
+        </div>
+      )}
+
       <button
-        onClick={handleStart}
-        disabled={!name.trim()}
+        onClick={handleJoin}
+        disabled={!canJoin}
         style={{
           width: '100%', height: 48, borderRadius: 14, border: 0,
-          background: name.trim() ? 'var(--brand-1)' : 'var(--border-1)',
-          color: name.trim() ? '#fff' : 'var(--text-3)',
+          background: canJoin ? 'var(--brand-1)' : 'var(--border-1)',
+          color: canJoin ? '#fff' : 'var(--text-3)',
           fontSize: 15, fontWeight: 700,
-          cursor: name.trim() ? 'pointer' : 'default',
+          cursor: canJoin ? 'pointer' : 'default',
           fontFamily: 'var(--vb-font-body)',
           transition: 'background .15s',
         }}
       >
-        Bắt đầu →
+        {loading ? 'Đang vào nhóm...' : 'Vào nhóm →'}
       </button>
-      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 20, textAlign: 'center' }}>
-        Tài khoản đầy đủ sẽ có ở phiên bản tiếp theo
-      </div>
     </div>
-  );
+  )
 }
 
 function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { state } = useApp();
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS)
+  const { state } = useApp()
 
-  // Nav state — each tab has its own stack
   const initStacks = () => ({
-    home: [{ name: 'home' }],
+    home:   [{ name: 'home' }],
     groups: [{ name: 'groups' }],
     pickle: [{ name: 'pickle' }],
-    me: [{ name: 'me' }],
-  });
-  const [stacks, setStacks] = useState(initStacks);
-  const [activeTab, setActiveTab] = useState('home');
-  const [navDir, setNavDir] = useState('forward'); // forward | backward | tab
-  const [animKey, setAnimKey] = useState(0);
+    me:     [{ name: 'me' }],
+  })
+  const [stacks, setStacks]   = useState(initStacks)
+  const [activeTab, setActiveTab] = useState('home')
+  const [navDir, setNavDir]   = useState('forward')
+  const [animKey, setAnimKey] = useState(0)
 
   const push = (name, params) => {
-    setNavDir('forward');
-    setAnimKey(k => k + 1);
-    setStacks(s => ({ ...s, [activeTab]: [...s[activeTab], { name, params }] }));
-  };
+    setNavDir('forward')
+    setAnimKey(k => k + 1)
+    setStacks(s => ({ ...s, [activeTab]: [...s[activeTab], { name, params }] }))
+  }
   const pushToTab = (tab, name, params) => {
-    setNavDir('forward');
-    setAnimKey(k => k + 1);
-    setActiveTab(tab);
-    setStacks(s => ({ ...s, [tab]: [...s[tab], { name, params }] }));
-  };
+    setNavDir('forward')
+    setAnimKey(k => k + 1)
+    setActiveTab(tab)
+    setStacks(s => ({ ...s, [tab]: [...s[tab], { name, params }] }))
+  }
   const pop = () => {
-    setNavDir('backward');
-    setAnimKey(k => k + 1);
-    setStacks(s => ({ ...s, [activeTab]: s[activeTab].slice(0, -1) }));
-  };
+    setNavDir('backward')
+    setAnimKey(k => k + 1)
+    setStacks(s => ({ ...s, [activeTab]: s[activeTab].slice(0, -1) }))
+  }
   const switchTab = (tab) => {
     if (tab === activeTab) {
-      // Pop to root
       if (stacks[tab].length > 1) {
-        setNavDir('backward');
-        setAnimKey(k => k + 1);
-        setStacks(s => ({ ...s, [tab]: [s[tab][0]] }));
+        setNavDir('backward')
+        setAnimKey(k => k + 1)
+        setStacks(s => ({ ...s, [tab]: [s[tab][0]] }))
       }
-      return;
+      return
     }
-    setNavDir('tab');
-    setAnimKey(k => k + 1);
-    setActiveTab(tab);
-  };
+    setNavDir('tab')
+    setAnimKey(k => k + 1)
+    setActiveTab(tab)
+  }
 
-  // Build CSS variables for theme
-  const pal = PALETTES[t.palette] || PALETTES.purple;
-  const dark = t.dark;
-  const font = FONTS[t.font] || FONTS.inter;
+  const pal  = PALETTES[t.palette] || PALETTES.purple
+  const dark = t.dark
+  const font = FONTS[t.font] || FONTS.inter
 
   const themeVars = {
-    '--brand-1': pal.c1,
-    '--brand-2': pal.c2,
-    '--brand-soft': dark ? hexA(pal.c1, 0.18) : pal.soft,
+    '--brand-1':     pal.c1,
+    '--brand-2':     pal.c2,
+    '--brand-soft':  dark ? hexA(pal.c1, 0.18) : pal.soft,
     '--brand-shadow': pal.shadow,
-    '--surface-1': dark ? '#1A1B1F' : '#FFFFFF',
-    '--surface-2': dark ? '#24262C' : '#F1F5F9',
-    '--text-1':    dark ? '#F2F3F5' : '#101828',
-    '--text-2':    dark ? '#9CA3AF' : '#62748E',
-    '--text-3':    dark ? '#6B7280' : '#9CA3AF',
-    '--border-1':  dark ? '#2A2D33' : '#E5E5E7',
+    '--surface-1':   dark ? '#1A1B1F' : '#FFFFFF',
+    '--surface-2':   dark ? '#24262C' : '#F1F5F9',
+    '--text-1':      dark ? '#F2F3F5' : '#101828',
+    '--text-2':      dark ? '#9CA3AF' : '#62748E',
+    '--text-3':      dark ? '#6B7280' : '#9CA3AF',
+    '--border-1':    dark ? '#2A2D33' : '#E5E5E7',
     '--border-strong': dark ? '#3A3D44' : '#99A1AF',
-    '--vb-font-body': font.body,
+    '--vb-font-body':    font.body,
     '--vb-font-display': font.display,
-    // Re-tint dark mode utilities
     '--vb-success-100': dark ? 'rgba(46,191,67,0.16)' : '#F3FFF6',
     '--vb-success-700': dark ? '#5DD477' : '#1F8A4C',
     '--vb-danger-50':   dark ? 'rgba(231,0,11,0.16)' : '#FEF2F2',
     '--vb-danger-700':  dark ? '#FF7A85' : '#C8322B',
     '--vb-warn-100':    dark ? 'rgba(238,162,62,0.16)' : '#FFFAF2',
     '--vb-gray-75':     dark ? '#1F2126' : '#EFEFF1',
-  };
+  }
 
-  const stack = stacks[activeTab];
-  const current = stack[stack.length - 1];
+  const stack   = stacks[activeTab]
+  const current = stack[stack.length - 1]
 
   const renderScreen = () => {
-    const p = current.params || {};
+    const p = current.params || {}
     switch (current.name) {
-      case 'home':     return <ScreenHome tweaks={t} push={push} pushToTab={pushToTab} switchTab={switchTab}/>;
-      case 'groups':   return <ScreenGroups tweaks={t} push={push}/>;
-      case 'pickle':   return <ScreenPickleball tweaks={t} push={push}/>;
-      case 'me':       return <ScreenProfile tweaks={t} push={push} setTweak={setTweak}/>;
-      case 'group-detail':    return <ScreenGroupDetail params={p} tweaks={t} push={push} pop={pop}/>;
-      case 'expense-detail':  return <ScreenExpenseDetail params={p} tweaks={t} push={push} pop={pop}/>;
-      case 'add-expense':     return <ScreenAddExpense params={p} tweaks={t} push={push} pop={pop}/>;
-      case 'settle-all':      return <ScreenSettleAll tweaks={t} pop={pop}/>;
-      case 'settle-group':    return <ScreenSettleAll params={p} tweaks={t} pop={pop}/>;
-      case 'new-group':       return <ScreenNewGroup params={p} pop={pop}/>;
-      case 'notifications':   return <ScreenNotifications pop={pop} tweaks={t}/>;
-      case 'session-detail':  return <ScreenSessionDetail params={p} pop={pop} tweaks={t}/>;
-      case 'add-session-expense': return <ScreenAddSessionExpense params={p} pop={pop} tweaks={t}/>;
-      case 'add-external-ticket':   return <ScreenAddExternalTicket pop={pop} tweaks={t}/>;
-      case 'settings':        return <ScreenSettings pop={pop}/>;
-      default: return null;
+      case 'home':     return <ScreenHome tweaks={t} push={push} pushToTab={pushToTab} switchTab={switchTab}/>
+      case 'groups':   return <ScreenGroups tweaks={t} push={push}/>
+      case 'pickle':   return <ScreenPickleball tweaks={t} push={push}/>
+      case 'me':       return <ScreenProfile tweaks={t} push={push} setTweak={setTweak}/>
+      case 'group-detail':    return <ScreenGroupDetail params={p} tweaks={t} push={push} pop={pop}/>
+      case 'expense-detail':  return <ScreenExpenseDetail params={p} tweaks={t} push={push} pop={pop}/>
+      case 'add-expense':     return <ScreenAddExpense params={p} tweaks={t} push={push} pop={pop}/>
+      case 'settle-all':      return <ScreenSettleAll tweaks={t} pop={pop}/>
+      case 'settle-group':    return <ScreenSettleAll params={p} tweaks={t} pop={pop}/>
+      case 'new-group':       return <ScreenNewGroup params={p} pop={pop}/>
+      case 'notifications':   return <ScreenNotifications pop={pop} tweaks={t}/>
+      case 'session-detail':  return <ScreenSessionDetail params={p} pop={pop} tweaks={t}/>
+      case 'add-session-expense': return <ScreenAddSessionExpense params={p} pop={pop} tweaks={t}/>
+      case 'add-external-ticket': return <ScreenAddExternalTicket pop={pop} tweaks={t}/>
+      case 'settings':        return <ScreenSettings pop={pop}/>
+      default: return null
     }
-  };
+  }
 
   const tabs = [
-    { id: 'home', label: 'Trang chủ', icon: 'home' },
-    { id: 'groups', label: 'Nhóm', icon: 'users' },
+    { id: 'home',   label: 'Trang chủ', icon: 'home' },
+    { id: 'groups', label: 'Nhóm',      icon: 'users' },
     ...(t.showPickleball ? [{ id: 'pickle', label: 'Pickleball', icon: 'pickle' }] : []),
     { id: 'me', label: 'Cá nhân', icon: 'user' },
-  ];
+  ]
 
   if (state.currentUserId === null) {
     return (
       <div style={{ ...themeVars, fontFamily: 'var(--vb-font-body)', height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--surface-2)', overflowY: 'auto' }}>
-        <ScreenEnterName/>
+        <ScreenJoinGroup/>
       </div>
-    );
+    )
   }
 
   return (
@@ -220,17 +292,12 @@ function App() {
           {renderScreen()}
         </ScreenTransition>
       </div>
-
-      {/* Bottom tab bar */}
       <TabBar tabs={tabs} active={activeTab} onSwitch={switchTab} onAdd={() => push('add-expense')}/>
-
-      {/* Tweaks */}
       <SpliteasyTweaks t={t} setTweak={setTweak} activeTab={activeTab} switchTab={switchTab}/>
     </div>
-  );
+  )
 }
 
-// ── Tab Bar ─────────────────────────────────────────────────────────────────
 function TabBar({ tabs, active, onSwitch, onAdd }) {
   return (
     <div style={{
@@ -242,8 +309,8 @@ function TabBar({ tabs, active, onSwitch, onAdd }) {
       zIndex: 50,
     }}>
       {tabs.map((tab, i) => {
-        const isActive = active === tab.id;
-        const isMid = i === Math.floor(tabs.length / 2);
+        const isActive = active === tab.id
+        const isMid = i === Math.floor(tabs.length / 2)
         return (
           <React.Fragment key={tab.id}>
             {isMid && (
@@ -253,8 +320,7 @@ function TabBar({ tabs, active, onSwitch, onAdd }) {
                 background: 'var(--brand-1)', color: '#fff', border: 0,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 boxShadow: '0 8px 20px -4px var(--brand-shadow)',
-                marginTop: -8,
-                transition: 'transform .15s ease',
+                marginTop: -8, transition: 'transform .15s ease',
               }}
               onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.94)'}
               onMouseUp={(e) => e.currentTarget.style.transform = ''}
@@ -273,13 +339,12 @@ function TabBar({ tabs, active, onSwitch, onAdd }) {
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '-0.005em' }}>{tab.label}</span>
             </button>
           </React.Fragment>
-        );
+        )
       })}
     </div>
-  );
+  )
 }
 
-// ── Tweaks panel ───────────────────────────────────────────────────────────
 function SpliteasyTweaks({ t, setTweak, activeTab, switchTab }) {
   return (
     <TweaksPanel title="Tweaks · Spliteasy">
@@ -287,7 +352,7 @@ function SpliteasyTweaks({ t, setTweak, activeTab, switchTab }) {
       <TweakRadio label="Theme" value={t.dark ? 'dark' : 'light'} options={['light','dark']} onChange={(v) => setTweak('dark', v === 'dark')}/>
       <TweakColor label="Màu chủ đạo" value={t.palette}
         options={Object.keys(PALETTES).map(k => PALETTES[k].c1)}
-        onChange={(v) => { const key = Object.keys(PALETTES).find(k => PALETTES[k].c1 === v); setTweak('palette', key); }}
+        onChange={(v) => { const key = Object.keys(PALETTES).find(k => PALETTES[k].c1 === v); setTweak('palette', key) }}
       />
       <TweakSelect label="Font chữ" value={t.font}
         options={[
@@ -298,7 +363,6 @@ function SpliteasyTweaks({ t, setTweak, activeTab, switchTab }) {
         onChange={(v) => setTweak('font', v)}
       />
       <TweakRadio label="Avatar" value={t.avatarStyle} options={['photo','initials']} onChange={(v) => setTweak('avatarStyle', v)}/>
-
       <TweakSection label="Layout & nội dung"/>
       <TweakSelect label="Trang chủ" value={t.homeLayout}
         options={[
@@ -322,21 +386,12 @@ function SpliteasyTweaks({ t, setTweak, activeTab, switchTab }) {
         label="Bật tab Pickleball"
         value={t.showPickleball}
         onChange={(v) => {
-          setTweak('showPickleball', v);
-          if (!v && activeTab === 'pickle') switchTab('home');
+          setTweak('showPickleball', v)
+          if (!v && activeTab === 'pickle') switchTab('home')
         }}
       />
     </TweaksPanel>
-  );
+  )
 }
 
-// Mount inside the iOS frame
-function Mount() {
-  return (
-    <IOSDevice width={402} height={874} dark={false}>
-      <App/>
-    </IOSDevice>
-  );
-}
-
-ReactDOM.createRoot(document.getElementById('root')).render(<AppProvider><Mount/></AppProvider>);
+export default App

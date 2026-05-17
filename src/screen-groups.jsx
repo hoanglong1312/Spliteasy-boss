@@ -1,3 +1,8 @@
+import React, { useState, useMemo, useCallback, useRef } from 'react'
+import { useApp } from './store.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual } from './data.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState } from './components.jsx'
+
 // Groups tab — list / detail / add expense / settle
 // Several sub-screens, all driven by `push` from the nav stack.
 
@@ -954,7 +959,5 @@ function ScreenNotifications({ pop, tweaks }) {
   );
 }
 
-Object.assign(window, {
-  ScreenGroups, ScreenGroupDetail, ScreenExpenseDetail,
-  ScreenAddExpense, ScreenSettleAll, ScreenNewGroup, ScreenNotifications,
-});
+export default ScreenGroups
+export { ScreenGroupDetail, ScreenExpenseDetail, ScreenAddExpense, ScreenSettleAll, ScreenNewGroup, ScreenNotifications }

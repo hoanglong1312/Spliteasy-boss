@@ -1,3 +1,4 @@
+import React from 'react'
 
 // iOS.jsx — Simplified iOS 26 (Liquid Glass) device frame
 // Based on the iOS 26 UI Kit + Figma status bar spec. No assets, no deps.
@@ -333,6 +334,6 @@ function IOSKeyboard({ dark = false }) {
   );
 }
 
-Object.assign(window, {
+export {
   IOSDevice, IOSStatusBar, IOSNavBar, IOSGlassPill, IOSList, IOSListRow, IOSKeyboard,
-});
+}

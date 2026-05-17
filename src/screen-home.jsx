@@ -1,3 +1,8 @@
+import React, { useMemo } from 'react'
+import { useApp } from './store.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, recentActivity, groupBalance, groupNet } from './data.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow } from './components.jsx'
+
 // Home tab — dashboard with balance summary, recent activity, group cards
 // Has 3 layout variations exposed via Tweaks: 'overview' | 'feed' | 'compact'
 
@@ -81,15 +86,6 @@ function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
   );
 }
 
-function iconBtnStyle() {
-  return {
-    appearance: 'none', position: 'relative',
-    width: 40, height: 40, borderRadius: 12,
-    border: '1px solid var(--border-1)', background: 'var(--surface-1)',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer',
-  };
-}
 
 // ── Balance Hero (the big summary card at top) ──────────────────────────────
 function BalanceHero({ net, youAreOwed, youOwe, push }) {
@@ -466,4 +462,4 @@ function hexA(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-Object.assign(window, { ScreenHome, BalanceHero, WhoOwesView, GroupCard, ActivityRow, hexA });
+export default ScreenHome

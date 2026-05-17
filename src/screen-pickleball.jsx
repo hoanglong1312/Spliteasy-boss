@@ -1,3 +1,8 @@
+import React, { useState, useMemo } from 'react'
+import { useApp } from './store.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, pickleSummary } from './data.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow } from './components.jsx'
+
 // Pickleball tab — special sub-app for the company's CLB Pickleball
 // Has 2 visual styles via Tweaks: 'sporty' (vibrant lime/orange) | 'consistent' (purple match)
 
@@ -694,4 +699,5 @@ function ScreenAddExternalTicket({ pop, tweaks }) {
   );
 }
 
-Object.assign(window, { ScreenPickleball, ScreenSessionDetail, ScreenAddSessionExpense, ScreenAddExternalTicket });
+export default ScreenPickleball
+export { ScreenSessionDetail, ScreenAddSessionExpense, ScreenAddExternalTicket }

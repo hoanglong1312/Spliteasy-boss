@@ -1,14 +1,18 @@
-// store.jsx — "Kho trạng thái trung tâm" của toàn bộ app
-const { createContext, useContext, useReducer, useEffect } = React;
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { createSupabase } from './lib/supabase.js'
+import { getStoredAuth, storeAuth, clearAuth } from './lib/auth.js'
 
-const STORAGE_KEY = 'spliteasy_v3_state';
+const AppContext = createContext(null)
 
-// ─── Initial State ────────────────────────────────────────────────────────────
-// Trạng thái ban đầu — rỗng, user phải đăng nhập để tạo dữ liệu
-function buildInitialState() {
+export function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+}
+
+function buildEmptyState() {
   return {
     currentUserId: null,
     currentUserName: null,
+    currentGroupId: null,
     members: [],
     groups: [],
     pickle: {
@@ -20,230 +24,334 @@ function buildInitialState() {
       guestFeePerSession: 0,
     },
     notifications: [],
-  };
+    _loading: false,
+    _error: null,
+  }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function genId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+async function fetchGroupData(token) {
+  const sb = createSupabase(token)
+  const [mR, gR, eR, pR, sR, pcR, psR, paR] = await Promise.all([
+    sb.from('members').select('*'),
+    sb.from('groups').select('*'),
+    sb.from('expenses').select('*').order('expense_date', { ascending: false }),
+    sb.from('expense_participants').select('*'),
+    sb.from('settlements').select('*').order('settlement_date', { ascending: false }),
+    sb.from('pickle_configs').select('*').limit(1).maybeSingle(),
+    sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
+    sb.from('pickle_attendees').select('*'),
+  ])
+  if (mR.error) throw mR.error
+  if (gR.error) throw gR.error
+  return {
+    members:         mR.data || [],
+    groups:          gR.data || [],
+    expenses:        eR.data || [],
+    participants:    pR.data || [],
+    settlements:     sR.data || [],
+    pickleConfig:    pcR.data,
+    pickleSessions:  psR.data || [],
+    pickleAttendees: paR.data || [],
+  }
 }
 
-// ─── Reducer ──────────────────────────────────────────────────────────────────
-function appReducer(state, action) {
-  switch (action.type) {
+function normalize(raw, currentMemberId) {
+  const { members, groups, expenses, participants, settlements, pickleConfig, pickleSessions, pickleAttendees } = raw
+  const group = groups[0]
+  if (!group) return buildEmptyState()
 
-    // ── User ──────────────────────────────────────────────────────────────────
-    case 'SET_CURRENT_USER': {
-      const shortName = action.userName.trim().split(' ').pop();
-      const initials = action.userName.trim().split(' ')
-        .map(w => w[0]).join('').slice(0, 2).toUpperCase();
-      const newMember = {
-        id: action.userId,
-        name: action.userName.trim(),
-        short: shortName,
-        initials,
-        color: '#574EFA',
-        isMe: true,
-      };
-      const alreadyExists = state.members.some(m => m.id === action.userId);
+  const me = members.find(m => m.id === currentMemberId)
+
+  const normalExpenses = expenses.map(e => ({
+    id: e.id,
+    title: e.description,
+    amount: Number(e.amount),
+    paidBy: e.paid_by_member_id,
+    participants: participants.filter(p => p.expense_id === e.id).map(p => p.member_id),
+    splits: participants.filter(p => p.expense_id === e.id).map(p => ({
+      memberId: p.member_id,
+      amount: Number(p.share_amount),
+    })),
+    date: e.expense_date,
+    status: e.status,
+    submittedBy: e.submitted_by_member_id,
+    pickleSessionId: e.pickle_session_id,
+  }))
+
+  const normalSettlements = settlements.map(s => ({
+    id: s.id,
+    fromId: s.from_member_id,
+    toId: s.to_member_id,
+    amount: Number(s.amount),
+    date: s.settlement_date,
+  }))
+
+  const normalSessions = pickleSessions.map(s => ({
+    id: s.id,
+    date: s.session_date,
+    status: s.status,
+    notes: s.notes,
+    attendees: pickleAttendees
+      .filter(a => a.session_id === s.id && !a.is_guest)
+      .map(a => a.member_id),
+    guests: pickleAttendees
+      .filter(a => a.session_id === s.id && a.is_guest),
+    expenses: normalExpenses.filter(e => e.pickleSessionId === s.id),
+  }))
+
+  return {
+    currentUserId: currentMemberId,
+    currentUserName: me?.name || '',
+    currentGroupId: group.id,
+    members: members.map(m => ({
+      id: m.id,
+      name: m.name,
+      short: m.short || m.name.split(' ').pop(),
+      initials: m.initials || m.name.slice(0, 2).toUpperCase(),
+      color: m.color || '#574EFA',
+      role: m.role,
+      isMe: m.id === currentMemberId,
+    })),
+    groups: [{
+      id: group.id,
+      name: group.name,
+      emoji: group.emoji || '👥',
+      color: group.color || '#574EFA',
+      inviteCode: group.invite_code,
+      members: members.map(m => m.id),
+      expenses: normalExpenses,
+      settlements: normalSettlements,
+    }],
+    pickle: {
+      sessions: normalSessions,
+      upcoming: [],
+      fixedMembers: members.filter(m => m.is_active !== false).map(m => m.id),
+      externalTickets: [],
+      monthlyCourtFee: Number(pickleConfig?.monthly_court_fee || 0),
+      guestFeePerSession: Number(pickleConfig?.guest_fee_per_session || 0),
+    },
+    notifications: [],
+    _loading: false,
+    _error: null,
+  }
+}
+
+export function AppProvider({ children }) {
+  const { token: storedToken, member: storedMember } = getStoredAuth()
+
+  const [state, setState] = useState(() => {
+    if (storedToken && storedMember) {
       return {
-        ...state,
-        currentUserId: action.userId,
-        currentUserName: action.userName.trim(),
-        members: alreadyExists ? state.members : [...state.members, newMember],
-      };
-    }
-
-    // ── Members ───────────────────────────────────────────────────────────────
-    case 'ADD_MEMBER': {
-      const { member } = action;
-      const alreadyExists = state.members.some(m => m.id === member.id);
-      return {
-        ...state,
-        members: alreadyExists ? state.members : [...state.members, member],
-      };
-    }
-
-    // ── Groups ────────────────────────────────────────────────────────────────
-    case 'ADD_GROUP':
-      return { ...state, groups: [...state.groups, action.group] };
-
-    case 'EDIT_GROUP':
-      return {
-        ...state,
-        groups: state.groups.map(g => g.id === action.group.id ? { ...g, ...action.group } : g),
-      };
-
-    case 'DELETE_GROUP':
-      return { ...state, groups: state.groups.filter(g => g.id !== action.groupId) };
-
-    // ── Expenses ──────────────────────────────────────────────────────────────
-    case 'ADD_EXPENSE':
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.groupId
-            ? { ...g, expenses: [...g.expenses, action.expense] }
-            : g
-        ),
-      };
-
-    case 'EDIT_EXPENSE': {
-      const { groupId, expense } = action;
-      // Find the group that currently contains this expense so moving groups
-      // removes the stale copy from the source group.
-      const sourceGroup = state.groups.find(g => g.expenses.some(e => e.id === expense.id));
-      const sourceGroupId = sourceGroup?.id;
-      if (sourceGroupId && sourceGroupId !== groupId) {
-        return {
-          ...state,
-          groups: state.groups.map(g => {
-            if (g.id === sourceGroupId) return { ...g, expenses: g.expenses.filter(e => e.id !== expense.id) };
-            if (g.id === groupId) return { ...g, expenses: [...g.expenses, expense] };
-            return g;
-          }),
-        };
+        ...buildEmptyState(),
+        currentUserId: storedMember.id,
+        currentUserName: storedMember.name,
+        currentGroupId: storedMember.groupId,
+        _loading: true,
       }
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === groupId
-            ? { ...g, expenses: g.expenses.map(e => e.id === expense.id ? expense : e) }
-            : g
-        ),
-      };
     }
+    return buildEmptyState()
+  })
 
-    case 'DELETE_EXPENSE':
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.groupId
-            ? { ...g, expenses: g.expenses.filter(e => e.id !== action.expenseId) }
-            : g
-        ),
-      };
+  const tokenRef = useRef(storedToken)
 
-    // ── Settle Debt ───────────────────────────────────────────────────────────
-    case 'SETTLE_DEBT': {
-      // action.settlement = { id, fromId, toId, amount, date }
-      return {
-        ...state,
-        groups: state.groups.map(g =>
-          g.id === action.groupId
-            ? { ...g, settlements: [...(g.settlements || []), action.settlement] }
-            : g
-        ),
-      };
+  const refresh = useCallback(async (tok) => {
+    const t = tok ?? tokenRef.current
+    if (!t) return
+    setState(s => ({ ...s, _loading: true }))
+    try {
+      const { member } = getStoredAuth()
+      const raw = await fetchGroupData(t)
+      setState(normalize(raw, member?.id))
+    } catch (err) {
+      console.error('[store] refresh error:', err)
+      setState(s => ({ ...s, _loading: false, _error: err.message }))
     }
+  }, [])
 
-    // ── Pickleball ────────────────────────────────────────────────────────────
-    case 'CONFIRM_ATTENDANCE': {
-      const sessions = (state.pickle.sessions || []).map(s =>
-        s.id === action.sessionId
-          ? {
-              ...s,
-              attendees: action.attending
-                ? [...new Set([...(s.attendees || []), action.memberId])]
-                : (s.attendees || []).filter(id => id !== action.memberId)
-            }
-          : s
-      );
-      return { ...state, pickle: { ...state.pickle, sessions } };
-    }
-
-    case 'ADD_PICKLE_EXPENSE': {
-      const sessions = (state.pickle.sessions || []).map(s =>
-        s.id === action.sessionId
-          ? { ...s, expenses: [...(s.expenses || []), action.expense] }
-          : s
-      );
-      return { ...state, pickle: { ...state.pickle, sessions } };
-    }
-
-    case 'ADD_EXTERNAL_TICKET': {
-      return {
-        ...state,
-        pickle: {
-          ...state.pickle,
-          externalTickets: [...(state.pickle.externalTickets || []), action.ticket]
-        }
-      };
-    }
-
-    case 'TOGGLE_UPCOMING': {
-      const upcoming = (state.pickle.upcoming || []).map(s =>
-        s.id === action.sessionId
-          ? {
-              ...s,
-              going: (s.going || []).includes(action.memberId)
-                ? (s.going || []).filter(id => id !== action.memberId)
-                : [...new Set([...(s.going || []), action.memberId])]
-            }
-          : s
-      );
-      return { ...state, pickle: { ...state.pickle, upcoming } };
-    }
-
-    case 'ADD_PICKLE_MEMBER': {
-      const fixedMembers = state.pickle.fixedMembers || [];
-      if (fixedMembers.includes(action.memberId)) return state;
-      return {
-        ...state,
-        pickle: { ...state.pickle, fixedMembers: [...fixedMembers, action.memberId] }
-      };
-    }
-
-    case 'LOGOUT':
-      return buildInitialState();
-
-    default:
-      return state;
-  }
-}
-
-// ─── localStorage sync ────────────────────────────────────────────────────────
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw);
-    // Migrate: ensure pickle is never null (older saves had pickle: null)
-    if (s && s.pickle == null) {
-      s.pickle = buildInitialState().pickle;
-    }
-    return s;
-  } catch (e) {
-    console.warn('[store] Failed to load state from localStorage:', e);
-    return null;
-  }
-}
-
-function saveState(state) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // bỏ qua nếu localStorage đầy
-  }
-}
-
-// ─── Context & Provider ───────────────────────────────────────────────────────
-const AppContext = createContext(null);
-
-function AppProvider({ children }) {
-  const [state, dispatch] = useReducer(appReducer, undefined, () => loadState() || buildInitialState());
-
-  // Sync xuống localStorage mỗi khi state thay đổi
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    if (storedToken) refresh(storedToken)
+  }, [])
 
-  return React.createElement(AppContext.Provider, { value: { state, dispatch, genId } }, children);
+  const dispatch = useCallback(async (action) => {
+    const token = tokenRef.current
+    const sb = token ? createSupabase(token) : null
+
+    switch (action.type) {
+
+      case 'LOGIN': {
+        const { token: newToken, memberId, groupId, memberName } = action
+        storeAuth(newToken, { id: memberId, groupId, name: memberName })
+        tokenRef.current = newToken
+        await refresh(newToken)
+        break
+      }
+
+      case 'LOGOUT': {
+        clearAuth()
+        tokenRef.current = null
+        setState(buildEmptyState())
+        break
+      }
+
+      case 'ADD_EXPENSE': {
+        if (!sb) return
+        const { groupId, expense } = action
+        const { data: newExp, error } = await sb
+          .from('expenses')
+          .insert({
+            group_id: groupId,
+            description: expense.title,
+            amount: expense.amount,
+            paid_by_member_id: expense.paidBy,
+            submitted_by_member_id: state.currentUserId,
+            expense_date: expense.date || new Date().toISOString().slice(0, 10),
+            status: 'pending',
+            pickle_session_id: expense.pickleSessionId || null,
+          })
+          .select()
+          .single()
+        if (error) { console.error('[store] ADD_EXPENSE:', error); return }
+        if (expense.participants?.length > 0) {
+          const per = Math.round(expense.amount / expense.participants.length)
+          await sb.from('expense_participants').insert(
+            expense.participants.map((memberId, i) => ({
+              expense_id: newExp.id,
+              member_id: memberId,
+              share_amount: i === expense.participants.length - 1
+                ? expense.amount - per * (expense.participants.length - 1)
+                : per,
+            }))
+          )
+        }
+        await refresh()
+        break
+      }
+
+      case 'EDIT_EXPENSE': {
+        if (!sb) return
+        const { expense } = action
+        await sb.from('expenses').update({
+          description: expense.title,
+          amount: expense.amount,
+          paid_by_member_id: expense.paidBy,
+          expense_date: expense.date,
+        }).eq('id', expense.id)
+        await sb.from('expense_participants').delete().eq('expense_id', expense.id)
+        if (expense.participants?.length > 0) {
+          const per = Math.round(expense.amount / expense.participants.length)
+          await sb.from('expense_participants').insert(
+            expense.participants.map((memberId, i) => ({
+              expense_id: expense.id,
+              member_id: memberId,
+              share_amount: i === expense.participants.length - 1
+                ? expense.amount - per * (expense.participants.length - 1)
+                : per,
+            }))
+          )
+        }
+        await refresh()
+        break
+      }
+
+      case 'DELETE_EXPENSE': {
+        if (!sb) return
+        await sb.from('expense_participants').delete().eq('expense_id', action.expenseId)
+        await sb.from('expenses').delete().eq('id', action.expenseId)
+        await refresh()
+        break
+      }
+
+      case 'SETTLE_DEBT': {
+        if (!sb) return
+        const { groupId, settlement } = action
+        await sb.from('settlements').insert({
+          group_id: groupId,
+          from_member_id: settlement.fromId,
+          to_member_id: settlement.toId,
+          amount: settlement.amount,
+          settlement_date: settlement.date || new Date().toISOString().slice(0, 10),
+          settled_by_member_id: state.currentUserId,
+        })
+        await refresh()
+        break
+      }
+
+      case 'EDIT_GROUP': {
+        if (!sb) return
+        await sb.from('groups').update({
+          name: action.group.name,
+          emoji: action.group.emoji,
+          color: action.group.color,
+        }).eq('id', action.group.id)
+        await refresh()
+        break
+      }
+
+      case 'ADD_MEMBER': {
+        if (!sb) return
+        const { member } = action
+        await sb.from('members').insert({
+          id: member.id,
+          group_id: state.currentGroupId,
+          name: member.name,
+          short: member.short,
+          initials: member.initials,
+          color: member.color || '#574EFA',
+          role: member.role || 'member',
+        })
+        await refresh()
+        break
+      }
+
+      case 'CONFIRM_ATTENDANCE': {
+        if (!sb) return
+        const { sessionId, memberId, attending } = action
+        if (attending) {
+          await sb.from('pickle_attendees').upsert(
+            { session_id: sessionId, member_id: memberId, is_guest: false },
+            { onConflict: 'session_id,member_id' }
+          )
+        } else {
+          await sb.from('pickle_attendees').delete()
+            .eq('session_id', sessionId).eq('member_id', memberId)
+        }
+        await refresh()
+        break
+      }
+
+      case 'ADD_PICKLE_EXPENSE':
+        dispatch({
+          type: 'ADD_EXPENSE',
+          groupId: state.currentGroupId,
+          expense: { ...action.expense, pickleSessionId: action.sessionId },
+        })
+        break
+
+      case 'ADD_GROUP':
+      case 'DELETE_GROUP':
+      case 'ADD_EXTERNAL_TICKET':
+      case 'TOGGLE_UPCOMING':
+      case 'ADD_PICKLE_MEMBER':
+        console.warn(`[store] ${action.type}: not implemented in Phase 4`)
+        break
+
+      case 'SET_CURRENT_USER':
+        break
+
+      default:
+        console.warn('[store] Unknown action:', action.type)
+    }
+  }, [state.currentUserId, state.currentGroupId, refresh])
+
+  return (
+    <AppContext.Provider value={{ state, dispatch, genId }}>
+      {children}
+    </AppContext.Provider>
+  )
 }
 
-// Hook tiện dụng dùng trong mọi component
-function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used inside AppProvider');
-  return ctx;
+export function useApp() {
+  const ctx = useContext(AppContext)
+  if (!ctx) throw new Error('useApp must be inside AppProvider')
+  return ctx
 }

@@ -1,6 +1,6 @@
-// Shared UI primitives for Spliteasy
+import React, { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from 'react'
 
-const { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } = React;
+// Shared UI primitives for Spliteasy
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 function Icon({ name, size = 20, color = 'currentColor', stroke = 1.75 }) {
@@ -339,7 +339,18 @@ function HScroll({ children, style, gap = 8, pb = 4 }) {
   );
 }
 
-Object.assign(window, {
+function iconBtnStyle() {
+  return {
+    appearance: 'none', position: 'relative',
+    width: 40, height: 40, borderRadius: 12,
+    border: '1px solid var(--border-1)', background: 'var(--surface-1)',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer',
+  }
+}
+
+export {
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
   CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
-});
+  iconBtnStyle,
+}

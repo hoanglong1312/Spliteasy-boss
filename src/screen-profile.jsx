@@ -1,3 +1,8 @@
+import React, { useState, useMemo } from 'react'
+import { useApp } from './store.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, pickleSummary } from './data.jsx'
+import { Icon, Avatar, Money, Button, Card, Pill, iconBtnStyle, ListRow } from './components.jsx'
+
 // Profile / Cá nhân tab — personal stats + settings
 
 function ScreenProfile({ tweaks, push, setTweak }) {
@@ -215,4 +220,5 @@ function ScreenSettings({ pop }) {
   );
 }
 
-Object.assign(window, { ScreenProfile, ScreenSettings });
+export default ScreenProfile
+export { ScreenSettings }
