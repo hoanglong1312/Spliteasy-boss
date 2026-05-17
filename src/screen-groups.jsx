@@ -597,7 +597,7 @@ function ScreenAddExpense({ params = {}, push, pop, tweaks = {} }) {
       if (total !== num) return;
     }
     const now = new Date();
-    const date = `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}`;
+    const date = now.toISOString().slice(0, 10);
     let splits;
     if (splitMode === 'custom') {
       splits = participants.map(id => ({ memberId: id, amount: customAmounts[id] || 0 }));
