@@ -64,7 +64,7 @@ function normalize(raw, currentMemberId) {
 
   const normalExpenses = expenses.map(e => ({
     id: e.id,
-    title: e.description,
+    title: e.title,
     cat: e.cat || e.category || 'food',
     amount: Number(e.amount),
     paidBy: e.paid_by_member_id,
@@ -75,6 +75,7 @@ function normalize(raw, currentMemberId) {
     })),
     date: e.expense_date,
     status: e.status,
+    declineReason: e.decline_reason,
     submittedBy: e.submitted_by_member_id,
     pickleSessionId: e.pickle_session_id,
   }))
@@ -207,7 +208,7 @@ export function AppProvider({ children }) {
           .from('expenses')
           .insert({
             group_id: groupId,
-            description: expense.title,
+            title: expense.title,
             amount: expense.amount,
             paid_by_member_id: expense.paidBy,
             submitted_by_member_id: state.currentUserId,
@@ -238,7 +239,7 @@ export function AppProvider({ children }) {
         if (!sb) return
         const { expense } = action
         await sb.from('expenses').update({
-          description: expense.title,
+          title: expense.title,
           amount: expense.amount,
           paid_by_member_id: expense.paidBy,
           expense_date: expense.date,
