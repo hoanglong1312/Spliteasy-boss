@@ -1152,22 +1152,32 @@ function ScreenApprovalQueue({ params = {}, pop }) {
 
   const handleApprove = async () => {
     if (!current) return
-    await dispatch({ type: 'APPROVE_EXPENSE', expenseId: current.id })
-    setIdx(i => i + 1)
-    setDeclineMode(false)
+    try {
+      await dispatch({ type: 'APPROVE_EXPENSE', expenseId: current.id })
+      setIdx(i => i + 1)
+      setDeclineMode(false)
+    } catch (err) {
+      console.error('[ApprovalQueue] approve failed:', err)
+    }
   }
 
   const handleDeclineClick = () => setDeclineMode(true)
 
   const handleDeclineConfirm = async () => {
     if (!current || !declineReason.trim()) return
-    await dispatch({ type: 'DECLINE_EXPENSE', expenseId: current.id, reason: declineReason.trim() })
-    setIdx(i => i + 1)
-    setDeclineMode(false)
-    setDeclineReason('')
+    try {
+      await dispatch({ type: 'DECLINE_EXPENSE', expenseId: current.id, reason: declineReason.trim() })
+      setIdx(i => i + 1)
+      setDeclineMode(false)
+      setDeclineReason('')
+    } catch (err) {
+      console.error('[ApprovalQueue] decline failed:', err)
+    }
   }
 
   if (!g) return null
+  const isTreasurer = state.members.find(m => m.id === meId)?.role === 'treasurer'
+  if (!isTreasurer) return null
 
   return (
     <div style={{ paddingBottom: 40 }}>

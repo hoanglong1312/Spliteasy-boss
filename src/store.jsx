@@ -333,7 +333,7 @@ export function AppProvider({ children }) {
           reviewed_by_member_id: state.currentUserId,
           reviewed_at: new Date().toISOString(),
         }).eq('id', expenseId)
-        if (error) { console.error('[store] APPROVE_EXPENSE:', error); return }
+        if (error) { console.error('[store] APPROVE_EXPENSE:', error); throw error }
         await refresh()
         break
       }
@@ -345,7 +345,7 @@ export function AppProvider({ children }) {
           reviewed_at: new Date().toISOString(),
           decline_reason: reason,
         }).eq('id', expenseId)
-        if (error) { console.error('[store] DECLINE_EXPENSE:', error); return }
+        if (error) { console.error('[store] DECLINE_EXPENSE:', error); throw error }
         await refresh()
         break
       }
@@ -356,7 +356,7 @@ export function AppProvider({ children }) {
           raised_by: state.currentUserId,
           note,
         })
-        if (error) { console.error('[store] SUBMIT_DISPUTE:', error); return }
+        if (error) { console.error('[store] SUBMIT_DISPUTE:', error); throw error }
         await refresh()
         break
       }
