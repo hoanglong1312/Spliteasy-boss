@@ -326,6 +326,38 @@ export function AppProvider({ children }) {
         break
       }
 
+      case 'APPROVE_EXPENSE': {
+        const { expenseId } = action
+        await sb.from('expenses').update({
+          status: 'approved',
+          reviewed_by_member_id: state.currentUserId,
+          reviewed_at: new Date().toISOString(),
+        }).eq('id', expenseId)
+        await refresh()
+        break
+      }
+      case 'DECLINE_EXPENSE': {
+        const { expenseId, reason } = action
+        await sb.from('expenses').update({
+          status: 'declined',
+          reviewed_by_member_id: state.currentUserId,
+          reviewed_at: new Date().toISOString(),
+          decline_reason: reason,
+        }).eq('id', expenseId)
+        await refresh()
+        break
+      }
+      case 'SUBMIT_DISPUTE': {
+        const { expenseId, note } = action
+        await sb.from('expense_disputes').insert({
+          expense_id: expenseId,
+          raised_by: state.currentUserId,
+          note,
+        })
+        await refresh()
+        break
+      }
+
       case 'ADD_PICKLE_EXPENSE':
         dispatch({
           type: 'ADD_EXPENSE',
