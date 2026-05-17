@@ -445,8 +445,100 @@ function DisputePopup({ expenseId, onClose }) {
   )
 }
 
+function SwipeCard({ expense, members, onApprove, onDecline }) {
+  const [offset, setOffset] = React.useState(0)
+  const startX = React.useRef(null)
+  const isDragging = React.useRef(false)
+
+  const handleTouchStart = e => {
+    startX.current = e.touches[0].clientX
+    isDragging.current = true
+  }
+  const handleTouchMove = e => {
+    if (!isDragging.current) return
+    setOffset(e.touches[0].clientX - startX.current)
+  }
+  const handleTouchEnd = () => {
+    isDragging.current = false
+    if (offset > 80) onApprove()
+    else if (offset < -80) onDecline()
+    else setOffset(0)
+    startX.current = null
+  }
+  // Mouse support for desktop testing
+  const handleMouseDown = e => { startX.current = e.clientX; isDragging.current = true }
+  const handleMouseMove = e => { if (!isDragging.current) return; setOffset(e.clientX - startX.current) }
+  const handleMouseUp = () => { handleTouchEnd() }
+
+  const payer = members[expense.paidBy] || { name: '?', short: '?' }
+  const parts = expense.participantIds?.length || expense.participants?.length || 1
+  const perPerson = parts > 0 ? Math.round((expense.amount || 0) / parts) : (expense.amount || 0)
+  const isEven = !expense.splitType || expense.splitType === 'equal'
+
+  const approveOpacity = Math.min(1, Math.max(0, offset / 80))
+  const declineOpacity = Math.min(1, Math.max(0, -offset / 80))
+
+  return (
+    <div
+      style={{ position: 'relative', userSelect: 'none' }}
+      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+    >
+      {/* Decline hint */}
+      <div style={{
+        position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+        color: '#EF4444', opacity: declineOpacity, fontSize: 28, fontWeight: 800,
+        pointerEvents: 'none',
+      }}>✕</div>
+      {/* Approve hint */}
+      <div style={{
+        position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+        color: '#10B981', opacity: approveOpacity, fontSize: 28, fontWeight: 800,
+        pointerEvents: 'none',
+      }}>✓</div>
+
+      {/* Card */}
+      <div style={{
+        transform: `translateX(${offset}px) rotate(${offset * 0.03}deg)`,
+        transition: isDragging.current ? 'none' : 'transform 0.25s ease',
+        background: 'var(--surface-1)',
+        borderRadius: 20,
+        padding: '28px 24px',
+        margin: '0 48px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+        cursor: 'grab',
+      }}>
+        <div style={{ fontSize: 32, marginBottom: 10 }}>
+          {expense.cat === 'food' ? '🍜' : expense.cat === 'drink' ? '☕' : expense.cat === 'transport' ? '🚗' : '📦'}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
+          {expense.title || 'Chi tiêu'}
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--brand-1)', marginBottom: 16 }}>
+          {fmtVND(expense.amount || 0)}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
+          {payer.name} đề xuất
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
+          {expense.date || ''}
+        </div>
+        {isEven && parts > 1 && (
+          <div style={{
+            marginTop: 16, padding: '10px 14px',
+            background: 'var(--surface-2)',
+            borderRadius: 10, fontSize: 13, color: 'var(--text-1)',
+          }}>
+            {parts} người • mỗi người {fmtVND(perPerson)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export {
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
   CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
-  iconBtnStyle, StatusBadge, DisputePopup,
+  iconBtnStyle, StatusBadge, DisputePopup, SwipeCard,
 }
