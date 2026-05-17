@@ -351,8 +351,34 @@ function iconBtnStyle() {
   }
 }
 
+function StatusBadge({ status, declineReason }) {
+  const config = {
+    pending:  { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', icon: '⏳', label: 'Chờ duyệt' },
+    approved: { color: '#10B981', bg: 'rgba(16,185,129,0.12)', icon: '✅', label: 'Đã duyệt' },
+    declined: { color: '#EF4444', bg: 'rgba(239,68,68,0.12)',  icon: '❌', label: 'Bị từ chối' },
+  }
+  const c = config[status] || config.pending
+  return (
+    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        fontSize: 11, fontWeight: 600,
+        color: c.color, background: c.bg,
+        padding: '2px 8px', borderRadius: 99,
+      }}>
+        {c.icon} {c.label}
+      </span>
+      {status === 'declined' && declineReason && (
+        <span style={{ fontSize: 11, color: 'var(--text-2)', paddingLeft: 4 }}>
+          {declineReason}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export {
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
   CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
-  iconBtnStyle,
+  iconBtnStyle, StatusBadge,
 }
