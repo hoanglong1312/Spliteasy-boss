@@ -1144,17 +1144,15 @@ function ScreenApprovalQueue({ params = {}, pop }) {
   const group = safeGroup(g)
   const pending = safeArray(group.expenses).filter(e => e.status === 'pending')
 
-  const [idx, setIdx] = React.useState(0)
   const [declineMode, setDeclineMode] = React.useState(false)
   const [declineReason, setDeclineReason] = React.useState('')
 
-  const current = pending[idx]
+  const current = pending[0]
 
   const handleApprove = async () => {
     if (!current) return
     try {
       await dispatch({ type: 'APPROVE_EXPENSE', expenseId: current.id })
-      setIdx(i => i + 1)
       setDeclineMode(false)
     } catch (err) {
       console.error('[ApprovalQueue] approve failed:', err)
@@ -1167,7 +1165,6 @@ function ScreenApprovalQueue({ params = {}, pop }) {
     if (!current || !declineReason.trim()) return
     try {
       await dispatch({ type: 'DECLINE_EXPENSE', expenseId: current.id, reason: declineReason.trim() })
-      setIdx(i => i + 1)
       setDeclineMode(false)
       setDeclineReason('')
     } catch (err) {
@@ -1187,23 +1184,16 @@ function ScreenApprovalQueue({ params = {}, pop }) {
         <div style={{ padding: '40px 20px' }}>
           <EmptyState icon="check-circle" title="Không còn chi tiêu chờ duyệt" subtitle="Tất cả đã được xử lý"/>
         </div>
-      ) : idx >= pending.length ? (
-        <div style={{ padding: '40px 20px' }}>
-          <EmptyState icon="check-circle" title="Hoàn tất!" subtitle={`Đã xử lý ${pending.length} chi tiêu`}/>
-          <div style={{ padding: '0 20px' }}>
-            <Button variant="primary" full onClick={pop}>Xong</Button>
-          </div>
-        </div>
       ) : (
         <div style={{ padding: '24px 0' }}>
           <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>
-            {idx + 1} / {pending.length} chi tiêu
+            1 / {pending.length} chi tiêu
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
             {pending.map((_, i) => (
               <div key={i} style={{
                 width: 8, height: 8, borderRadius: 4,
-                background: i < idx ? 'var(--vb-success-700)' : i === idx ? 'var(--brand-1)' : 'var(--border-1)',
+                background: i === 0 ? 'var(--brand-1)' : 'var(--border-1)',
               }}/>
             ))}
           </div>

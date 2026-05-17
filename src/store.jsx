@@ -213,7 +213,12 @@ export function AppProvider({ children }) {
             paid_by_member_id: expense.paidBy,
             submitted_by_member_id: state.currentUserId,
             expense_date: expense.date || new Date().toISOString().slice(0, 10),
-            status: 'pending',
+            ...((() => {
+              const isTreasurer = state.members?.find(m => m.id === state.currentUserId)?.role === 'treasurer'
+              return isTreasurer
+                ? { status: 'approved', reviewed_by_member_id: state.currentUserId, reviewed_at: new Date().toISOString() }
+                : { status: 'pending' }
+            })()),
             pickle_session_id: expense.pickleSessionId || null,
           })
           .select()
