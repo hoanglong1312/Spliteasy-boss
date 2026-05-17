@@ -204,8 +204,7 @@ export function AppProvider({ children }) {
       case 'ADD_EXPENSE': {
         if (!sb) return
         const { groupId, expense } = action
-        const isTreasurer = state.members?.find(m => m.id === state.currentUserId)?.role === 'treasurer'
-        console.log('[ADD_EXPENSE] currentUserId:', state.currentUserId, 'isTreasurer:', isTreasurer, 'members:', state.members?.map(m => m.id + ':' + m.role))
+        const isTreasurer = action.isTreasurer === true
         const statusFields = isTreasurer
           ? { status: 'approved', reviewed_by_member_id: state.currentUserId, reviewed_at: new Date().toISOString() }
           : { status: 'pending' }

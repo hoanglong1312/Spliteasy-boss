@@ -624,7 +624,9 @@ function ScreenAddExpense({ params = {}, push, pop, tweaks = {} }) {
     if (existing) {
       dispatch({ type: 'EDIT_EXPENSE', groupId: g.id, expense });
     } else {
-      dispatch({ type: 'ADD_EXPENSE', groupId: g.id, expense });
+      const M2 = getMemberMap(state.members);
+      const isTreasurer = M2[state.currentUserId]?.role === 'treasurer';
+      dispatch({ type: 'ADD_EXPENSE', groupId: g.id, expense, isTreasurer });
     }
     pop();
   }
