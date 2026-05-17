@@ -448,26 +448,26 @@ function DisputePopup({ expenseId, onClose }) {
 function SwipeCard({ expense, members, onApprove, onDecline }) {
   const [offset, setOffset] = React.useState(0)
   const startX = React.useRef(null)
-  const isDragging = React.useRef(false)
+  const [isDragging, setIsDragging] = React.useState(false)
 
   const handleTouchStart = e => {
     startX.current = e.touches[0].clientX
-    isDragging.current = true
+    setIsDragging(true)
   }
   const handleTouchMove = e => {
-    if (!isDragging.current) return
+    if (!isDragging) return
     setOffset(e.touches[0].clientX - startX.current)
   }
   const handleTouchEnd = () => {
-    isDragging.current = false
+    setIsDragging(false)
     if (offset > 80) onApprove()
     else if (offset < -80) onDecline()
     else setOffset(0)
     startX.current = null
   }
   // Mouse support for desktop testing
-  const handleMouseDown = e => { startX.current = e.clientX; isDragging.current = true }
-  const handleMouseMove = e => { if (!isDragging.current) return; setOffset(e.clientX - startX.current) }
+  const handleMouseDown = e => { startX.current = e.clientX; setIsDragging(true) }
+  const handleMouseMove = e => { if (!isDragging) return; setOffset(e.clientX - startX.current) }
   const handleMouseUp = () => { handleTouchEnd() }
 
   const payer = members[expense.paidBy] || { name: '?', short: '?' }
@@ -500,7 +500,7 @@ function SwipeCard({ expense, members, onApprove, onDecline }) {
       {/* Card */}
       <div style={{
         transform: `translateX(${offset}px) rotate(${offset * 0.03}deg)`,
-        transition: isDragging.current ? 'none' : 'transform 0.25s ease',
+        transition: isDragging ? 'none' : 'transform 0.25s ease',
         background: 'var(--surface-1)',
         borderRadius: 20,
         padding: '28px 24px',
