@@ -328,32 +328,35 @@ export function AppProvider({ children }) {
 
       case 'APPROVE_EXPENSE': {
         const { expenseId } = action
-        await sb.from('expenses').update({
+        const { error } = await sb.from('expenses').update({
           status: 'approved',
           reviewed_by_member_id: state.currentUserId,
           reviewed_at: new Date().toISOString(),
         }).eq('id', expenseId)
+        if (error) { console.error('[store] APPROVE_EXPENSE:', error); return }
         await refresh()
         break
       }
       case 'DECLINE_EXPENSE': {
         const { expenseId, reason } = action
-        await sb.from('expenses').update({
+        const { error } = await sb.from('expenses').update({
           status: 'declined',
           reviewed_by_member_id: state.currentUserId,
           reviewed_at: new Date().toISOString(),
           decline_reason: reason,
         }).eq('id', expenseId)
+        if (error) { console.error('[store] DECLINE_EXPENSE:', error); return }
         await refresh()
         break
       }
       case 'SUBMIT_DISPUTE': {
         const { expenseId, note } = action
-        await sb.from('expense_disputes').insert({
+        const { error } = await sb.from('expense_disputes').insert({
           expense_id: expenseId,
           raised_by: state.currentUserId,
           note,
         })
+        if (error) { console.error('[store] SUBMIT_DISPUTE:', error); return }
         await refresh()
         break
       }
