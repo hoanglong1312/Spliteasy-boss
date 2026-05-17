@@ -377,8 +377,76 @@ function StatusBadge({ status, declineReason }) {
   )
 }
 
+function DisputePopup({ expenseId, onClose }) {
+  const { dispatch } = useApp()
+  const [note, setNote] = React.useState('')
+  const [sending, setSending] = React.useState(false)
+
+  const submit = async () => {
+    const trimmed = note.trim()
+    if (!trimmed) return
+    setSending(true)
+    await dispatch({ type: 'SUBMIT_DISPUTE', expenseId, note: trimmed })
+    setSending(false)
+    onClose()
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'flex-end',
+        zIndex: 200,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--surface-1)',
+          borderRadius: '20px 20px 0 0',
+          padding: '20px 20px 36px',
+          width: '100%',
+          boxSizing: 'border-box',
+        }}
+      >
+        <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-1)', marginBottom: 4 }}>
+          Báo sai sót
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 14 }}>
+          Mô tả sai sót để thủ quỹ kiểm tra lại
+        </div>
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          placeholder="Ví dụ: Số tiền sai, tôi không tham gia buổi này..."
+          style={{
+            width: '100%', minHeight: 88,
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border-1)',
+            borderRadius: 12,
+            color: 'var(--text-1)',
+            fontSize: 14, padding: '10px 12px',
+            resize: 'none', boxSizing: 'border-box',
+            fontFamily: 'var(--vb-font-body)',
+          }}
+        />
+        <Button
+          variant="primary"
+          style={{ width: '100%', marginTop: 12 }}
+          onClick={submit}
+          disabled={sending || !note.trim()}
+        >
+          {sending ? 'Đang gửi...' : 'Gửi báo cáo'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export {
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
   CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
-  iconBtnStyle, StatusBadge,
+  iconBtnStyle, StatusBadge, DisputePopup,
 }
