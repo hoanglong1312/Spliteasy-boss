@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup, SwipeCard } from './components.jsx'
 
 // Groups tab — list / detail / add expense / settle
 // Several sub-screens, all driven by `push` from the nav stack.
@@ -200,6 +200,8 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const balance = useMemo(() => g ? groupBalance(safeGroup(g), meId) : {}, [g, meId]);
   const net = useMemo(() => g ? groupNet(safeGroup(g), meId) : 0, [g, meId]);
+  const isTreasurer = state.members.find(m => m.id === meId)?.role === 'treasurer'
+  const pendingCount = safeArray(g ? safeGroup(g).expenses : []).filter(e => e.status === 'pending').length
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -274,7 +276,25 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
             </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+        <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+          {isTreasurer && pendingCount > 0 && (
+            <button
+              onClick={() => push('approval-queue', { groupId: params?.groupId })}
+              style={{
+                appearance: 'none', cursor: 'pointer',
+                height: 36, padding: '0 14px',
+                background: 'rgba(245,158,11,0.12)',
+                color: '#F59E0B',
+                border: '1px solid rgba(245,158,11,0.3)',
+                borderRadius: 10,
+                fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 13,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                flexShrink: 0,
+              }}
+            >
+              ⏳ {pendingCount} chờ duyệt
+            </button>
+          )}
           <Button variant="primary" full icon="plus" onClick={() => push('add-expense', { groupId: g.id })}>Thêm chi tiêu</Button>
           <Button variant="secondary" full icon="zap" onClick={() => push('settle-group', { groupId: g.id })}>Tất toán</Button>
         </div>
@@ -1116,5 +1136,119 @@ function ScreenNotifications({ pop, tweaks = {} }) {
   );
 }
 
+function ScreenApprovalQueue({ params = {}, pop }) {
+  const { state, dispatch } = useApp()
+  const meId = state.currentUserId || ME
+  const M = getMemberMap(state.members)
+  const g = safeArray(state.groups).find(x => x.id === params?.groupId)
+  const group = safeGroup(g)
+  const pending = safeArray(group.expenses).filter(e => e.status === 'pending')
+
+  const [idx, setIdx] = React.useState(0)
+  const [declineMode, setDeclineMode] = React.useState(false)
+  const [declineReason, setDeclineReason] = React.useState('')
+
+  const current = pending[idx]
+
+  const handleApprove = async () => {
+    if (!current) return
+    await dispatch({ type: 'APPROVE_EXPENSE', expenseId: current.id })
+    setIdx(i => i + 1)
+    setDeclineMode(false)
+  }
+
+  const handleDeclineClick = () => setDeclineMode(true)
+
+  const handleDeclineConfirm = async () => {
+    if (!current || !declineReason.trim()) return
+    await dispatch({ type: 'DECLINE_EXPENSE', expenseId: current.id, reason: declineReason.trim() })
+    setIdx(i => i + 1)
+    setDeclineMode(false)
+    setDeclineReason('')
+  }
+
+  if (!g) return null
+
+  return (
+    <div style={{ paddingBottom: 40 }}>
+      <NavHeader title="Duyệt chi tiêu" onBack={pop}/>
+
+      {pending.length === 0 ? (
+        <div style={{ padding: '40px 20px' }}>
+          <EmptyState icon="check-circle" title="Không còn chi tiêu chờ duyệt" subtitle="Tất cả đã được xử lý"/>
+        </div>
+      ) : idx >= pending.length ? (
+        <div style={{ padding: '40px 20px' }}>
+          <EmptyState icon="check-circle" title="Hoàn tất!" subtitle={`Đã xử lý ${pending.length} chi tiêu`}/>
+          <div style={{ padding: '0 20px' }}>
+            <Button variant="primary" full onClick={pop}>Xong</Button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '24px 0' }}>
+          <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 13, color: 'var(--text-2)', fontWeight: 600 }}>
+            {idx + 1} / {pending.length} chi tiêu
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 32 }}>
+            {pending.map((_, i) => (
+              <div key={i} style={{
+                width: 8, height: 8, borderRadius: 4,
+                background: i < idx ? 'var(--vb-success-700)' : i === idx ? 'var(--brand-1)' : 'var(--border-1)',
+              }}/>
+            ))}
+          </div>
+
+          <SwipeCard
+            expense={current}
+            members={M}
+            onApprove={handleApprove}
+            onDecline={handleDeclineClick}
+          />
+
+          {!declineMode ? (
+            <div style={{ display: 'flex', gap: 12, padding: '24px 24px 0' }}>
+              <Button variant="ghost" style={{ flex: 1, borderColor: '#EF4444', color: '#EF4444' }} onClick={handleDeclineClick}>
+                ✕ Từ chối
+              </Button>
+              <Button variant="primary" style={{ flex: 1 }} onClick={handleApprove}>
+                ✓ Duyệt
+              </Button>
+            </div>
+          ) : (
+            <div style={{ padding: '20px 20px 0' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>
+                Lý do từ chối:
+              </div>
+              <textarea
+                value={declineReason}
+                onChange={e => setDeclineReason(e.target.value)}
+                placeholder="Ghi lý do ngắn gọn..."
+                style={{
+                  width: '100%', minHeight: 80,
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-1)',
+                  borderRadius: 12,
+                  color: 'var(--text-1)',
+                  fontSize: 14, padding: '10px 12px',
+                  resize: 'none', boxSizing: 'border-box',
+                  fontFamily: 'var(--vb-font-body)',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+                <Button variant="ghost" style={{ flex: 1 }} onClick={() => { setDeclineMode(false); setDeclineReason(''); }}>
+                  Huỷ
+                </Button>
+                <Button variant="primary" style={{ flex: 1, background: '#EF4444' }} onClick={handleDeclineConfirm} disabled={!declineReason.trim()}>
+                  Xác nhận từ chối
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default ScreenGroups
-export { ScreenGroupDetail, ScreenExpenseDetail, ScreenAddExpense, ScreenSettleAll, ScreenNewGroup, ScreenNotifications }
+export { ScreenGroupDetail, ScreenExpenseDetail, ScreenAddExpense, ScreenSettleAll, ScreenNewGroup, ScreenNotifications, ScreenApprovalQueue }
