@@ -19,6 +19,7 @@ import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakSele
 import { Icon, ScreenTransition } from './components.jsx'
 import { joinGroup } from './lib/auth.js'
 import { ScreenJoin } from './screen-join.jsx'
+import { ScreenPersonal } from './screen-personal.jsx'
 import ScreenHome from './screen-home.jsx'
 import ScreenGroups, {
   ScreenGroupDetail, ScreenExpenseDetail, ScreenAddExpense,
@@ -194,10 +195,13 @@ function ScreenJoinGroup() {
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS)
   const { state } = useApp()
-  const isJoinRoute = typeof window !== 'undefined' && /\/join\//i.test(window.location.hash)
+  const initialHash = typeof window !== 'undefined' ? window.location.hash : ''
+  const isJoinRoute = /\/join\//i.test(initialHash)
+  const isPersonalRoute = /\/me\//i.test(initialHash)
+  const initialHomeScreen = isPersonalRoute ? 'personal' : isJoinRoute ? 'join' : 'home'
 
   const initStacks = () => ({
-    home:   [{ name: isJoinRoute ? 'join' : 'home' }],
+    home:   [{ name: initialHomeScreen }],
     groups: [{ name: 'groups' }],
     pickle: [{ name: 'pickle' }],
     me:     [{ name: 'me' }],
@@ -270,6 +274,7 @@ function App() {
     const p = current.params || {}
     switch (current.name) {
       case 'join':     return <ScreenJoin push={push} />
+      case 'personal': return <ScreenPersonal />
       case 'home':     return <ScreenHome tweaks={t} push={push} pushToTab={pushToTab} switchTab={switchTab}/>
       case 'groups':   return <ScreenGroups tweaks={t} push={push}/>
       case 'pickle':   return <ScreenPickleball tweaks={t} push={push}/>
@@ -298,7 +303,7 @@ function App() {
     { id: 'me', label: 'Cá nhân', icon: 'user' },
   ]
 
-  if (current.name === 'join') {
+  if (current.name === 'join' || current.name === 'personal') {
     return (
       <div style={{ ...themeVars, fontFamily: 'var(--vb-font-body)', height: '100%', background: 'var(--bg-1)', overflowY: 'auto' }}>
         <ErrorBoundary>
