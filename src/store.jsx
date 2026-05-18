@@ -191,6 +191,14 @@ export function AppProvider({ children, onToast }) {
     debounceRef.current = setTimeout(() => refresh(), 600)
   }, [refresh])
 
+  const broadcastChange = useCallback((table, evType, row) => {
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'data_changed',
+      payload: { table, event: evType, new: row },
+    })
+  }, [])
+
   useEffect(() => {
     if (storedToken) refresh(storedToken)
   }, [])
@@ -208,62 +216,37 @@ export function AppProvider({ children, onToast }) {
     const getMyRole = () =>
       stateRef.current.members.find(m => m.isMe)?.role
 
-    channel
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'expenses',
-        filter: `group_id=eq.${groupId}`,
-      }, (payload) => {
-        scheduleRefresh()
-        const row = payload.new
-        if (row.submitted_by_member_id === stateRef.current.currentUserId) return
-        if (!onToast) return
+    channel.on('broadcast', { event: 'data_changed' }, (payload) => {
+      const { table, event: evType, new: row } = payload.payload ?? {}
+      scheduleRefresh()
+
+      if (!onToast || !row) return
+      const submittedBy = row.submitted_by_member_id
+      const fromMe = submittedBy === stateRef.current.currentUserId
+      const toMe   = row.to_member_id === stateRef.current.currentUserId
+
+      if (table === 'expenses' && evType === 'INSERT' && !fromMe) {
         if (getMyRole() === 'treasurer') {
           onToast('Có khoản mới chờ duyệt ⏳', 'warning')
         } else {
-          onToast(`${getMemberName(row.submitted_by_member_id)} vừa thêm chi tiêu ${row.title}`, 'info')
+          onToast(`${getMemberName(submittedBy)} vừa thêm chi tiêu ${row.title}`, 'info')
         }
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'expenses',
-        filter: `group_id=eq.${groupId}`,
-      }, (payload) => {
-        scheduleRefresh()
-        const row = payload.new
-        if (row.submitted_by_member_id !== stateRef.current.currentUserId) return
-        if (!onToast) return
+      } else if (table === 'expenses' && evType === 'UPDATE' && fromMe) {
         if (row.status === 'approved') {
           onToast(`Chi tiêu "${row.title}" đã được duyệt ✅`, 'success')
         } else if (row.status === 'declined') {
           onToast(`Chi tiêu "${row.title}" bị từ chối ❌`, 'warning')
         }
-      })
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'settlements',
-        filter: `group_id=eq.${groupId}`,
-      }, (payload) => {
-        scheduleRefresh()
-        const row = payload.new
-        if (row.to_member_id !== stateRef.current.currentUserId) return
-        if (onToast) onToast(`${getMemberName(row.from_member_id)} đã thanh toán cho bạn 💸`, 'success')
-      })
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'pickle_sessions',
-        filter: `group_id=eq.${groupId}`,
-      }, () => scheduleRefresh())
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'pickle_attendees',
-      }, () => scheduleRefresh())
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'expense_disputes',
-      }, () => {
-        scheduleRefresh()
-        if (getMyRole() === 'treasurer' && onToast) {
-          onToast('Có sai sót cần xem ⚠️', 'warning')
-        }
-      })
-      .subscribe((status, err) => {
-        if (err) console.error('[realtime]', status, err)
-      })
+      } else if (table === 'settlements' && evType === 'INSERT' && toMe) {
+        onToast(`${getMemberName(row.from_member_id)} đã thanh toán cho bạn 💸`, 'success')
+      } else if (table === 'expense_disputes' && evType === 'INSERT' && getMyRole() === 'treasurer') {
+        onToast('Có sai sót cần xem ⚠️', 'warning')
+      }
+    }).subscribe((status, err) => {
+      if (err) {
+        console.error('[realtime]', status, err)
+      }
+    })
 
     channelRef.current = channel
 
@@ -343,6 +326,11 @@ export function AppProvider({ children, onToast }) {
             }))
           )
         }
+        broadcastChange('expenses', 'INSERT', {
+          submitted_by_member_id: state.currentUserId,
+          title: expense.title,
+          group_id: groupId,
+        })
         await refresh()
         break
       }
@@ -391,6 +379,10 @@ export function AppProvider({ children, onToast }) {
           amount: settlement.amount,
           settlement_date: settlement.date || new Date().toISOString().slice(0, 10),
           settled_by_member_id: state.currentUserId,
+        })
+        broadcastChange('settlements', 'INSERT', {
+          from_member_id: settlement.fromId,
+          to_member_id: settlement.toId,
         })
         await refresh()
         break
@@ -468,17 +460,30 @@ export function AppProvider({ children, onToast }) {
 
       case 'APPROVE_EXPENSE': {
         const { expenseId } = action
+        const expense = stateRef.current.groups
+          .flatMap(g => g.expenses || [])
+          .find(e => e.id === expenseId)
         const { error } = await sb.from('expenses').update({
           status: 'approved',
           reviewed_by_member_id: state.currentUserId,
           reviewed_at: new Date().toISOString(),
         }).eq('id', expenseId)
         if (error) { console.error('[store] APPROVE_EXPENSE:', error); throw error }
+        if (expense) {
+          broadcastChange('expenses', 'UPDATE', {
+            submitted_by_member_id: expense.submittedBy,
+            title: expense.title,
+            status: 'approved',
+          })
+        }
         await refresh()
         break
       }
       case 'DECLINE_EXPENSE': {
         const { expenseId, reason } = action
+        const expense = stateRef.current.groups
+          .flatMap(g => g.expenses || [])
+          .find(e => e.id === expenseId)
         const { error } = await sb.from('expenses').update({
           status: 'declined',
           reviewed_by_member_id: state.currentUserId,
@@ -486,6 +491,13 @@ export function AppProvider({ children, onToast }) {
           decline_reason: reason,
         }).eq('id', expenseId)
         if (error) { console.error('[store] DECLINE_EXPENSE:', error); throw error }
+        if (expense) {
+          broadcastChange('expenses', 'UPDATE', {
+            submitted_by_member_id: expense.submittedBy,
+            title: expense.title,
+            status: 'declined',
+          })
+        }
         await refresh()
         break
       }
@@ -526,7 +538,7 @@ export function AppProvider({ children, onToast }) {
       default:
         console.warn('[store] Unknown action:', action.type)
     }
-  }, [state.currentUserId, state.currentGroupId, refresh])
+  }, [state.currentUserId, state.currentGroupId, refresh, broadcastChange])
 
   return (
     <AppContext.Provider value={{ state, dispatch, genId }}>
