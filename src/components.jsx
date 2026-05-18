@@ -346,6 +346,119 @@ function HScroll({ children, style, gap = 8, pb = 4 }) {
   );
 }
 
+function GroupSwitcherBar() {
+  const { state, dispatch } = useApp()
+  const groups = state.groups || []
+  const startRef = useRef(null)
+
+  const currentIndex = Math.max(0, groups.findIndex(g => g.id === state.currentGroupId))
+  const currentGroup = groups[currentIndex] || groups[0]
+
+  const switchTo = useCallback((index) => {
+    if (groups.length < 2) return
+    const nextGroup = groups[(index + groups.length) % groups.length]
+    if (!nextGroup || nextGroup.id === state.currentGroupId) return
+    dispatch({ type: 'SWITCH_GROUP', groupId: nextGroup.id })
+  }, [dispatch, groups, state.currentGroupId])
+
+  const previousGroup = useCallback(() => switchTo(currentIndex - 1), [currentIndex, switchTo])
+  const nextGroup = useCallback(() => switchTo(currentIndex + 1), [currentIndex, switchTo])
+
+  if (groups.length < 2) return null
+
+  const handlePointerDown = (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    startRef.current = { x: event.clientX, y: event.clientY }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+  }
+
+  const handlePointerEnd = (event) => {
+    const start = startRef.current
+    startRef.current = null
+    if (!start) return
+
+    const dx = event.clientX - start.x
+    const dy = event.clientY - start.y
+    if (Math.abs(dx) < 44 || Math.abs(dx) < Math.abs(dy) * 1.25) return
+    if (dx < 0) nextGroup()
+    else previousGroup()
+  }
+
+  const arrowStyle = {
+    appearance: 'none',
+    width: 36,
+    height: 34,
+    border: 0,
+    background: 'transparent',
+    color: 'var(--text-2)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    flexShrink: 0,
+  }
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={() => { startRef.current = null }}
+      style={{
+        height: 36,
+        margin: '0 12px 8px',
+        flexShrink: 0,
+        borderRadius: 12,
+        border: '1px solid var(--border-1)',
+        background: 'var(--surface-1)',
+        boxShadow: 'var(--vb-shadow-card)',
+        display: 'flex',
+        alignItems: 'center',
+        overflow: 'hidden',
+        touchAction: 'pan-y',
+        userSelect: 'none',
+      }}
+      aria-label="Chuyển nhóm"
+    >
+      <button type="button" onClick={previousGroup} style={arrowStyle} aria-label="Nhóm trước">
+        <Icon name="chevron-left" size={18} color="currentColor"/>
+      </button>
+      <div style={{
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'center',
+        gap: 6,
+        color: 'var(--text-1)',
+        fontFamily: 'var(--vb-font-body)',
+      }}>
+        <span style={{
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          fontSize: 13,
+          fontWeight: 800,
+        }}>
+          {currentGroup?.name || 'Nhóm'}
+        </span>
+        <span style={{
+          flexShrink: 0,
+          fontSize: 12,
+          fontWeight: 700,
+          color: 'var(--text-2)',
+          fontVariantNumeric: 'tabular-nums',
+        }}>
+          ({currentIndex + 1}/{groups.length})
+        </span>
+      </div>
+      <button type="button" onClick={nextGroup} style={arrowStyle} aria-label="Nhóm tiếp theo">
+        <Icon name="chevron-right" size={18} color="currentColor"/>
+      </button>
+    </div>
+  )
+}
+
 function iconBtnStyle() {
   return {
     appearance: 'none', position: 'relative',
@@ -546,5 +659,5 @@ export {
   displayMemberName,
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
   CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
-  iconBtnStyle, StatusBadge, DisputePopup, SwipeCard,
+  GroupSwitcherBar, iconBtnStyle, StatusBadge, DisputePopup, SwipeCard,
 }

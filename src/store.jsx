@@ -95,7 +95,9 @@ function buildEmptyState() {
     currentUserId: null,
     currentUserName: null,
     currentGroupId: null,
+    currentGroup: null,
     members: [],
+    memberTokens: [],
     groups: [],
     joinRequests: [],
     settlementPeriods: [],
@@ -109,6 +111,7 @@ function buildEmptyState() {
     },
     notifications: [],
     disputeCount: 0,
+    _allPickle: null,
     _loading: false,
     _error: null,
   }
@@ -124,15 +127,16 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, eR, pR, sR, spR, ppR, pcR, psR, paR, dR, jR] = await Promise.all([
+  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, psR, paR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
+    sb.from('member_tokens').select('member_id,revoked_at'),
     sb.from('expenses').select('*').order('expense_date', { ascending: false }),
     sb.from('expense_participants').select('*'),
     sb.from('settlements').select('*').order('settlement_date', { ascending: false }),
     sb.from('settlement_periods').select('*').order('period_end', { ascending: false }),
     sb.from('period_payments').select('*'),
-    sb.from('pickle_configs').select('*').limit(1).maybeSingle(),
+    sb.from('pickle_configs').select('*'),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
@@ -140,19 +144,22 @@ async function fetchGroupData(token) {
   ])
   if (mR.error) throw mR.error
   if (gR.error) throw gR.error
+  if (mtR.error) console.warn('[store] member_tokens query failed:', mtR.error)
   if (spR.error) console.warn('[store] settlement_periods query failed:', spR.error)
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
+  if (pcR.error) console.warn('[store] pickle_configs query failed:', pcR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
     members:         mR.data || [],
     groups:          gR.data || [],
+    memberTokens:    mtR.data || [],
     expenses:        eR.data || [],
     participants:    pR.data || [],
     settlements:     sR.data || [],
     settlementPeriods: spR.data || [],
     periodPayments:    ppR.data || [],
-    pickleConfig:    pcR.data,
+    pickleConfigs:   pcR.data || [],
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
     disputeCount:    (dR.data || []).length,
@@ -160,14 +167,111 @@ async function fetchGroupData(token) {
   }
 }
 
-function normalize(raw, currentMemberId) {
-  const { members, groups, expenses, participants, settlements, settlementPeriods, periodPayments, pickleConfig, pickleSessions, pickleAttendees, disputeCount, joinRequests = [] } = raw
+function sameMemberName(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+}
+
+function normalizeMemberTokens(memberTokens = []) {
+  return safeArray(memberTokens)
+    .map(token => {
+      const memberId = token.member_id ?? token.memberId
+      return memberId ? { ...token, memberId, member_id: memberId } : null
+    })
+    .filter(Boolean)
+}
+
+function resolveMemberForGroup({ members, memberTokens, groupId, currentMemberId, currentUserName }) {
+  const groupMembers = safeArray(members).filter(m => (m.groupId ?? m.group_id) === groupId)
+  const tokenMemberIds = new Set(normalizeMemberTokens(memberTokens).map(t => t.memberId))
+  const tokenMember = groupMembers.find(m => tokenMemberIds.has(m.id))
+  if (tokenMember) return tokenMember
+
+  const currentMember = groupMembers.find(m => m.id === currentMemberId)
+  if (currentMember) return currentMember
+
+  const namedMember = groupMembers.find(m => sameMemberName(m.name, currentUserName))
+  if (namedMember) return namedMember
+
+  const previousMember = safeArray(members).find(m => m.id === currentMemberId)
+  if (previousMember?.name) {
+    const matchingName = groupMembers.find(m => sameMemberName(m.name, previousMember.name))
+    if (matchingName) return matchingName
+  }
+
+  return groupMembers[0] || null
+}
+
+function pickleForGroup(allPickle, members, groupId) {
+  const source = allPickle || {}
+  const sessions = safeArray(source.sessions).filter(s => (s.groupId ?? s.group_id) === groupId)
+  const upcoming = safeArray(source.upcoming).filter(s => (s.groupId ?? s.group_id) === groupId)
+  const configs = safeArray(source.configs)
+  const config = configs.find(c => (c.groupId ?? c.group_id) === groupId)
+    || configs.find(c => !(c.groupId ?? c.group_id))
+    || {}
+  const fixedMembers = safeArray(members)
+    .filter(m => (m.groupId ?? m.group_id) === groupId && m.isActive !== false && m.is_active !== false)
+    .map(m => m.id)
+
+  return {
+    sessions,
+    upcoming,
+    fixedMembers,
+    externalTickets: safeArray(source.externalTickets).filter(t => (t.groupId ?? t.group_id) === groupId),
+    monthlyCourtFee: Number(config.monthlyCourtFee ?? config.monthly_court_fee ?? 0),
+    guestFeePerSession: Number(config.guestFeePerSession ?? config.guest_fee_per_session ?? 0),
+  }
+}
+
+function applyGroupSelection(state, groupId, options = {}) {
+  const groups = safeArray(state.groups)
+  const currentGroup = groups.find(g => g.id === groupId)
+  if (!currentGroup) return state
+
+  const nextMember = resolveMemberForGroup({
+    members: state.members,
+    memberTokens: state.memberTokens,
+    groupId,
+    currentMemberId: options.currentMemberId ?? state.currentUserId,
+    currentUserName: options.currentUserName ?? state.currentUserName,
+  })
+  const currentUserId = nextMember?.id || state.currentUserId
+  const currentUserName = nextMember?.name || state.currentUserName || ''
+  const members = safeArray(state.members).map(m => ({ ...m, isMe: m.id === currentUserId }))
+
+  return {
+    ...state,
+    currentUserId,
+    currentUserName,
+    currentGroupId: groupId,
+    currentGroup,
+    members,
+    pickle: pickleForGroup(state._allPickle || state.pickle, members, groupId),
+  }
+}
+
+function normalize(raw, currentMemberId, preferredGroupId = null, preferredMemberName = '') {
+  const {
+    members,
+    groups,
+    memberTokens = [],
+    expenses,
+    participants,
+    settlements,
+    settlementPeriods,
+    periodPayments,
+    pickleConfigs,
+    pickleConfig,
+    pickleSessions,
+    pickleAttendees,
+    disputeCount,
+    joinRequests = [],
+  } = raw
   if (groups.length === 0) return null  // signal: data empty but keep session
 
   const me = members.find(m => m.id === currentMemberId)
-  const currentGroup = groups.find(g => g.id === me?.group_id) || groups[0]
+  const currentGroup = groups.find(g => g.id === preferredGroupId) || groups.find(g => g.id === me?.group_id) || groups[0]
   const normalJoinRequests = safeArray(joinRequests)
-    .filter(r => r.group_id === currentGroup.id)
     .map(r => ({
       id: r.id,
       groupId: r.group_id,
@@ -242,6 +346,8 @@ function normalize(raw, currentMemberId) {
 
   const normalSessions = pickleSessions.map(s => ({
     id: s.id,
+    groupId: s.group_id,
+    group_id: s.group_id,
     date: s.session_date,
     status: s.status,
     notes: s.notes,
@@ -263,6 +369,8 @@ function normalize(raw, currentMemberId) {
     color: m.color || '#574EFA',
     role: m.role,
     isMe: m.id === currentMemberId,
+    isActive: m.is_active !== false,
+    is_active: m.is_active !== false,
     bankName: m.bank_name || '',
     bankAccount: m.bank_account || '',
     bankAccountName: m.bank_account_name || '',
@@ -275,37 +383,53 @@ function normalize(raw, currentMemberId) {
     has_pin: memberHasPin(m),
   }))
 
-  return {
+  const normalGroups = groups.map(group => ({
+    id: group.id,
+    name: group.name,
+    emoji: group.emoji || '👥',
+    color: group.color || '#574EFA',
+    inviteCode: group.invite_code,
+    members: members.filter(m => m.group_id === group.id).map(m => m.id),
+    expenses: normalExpenses.filter(e => e.groupId === group.id),
+    settlements: normalSettlements.filter(s => s.groupId === group.id),
+    settlementPeriods: normalSettlementPeriods.filter(p => p.groupId === group.id),
+  }))
+  const normalPickleConfigs = safeArray(pickleConfigs ?? (pickleConfig ? [pickleConfig] : [])).map(config => ({
+    ...config,
+    groupId: config.group_id ?? config.groupId,
+    group_id: config.group_id ?? config.groupId,
+    monthlyCourtFee: Number(config.monthly_court_fee ?? config.monthlyCourtFee ?? 0),
+    monthly_court_fee: Number(config.monthly_court_fee ?? config.monthlyCourtFee ?? 0),
+    guestFeePerSession: Number(config.guest_fee_per_session ?? config.guestFeePerSession ?? 0),
+    guest_fee_per_session: Number(config.guest_fee_per_session ?? config.guestFeePerSession ?? 0),
+  }))
+  const baseState = {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
     currentGroupId: currentGroup.id,
+    currentGroup: normalGroups.find(g => g.id === currentGroup.id) || normalGroups[0] || null,
     members: normalMembers,
-    groups: groups.map(group => ({
-      id: group.id,
-      name: group.name,
-      emoji: group.emoji || '👥',
-      color: group.color || '#574EFA',
-      inviteCode: group.invite_code,
-      members: members.filter(m => m.group_id === group.id).map(m => m.id),
-      expenses: normalExpenses.filter(e => e.groupId === group.id),
-      settlements: normalSettlements.filter(s => s.groupId === group.id),
-      settlementPeriods: normalSettlementPeriods.filter(p => p.groupId === group.id),
-    })),
+    memberTokens: normalizeMemberTokens(memberTokens),
+    groups: normalGroups,
     joinRequests: normalJoinRequests,
     settlementPeriods: normalSettlementPeriods,
-    pickle: {
+    pickle: null,
+    _allPickle: {
       sessions: normalSessions,
       upcoming: [],
-      fixedMembers: members.filter(m => m.is_active !== false).map(m => m.id),
+      configs: normalPickleConfigs,
       externalTickets: [],
-      monthlyCourtFee: Number(pickleConfig?.monthly_court_fee || 0),
-      guestFeePerSession: Number(pickleConfig?.guest_fee_per_session || 0),
     },
     notifications: [],
     disputeCount: disputeCount || 0,
     _loading: false,
     _error: null,
   }
+
+  return applyGroupSelection(baseState, currentGroup.id, {
+    currentMemberId,
+    currentUserName: preferredMemberName || me?.name || '',
+  })
 }
 
 export function AppProvider({ children, onToast }) {
@@ -338,7 +462,7 @@ export function AppProvider({ children, onToast }) {
     try {
       const { member } = getStoredAuth()
       const raw = await fetchGroupData(t)
-      const next = normalize(raw, member?.id)
+      const next = normalize(raw, member?.id, member?.groupId || member?.group_id, member?.name)
       if (next) {
         setState(next)
       } else {
@@ -444,6 +568,24 @@ export function AppProvider({ children, onToast }) {
       case 'REFRESH': {
         await refresh(action.token)
         break
+      }
+
+      case 'SWITCH_GROUP': {
+        const groupId = action.groupId ?? action.group_id
+        if (!groupId) return null
+        const current = stateRef.current
+        const next = applyGroupSelection(current, groupId)
+        if (next === current) return null
+        if (tokenRef.current && next.currentUserId) {
+          storeAuth(tokenRef.current, {
+            id: next.currentUserId,
+            groupId: next.currentGroupId,
+            name: next.currentUserName,
+          })
+        }
+        stateRef.current = next
+        setState(next)
+        return next.currentGroupId
       }
 
       case 'JOIN_GROUP': {
