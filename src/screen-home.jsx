@@ -9,6 +9,10 @@ function ScreenHome({ push, switchTab }) {
   const { members, currentUserId } = state
   const meId = currentUserId || ME
   const [selectedMonth, setSelectedMonth] = useState(() => toYearMonth(new Date()))
+  const hasPickleballGroup = useMemo(
+    () => safeArray(state.groups).some(isPickleballGroupName),
+    [state.groups],
+  )
 
   const meMember = members.find(m => m.id === meId) || {
     name: state.currentUserName || 'Bạn',
@@ -90,7 +94,7 @@ function ScreenHome({ push, switchTab }) {
       />
 
       <div style={{ padding: '0 14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {homeMonthSessions.length > 0 && (
+        {hasPickleballGroup && (
           <PickleballMonthCard
             sessions={homeMonthSessions}
             memberId={meId}
@@ -99,14 +103,13 @@ function ScreenHome({ push, switchTab }) {
           />
         )}
 
-        {homeMonthExpenses.length > 0 && (
-          <GroupExpensesCard
-            summaries={allExpenseSummaries}
-            net={groupNet}
-            totalSpent={totalSpent}
-            onClick={() => switchTab('groups')}
-          />
-        )}
+        <GroupExpensesCard
+          summaries={allExpenseSummaries}
+          net={groupNet}
+          totalSpent={totalSpent}
+          hasExpenses={homeMonthExpenses.length > 0}
+          onClick={() => switchTab('groups')}
+        />
 
         {monthNet < 0 && (
           <PaymentCTA amount={Math.abs(monthNet)} onClick={() => push('payment-flow')}/>
@@ -251,32 +254,38 @@ function PickleballMonthCard({ sessions, memberId, net, onClick }) {
       </div>
 
       <div style={{ padding: '0 16px 10px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 5 }}>
-          {sessionItems.map(item => (
-            <AttendanceCell key={item.id} item={item}/>
-          ))}
-        </div>
+        {sessionItems.length === 0 ? (
+          <CardEmptyText style={{ padding: '16px 0 18px' }}>Chưa có lịch tháng này</CardEmptyText>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 5 }}>
+              {sessionItems.map(item => (
+                <AttendanceCell key={item.id} item={item}/>
+              ))}
+            </div>
 
-        <div style={{ display: 'flex', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
-          <LegendItem
-            label={`Có mặt (${presentCount})`}
-            color="rgba(167,243,208,.75)"
-            swatchBg="rgba(110,231,183,.4)"
-            swatchBorder="1px solid rgba(110,231,183,.6)"
-          />
-          <LegendItem
-            label={`Vắng (${absentCount})`}
-            color="rgba(253,164,175,.75)"
-            swatchBg="rgba(251,113,133,.3)"
-            swatchBorder="1px solid rgba(251,113,133,.5)"
-          />
-          <LegendItem
-            label={`Sắp tới (${upcomingCount})`}
-            color="rgba(255,255,255,.3)"
-            swatchBg="rgba(255,255,255,.05)"
-            swatchBorder="1px dashed rgba(255,255,255,.2)"
-          />
-        </div>
+            <div style={{ display: 'flex', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
+              <LegendItem
+                label={`Có mặt (${presentCount})`}
+                color="rgba(167,243,208,.75)"
+                swatchBg="rgba(110,231,183,.4)"
+                swatchBorder="1px solid rgba(110,231,183,.6)"
+              />
+              <LegendItem
+                label={`Vắng (${absentCount})`}
+                color="rgba(253,164,175,.75)"
+                swatchBg="rgba(251,113,133,.3)"
+                swatchBorder="1px solid rgba(251,113,133,.5)"
+              />
+              <LegendItem
+                label={`Sắp tới (${upcomingCount})`}
+                color="rgba(255,255,255,.3)"
+                swatchBg="rgba(255,255,255,.05)"
+                swatchBorder="1px dashed rgba(255,255,255,.2)"
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <StatsFooter
@@ -291,7 +300,7 @@ function PickleballMonthCard({ sessions, memberId, net, onClick }) {
   )
 }
 
-function GroupExpensesCard({ summaries, net, totalSpent, onClick }) {
+function GroupExpensesCard({ summaries, net, totalSpent, hasExpenses, onClick }) {
   const recent = summaries.slice(0, 3)
   const debt = Math.max(-net, 0)
   const groupCount = new Set(summaries.map(item => item.groupId).filter(Boolean)).size
@@ -328,7 +337,7 @@ function GroupExpensesCard({ summaries, net, totalSpent, onClick }) {
         action="Chi tiết ›"
       />
 
-      {recent.length > 0 && (
+      {recent.length > 0 ? (
         <div style={{ borderTop: '1px solid rgba(255,255,255,.08)' }}>
           {recent.map((item, index) => (
             <ExpensePreviewRow
@@ -338,7 +347,9 @@ function GroupExpensesCard({ summaries, net, totalSpent, onClick }) {
             />
           ))}
         </div>
-      )}
+      ) : !hasExpenses ? (
+        <CardEmptyText>Chưa có chi tiêu tháng này</CardEmptyText>
+      ) : null}
 
       <StatsFooter
         items={[
@@ -348,6 +359,21 @@ function GroupExpensesCard({ summaries, net, totalSpent, onClick }) {
         ]}
       />
     </button>
+  )
+}
+
+function CardEmptyText({ children, style }) {
+  return (
+    <div style={{
+      padding: 16,
+      fontSize: 12,
+      fontWeight: 600,
+      color: 'rgba(255,255,255,.48)',
+      textAlign: 'center',
+      ...style,
+    }}>
+      {children}
+    </div>
   )
 }
 
@@ -527,6 +553,14 @@ function PaymentCTA({ amount, onClick }) {
       </div>
     </button>
   )
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function isPickleballGroupName(group) {
+  return String(group?.name || '').toLowerCase().includes('pickleball')
 }
 
 function calcMonthNet(expenses, currentMemberId) {

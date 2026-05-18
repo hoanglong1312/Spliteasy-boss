@@ -12,6 +12,81 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function sameId(a, b) {
+  return a != null && b != null && String(a) === String(b);
+}
+
+function rowGroupId(row) {
+  return row?.groupId ?? row?.group_id;
+}
+
+function sameMemberName(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
+function getStateMembers(state) {
+  const allMembers = safeArray(state?.allMembers);
+  return allMembers.length > 0 ? allMembers : safeArray(state?.members);
+}
+
+function isPickleballGroupName(group) {
+  return String(group?.name || '').toLowerCase().includes('pickleball');
+}
+
+function hasPickleballDataForGroup(state, groupId) {
+  if (!groupId) return false;
+  const hasGroupSession = safeArray(state?._allPickle?.sessions)
+    .some(s => sameId(rowGroupId(s), groupId) && String(s.status || '').toLowerCase() === 'external');
+  const hasExternalTicket = safeArray(state?._allPickle?.externalTickets)
+    .some(t => sameId(rowGroupId(t), groupId));
+  const group = safeArray(state?.groups).find(g => sameId(g.id, groupId));
+  const hasPickleExpense = safeArray(group?.expenses).some(expense => (
+    expense?.pickleSessionId
+    || expense?.pickle_session_id
+    || String(expense?.module || '').toLowerCase() === 'pickleball'
+  ));
+  return hasGroupSession || hasExternalTicket || hasPickleExpense;
+}
+
+function findPickleballGroup(state) {
+  const groups = safeArray(state?.groups);
+  const namedGroup = groups.find(isPickleballGroupName);
+  if (namedGroup) return namedGroup;
+
+  const dataGroup = groups.find(group => hasPickleballDataForGroup(state, group.id));
+  if (dataGroup) return dataGroup;
+
+  const fallbackId = state?.currentGroupId || state?.currentGroup?.id;
+  return groups.find(group => sameId(group.id, fallbackId)) || state?.currentGroup || null;
+}
+
+function findCurrentMemberForGroup(state, groupId) {
+  const members = getStateMembers(state);
+  const groupMembers = members.filter(m => sameId(rowGroupId(m), groupId));
+  const tokenMemberIds = new Set(
+    safeArray(state?.memberTokens)
+      .filter(token => !(token.revoked_at || token.revokedAt))
+      .map(token => token.memberId ?? token.member_id)
+      .filter(Boolean)
+      .map(String)
+  );
+  const tokenMember = groupMembers.find(m => tokenMemberIds.has(String(m.id)));
+  if (tokenMember) return tokenMember;
+
+  const currentMember = groupMembers.find(m => sameId(m.id, state?.currentUserId));
+  if (currentMember) return currentMember;
+
+  const namedMember = groupMembers.find(m => sameMemberName(m.name, state?.currentUserName));
+  if (namedMember) return namedMember;
+
+  const previousMember = members.find(m => sameId(m.id, state?.currentUserId));
+  if (previousMember?.name) {
+    return groupMembers.find(m => sameMemberName(m.name, previousMember.name)) || null;
+  }
+
+  return null;
+}
+
 function memberOrFallback(M, id) {
   return M[id] || {
     id,
@@ -441,14 +516,16 @@ function BreakdownRow({ label, sub, value, icon, positive = false, accent }) {
 // ── Sessions tab — list of all sessions this month ──────────────────────────
 function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) {
   const { state, dispatch } = useApp();
-  const M = getMemberMap(state.members);
-  const currentUserId = state.currentUserId;
-  const groupId = state.currentGroupId || state.currentGroup?.id || pickle.sessions[0]?.groupId || pickle.sessions[0]?.group_id;
-  const currentMember = safeArray(state.members).find(m => m.id === currentUserId);
+  const allMembers = getStateMembers(state);
+  const M = getMemberMap(allMembers);
+  const pickleballGroup = findPickleballGroup(state);
+  const groupId = pickleballGroup?.id || state.currentGroupId || state.currentGroup?.id || pickle.sessions[0]?.groupId || pickle.sessions[0]?.group_id;
+  const currentMember = findCurrentMemberForGroup(state, groupId);
+  const currentUserId = currentMember?.id || state.currentUserId;
   const isTreasurer = currentMember?.role === 'treasurer';
-  const groupMembers = useMemo(() => safeArray(state.members)
-    .filter(m => (m.groupId ?? m.group_id) === groupId && m.isActive !== false && m.is_active !== false),
-    [state.members, groupId]);
+  const groupMembers = useMemo(() => allMembers
+    .filter(m => sameId(rowGroupId(m), groupId) && m.isActive !== false && m.is_active !== false),
+    [allMembers, groupId]);
   const [scheduleForm, setScheduleForm] = useState({
     startDate: '',
     weekdays: [1, 3, 5],
