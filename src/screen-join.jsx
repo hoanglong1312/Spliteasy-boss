@@ -68,7 +68,7 @@ export function ScreenJoin({ push }) {
       const sb = createSupabase(null)
       const { data, error: rpcErr } = await sb.rpc('join_group', {
         p_invite_code: code.toUpperCase().trim(),
-        p_name: member.name,
+        p_member_name: member.name,
       })
       if (rpcErr || data?.error) {
         setError('Không thể tham gia nhóm. Thử lại hoặc liên hệ thủ quỹ.')
