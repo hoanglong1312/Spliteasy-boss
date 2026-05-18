@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { useApp } from './store.jsx'
 import { ME, totalBalances } from './data.jsx'
 import { Icon, Avatar, Money, Button, Card, iconBtnStyle, ListRow, SectionHeader, NavHeader } from './components.jsx'
+import { exportMonthlyCSV } from './lib/export.js'
 
 // Profile / Cá nhân tab — personal stats + settings
 const PRESET_COLORS = ['#574EFA', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
@@ -99,6 +100,18 @@ function ScreenProfile({ tweaks, push }) {
           </div>
           <AttendanceCard pct={monthStats.attendancePct}/>
         </div>
+
+        {me?.role === 'treasurer' && (
+          <Button
+            variant="secondary"
+            full
+            icon="arrow-down"
+            onClick={() => exportMonthlyCSV(state)}
+            style={{ justifyContent: 'flex-start' }}
+          >
+            Xuất báo cáo tháng (CSV)
+          </Button>
+        )}
 
         <Button
           variant="danger"
