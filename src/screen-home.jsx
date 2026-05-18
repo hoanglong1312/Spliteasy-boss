@@ -242,7 +242,7 @@ function SmartHomeSummary({ push, switchTab }) {
         }}>
           {pendingCount > 0 && (
             <button
-              onClick={() => push('approval-queue')}
+              onClick={() => push('approval-queue', { groupId: state.currentGroupId || state.groups[0]?.id })}
               style={{
                 appearance: 'none', cursor: 'pointer', background: 'none', border: 'none', padding: 0,
                 display: 'flex', alignItems: 'center', gap: 8,

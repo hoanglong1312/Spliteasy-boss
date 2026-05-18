@@ -501,13 +501,16 @@ export function AppProvider({ children, onToast }) {
         break
       }
 
-      case 'ADD_PICKLE_EXPENSE':
+      case 'ADD_PICKLE_EXPENSE': {
+        const isTreasurer = state.members.find(m => m.id === state.currentUserId)?.role === 'treasurer'
         dispatch({
           type: 'ADD_EXPENSE',
           groupId: state.currentGroupId,
           expense: { ...action.expense, pickleSessionId: action.sessionId },
+          isTreasurer,
         })
         break
+      }
 
       case 'ADD_GROUP':
       case 'DELETE_GROUP':

@@ -1213,6 +1213,7 @@ function ScreenApprovalQueue({ params = {}, pop }) {
           </div>
 
           <SwipeCard
+            key={current.id}
             expense={current}
             members={M}
             onApprove={handleApprove}
