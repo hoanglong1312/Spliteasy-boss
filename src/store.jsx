@@ -200,7 +200,7 @@ export function AppProvider({ children, onToast }) {
     const token   = tokenRef.current
     if (!groupId || !token) return
 
-    const sb      = createSupabase(token)
+    const sb      = createSupabase(null)
     const channel = sb.channel(`group-${groupId}`)
 
     const getMemberName = (id) =>
@@ -261,7 +261,9 @@ export function AppProvider({ children, onToast }) {
           onToast('Có sai sót cần xem ⚠️', 'warning')
         }
       })
-      .subscribe()
+      .subscribe((status, err) => {
+        if (err) console.error('[realtime]', status, err)
+      })
 
     channelRef.current = channel
 
