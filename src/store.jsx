@@ -143,7 +143,7 @@ function normalize(raw, currentMemberId) {
   }
 }
 
-export function AppProvider({ children }) {
+export function AppProvider({ children, onToast }) {
   const { token: storedToken, member: storedMember } = getStoredAuth()
 
   const [state, setState] = useState(() => {
@@ -160,6 +160,11 @@ export function AppProvider({ children }) {
   })
 
   const tokenRef = useRef(storedToken)
+  const channelRef  = useRef(null)
+  const debounceRef = useRef(null)
+  const stateRef    = useRef(state)
+
+  useEffect(() => { stateRef.current = state })
 
   const refresh = useCallback(async (tok) => {
     const t = tok ?? tokenRef.current
@@ -181,9 +186,94 @@ export function AppProvider({ children }) {
     }
   }, [])
 
+  const scheduleRefresh = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => refresh(), 600)
+  }, [refresh])
+
   useEffect(() => {
     if (storedToken) refresh(storedToken)
   }, [])
+
+  useEffect(() => {
+    const groupId = stateRef.current.currentGroupId
+    const token   = tokenRef.current
+    if (!groupId || !token) return
+
+    const sb      = createSupabase(token)
+    const channel = sb.channel(`group-${groupId}`)
+
+    const getMemberName = (id) =>
+      stateRef.current.members.find(m => m.id === id)?.name || 'Ai đó'
+    const getMyRole = () =>
+      stateRef.current.members.find(m => m.isMe)?.role
+
+    channel
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'expenses',
+        filter: `group_id=eq.${groupId}`,
+      }, (payload) => {
+        scheduleRefresh()
+        const row = payload.new
+        if (row.submitted_by_member_id === stateRef.current.currentUserId) return
+        if (!onToast) return
+        if (getMyRole() === 'treasurer') {
+          onToast('Có khoản mới chờ duyệt ⏳', 'warning')
+        } else {
+          onToast(`${getMemberName(row.submitted_by_member_id)} vừa thêm chi tiêu ${row.title}`, 'info')
+        }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'expenses',
+        filter: `group_id=eq.${groupId}`,
+      }, (payload) => {
+        scheduleRefresh()
+        const row = payload.new
+        if (row.submitted_by_member_id !== stateRef.current.currentUserId) return
+        if (!onToast) return
+        if (row.status === 'approved') {
+          onToast(`Chi tiêu "${row.title}" đã được duyệt ✅`, 'success')
+        } else if (row.status === 'declined') {
+          onToast(`Chi tiêu "${row.title}" bị từ chối ❌`, 'warning')
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'settlements',
+        filter: `group_id=eq.${groupId}`,
+      }, (payload) => {
+        scheduleRefresh()
+        const row = payload.new
+        if (row.to_member_id !== stateRef.current.currentUserId) return
+        if (onToast) onToast(`${getMemberName(row.from_member_id)} đã thanh toán cho bạn 💸`, 'success')
+      })
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'pickle_sessions',
+        filter: `group_id=eq.${groupId}`,
+      }, () => scheduleRefresh())
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'pickle_attendees',
+      }, () => scheduleRefresh())
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'expense_disputes',
+      }, () => {
+        scheduleRefresh()
+        if (getMyRole() === 'treasurer' && onToast) {
+          onToast('Có sai sót cần xem ⚠️', 'warning')
+        }
+      })
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      channel.unsubscribe()
+      channelRef.current = null
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+    }
+  }, [state.currentGroupId, scheduleRefresh, onToast])
 
   const dispatch = useCallback(async (action) => {
     const token = tokenRef.current
