@@ -45,6 +45,7 @@ async function fetchGroupData(token) {
   ])
   if (mR.error) throw mR.error
   if (gR.error) throw gR.error
+  if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   return {
     members:         mR.data || [],
     groups:          gR.data || [],

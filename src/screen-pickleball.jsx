@@ -190,10 +190,7 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
   const guestCount = pickle.sessions.reduce((a,s)=>a+safeArray(s.guests).length,0);
 
   // Compute "what you contributed vs what you owe" for me
-  const myCourt = summary.courtPerMember;
-  const myCredit = summary.guestCreditPer;
-  const myExpenses = summary.memberOwes[meId] || 0;
-  const myNet = -myCourt + myCredit + myExpenses;
+  const myNet = summary.memberOwes[meId] || 0;
 
   const next = pickle.upcoming[0];
   const nextGoing = sessionMemberIds(next);
@@ -213,9 +210,9 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
           </div>
         </div>
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <BreakdownRow label="Tiền thuê sân tháng 5" sub={`${pickle.fixedMembers.length} người chia đều`} value={-myCourt} icon="card"/>
-          <BreakdownRow label={`Phí vé vãng lai (${guestCount} lượt)`} sub="Chia đều cho thành viên cố định" value={+myCredit} icon="users" positive accent={accent}/>
-          <BreakdownRow label="Chi phí bóng / nước / ăn" sub="Đã trả - phần phải đóng" value={myExpenses} icon="ball" positive={myExpenses >= 0} accent={accent}/>
+          <BreakdownRow label="Tiền thuê sân tháng 5" sub={`${pickle.fixedMembers.length} người chia đều`} value={-summary.courtPerMember} icon="card"/>
+          <BreakdownRow label={`Phí vé vãng lai (${guestCount} lượt)`} sub="Chia đều cho thành viên cố định" value={+summary.guestCreditPer} icon="users" positive accent={accent}/>
+          <BreakdownRow label="Chi phí bóng / nước / ăn" sub="Đã trả - phần phải đóng" value={myNet + summary.courtPerMember - summary.guestCreditPer} icon="ball" positive={myNet + summary.courtPerMember - summary.guestCreditPer >= 0} accent={accent}/>
         </div>
       </Card>
 
@@ -473,10 +470,7 @@ function PickleMembers({ tweaks = {}, summary, accent, accentBg, style, pickle }
             const member = memberOrFallback(M, id);
             const attendedCount = pickle.sessions.filter(s => sessionMemberIds(s).includes(id)).length;
             const sessionCount = pickle.sessions.length;
-            const myCourt = summary.courtPerMember;
-            const myCredit = summary.guestCreditPer;
-            const myExp = summary.memberOwes[id] || 0;
-            const net = -myCourt + myCredit + myExp;
+            const net = summary.memberOwes[id] || 0;
             return (
               <div key={id} style={{
                 padding: 14, borderBottom: i < pickle.fixedMembers.length - 1 ? '1px solid var(--border-1)' : 'none',
