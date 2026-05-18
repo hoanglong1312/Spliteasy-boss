@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { useApp } from './store.jsx'
-import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, recentActivity, groupBalance, groupNet } from './data.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, recentActivity, groupBalance, groupNet, pickleSummary } from './data.jsx'
 import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon } from './components.jsx'
 
 // Home tab — dashboard with balance summary, recent activity, group cards
@@ -157,6 +157,145 @@ function SubBalance({ label, amount, positive = false }) {
   );
 }
 
+function SmartHomeSummary({ push, pushToTab, switchTab }) {
+  const { state } = useApp()
+  const meId = state.currentUserId || ME
+  const M = getMemberMap(state.members)
+  const isTreasurer = M[meId]?.role === 'treasurer'
+
+  // Nợ nhóm: tổng số âm từ totalBalances
+  const groupBalances = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId])
+  const groupDebt = Math.abs(Object.values(groupBalances).filter(v => v < 0).reduce((a, b) => a + b, 0))
+
+  // Nợ pickleball: memberOwes[meId] âm = nợ
+  const pSummary = useMemo(() => pickleSummary(state.pickle), [state.pickle])
+  const pickleOwes = pSummary.memberOwes?.[meId] || 0
+  const pickleDebt = pickleOwes < 0 ? Math.abs(pickleOwes) : 0
+
+  // Tổng cần thanh toán
+  const totalDebt = groupDebt + pickleDebt
+  const hasDebt = totalDebt > 0
+
+  // Pending expenses (chờ duyệt)
+  const pendingCount = useMemo(() => {
+    return state.groups.flatMap(g => g.expenses || []).filter(e => e.status === 'pending').length
+  }, [state.groups])
+  const disputeCount = state.disputeCount || 0
+
+  const month = new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Month label */}
+      <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, textTransform: 'capitalize' }}>
+        {month}
+      </div>
+
+      {/* Two summary cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <SummaryCard
+          emoji="📦"
+          label="Chi tiêu nhóm"
+          debt={groupDebt}
+          subtitle={`${state.groups.length} nhóm`}
+          onClick={() => switchTab('groups')}
+        />
+        <SummaryCard
+          emoji="🏸"
+          label="Pickleball"
+          debt={pickleDebt}
+          subtitle="CLB Q7"
+          onClick={() => switchTab('pickle')}
+        />
+      </div>
+
+      {/* Thanh toán CTA */}
+      {hasDebt && (
+        <button
+          onClick={() => push('payment-flow')}
+          style={{
+            appearance: 'none', cursor: 'pointer', width: '100%', height: 48,
+            borderRadius: 14, border: 0,
+            background: 'var(--brand-1)', color: '#fff',
+            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 15,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          → Thanh toán ngay {fmtVND(totalDebt)}
+        </button>
+      )}
+      {!hasDebt && (
+        <div style={{
+          textAlign: 'center', padding: '12px 0',
+          fontSize: 14, color: 'var(--vb-success-700)', fontWeight: 600,
+        }}>
+          🎉 Tháng này bạn đang cân bằng
+        </div>
+      )}
+
+      {/* Treasurer block — chỉ hiện khi có dữ liệu */}
+      {isTreasurer && (pendingCount > 0 || disputeCount > 0) && (
+        <div style={{
+          background: 'var(--vb-warn-100)', borderRadius: 12,
+          border: '1px solid rgba(245,158,11,0.25)',
+          padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          {pendingCount > 0 && (
+            <button
+              onClick={() => push('approval-queue')}
+              style={{
+                appearance: 'none', cursor: 'pointer', background: 'none', border: 'none', padding: 0,
+                display: 'flex', alignItems: 'center', gap: 8,
+                fontFamily: 'var(--vb-font-body)', textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 14 }}>⏳</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
+                {pendingCount} chi tiêu chờ duyệt
+              </span>
+            </button>
+          )}
+          {disputeCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14 }}>⚠️</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
+                {disputeCount} sai sót cần xem
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SummaryCard({ emoji, label, debt, subtitle, onClick }) {
+  const hasDebt = debt > 0
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        appearance: 'none', cursor: 'pointer', textAlign: 'left',
+        padding: '12px 14px', borderRadius: 14,
+        background: 'var(--surface-1)', border: '1px solid var(--border-1)',
+        display: 'flex', flexDirection: 'column', gap: 4,
+        fontFamily: 'var(--vb-font-body)',
+      }}
+    >
+      <div style={{ fontSize: 22 }}>{emoji}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 700, color: hasDebt ? 'var(--vb-danger-700)' : 'var(--vb-success-700)' }}>
+        {hasDebt ? `Nợ ${fmtVND(debt)}` : 'Cân bằng'}
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
+        {subtitle}
+      </div>
+    </button>
+  )
+}
+
 // ── OVERVIEW layout (default) — groups + ai nợ ai + recent ──────────────────
 function OverviewLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
   const { state: _s } = useApp();
@@ -166,6 +305,9 @@ function OverviewLayout({ push, pushToTab, switchTab, tweaks, activity, groups }
 
   return (
     <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Smart summary block */}
+      <SmartHomeSummary push={push} pushToTab={pushToTab} switchTab={switchTab}/>
+
       {/* Quick chips */}
       <HScroll style={{ padding: '0 4px', marginLeft: -4, marginRight: -4 }}>
         {[
