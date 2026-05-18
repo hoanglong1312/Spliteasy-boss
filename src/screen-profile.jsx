@@ -1,11 +1,32 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useApp } from './store.jsx'
 import { ME, totalBalances } from './data.jsx'
 import { Icon, Avatar, Money, Button, Card, iconBtnStyle, ListRow, SectionHeader, NavHeader } from './components.jsx'
 import { exportMonthlyCSV } from './lib/export.js'
+import { BANK_LIST } from './lib/vietqr.js'
 
 // Profile / Cá nhân tab — personal stats + settings
 const PRESET_COLORS = ['#574EFA', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+const PIN_RE = /^\d{4,6}$/
+
+function getBank(bankValue) {
+  return BANK_LIST.find(b => b.id === bankValue || b.shortName === bankValue || b.name === bankValue)
+}
+
+function getBankLabel(bankValue) {
+  return getBank(bankValue)?.shortName || bankValue || ''
+}
+
+function normalizeBankId(bankValue) {
+  return getBank(bankValue)?.id || bankValue || ''
+}
+
+function maskBankAccount(account) {
+  const clean = String(account || '').replace(/\s+/g, '')
+  if (!clean) return ''
+  if (clean.length <= 4) return '****'
+  return `**** ${clean.slice(-4)}`
+}
 
 function ScreenProfile({ tweaks, push }) {
   const { state, dispatch } = useApp();
@@ -20,6 +41,22 @@ function ScreenProfile({ tweaks, push }) {
     color: '#574EFA',
     isMe: true,
   };
+  const currentBankName = me.bankName ?? me.bank_name ?? '';
+  const currentBankAccount = me.bankAccount ?? me.bank_account ?? '';
+  const currentBankAccountName = me.bankAccountName ?? me.bank_account_name ?? '';
+  const hasPin = me.hasPin === true || me.has_pin === true;
+  const [bankName, setBankName] = useState(normalizeBankId(currentBankName));
+  const [bankAccount, setBankAccount] = useState(currentBankAccount || '');
+  const [bankAccountName, setBankAccountName] = useState(currentBankAccountName || '');
+  const [bankSaving, setBankSaving] = useState(false);
+  const [bankMessage, setBankMessage] = useState(null);
+  const [pinMode, setPinMode] = useState(null);
+  const [pinValue, setPinValue] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinError, setPinError] = useState(null);
+  const [pinMessage, setPinMessage] = useState(null);
+
   const totals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId]);
   const netBalance = useMemo(
     () => Object.values(totals).reduce((sum, value) => sum + value, 0),
@@ -41,6 +78,86 @@ function ScreenProfile({ tweaks, push }) {
   const netLabel = netBalance > 0 ? 'Được nhận' : netBalance < 0 ? 'Nợ' : 'Cân bằng';
   const netColor = netBalance > 0 ? 'var(--vb-success-700)' : netBalance < 0 ? 'var(--vb-danger-700)' : 'var(--text-1)';
   const activeColor = me.color || '#574EFA';
+  const currentBankLabel = getBankLabel(currentBankName);
+  const maskedBankAccount = maskBankAccount(currentBankAccount);
+
+  useEffect(() => {
+    setBankName(normalizeBankId(currentBankName));
+    setBankAccount(currentBankAccount || '');
+    setBankAccountName(currentBankAccountName || '');
+  }, [currentBankName, currentBankAccount, currentBankAccountName]);
+
+  async function handleSaveBankInfo() {
+    if (bankSaving) return;
+    setBankSaving(true);
+    setBankMessage(null);
+    try {
+      await dispatch({
+        type: 'UPDATE_BANK_INFO',
+        bankName: bankName.trim() || null,
+        bankAccount: bankAccount.trim() || null,
+        bankAccountName: bankAccountName.trim() || null,
+      });
+      setBankMessage({ type: 'success', text: 'Đã lưu thông tin ngân hàng' });
+    } catch (err) {
+      setBankMessage({ type: 'error', text: 'Không lưu được thông tin ngân hàng' });
+    } finally {
+      setBankSaving(false);
+    }
+  }
+
+  function openPinForm(mode) {
+    setPinMode(mode);
+    setPinValue('');
+    setPinConfirm('');
+    setPinError(null);
+    setPinMessage(null);
+  }
+
+  async function handleSavePin() {
+    if (pinSaving) return;
+    if (!PIN_RE.test(pinValue)) {
+      setPinError('PIN cần 4-6 chữ số');
+      return;
+    }
+    if (pinValue !== pinConfirm) {
+      setPinError('PIN xác nhận không khớp');
+      return;
+    }
+    setPinSaving(true);
+    setPinError(null);
+    setPinMessage(null);
+    try {
+      await dispatch({ type: 'SET_MEMBER_PIN', pin: pinValue });
+      setPinMode(null);
+      setPinValue('');
+      setPinConfirm('');
+      setPinMessage({ type: 'success', text: 'Đã lưu mã PIN' });
+    } catch (err) {
+      setPinError('Không lưu được mã PIN');
+    } finally {
+      setPinSaving(false);
+    }
+  }
+
+  async function handleResetPin() {
+    if (pinSaving || !me.id) return;
+    if (!window.confirm('Xóa mã PIN của bạn?')) return;
+    setPinSaving(true);
+    setPinError(null);
+    setPinMessage(null);
+    try {
+      await dispatch({ type: 'RESET_MEMBER_PIN', memberId: me.id });
+      setPinMode(null);
+      setPinValue('');
+      setPinConfirm('');
+      setPinMessage({ type: 'success', text: 'Đã xóa mã PIN' });
+    } catch (err) {
+      setPinMessage({ type: 'error', text: 'Không xóa được mã PIN' });
+    } finally {
+      setPinSaving(false);
+    }
+  }
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -113,6 +230,159 @@ function ScreenProfile({ tweaks, push }) {
           </Button>
         )}
 
+        <div>
+          <SectionHeader title="Tài khoản ngân hàng"/>
+          <Card style={{ padding: 16 }}>
+            {(currentBankLabel || maskedBankAccount) && (
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-1)',
+                marginBottom: 14,
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)' }}>
+                  {currentBankLabel || 'Ngân hàng'}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginTop: 3 }}>
+                  {maskedBankAccount}{currentBankAccountName ? ` • ${currentBankAccountName}` : ''}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <ProfileField label="Ngân hàng">
+                <select
+                  value={bankName}
+                  onChange={e => setBankName(e.target.value)}
+                  style={profileControlStyle()}
+                >
+                  <option value="">Chọn ngân hàng</option>
+                  {bankName && !getBank(bankName) && (
+                    <option value={bankName}>{getBankLabel(bankName)}</option>
+                  )}
+                  {BANK_LIST.map(bank => (
+                    <option key={bank.id} value={bank.id}>{bank.shortName}</option>
+                  ))}
+                </select>
+              </ProfileField>
+              <ProfileField label="Số tài khoản">
+                <input
+                  value={bankAccount}
+                  onChange={e => setBankAccount(e.target.value.replace(/[^\d]/g, ''))}
+                  inputMode="numeric"
+                  placeholder="Nhập số tài khoản"
+                  style={profileControlStyle()}
+                />
+              </ProfileField>
+              <ProfileField label="Tên chủ tài khoản">
+                <input
+                  value={bankAccountName}
+                  onChange={e => setBankAccountName(e.target.value)}
+                  placeholder="Nhập tên chủ tài khoản"
+                  style={profileControlStyle()}
+                />
+              </ProfileField>
+              <Button full onClick={handleSaveBankInfo} disabled={bankSaving}>
+                {bankSaving ? 'Đang lưu...' : 'Lưu'}
+              </Button>
+              {bankMessage && (
+                <div style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: bankMessage.type === 'error' ? 'var(--vb-danger-700)' : 'var(--vb-success-700)',
+                }}>
+                  {bankMessage.text}
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+
+        <div>
+          <SectionHeader title="Bảo mật / Mã PIN"/>
+          <Card style={{ padding: 16 }}>
+            <div style={{ fontSize: 13, lineHeight: 1.45, color: 'var(--text-2)', fontWeight: 600, marginBottom: 14 }}>
+              Mã PIN bảo vệ tài khoản khi chia sẻ link nhóm. Nếu quên PIN, nhờ thủ quỹ reset giúp.
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {!hasPin ? (
+                <Button variant="brandSoft" onClick={() => openPinForm('set')} disabled={pinSaving}>
+                  Đặt mã PIN
+                </Button>
+              ) : (
+                <>
+                  <Button variant="brandSoft" onClick={() => openPinForm('change')} disabled={pinSaving}>
+                    Đổi PIN
+                  </Button>
+                  <Button variant="danger" onClick={handleResetPin} disabled={pinSaving}>
+                    Xóa PIN
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {pinMode && (
+              <div style={{
+                marginTop: 14,
+                padding: 12,
+                borderRadius: 12,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+              }}>
+                <ProfileField label={pinMode === 'change' ? 'PIN mới' : 'PIN'}>
+                  <input
+                    value={pinValue}
+                    onChange={e => setPinValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="4-6 số"
+                    style={profileControlStyle({ borderColor: pinError ? 'var(--vb-danger-700)' : undefined })}
+                  />
+                </ProfileField>
+                <ProfileField label="Nhập lại PIN">
+                  <input
+                    value={pinConfirm}
+                    onChange={e => setPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="4-6 số"
+                    style={profileControlStyle({ borderColor: pinError ? 'var(--vb-danger-700)' : undefined })}
+                  />
+                </ProfileField>
+                {pinError && (
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--vb-danger-700)' }}>
+                    {pinError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Button variant="secondary" style={{ flex: 1 }} onClick={() => setPinMode(null)} disabled={pinSaving}>
+                    Hủy
+                  </Button>
+                  <Button style={{ flex: 1 }} onClick={handleSavePin} disabled={pinSaving || !PIN_RE.test(pinValue) || !PIN_RE.test(pinConfirm)}>
+                    {pinSaving ? 'Đang lưu...' : 'Lưu PIN'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {pinMessage && (
+              <div style={{
+                marginTop: 12,
+                fontSize: 12,
+                fontWeight: 700,
+                color: pinMessage.type === 'error' ? 'var(--vb-danger-700)' : 'var(--vb-success-700)',
+              }}>
+                {pinMessage.text}
+              </div>
+            )}
+          </Card>
+        </div>
+
         <Button
           variant="danger"
           full
@@ -128,6 +398,35 @@ function ScreenProfile({ tweaks, push }) {
       </div>
     </div>
   );
+}
+
+function ProfileField({ label, children }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function profileControlStyle(overrides = {}) {
+  return {
+    width: '100%',
+    minHeight: 42,
+    boxSizing: 'border-box',
+    borderRadius: 12,
+    border: `1px solid ${overrides.borderColor || 'var(--border-1)'}`,
+    background: 'var(--surface-1)',
+    color: 'var(--text-1)',
+    fontFamily: 'var(--vb-font-body)',
+    fontSize: 14,
+    fontWeight: 600,
+    padding: '0 12px',
+    outline: 'none',
+    ...overrides,
+  };
 }
 
 function ColorSwatch({ color, active, onClick }) {

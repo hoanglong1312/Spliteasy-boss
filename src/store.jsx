@@ -30,6 +30,14 @@ function buildEmptyState() {
   }
 }
 
+function memberHasPin(member) {
+  if (typeof member.has_pin === 'boolean') return member.has_pin
+  if (typeof member.hasPin === 'boolean') return member.hasPin
+  if ('pin_hash' in member) return Boolean(member.pin_hash)
+  if ('pinHash' in member) return Boolean(member.pinHash)
+  return false
+}
+
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
   const [mR, gR, eR, pR, sR, pcR, psR, paR, dR] = await Promise.all([
@@ -117,6 +125,14 @@ function normalize(raw, currentMemberId) {
       color: m.color || '#574EFA',
       role: m.role,
       isMe: m.id === currentMemberId,
+      bankName: m.bank_name || '',
+      bankAccount: m.bank_account || '',
+      bankAccountName: m.bank_account_name || '',
+      bank_name: m.bank_name || '',
+      bank_account: m.bank_account || '',
+      bank_account_name: m.bank_account_name || '',
+      hasPin: memberHasPin(m),
+      has_pin: memberHasPin(m),
     })),
     groups: [{
       id: group.id,
@@ -288,6 +304,53 @@ export function AppProvider({ children, onToast }) {
           .update({ color: action.color })
           .eq('id', state.currentUserId)
         if (error) { console.error('[store] UPDATE_MEMBER_COLOR:', error); return }
+        await refresh()
+        break
+      }
+
+      case 'SET_MEMBER_PIN': {
+        if (!sb) return
+        const { data, error } = await sb.rpc('set_member_pin', {
+          p_pin: action.pin ?? action.p_pin,
+        })
+        if (error || data?.error) {
+          const err = error || new Error(data.error)
+          console.error('[store] SET_MEMBER_PIN:', err)
+          throw err
+        }
+        await refresh()
+        break
+      }
+
+      case 'RESET_MEMBER_PIN': {
+        if (!sb) return
+        const { data, error } = await sb.rpc('reset_member_pin', {
+          p_member_id: action.memberId ?? action.p_member_id,
+        })
+        if (error || data?.error) {
+          const err = error || new Error(data.error)
+          console.error('[store] RESET_MEMBER_PIN:', err)
+          throw err
+        }
+        await refresh()
+        break
+      }
+
+      case 'UPDATE_BANK_INFO': {
+        if (!sb || !state.currentUserId) return
+        const bankInfo = action.bankInfo || action
+        const { error } = await sb
+          .from('members')
+          .update({
+            bank_name: bankInfo.bankName ?? bankInfo.bank_name ?? null,
+            bank_account: bankInfo.bankAccount ?? bankInfo.bank_account ?? null,
+            bank_account_name: bankInfo.bankAccountName ?? bankInfo.bank_account_name ?? null,
+          })
+          .eq('id', state.currentUserId)
+        if (error) {
+          console.error('[store] UPDATE_BANK_INFO:', error)
+          throw error
+        }
         await refresh()
         break
       }

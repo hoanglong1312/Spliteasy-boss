@@ -10,6 +10,10 @@ export function ScreenJoin({ push }) {
   const [previewing, setPreviewing] = useState(false)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState(null)
+  const [pinMember, setPinMember] = useState(null)
+  const [pin, setPin] = useState('')
+  const [pinError, setPinError] = useState(null)
+  const [verifyingPin, setVerifyingPin] = useState(false)
 
   useEffect(() => {
     const hash = window.location.hash
@@ -27,6 +31,9 @@ export function ScreenJoin({ push }) {
     setPreviewing(true)
     setError(null)
     setPreview(null)
+    setPinMember(null)
+    setPin('')
+    setPinError(null)
     try {
       const sb = createSupabase(null)
       const { data, error: rpcErr } = await sb.rpc('preview_group', { p_invite_code: c })
@@ -42,30 +49,82 @@ export function ScreenJoin({ push }) {
     }
   }
 
-  async function handleSelectMember(memberName) {
+  async function loginWithToken(data, member) {
+    await dispatch({
+      type: 'LOGIN',
+      token: data.token,
+      memberId: data.member_id || data.memberId || member?.id,
+      groupId: data.group_id || data.groupId || preview?.group_id,
+      memberName: data.member_name || data.memberName || member?.name,
+    })
+    push('home')
+  }
+
+  async function handleJoinMember(member) {
     setJoining(true)
     setError(null)
+    setPinError(null)
     try {
       const sb = createSupabase(null)
       const { data, error: rpcErr } = await sb.rpc('join_group', {
         p_invite_code: code.toUpperCase().trim(),
-        p_name: memberName,
+        p_name: member.name,
       })
       if (rpcErr || data?.error) {
         setError('Không thể tham gia nhóm. Thử lại hoặc liên hệ thủ quỹ.')
         return
       }
-      await dispatch({
-        type: 'LOGIN',
-        token: data.token,
-        memberId: data.member_id,
-        groupId: data.group_id,
-        memberName: data.member_name,
-      })
-      push('home')
+      await loginWithToken(data, member)
     } catch (e) {
       setError('Có lỗi xảy ra. Thử lại.')
     } finally {
+      setJoining(false)
+    }
+  }
+
+  function handleSelectMember(member) {
+    if (member.has_pin === true || member.hasPin === true) {
+      setPinMember(member)
+      setPin('')
+      setPinError(null)
+      setError(null)
+      return
+    }
+    handleJoinMember(member)
+  }
+
+  async function handleConfirmPin(member = pinMember) {
+    const cleanPin = pin.trim()
+    if (!member || !/^\d{4,6}$/.test(cleanPin) || verifyingPin) return
+    setVerifyingPin(true)
+    setJoining(true)
+    setError(null)
+    setPinError(null)
+    try {
+      const sb = createSupabase(null)
+      const { data, error: rpcErr } = await sb.rpc('verify_member_pin', {
+        p_invite_code: code.toUpperCase().trim(),
+        p_member_id: member.id,
+        p_pin: cleanPin,
+      })
+      if (rpcErr) {
+        setError('Không thể xác nhận PIN. Thử lại.')
+        return
+      }
+      if (data?.token) {
+        await loginWithToken(data, member)
+        return
+      }
+      if (data?.error === 'wrong_pin') {
+        setPinError('Mã PIN không đúng')
+        setPin('')
+        return
+      }
+      setError('Không thể xác nhận PIN. Thử lại.')
+    } catch (e) {
+      setError('Có lỗi xảy ra. Thử lại.')
+    } finally {
+      setVerifyingPin(false)
       setJoining(false)
     }
   }
@@ -142,37 +201,96 @@ export function ScreenJoin({ push }) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(preview.members || []).map(m => (
-              <button
-                key={m.id}
-                onClick={() => !joining && handleSelectMember(m.name)}
-                disabled={joining}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '10px 14px', borderRadius: 10,
-                  background: 'var(--surface-2)',
-                  border: '1.5px solid transparent',
-                  cursor: joining ? 'default' : 'pointer',
-                  textAlign: 'left', width: '100%',
-                  opacity: joining ? 0.6 : 1,
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => { if (!joining) e.currentTarget.style.borderColor = 'var(--brand-1)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent' }}
-              >
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: m.color || 'var(--brand-1)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
-                }}>
-                  {m.initials}
+            {(preview.members || []).map(m => {
+              const selectedForPin = pinMember?.id === m.id
+              return (
+                <div key={m.id}>
+                  <button
+                    onClick={() => !joining && !verifyingPin && handleSelectMember(m)}
+                    disabled={joining || verifyingPin}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px', borderRadius: 10,
+                      background: 'var(--surface-2)',
+                      border: `1.5px solid ${selectedForPin ? 'var(--brand-1)' : 'transparent'}`,
+                      cursor: joining || verifyingPin ? 'default' : 'pointer',
+                      textAlign: 'left', width: '100%',
+                      opacity: joining || verifyingPin ? 0.6 : 1,
+                      transition: 'border-color 0.15s',
+                    }}
+                    onMouseEnter={e => { if (!joining && !verifyingPin) e.currentTarget.style.borderColor = 'var(--brand-1)' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = selectedForPin ? 'var(--brand-1)' : 'transparent' }}
+                  >
+                    <div style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: m.color || 'var(--brand-1)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0,
+                    }}>
+                      {m.initials}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-1)' }}>
+                        {m.name}
+                      </div>
+                      {m.role === 'treasurer' && (
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', marginTop: 2 }}>
+                          Thủ quỹ
+                        </div>
+                      )}
+                    </div>
+                  </button>
+
+                  {selectedForPin && (
+                    <div style={{
+                      marginTop: 8,
+                      padding: 12,
+                      borderRadius: 12,
+                      background: 'var(--surface-2)',
+                      border: '1px solid var(--border-1)',
+                    }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          value={pin}
+                          onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          onKeyDown={e => e.key === 'Enter' && handleConfirmPin(m)}
+                          type="password"
+                          inputMode="numeric"
+                          autoFocus
+                          placeholder="PIN 4-6 số"
+                          style={{
+                            flex: 1, minWidth: 0,
+                            padding: '10px 12px', borderRadius: 10,
+                            border: `1.5px solid ${pinError ? '#EF4444' : 'var(--border-1)'}`,
+                            background: 'var(--surface-1)',
+                            color: 'var(--text-1)',
+                            fontSize: 15,
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={() => handleConfirmPin(m)}
+                          disabled={!/^\d{4,6}$/.test(pin) || verifyingPin}
+                          style={{
+                            padding: '10px 12px', borderRadius: 10,
+                            background: 'var(--brand-1)', color: '#fff',
+                            border: 'none', fontWeight: 700, cursor: 'pointer',
+                            opacity: (!/^\d{4,6}$/.test(pin) || verifyingPin) ? 0.5 : 1,
+                          }}
+                        >
+                          {verifyingPin ? '...' : 'Xác nhận'}
+                        </button>
+                      </div>
+                      {pinError && (
+                        <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: '#EF4444' }}>
+                          {pinError}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-1)' }}>
-                  {m.name}
-                </div>
-              </button>
-            ))}
+              )
+            })}
           </div>
 
           {joining && (
