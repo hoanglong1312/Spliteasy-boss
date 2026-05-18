@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useApp } from './store.jsx'
-import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances } from './data.jsx'
+import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances, pickleSummary } from './data.jsx'
 import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup, SwipeCard } from './components.jsx'
 
 // Groups tab — list / detail / add expense / settle
@@ -1248,6 +1248,198 @@ function ScreenApprovalQueue({ params = {}, pop }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+export function ScreenPaymentFlow({ tweaks = {}, pop }) {
+  const { state, dispatch } = useApp()
+  const meId = state.currentUserId || ME
+  const M = getMemberMap(state.members)
+  const [loading, setLoading] = React.useState(false)
+  const [done, setDone] = React.useState(false)
+
+  // Nợ nhóm: totalBalances âm
+  const groupBals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId])
+  const groupDebts = Object.entries(groupBals)
+    .filter(([, v]) => v < 0)
+    .map(([id, v]) => ({ memberId: id, amount: Math.abs(v), source: 'Nhóm' }))
+
+  // Nợ pickleball: memberOwes[meId] âm → nợ thủ quỹ
+  const pSummary = useMemo(() => pickleSummary(state.pickle), [state.pickle])
+  const pickleOwes = pSummary.memberOwes?.[meId] || 0
+  const treasurer = state.members.find(m => m.role === 'treasurer')
+  const pickleDebts = (pickleOwes < 0 && treasurer && treasurer.id !== meId)
+    ? [{ memberId: treasurer.id, amount: Math.abs(pickleOwes), source: 'Pickleball' }]
+    : []
+
+  // Gộp theo người: cùng memberId → cộng amount
+  const consolidated = useMemo(() => {
+    const allDebts = [...groupDebts, ...pickleDebts]
+    const map = {}
+    for (const d of allDebts) {
+      if (!map[d.memberId]) map[d.memberId] = { memberId: d.memberId, amount: 0, sources: [] }
+      map[d.memberId].amount += d.amount
+      map[d.memberId].sources.push(d.source)
+    }
+    return Object.values(map)
+  }, [state.groups, state.pickle, meId])
+
+  const totalAmount = consolidated.reduce((a, d) => a + d.amount, 0)
+
+  async function handleConfirm() {
+    if (loading || consolidated.length === 0) return
+    setLoading(true)
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      for (const d of consolidated) {
+        await dispatch({
+          type: 'SETTLE_DEBT',
+          groupId: state.currentGroupId,
+          settlement: {
+            fromId: meId,
+            toId: d.memberId,
+            amount: d.amount,
+            date: today,
+          },
+        })
+      }
+      setDone(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div style={{ paddingBottom: 96 }}>
+        <NavHeader title="Thanh toán" onBack={pop}/>
+        <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', marginBottom: 8 }}>
+            Đã ghi nhận thanh toán!
+          </div>
+          <div style={{ fontSize: 14, color: 'var(--text-2)', marginBottom: 32 }}>
+            Số dư đã được cập nhật
+          </div>
+          <button
+            onClick={pop}
+            style={{
+              appearance: 'none', cursor: 'pointer',
+              height: 48, padding: '0 32px', borderRadius: 14, border: 0,
+              background: 'var(--brand-1)', color: '#fff',
+              fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 15,
+            }}
+          >
+            Về trang chủ
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (consolidated.length === 0) {
+    return (
+      <div style={{ paddingBottom: 96 }}>
+        <NavHeader title="Thanh toán" onBack={pop}/>
+        <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
+            Không có khoản nào cần trả!
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const monthLabel = new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+
+  return (
+    <div style={{ paddingBottom: 96 }}>
+      <NavHeader title={`Thanh toán ${monthLabel}`} onBack={pop}/>
+      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Breakdown */}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>
+            Bạn cần trả:
+          </div>
+          <Card>
+            {consolidated.map((d, i) => {
+              const m = M[d.memberId] || { name: '?', short: '?', initials: '??', color: '#999' }
+              return (
+                <ListRow
+                  key={d.memberId}
+                  left={<Avatar member={m} size={40} style={tweaks.avatarStyle}/>}
+                  title={m.name}
+                  subtitle={d.sources.join(' + ')}
+                  right={
+                    <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 15, color: 'var(--vb-danger-700)' }}>
+                      {fmtVND(d.amount)}
+                    </div>
+                  }
+                  divider={i < consolidated.length - 1}
+                />
+              )
+            })}
+          </Card>
+        </div>
+
+        {/* Total */}
+        <div style={{
+          padding: '14px 16px', borderRadius: 14,
+          background: 'var(--surface-1)', border: '1px solid var(--border-1)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>Tổng</span>
+          <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--vb-danger-700)', fontFamily: 'var(--vb-font-body)' }}>
+            {fmtVND(totalAmount)}
+          </span>
+        </div>
+
+        {/* QR placeholder */}
+        <div style={{
+          padding: '20px 16px', borderRadius: 14,
+          background: 'var(--surface-1)', border: '1px solid var(--border-1)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{
+            width: 160, height: 160, borderRadius: 12,
+            background: 'var(--surface-2)', border: '1px dashed var(--border-strong)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: 8,
+          }}>
+            <span style={{ fontSize: 32 }}>📱</span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 600, textAlign: 'center', padding: '0 8px' }}>
+              QR chuyển khoản
+            </span>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
+              {consolidated.length === 1 ? (M[consolidated[0].memberId]?.name || '?') : 'Chuyển theo từng người'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
+              Nội dung: SP-{consolidated.map(d => (M[d.memberId]?.short || '?')).join('-')}
+            </div>
+          </div>
+        </div>
+
+        {/* Confirm button */}
+        <button
+          onClick={handleConfirm}
+          disabled={loading}
+          style={{
+            appearance: 'none', cursor: loading ? 'default' : 'pointer',
+            width: '100%', height: 52, borderRadius: 14, border: 0,
+            background: loading ? 'var(--border-1)' : 'var(--vb-success-700)',
+            color: loading ? 'var(--text-3)' : '#fff',
+            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 16,
+            transition: 'background .15s',
+          }}
+        >
+          {loading ? 'Đang xử lý...' : '✓ Đã chuyển tiền rồi'}
+        </button>
+      </div>
     </div>
   )
 }
