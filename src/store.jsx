@@ -12,6 +12,21 @@ function safeArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function getMonthRange(yearMonth) {
+  const [yearText, monthText] = String(yearMonth || '').split('-')
+  const year = Number(yearText)
+  const month = Number(monthText)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error('invalid_year_month')
+  }
+  const mm = String(month).padStart(2, '0')
+  const endDay = new Date(year, month, 0).getDate()
+  return {
+    start: `${year}-${mm}-01`,
+    end: `${year}-${mm}-${String(endDay).padStart(2, '0')}`,
+  }
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))
 }
@@ -111,6 +126,10 @@ function buildEmptyState() {
     },
     notifications: [],
     disputeCount: 0,
+    homeMonth: null,
+    homeMonthSessions: [],
+    homeMonthExpenses: [],
+    homeMonthError: null,
     _allPickle: null,
     _loading: false,
     _error: null,
@@ -165,6 +184,74 @@ async function fetchGroupData(token) {
     disputeCount:    (dR.data || []).length,
     joinRequests:    jR.data || [],
   }
+}
+
+export async function fetchPickleballSessions(token, yearMonth) {
+  const { start, end } = getMonthRange(yearMonth)
+  const sb = createSupabase(token)
+  const { data, error } = await sb
+    .from('pickleball_sessions')
+    .select(`
+      id,
+      group_id,
+      date,
+      notes,
+      created_at,
+      pickleball_attendance (
+        session_id,
+        member_id,
+        status
+      )
+    `)
+    .gte('date', start)
+    .lte('date', end)
+    .order('date', { ascending: true })
+
+  if (error) throw error
+  return data || []
+}
+
+export async function fetchMonthlyExpenses(token, yearMonth) {
+  const { start, end } = getMonthRange(yearMonth)
+  const sb = createSupabase(token)
+  const { data, error } = await sb
+    .from('expense_participants')
+    .select(`
+      expense_id,
+      member_id,
+      share_amount,
+      amount:share_amount,
+      share:share_amount,
+      share_type,
+      expenses!inner (
+        id,
+        group_id,
+        title,
+        description:title,
+        amount,
+        expense_date,
+        date:expense_date,
+        category,
+        cat:category,
+        module,
+        pickle_session_id,
+        paid_by_member_id,
+        submitted_by_member_id,
+        status,
+        groups (
+          id,
+          name
+        )
+      )
+    `)
+    .gte('expenses.expense_date', start)
+    .lte('expenses.expense_date', end)
+
+  if (error) throw error
+  return (data || []).slice().sort((a, b) => (
+    String(b.expenses?.expense_date || b.expenses?.date || '')
+      .localeCompare(String(a.expenses?.expense_date || a.expenses?.date || ''))
+  ))
 }
 
 function sameMemberName(a, b) {
@@ -556,6 +643,29 @@ export function AppProvider({ children, onToast }) {
     const sb = token ? createSupabase(token) : null
 
     switch (action.type) {
+
+      case 'FETCH_HOME_MONTH_SUCCESS': {
+        const next = {
+          ...stateRef.current,
+          homeMonth: action.yearMonth,
+          homeMonthSessions: action.sessions,
+          homeMonthExpenses: action.expenses,
+          homeMonthError: null,
+        }
+        stateRef.current = next
+        setState(next)
+        return next
+      }
+
+      case 'FETCH_HOME_MONTH_ERROR': {
+        const next = {
+          ...stateRef.current,
+          homeMonthError: action.error,
+        }
+        stateRef.current = next
+        setState(next)
+        return next
+      }
 
       case 'LOGIN': {
         const { token: newToken, memberId, groupId, memberName } = action
