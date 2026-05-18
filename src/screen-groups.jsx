@@ -1258,44 +1258,43 @@ export function ScreenPaymentFlow({ tweaks = {}, pop }) {
   const M = getMemberMap(state.members)
   const [loading, setLoading] = React.useState(false)
   const [done, setDone] = React.useState(false)
+  const [error, setError] = React.useState(null)
 
-  // Nợ nhóm: totalBalances âm
-  const groupBals = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId])
-  const groupDebts = Object.entries(groupBals)
-    .filter(([, v]) => v < 0)
-    .map(([id, v]) => ({ memberId: id, amount: Math.abs(v), source: 'Nhóm' }))
-
-  // Nợ pickleball: memberOwes[meId] âm → nợ thủ quỹ
-  const pSummary = useMemo(() => pickleSummary(state.pickle), [state.pickle])
-  const pickleOwes = pSummary.memberOwes?.[meId] || 0
-  const treasurer = state.members.find(m => m.role === 'treasurer')
-  const pickleDebts = (pickleOwes < 0 && treasurer && treasurer.id !== meId)
-    ? [{ memberId: treasurer.id, amount: Math.abs(pickleOwes), source: 'Pickleball' }]
-    : []
-
-  // Gộp theo người: cùng memberId → cộng amount
+  // Consolidated debts: merge group + pickleball debts per person
   const consolidated = useMemo(() => {
-    const allDebts = [...groupDebts, ...pickleDebts]
+    const groupBals = totalBalances(state.groups, meId)
+    const groupDebts = Object.entries(groupBals)
+      .filter(([, v]) => v < 0)
+      .map(([id, v]) => ({ memberId: id, amount: Math.abs(v), source: 'Nhóm', groupId: null }))
+
+    const pSummary = pickleSummary(state.pickle)
+    const pickleOwes = pSummary.memberOwes?.[meId] || 0
+    const treasurer = state.members.find(m => m.role === 'treasurer')
+    const pickleDebts = (pickleOwes < 0 && treasurer && treasurer.id !== meId)
+      ? [{ memberId: treasurer.id, amount: Math.abs(pickleOwes), source: 'Pickleball', groupId: state.currentGroupId }]
+      : []
+
     const map = {}
-    for (const d of allDebts) {
-      if (!map[d.memberId]) map[d.memberId] = { memberId: d.memberId, amount: 0, sources: [] }
+    for (const d of [...groupDebts, ...pickleDebts]) {
+      if (!map[d.memberId]) map[d.memberId] = { memberId: d.memberId, amount: 0, sources: [], groupId: d.groupId }
       map[d.memberId].amount += d.amount
       map[d.memberId].sources.push(d.source)
     }
     return Object.values(map)
-  }, [state.groups, state.pickle, meId])
+  }, [state.groups, state.pickle, state.members, state.currentGroupId, meId])
 
   const totalAmount = consolidated.reduce((a, d) => a + d.amount, 0)
 
   async function handleConfirm() {
     if (loading || consolidated.length === 0) return
     setLoading(true)
+    setError(null)
     try {
       const today = new Date().toISOString().slice(0, 10)
       for (const d of consolidated) {
         await dispatch({
           type: 'SETTLE_DEBT',
-          groupId: state.currentGroupId,
+          groupId: d.groupId || state.currentGroupId,
           settlement: {
             fromId: meId,
             toId: d.memberId,
@@ -1305,6 +1304,8 @@ export function ScreenPaymentFlow({ tweaks = {}, pop }) {
         })
       }
       setDone(true)
+    } catch (e) {
+      setError('Có lỗi xảy ra, vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
@@ -1423,6 +1424,17 @@ export function ScreenPaymentFlow({ tweaks = {}, pop }) {
             </div>
           </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div style={{
+            padding: '10px 14px', borderRadius: 10,
+            background: 'var(--vb-danger-50)', color: 'var(--vb-danger-700)',
+            fontSize: 13, fontWeight: 500,
+          }}>
+            {error}
+          </div>
+        )}
 
         {/* Confirm button */}
         <button
