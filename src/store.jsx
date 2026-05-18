@@ -24,6 +24,7 @@ function buildEmptyState() {
       guestFeePerSession: 0,
     },
     notifications: [],
+    disputeCount: 0,
     _loading: false,
     _error: null,
   }
@@ -31,7 +32,7 @@ function buildEmptyState() {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, eR, pR, sR, pcR, psR, paR] = await Promise.all([
+  const [mR, gR, eR, pR, sR, pcR, psR, paR, dR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -40,6 +41,7 @@ async function fetchGroupData(token) {
     sb.from('pickle_configs').select('*').limit(1).maybeSingle(),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
+    sb.from('expense_disputes').select('id').eq('status', 'open'),
   ])
   if (mR.error) throw mR.error
   if (gR.error) throw gR.error
@@ -52,11 +54,12 @@ async function fetchGroupData(token) {
     pickleConfig:    pcR.data,
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
+    disputeCount:    (dR.data || []).length,
   }
 }
 
 function normalize(raw, currentMemberId) {
-  const { members, groups, expenses, participants, settlements, pickleConfig, pickleSessions, pickleAttendees } = raw
+  const { members, groups, expenses, participants, settlements, pickleConfig, pickleSessions, pickleAttendees, disputeCount } = raw
   const group = groups[0]
   if (!group) return null  // signal: data empty but keep session
 
@@ -133,6 +136,7 @@ function normalize(raw, currentMemberId) {
       guestFeePerSession: Number(pickleConfig?.guest_fee_per_session || 0),
     },
     notifications: [],
+    disputeCount: disputeCount || 0,
     _loading: false,
     _error: null,
   }
