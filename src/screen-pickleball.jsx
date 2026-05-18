@@ -141,6 +141,16 @@ function dateDay(value) {
   return s;
 }
 
+function formatDow(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  return ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d.getDay()];
+}
+
+function formatShortDate(dateStr) {
+  const [, m, dd] = dateStr.split('-');
+  return `${dd}/${m}`;
+}
+
 function todayInputValue() {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -234,6 +244,101 @@ function ScreenPickleball({ tweaks = {}, push }) {
     : 'linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%)';
 
   const meId = state.currentUserId || ME;
+  const pickleballGroup = useMemo(() => safeArray(state.groups).find(g =>
+    g.name?.toLowerCase().includes('pickleball')
+  ), [state.groups]);
+  const activeMemberId = state.currentMemberId || state.currentUserId;
+  const currentMember = useMemo(() => (
+    pickleballGroup
+      ? safeArray(state.members).find(m =>
+        sameId(rowGroupId(m), pickleballGroup.id) &&
+        sameId(m.id, activeMemberId)
+      )
+      : null
+  ), [activeMemberId, pickleballGroup, state.members]);
+  const isTreasurer = currentMember?.role === 'treasurer';
+  const groupMembers = useMemo(() => safeArray(state.members)
+    .filter(m => sameId(rowGroupId(m), pickleballGroup?.id) && m.isActive !== false && m.is_active !== false),
+  [pickleballGroup?.id, state.members]);
+  const [pickSessions, setPickSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [expandedSession, setExpandedSession] = useState(null);
+  const [sessionAttendanceMap, setSessionAttendanceMap] = useState({});
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todaySession = pickSessions.find(s => s.date === todayStr);
+
+  async function loadSessions(groupId) {
+    if (!groupId) return;
+    setSessionsLoading(true);
+    try {
+      const { token } = getStoredAuth();
+      const sb = createSupabase(token);
+      const now = new Date();
+      const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+      const { data, error } = await sb
+        .from('pickleball_sessions')
+        .select('id, date, notes, group_id')
+        .eq('group_id', groupId)
+        .gte('date', start)
+        .lte('date', end)
+        .order('date', { ascending: true });
+      if (error) throw error;
+      setPickSessions(data || []);
+    } catch (e) {
+      console.error('loadSessions error', e);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadSessions(pickleballGroup?.id);
+  }, [pickleballGroup?.id]);
+
+  async function toggleSessionExpand(sessionId) {
+    if (expandedSession === sessionId) {
+      setExpandedSession(null);
+      return;
+    }
+    setExpandedSession(sessionId);
+    if (sessionAttendanceMap[sessionId]) return;
+    try {
+      const client = getAuthedSupabaseClient();
+      const { data, error } = await client
+        .from('pickleball_attendance')
+        .select('member_id, status')
+        .eq('session_id', sessionId);
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach(a => { map[a.member_id] = a.status; });
+      setSessionAttendanceMap(prev => ({ ...prev, [sessionId]: map }));
+    } catch (e) {
+      alert('Lỗi tải điểm danh: ' + e.message);
+    }
+  }
+
+  async function markAttendance(sessionId, memberId, status) {
+    try {
+      const client = getAuthedSupabaseClient();
+      const { error } = await client
+        .from('pickleball_attendance')
+        .upsert({
+          session_id: sessionId,
+          member_id: memberId,
+          status,
+          marked_by: currentMember?.id || activeMemberId,
+          marked_at: new Date().toISOString(),
+        }, { onConflict: 'session_id,member_id' });
+      if (error) throw error;
+      setSessionAttendanceMap(prev => ({
+        ...prev,
+        [sessionId]: { ...(prev[sessionId] || {}), [memberId]: status },
+      }));
+    } catch (e) {
+      alert('Lỗi: ' + e.message);
+    }
+  }
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -306,8 +411,8 @@ function ScreenPickleball({ tweaks = {}, push }) {
       </div>
 
       <div style={{ padding: 16 }}>
-        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} dispatch={dispatch} meId={meId} onShowSessions={() => setTab('sessions')}/>}
-        {tab === 'sessions' && <PickleSessions push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
+        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} dispatch={dispatch} meId={meId} onShowSessions={() => setTab('sessions')} isTreasurer={isTreasurer} todaySession={todaySession} sessionAttendanceMap={sessionAttendanceMap} groupMembers={groupMembers} setActiveTab={setTab} toggleSessionExpand={toggleSessionExpand}/>}
+        {tab === 'sessions' && <PickleSessions accent={accent} style={style} pickle={pickle} pickleballGroup={pickleballGroup} isTreasurer={isTreasurer} groupMembers={groupMembers} pickSessions={pickSessions} sessionsLoading={sessionsLoading} todayStr={todayStr} expandedSession={expandedSession} setExpandedSession={setExpandedSession} sessionAttendanceMap={sessionAttendanceMap} setSessionAttendanceMap={setSessionAttendanceMap} toggleSessionExpand={toggleSessionExpand} markAttendance={markAttendance} loadSessions={loadSessions}/>}
         {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
       </div>
@@ -380,7 +485,7 @@ function SessionProgressBlock({ done, total, pct, upcoming, accent = 'var(--bran
   );
 }
 
-function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, pickle, dispatch, meId, onShowSessions }) {
+function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, pickle, dispatch, meId, onShowSessions, isTreasurer, todaySession, sessionAttendanceMap, groupMembers, setActiveTab, toggleSessionExpand }) {
   const sessions = safeArray(pickle.sessions);
   const totalCourt = pickle.monthlyCourtFee;
   const guestCount = sessions.reduce((a,s)=>a+safeArray(s.guests).length,0);
@@ -412,6 +517,46 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {isTreasurer && todaySession && (() => {
+        const att = sessionAttendanceMap[todaySession.id] || {};
+        const members = groupMembers || [];
+        const presentCount = members.filter(m => (att[m.id] || 'present') === 'present').length;
+        const absentCount = members.length - presentCount;
+        return (
+          <div style={{
+            background: 'linear-gradient(135deg, #3730a3, #4f46e5)',
+            borderRadius: 16, padding: 16, marginBottom: 12,
+          }}>
+            <div style={{
+              display: 'inline-block', background: 'rgba(255,255,255,0.15)',
+              color: '#c7d2fe', fontSize: 10, padding: '2px 10px',
+              borderRadius: 20, marginBottom: 8,
+            }}>
+              📅 Hôm nay · {formatDow(todaySession.date)} {formatShortDate(todaySession.date)}
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#fff', marginBottom: 4 }}>
+              Buổi {formatShortDate(todaySession.date)}
+            </div>
+            <div style={{ fontSize: 11, color: '#c7d2fe', marginBottom: 10 }}>
+              {presentCount} có mặt · {absentCount} vắng
+            </div>
+            <button
+              onClick={() => {
+                setActiveTab('sessions');
+                setTimeout(() => toggleSessionExpand(todaySession.id), 50);
+              }}
+              style={{
+                width: '100%', padding: '8px 0', background: '#fff',
+                color: '#4f46e5', border: 'none', borderRadius: 8,
+                fontWeight: 700, fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              ✓ Điểm danh buổi này
+            </button>
+          </div>
+        );
+      })()}
+
       <SessionProgressBlock
         done={doneSessions.length}
         total={sessionTotal}
@@ -514,18 +659,9 @@ function BreakdownRow({ label, sub, value, icon, positive = false, accent }) {
 }
 
 // ── Sessions tab — list of all sessions this month ──────────────────────────
-function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) {
+function PickleSessions({ accent, style, pickle, pickleballGroup, isTreasurer, groupMembers = [], pickSessions = [], sessionsLoading, todayStr, expandedSession, setExpandedSession, sessionAttendanceMap, setSessionAttendanceMap, toggleSessionExpand, markAttendance, loadSessions }) {
   const { state, dispatch } = useApp();
-  const allMembers = getStateMembers(state);
-  const M = getMemberMap(allMembers);
-  const pickleballGroup = findPickleballGroup(state);
   const groupId = pickleballGroup?.id || state.currentGroupId || state.currentGroup?.id || pickle.sessions[0]?.groupId || pickle.sessions[0]?.group_id;
-  const currentMember = findCurrentMemberForGroup(state, groupId);
-  const currentUserId = currentMember?.id || state.currentUserId;
-  const isTreasurer = currentMember?.role === 'treasurer';
-  const groupMembers = useMemo(() => allMembers
-    .filter(m => sameId(rowGroupId(m), groupId) && m.isActive !== false && m.is_active !== false),
-    [allMembers, groupId]);
   const [scheduleForm, setScheduleForm] = useState({
     startDate: '',
     weekdays: [1, 3, 5],
@@ -533,57 +669,11 @@ function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) 
   });
   const [schedulePreview, setSchedulePreview] = useState([]);
   const [scheduleSaving, setScheduleSaving] = useState(false);
-  const [expandedSession, setExpandedSession] = useState(null);
-  const [sessionAttendanceMap, setSessionAttendanceMap] = useState({});
-  const [managedSessions, setManagedSessions] = useState([]);
-  const [managedLoading, setManagedLoading] = useState(false);
-  const [managedError, setManagedError] = useState('');
-  const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
   const canCreateSchedule = !!groupId && !!scheduleForm.startDate && scheduleForm.weekdays.length > 0 && schedulePreview.length > 0 && !scheduleSaving;
 
   useEffect(() => {
     setSchedulePreview(generateSessionDates(scheduleForm.startDate, scheduleForm.weekdays, scheduleForm.month));
   }, [scheduleForm.startDate, scheduleForm.weekdays, scheduleForm.month]);
-
-  useEffect(() => {
-    if (!isTreasurer || !groupId || !scheduleForm.month) {
-      setManagedSessions([]);
-      setManagedError('');
-      return undefined;
-    }
-
-    const range = monthDateRange(scheduleForm.month);
-    if (!range) return undefined;
-
-    let cancelled = false;
-    async function loadManagedSessions() {
-      setManagedLoading(true);
-      setManagedError('');
-      try {
-        const client = getAuthedSupabaseClient();
-        const { data, error } = await client
-          .from('pickleball_sessions')
-          .select('id, group_id, date, notes, created_at')
-          .eq('group_id', groupId)
-          .gte('date', range.start)
-          .lte('date', range.end)
-          .order('date', { ascending: true });
-        if (error) throw error;
-        if (!cancelled) setManagedSessions(data || []);
-      } catch (e) {
-        console.error('[pickleball] load managed sessions:', e);
-        if (!cancelled) {
-          setManagedSessions([]);
-          setManagedError(e.message || 'Không tải được lịch tháng');
-        }
-      } finally {
-        if (!cancelled) setManagedLoading(false);
-      }
-    }
-
-    loadManagedSessions();
-    return () => { cancelled = true; };
-  }, [isTreasurer, groupId, scheduleForm.month, sessionRefreshKey]);
 
   const toggleScheduleWeekday = (value) => {
     setScheduleForm(f => ({
@@ -638,59 +728,15 @@ function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) 
       }
 
       await dispatch({ type: 'REFRESH' });
+      await loadSessions(pickleballGroup?.id);
       setScheduleForm(f => ({ ...f, startDate: '' }));
       setSchedulePreview([]);
       setExpandedSession(null);
       setSessionAttendanceMap({});
-      setSessionRefreshKey(k => k + 1);
     } catch (e) {
       alert('Lỗi tạo lịch: ' + e.message);
     } finally {
       setScheduleSaving(false);
-    }
-  }
-
-  async function toggleSessionExpand(sessionId) {
-    if (expandedSession === sessionId) {
-      setExpandedSession(null);
-      return;
-    }
-    setExpandedSession(sessionId);
-    if (sessionAttendanceMap[sessionId]) return;
-    try {
-      const client = getAuthedSupabaseClient();
-      const { data, error } = await client
-        .from('pickleball_attendance')
-        .select('member_id, status')
-        .eq('session_id', sessionId);
-      if (error) throw error;
-      const map = {};
-      (data || []).forEach(a => { map[a.member_id] = a.status; });
-      setSessionAttendanceMap(prev => ({ ...prev, [sessionId]: map }));
-    } catch (e) {
-      alert('Lỗi tải điểm danh: ' + e.message);
-    }
-  }
-
-  async function markAttendance(sessionId, memberId, status) {
-    try {
-      const client = getAuthedSupabaseClient();
-      const { error } = await client
-        .from('pickleball_attendance')
-        .upsert({
-          session_id: sessionId,
-          member_id: memberId,
-          status,
-          marked_by: currentUserId,
-          marked_at: new Date().toISOString(),
-        }, { onConflict: 'session_id,member_id' });
-      if (error) throw error;
-      setSessionAttendanceMap(prev => ({
-        ...prev,
-        [sessionId]: { ...(prev[sessionId] || {}), [memberId]: status },
-      }));
-    } catch (e) {
-      alert('Lỗi: ' + e.message);
     }
   }
 
@@ -772,186 +818,120 @@ function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) 
             </Card>
           </div>
 
-          <div>
-            <SectionHeader title="Điểm danh tháng"/>
-            <Card>
-              {managedLoading ? (
-                <div style={{ padding: 16, color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>Đang tải lịch...</div>
-              ) : managedError ? (
-                <div style={{ padding: 16, color: 'var(--vb-danger-700)', fontSize: 13, textAlign: 'center' }}>{managedError}</div>
-              ) : managedSessions.length === 0 ? (
-                <div style={{ padding: 16, color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>Chưa có lịch trong tháng này</div>
-              ) : (
-                managedSessions.map((s, i) => {
-                  const expanded = expandedSession === s.id;
-                  const attendance = sessionAttendanceMap[s.id];
-                  const absentCount = attendance ? Object.values(attendance).filter(status => status === 'absent').length : 0;
-                  const presentCount = attendance ? Math.max(groupMembers.length - absentCount, 0) : groupMembers.length;
-                  return (
-                    <div key={s.id} style={{ borderBottom: i < managedSessions.length - 1 ? '1px solid var(--border-1)' : 'none' }}>
-                      <button
-                        type="button"
-                        onClick={() => toggleSessionExpand(s.id)}
-                        style={{
-                          appearance: 'none', width: '100%', border: 0, background: 'transparent',
-                          padding: 14, cursor: 'pointer', textAlign: 'left',
-                          display: 'flex', alignItems: 'center', gap: 12,
-                          fontFamily: 'var(--vb-font-body)',
-                        }}
-                      >
-                        <div style={{
-                          width: 44, height: 48, borderRadius: 10, flexShrink: 0,
-                          background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{formatExternalDate(s.date).split(' ')[0]}</div>
-                          <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{dateDay(s.date)}</div>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)' }}>{formatExternalDate(s.date)}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 600 }}>
-                            {attendance ? `${presentCount} có mặt • ${absentCount} vắng` : `${groupMembers.length} thành viên`}
-                          </div>
-                        </div>
-                        <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={18} color="var(--text-3)"/>
-                      </button>
-
-                      {expanded && (
-                        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {groupMembers.length === 0 ? (
-                            <div style={{ padding: 10, color: 'var(--text-2)', fontSize: 13 }}>Chưa có thành viên active</div>
-                          ) : groupMembers.map(member => {
-                            const status = sessionAttendanceMap[s.id]?.[member.id] || 'present';
-                            return (
-                              <div key={member.id} style={{
-                                display: 'flex', alignItems: 'center', gap: 10,
-                                padding: 10, borderRadius: 12, background: 'var(--surface-2)',
-                              }}>
-                                <Avatar member={memberOrFallback(M, member.id)} size={32} style={tweaks?.avatarStyle}/>
-                                <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {displayMemberName(memberOrFallback(M, member.id), member.short || '?')}
-                                </div>
-                                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                                  {[
-                                    { id: 'present', label: 'Có mặt', color: 'var(--vb-success-700)' },
-                                    { id: 'absent', label: 'Vắng', color: 'var(--vb-danger-700)' },
-                                  ].map(option => {
-                                    const active = status === option.id;
-                                    return (
-                                      <button
-                                        key={option.id}
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          markAttendance(s.id, member.id, option.id);
-                                        }}
-                                        style={{
-                                          appearance: 'none', cursor: 'pointer',
-                                          minWidth: 62, height: 30, padding: '0 10px',
-                                          background: active ? option.color : 'var(--surface-1)',
-                                          color: active ? '#fff' : 'var(--text-2)',
-                                          border: '1px solid ' + (active ? option.color : 'var(--border-1)'),
-                                          borderRadius: 'var(--vb-radius-pill)',
-                                          fontSize: 11, fontWeight: 800,
-                                        }}
-                                      >
-                                        {option.label}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              )}
-            </Card>
-          </div>
         </>
       )}
 
       <div>
-        <SectionHeader title="Sắp diễn ra"/>
-        <Card>
-          {pickle.upcoming.map((s, i) => {
-            const going = sessionMemberIds(s);
-            return (
-            <div key={s.id} onClick={() => push('session-detail', { sessionId: s.id })} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: 14, borderBottom: i < pickle.upcoming.length - 1 ? '1px solid var(--border-1)' : 'none',
-              cursor: 'pointer',
+        {sessionsLoading && (
+          <div style={{ color: '#888', textAlign: 'center', padding: 20 }}>Đang tải...</div>
+        )}
+        {!sessionsLoading && pickSessions.length === 0 && (
+          <div style={{ color: '#888', textAlign: 'center', padding: 20 }}>
+            Chưa có buổi nào tháng này
+          </div>
+        )}
+        {pickSessions.map((session, i) => {
+          const isToday = session.date === todayStr;
+          const isFuture = session.date > todayStr;
+          const isExpanded = expandedSession === session.id;
+          const attendance = sessionAttendanceMap[session.id] || {};
+          const members = groupMembers || [];
+          const presentCount = members.filter(m => (attendance[m.id] || 'present') === 'present').length;
+          const absentCount = members.length - presentCount;
+
+          return (
+            <div key={session.id} style={{
+              background: '#1e2235', borderRadius: 12, marginBottom: 8, overflow: 'hidden',
+              opacity: isFuture ? 0.55 : 1,
+              border: isToday ? '1px solid rgba(99,102,241,0.5)' : '1px solid transparent',
             }}>
-              <div style={{
-                width: 44, height: 48, borderRadius: 10, flexShrink: 0,
-                background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{s.day}</div>
-                <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{dateDay(s.date)}</div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{s.time} • {s.court}</div>
-                <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <AvatarStack ids={going} size={20} overlap={6} avatarStyle={tweaks?.avatarStyle} max={4}/>
-                  <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>{going.length} người</span>
+              <div
+                onClick={() => !isFuture && isTreasurer && toggleSessionExpand(session.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px',
+                  cursor: !isFuture && isTreasurer ? 'pointer' : 'default',
+                }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: isToday ? '#3730a3' : '#2a2d45',
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ fontSize: 16, fontWeight: 800, lineHeight: 1, color: '#fff' }}>
+                    {session.date.slice(8)}
+                  </span>
+                  <span style={{ fontSize: 8, color: isToday ? '#c7d2fe' : '#888' }}>
+                    {formatDow(session.date)}
+                  </span>
                 </div>
-              </div>
-              <Pill bg={accentBg} color={accent} size="xs">Sắp tới</Pill>
-            </div>
-            );
-          })}
-        </Card>
-      </div>
-
-      <div>
-        <SectionHeader title="Đã diễn ra"/>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {pickle.sessions.map(s => {
-            const attendees = sessionMemberIds(s);
-            const expenses = safeArray(s.expenses);
-            return (
-            <Card key={s.id} interactive onClick={() => push('session-detail', { sessionId: s.id })}>
-              <div style={{ padding: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                  <div style={{
-                    width: 44, height: 48, borderRadius: 10, flexShrink: 0,
-                    background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{s.day}</div>
-                    <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{dateDay(s.date)}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>
+                    Buổi #{i + 1}
+                    {isToday && (
+                      <span style={{ color: '#fbbf24', fontSize: 10, marginLeft: 6 }}>· Hôm nay</span>
+                    )}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{s.time} • {s.court}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>
-                      {attendees.length} có mặt{safeArray(s.guests).length > 0 ? ` • ${safeArray(s.guests).length} vãng lai` : ''}
-                    </div>
+                  <div style={{ fontSize: 10, color: '#666', marginTop: 2 }}>
+                    {isFuture
+                      ? 'Chưa đến · Chưa điểm danh'
+                      : `${presentCount} có mặt · ${absentCount} vắng`}
                   </div>
-                  <Icon name="chevron-right" size={18} color="var(--text-3)"/>
                 </div>
-
-                {expenses.length > 0 && (
-                  <div style={{ paddingTop: 10, borderTop: '1px dashed var(--border-1)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {expenses.map((ex, i) => {
-                      const cat = ex.category || ex.kind;
-                      const lbl = ex.title || ex.label;
-                      const payer = memberOrFallback(M, ex.payerId || ex.paidBy);
-                      return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                          <Icon name={cat === 'ball' ? 'ball' : cat === 'food' ? 'food' : 'drink'} size={14} color="var(--text-2)"/>
-                          <span style={{ color: 'var(--text-2)', flex: 1 }}>{lbl || 'Chi phí'} • {displayMemberName(payer, payer.short || '?')} trả</span>
-                          <Money value={Number(ex.amount) || 0} size={12} color="var(--text-1)" compact/>
-                        </div>
-                      );
-                    })}
-                  </div>
+                {!isFuture && isTreasurer && (
+                  <span style={{ color: isExpanded ? '#6366f1' : '#444', fontSize: 16 }}>
+                    {isExpanded ? '⌄' : '›'}
+                  </span>
                 )}
               </div>
-            </Card>
-            );
-          })}
-        </div>
+
+              {isExpanded && isTreasurer && (
+                <div style={{ borderTop: '1px solid #2a2d3a', padding: '8px 12px 12px' }}>
+                  <div style={{
+                    fontSize: 9, color: '#6c6f80', textTransform: 'uppercase',
+                    letterSpacing: '0.8px', paddingBottom: 8,
+                  }}>
+                    Tap để đánh dấu vắng
+                  </div>
+                  {members.map(member => {
+                    const status = attendance[member.id] || 'present';
+                    const isPresent = status === 'present';
+                    const initials = member.name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+                    return (
+                      <div
+                        key={member.id}
+                        onClick={() => markAttendance(session.id, member.id, isPresent ? 'absent' : 'present')}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10,
+                          padding: '8px 10px', borderRadius: 10, marginBottom: 6, cursor: 'pointer',
+                          background: isPresent ? 'rgba(52,211,153,0.1)' : 'rgba(251,113,133,0.1)',
+                          border: `1px solid ${isPresent ? 'rgba(52,211,153,0.25)' : 'rgba(251,113,133,0.3)'}`,
+                        }}
+                      >
+                        <div style={{
+                          width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 10, fontWeight: 700,
+                          background: isPresent ? 'rgba(52,211,153,0.2)' : 'rgba(251,113,133,0.2)',
+                          color: isPresent ? '#34d399' : '#fb7185',
+                        }}>
+                          {initials}
+                        </div>
+                        <div style={{ flex: 1, fontSize: 12, fontWeight: 500, color: '#fff' }}>
+                          {member.name}
+                        </div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: isPresent ? '#34d399' : '#fb7185' }}>
+                          {isPresent ? '✓ Có mặt' : '✗ Vắng'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
