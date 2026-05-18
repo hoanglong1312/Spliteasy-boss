@@ -232,7 +232,7 @@ const SCHEDULE_WEEKDAYS = [
 ];
 
 function ScreenPickleball({ tweaks = {}, push }) {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const [tab, setTab] = useState('overview'); // overview | sessions | members | external
   const pickle = useMemo(() => normalizePickle(state.pickle), [state.pickle]);
   const summary = useMemo(() => pickleSummary(pickle), [pickle]);
@@ -247,15 +247,17 @@ function ScreenPickleball({ tweaks = {}, push }) {
   const pickleballGroup = useMemo(() => safeArray(state.groups).find(g =>
     g.name?.toLowerCase().includes('pickleball')
   ), [state.groups]);
-  const activeMemberId = state.currentMemberId || state.currentUserId;
   const currentMember = useMemo(() => (
-    pickleballGroup
-      ? safeArray(state.members).find(m =>
-        sameId(rowGroupId(m), pickleballGroup.id) &&
-        sameId(m.id, activeMemberId)
-      )
-      : null
-  ), [activeMemberId, pickleballGroup, state.members]);
+    findCurrentMemberForGroup(state, pickleballGroup?.id)
+  ), [
+    pickleballGroup?.id,
+    state.allMembers,
+    state.currentUserId,
+    state.currentUserName,
+    state.memberTokens,
+    state.members,
+  ]);
+  const activeMemberId = currentMember?.id || state.currentUserId;
   const isTreasurer = currentMember?.role === 'treasurer';
   const groupMembers = useMemo(() => safeArray(state.members)
     .filter(m => sameId(rowGroupId(m), pickleballGroup?.id) && m.isActive !== false && m.is_active !== false),
@@ -264,7 +266,11 @@ function ScreenPickleball({ tweaks = {}, push }) {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [expandedSession, setExpandedSession] = useState(null);
   const [sessionAttendanceMap, setSessionAttendanceMap] = useState({});
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = (() => {
+    const d = new Date()
+    d.setHours(d.getHours() + 7) // offset VN
+    return d.toISOString().slice(0, 10)
+  })()
   const todaySession = pickSessions.find(s => s.date === todayStr);
 
   async function loadSessions(groupId) {
@@ -275,7 +281,11 @@ function ScreenPickleball({ tweaks = {}, push }) {
       const sb = createSupabase(token);
       const now = new Date();
       const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+      const end = (() => {
+        const d = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        d.setHours(d.getHours() + 7) // offset VN
+        return d.toISOString().slice(0, 10)
+      })()
       const { data, error } = await sb
         .from('pickleball_sessions')
         .select('id, date, notes, group_id')
@@ -381,7 +391,7 @@ function ScreenPickleball({ tweaks = {}, push }) {
             <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.01em' }}>
               Tháng 5 / 2026
             </div>
-            <div style={{ fontSize: 12, opacity: 0.78, marginTop: 2 }}>{pickle.sessions.length} buổi cố định • {pickle.fixedMembers.length} thành viên</div>
+            <div style={{ fontSize: 12, opacity: 0.78, marginTop: 2 }}>{pickSessions.length} buổi cố định • {pickle.fixedMembers.length} thành viên</div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
               <PickleHeroStat label="Tiền sân/người" value={summary.courtPerMember}/>
@@ -411,7 +421,7 @@ function ScreenPickleball({ tweaks = {}, push }) {
       </div>
 
       <div style={{ padding: 16 }}>
-        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} dispatch={dispatch} meId={meId} onShowSessions={() => setTab('sessions')} isTreasurer={isTreasurer} todaySession={todaySession} sessionAttendanceMap={sessionAttendanceMap} groupMembers={groupMembers} setActiveTab={setTab} toggleSessionExpand={toggleSessionExpand}/>}
+        {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId} onShowSessions={() => setTab('sessions')} isTreasurer={isTreasurer} todaySession={todaySession} sessionAttendanceMap={sessionAttendanceMap} groupMembers={groupMembers} setActiveTab={setTab} toggleSessionExpand={toggleSessionExpand} pickSessions={pickSessions} todayStr={todayStr}/>}
         {tab === 'sessions' && <PickleSessions accent={accent} style={style} pickle={pickle} pickleballGroup={pickleballGroup} isTreasurer={isTreasurer} groupMembers={groupMembers} pickSessions={pickSessions} sessionsLoading={sessionsLoading} todayStr={todayStr} expandedSession={expandedSession} setExpandedSession={setExpandedSession} sessionAttendanceMap={sessionAttendanceMap} setSessionAttendanceMap={setSessionAttendanceMap} toggleSessionExpand={toggleSessionExpand} markAttendance={markAttendance} loadSessions={loadSessions}/>}
         {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
@@ -485,35 +495,25 @@ function SessionProgressBlock({ done, total, pct, upcoming, accent = 'var(--bran
   );
 }
 
-function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, pickle, dispatch, meId, onShowSessions, isTreasurer, todaySession, sessionAttendanceMap, groupMembers, setActiveTab, toggleSessionExpand }) {
+function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, pickle, meId, onShowSessions, isTreasurer, todaySession, sessionAttendanceMap, groupMembers, setActiveTab, toggleSessionExpand, pickSessions = [], todayStr }) {
   const sessions = safeArray(pickle.sessions);
+  const monthPickSessions = safeArray(pickSessions);
   const totalCourt = pickle.monthlyCourtFee;
   const guestCount = sessions.reduce((a,s)=>a+safeArray(s.guests).length,0);
 
   // Compute "what you contributed vs what you owe" for me
   const myNet = summary.memberOwes[meId] || 0;
 
-  const next = pickle.upcoming[0];
-  const nextGoing = sessionMemberIds(next);
-  const isGoing = nextGoing.includes(meId);
-
-  const now = new Date();
-  const thisMonth = now.getMonth();
-  const thisYear  = now.getFullYear();
-
-  const monthSessions = sessions.filter(s => {
-    const d = new Date(s.date);
-    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
-  });
-  const doneSessions     = monthSessions.filter(s => new Date(s.date) <= now);
-  const upcomingSessions = monthSessions
-    .filter(s => new Date(s.date) > now)
-    .sort((a, b) => new Date(a.date) - new Date(b.date))
-    .slice(0, 3);
-  const sessionTotal = monthSessions.length;
+  const doneSessions = monthPickSessions.filter(s => s.date <= todayStr);
+  const upcomingSessions = monthPickSessions
+    .filter(s => s.date > todayStr)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  const sessionTotal = monthPickSessions.length;
   const sessionPct   = sessionTotal > 0
     ? Math.round((doneSessions.length / sessionTotal) * 100)
     : 0;
+  const next = upcomingSessions[0];
+  const nextGoing = sessionMemberIds(next);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -596,20 +596,24 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
                 width: 52, height: 56, borderRadius: 12, flexShrink: 0,
                 background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{next.day}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{next.day || formatDow(next.date)}</div>
                 <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 18, fontWeight: 700, color: accent }}>{dateDay(next.date)}</div>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>{next.time} • {next.court}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)' }}>
+                  {[next.time, next.court].filter(Boolean).join(' • ') || next.notes || 'Buổi CLB'}
+                </div>
                 <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AvatarStack ids={nextGoing} size={22} overlap={7} avatarStyle={tweaks?.avatarStyle} max={5}/>
-                  <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{nextGoing.length} người tham gia</span>
+                  {nextGoing.length > 0 && <AvatarStack ids={nextGoing} size={22} overlap={7} avatarStyle={tweaks?.avatarStyle} max={5}/>}
+                  <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>
+                    {nextGoing.length > 0 ? `${nextGoing.length} người tham gia` : 'Trong lịch tháng này'}
+                  </span>
                 </div>
               </div>
-              <button onClick={() => dispatch({ type: 'CONFIRM_ATTENDANCE', sessionId: next.id, memberId: meId, attending: !isGoing })} style={{
+              <button onClick={onShowSessions} style={{
                 appearance: 'none', cursor: 'pointer', height: 36, padding: '0 14px',
                 background: accent, color: style === 'sporty' ? '#0E1726' : '#fff', border: 0, borderRadius: 10, fontWeight: 700, fontSize: 13,
-              }}>{isGoing ? 'Huỷ' : 'Tham gia'}</button>
+              }}>Xem lịch</button>
             </div>
           ) : (
             <div style={{ padding: 16, color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>Không có buổi đánh sắp tới</div>
