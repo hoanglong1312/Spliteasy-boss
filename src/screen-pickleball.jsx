@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useApp } from './store.jsx'
+import { createSupabase } from './lib/supabase.js'
+import { getStoredAuth } from './lib/auth.js'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, pickleSummary } from './data.jsx'
 import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon, displayMemberName } from './components.jsx'
 
@@ -77,6 +79,47 @@ function localDateFromInput(value) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function dateInputValueFromDate(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function monthInputValue(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function generateSessionDates(startDate, weekdays, yearMonth) {
+  if (!startDate || weekdays.length === 0 || !yearMonth) return [];
+  const [year, month] = yearMonth.split('-').map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return [];
+  const start = new Date(startDate + 'T00:00:00');
+  const endOfMonth = new Date(year, month, 0);
+  const dates = [];
+  const cur = new Date(Math.max(start.getTime(), new Date(year, month - 1, 1).getTime()));
+  while (cur <= endOfMonth) {
+    if (weekdays.includes(cur.getDay())) {
+      dates.push(dateInputValueFromDate(cur));
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
+}
+
+function monthDateRange(yearMonth) {
+  const [year, month] = String(yearMonth || '').split('-').map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return null;
+  const mm = String(month).padStart(2, '0');
+  return {
+    start: `${year}-${mm}-01`,
+    end: `${year}-${mm}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`,
+  };
+}
+
+function getAuthedSupabaseClient() {
+  const { token } = getStoredAuth();
+  if (!token) throw new Error('Không tìm thấy phiên đăng nhập');
+  return createSupabase(token);
+}
+
 function formatExternalDate(value) {
   const d = localDateFromInput(value);
   if (!d) return value || '--/--/----';
@@ -92,6 +135,16 @@ function guestName(guest) {
 function initialsFromName(name) {
   return String(name || '?').split(' ').filter(Boolean).map(p => p[0]).join('').slice(-2).toUpperCase() || '?';
 }
+
+const SCHEDULE_WEEKDAYS = [
+  { label: 'T2', value: 1 },
+  { label: 'T3', value: 2 },
+  { label: 'T4', value: 3 },
+  { label: 'T5', value: 4 },
+  { label: 'T6', value: 5 },
+  { label: 'T7', value: 6 },
+  { label: 'CN', value: 0 },
+];
 
 function ScreenPickleball({ tweaks = {}, push }) {
   const { state, dispatch } = useApp();
@@ -387,10 +440,362 @@ function BreakdownRow({ label, sub, value, icon, positive = false, accent }) {
 
 // ── Sessions tab — list of all sessions this month ──────────────────────────
 function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const M = getMemberMap(state.members);
+  const currentUserId = state.currentUserId;
+  const groupId = state.currentGroupId || state.currentGroup?.id || pickle.sessions[0]?.groupId || pickle.sessions[0]?.group_id;
+  const currentMember = safeArray(state.members).find(m => m.id === currentUserId);
+  const isTreasurer = currentMember?.role === 'treasurer';
+  const groupMembers = useMemo(() => safeArray(state.members)
+    .filter(m => (m.groupId ?? m.group_id) === groupId && m.isActive !== false && m.is_active !== false),
+    [state.members, groupId]);
+  const [scheduleForm, setScheduleForm] = useState({
+    startDate: '',
+    weekdays: [1, 3, 5],
+    month: monthInputValue(),
+  });
+  const [schedulePreview, setSchedulePreview] = useState([]);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [expandedSession, setExpandedSession] = useState(null);
+  const [sessionAttendanceMap, setSessionAttendanceMap] = useState({});
+  const [managedSessions, setManagedSessions] = useState([]);
+  const [managedLoading, setManagedLoading] = useState(false);
+  const [managedError, setManagedError] = useState('');
+  const [sessionRefreshKey, setSessionRefreshKey] = useState(0);
+  const canCreateSchedule = !!groupId && !!scheduleForm.startDate && scheduleForm.weekdays.length > 0 && schedulePreview.length > 0 && !scheduleSaving;
+
+  useEffect(() => {
+    setSchedulePreview(generateSessionDates(scheduleForm.startDate, scheduleForm.weekdays, scheduleForm.month));
+  }, [scheduleForm.startDate, scheduleForm.weekdays, scheduleForm.month]);
+
+  useEffect(() => {
+    if (!isTreasurer || !groupId || !scheduleForm.month) {
+      setManagedSessions([]);
+      setManagedError('');
+      return undefined;
+    }
+
+    const range = monthDateRange(scheduleForm.month);
+    if (!range) return undefined;
+
+    let cancelled = false;
+    async function loadManagedSessions() {
+      setManagedLoading(true);
+      setManagedError('');
+      try {
+        const client = getAuthedSupabaseClient();
+        const { data, error } = await client
+          .from('pickleball_sessions')
+          .select('id, group_id, date, notes, created_at')
+          .eq('group_id', groupId)
+          .gte('date', range.start)
+          .lte('date', range.end)
+          .order('date', { ascending: true });
+        if (error) throw error;
+        if (!cancelled) setManagedSessions(data || []);
+      } catch (e) {
+        console.error('[pickleball] load managed sessions:', e);
+        if (!cancelled) {
+          setManagedSessions([]);
+          setManagedError(e.message || 'Không tải được lịch tháng');
+        }
+      } finally {
+        if (!cancelled) setManagedLoading(false);
+      }
+    }
+
+    loadManagedSessions();
+    return () => { cancelled = true; };
+  }, [isTreasurer, groupId, scheduleForm.month, sessionRefreshKey]);
+
+  const toggleScheduleWeekday = (value) => {
+    setScheduleForm(f => ({
+      ...f,
+      weekdays: f.weekdays.includes(value)
+        ? f.weekdays.filter(w => w !== value)
+        : [...f.weekdays, value],
+    }));
+  };
+
+  async function saveSessionSchedule() {
+    const dates = schedulePreview;
+    if (!dates.length || !groupId) return;
+    setScheduleSaving(true);
+    try {
+      const client = getAuthedSupabaseClient();
+      const rows = dates.map(date => ({ group_id: groupId, date }));
+      const { data: newSessions, error } = await client
+        .from('pickleball_sessions')
+        .upsert(rows, { onConflict: 'group_id,date', ignoreDuplicates: true })
+        .select('id');
+      if (error) throw error;
+
+      const { data: members, error: membersError } = await client
+        .from('members')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('is_active', true);
+      if (membersError) throw membersError;
+
+      let sessionsForAttendance = newSessions || [];
+      if (sessionsForAttendance.length < dates.length) {
+        const { data: existingSessions, error: sessionsError } = await client
+          .from('pickleball_sessions')
+          .select('id')
+          .eq('group_id', groupId)
+          .in('date', dates);
+        if (sessionsError) throw sessionsError;
+        sessionsForAttendance = existingSessions || [];
+      }
+
+      if (members?.length && sessionsForAttendance.length) {
+        const attRows = sessionsForAttendance.flatMap(s =>
+          members.map(m => ({ session_id: s.id, member_id: m.id, status: 'present' }))
+        );
+        if (attRows.length) {
+          const { error: attendanceError } = await client
+            .from('pickleball_attendance')
+            .upsert(attRows, { onConflict: 'session_id,member_id', ignoreDuplicates: true });
+          if (attendanceError) throw attendanceError;
+        }
+      }
+
+      await dispatch({ type: 'REFRESH' });
+      setScheduleForm(f => ({ ...f, startDate: '' }));
+      setSchedulePreview([]);
+      setExpandedSession(null);
+      setSessionAttendanceMap({});
+      setSessionRefreshKey(k => k + 1);
+    } catch (e) {
+      alert('Lỗi tạo lịch: ' + e.message);
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
+  async function toggleSessionExpand(sessionId) {
+    if (expandedSession === sessionId) {
+      setExpandedSession(null);
+      return;
+    }
+    setExpandedSession(sessionId);
+    if (sessionAttendanceMap[sessionId]) return;
+    try {
+      const client = getAuthedSupabaseClient();
+      const { data, error } = await client
+        .from('pickleball_attendance')
+        .select('member_id, status')
+        .eq('session_id', sessionId);
+      if (error) throw error;
+      const map = {};
+      (data || []).forEach(a => { map[a.member_id] = a.status; });
+      setSessionAttendanceMap(prev => ({ ...prev, [sessionId]: map }));
+    } catch (e) {
+      alert('Lỗi tải điểm danh: ' + e.message);
+    }
+  }
+
+  async function markAttendance(sessionId, memberId, status) {
+    try {
+      const client = getAuthedSupabaseClient();
+      const { error } = await client
+        .from('pickleball_attendance')
+        .upsert({
+          session_id: sessionId,
+          member_id: memberId,
+          status,
+          marked_by: currentUserId,
+          marked_at: new Date().toISOString(),
+        }, { onConflict: 'session_id,member_id' });
+      if (error) throw error;
+      setSessionAttendanceMap(prev => ({
+        ...prev,
+        [sessionId]: { ...(prev[sessionId] || {}), [memberId]: status },
+      }));
+    } catch (e) {
+      alert('Lỗi: ' + e.message);
+    }
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {isTreasurer && (
+        <>
+          <div>
+            <SectionHeader title="Quản lý CLB"/>
+            <Card>
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+                  <FormRow label="Tháng" icon="calendar">
+                    <input
+                      type="month"
+                      value={scheduleForm.month}
+                      onChange={(e) => setScheduleForm(f => ({ ...f, month: e.target.value }))}
+                      style={inputStyle()}
+                    />
+                  </FormRow>
+                  <FormRow label="Bắt đầu" icon="clock">
+                    <input
+                      type="date"
+                      value={scheduleForm.startDate}
+                      onChange={(e) => setScheduleForm(f => ({ ...f, startDate: e.target.value }))}
+                      style={inputStyle()}
+                    />
+                  </FormRow>
+                </div>
+
+                <FormRow label="Ngày trong tuần" icon="calendar">
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {SCHEDULE_WEEKDAYS.map(day => {
+                      const selected = scheduleForm.weekdays.includes(day.value);
+                      return (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => toggleScheduleWeekday(day.value)}
+                          style={{
+                            appearance: 'none', cursor: 'pointer',
+                            minWidth: 42, height: 34, padding: '0 12px',
+                            background: selected ? accent : 'var(--surface-2)',
+                            color: selected ? (style === 'sporty' ? '#0E1726' : '#fff') : 'var(--text-1)',
+                            border: '1px solid ' + (selected ? accent : 'var(--border-1)'),
+                            borderRadius: 'var(--vb-radius-pill)',
+                            fontSize: 12, fontWeight: 800,
+                          }}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FormRow>
+
+                {scheduleForm.startDate && (
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, lineHeight: 1.5 }}>
+                    {schedulePreview.length} buổi{schedulePreview.length > 0 ? ` — ${schedulePreview.map(d => Number(d.split('-')[2])).join(', ')}` : ''}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!canCreateSchedule}
+                  onClick={saveSessionSchedule}
+                  style={{
+                    appearance: 'none', height: 44, cursor: canCreateSchedule ? 'pointer' : 'not-allowed',
+                    background: canCreateSchedule ? accent : 'var(--surface-2)',
+                    color: canCreateSchedule ? (style === 'sporty' ? '#0E1726' : '#fff') : 'var(--text-3)',
+                    border: '1px solid ' + (canCreateSchedule ? accent : 'var(--border-1)'),
+                    borderRadius: 12, fontSize: 14, fontWeight: 800,
+                    fontFamily: 'var(--vb-font-body)',
+                  }}
+                >
+                  {scheduleSaving ? 'Đang tạo lịch' : 'Tạo lịch'}
+                </button>
+              </div>
+            </Card>
+          </div>
+
+          <div>
+            <SectionHeader title="Điểm danh tháng"/>
+            <Card>
+              {managedLoading ? (
+                <div style={{ padding: 16, color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>Đang tải lịch...</div>
+              ) : managedError ? (
+                <div style={{ padding: 16, color: 'var(--vb-danger-700)', fontSize: 13, textAlign: 'center' }}>{managedError}</div>
+              ) : managedSessions.length === 0 ? (
+                <div style={{ padding: 16, color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>Chưa có lịch trong tháng này</div>
+              ) : (
+                managedSessions.map((s, i) => {
+                  const expanded = expandedSession === s.id;
+                  const attendance = sessionAttendanceMap[s.id];
+                  const absentCount = attendance ? Object.values(attendance).filter(status => status === 'absent').length : 0;
+                  const presentCount = attendance ? Math.max(groupMembers.length - absentCount, 0) : groupMembers.length;
+                  return (
+                    <div key={s.id} style={{ borderBottom: i < managedSessions.length - 1 ? '1px solid var(--border-1)' : 'none' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSessionExpand(s.id)}
+                        style={{
+                          appearance: 'none', width: '100%', border: 0, background: 'transparent',
+                          padding: 14, cursor: 'pointer', textAlign: 'left',
+                          display: 'flex', alignItems: 'center', gap: 12,
+                          fontFamily: 'var(--vb-font-body)',
+                        }}
+                      >
+                        <div style={{
+                          width: 44, height: 48, borderRadius: 10, flexShrink: 0,
+                          background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          <div style={{ fontSize: 9, fontWeight: 700, color: accent, letterSpacing: '0.05em' }}>{formatExternalDate(s.date).split(' ')[0]}</div>
+                          <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 15, fontWeight: 700, color: accent }}>{dateDay(s.date)}</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)' }}>{formatExternalDate(s.date)}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 600 }}>
+                            {attendance ? `${presentCount} có mặt • ${absentCount} vắng` : `${groupMembers.length} thành viên`}
+                          </div>
+                        </div>
+                        <Icon name={expanded ? 'chevron-down' : 'chevron-right'} size={18} color="var(--text-3)"/>
+                      </button>
+
+                      {expanded && (
+                        <div style={{ padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {groupMembers.length === 0 ? (
+                            <div style={{ padding: 10, color: 'var(--text-2)', fontSize: 13 }}>Chưa có thành viên active</div>
+                          ) : groupMembers.map(member => {
+                            const status = sessionAttendanceMap[s.id]?.[member.id] || 'present';
+                            return (
+                              <div key={member.id} style={{
+                                display: 'flex', alignItems: 'center', gap: 10,
+                                padding: 10, borderRadius: 12, background: 'var(--surface-2)',
+                              }}>
+                                <Avatar member={memberOrFallback(M, member.id)} size={32} style={tweaks?.avatarStyle}/>
+                                <div style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 700, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {displayMemberName(memberOrFallback(M, member.id), member.short || '?')}
+                                </div>
+                                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                                  {[
+                                    { id: 'present', label: 'Có mặt', color: 'var(--vb-success-700)' },
+                                    { id: 'absent', label: 'Vắng', color: 'var(--vb-danger-700)' },
+                                  ].map(option => {
+                                    const active = status === option.id;
+                                    return (
+                                      <button
+                                        key={option.id}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          markAttendance(s.id, member.id, option.id);
+                                        }}
+                                        style={{
+                                          appearance: 'none', cursor: 'pointer',
+                                          minWidth: 62, height: 30, padding: '0 10px',
+                                          background: active ? option.color : 'var(--surface-1)',
+                                          color: active ? '#fff' : 'var(--text-2)',
+                                          border: '1px solid ' + (active ? option.color : 'var(--border-1)'),
+                                          borderRadius: 'var(--vb-radius-pill)',
+                                          fontSize: 11, fontWeight: 800,
+                                        }}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </Card>
+          </div>
+        </>
+      )}
+
       <div>
         <SectionHeader title="Sắp diễn ra"/>
         <Card>
