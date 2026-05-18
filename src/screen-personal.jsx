@@ -1,12 +1,59 @@
 import React, { useEffect, useState } from 'react'
 import { createSupabase } from './lib/supabase.js'
-import { totalBalances, pickleSummary } from './data.jsx'
 
 const money = (value) => `${Math.round(Math.abs(value)).toLocaleString('vi-VN')}đ`
 
 function assertNoError(results) {
   const failed = results.find(r => r.error)
   if (failed) throw failed.error
+}
+
+function memberName(membersById, memberId) {
+  return membersById[memberId]?.short || membersById[memberId]?.name || 'Không rõ'
+}
+
+function buildDirectTransactions({ expenses, participants, members, groups, memberId }) {
+  const membersById = Object.fromEntries(members.map(m => [m.id, m]))
+  const groupsById = Object.fromEntries(groups.map(g => [g.id, g]))
+  const participantsByExpense = participants.reduce((acc, p) => {
+    if (!acc[p.expense_id]) acc[p.expense_id] = []
+    acc[p.expense_id].push(p)
+    return acc
+  }, {})
+
+  return expenses.flatMap(expense => {
+    const expenseParticipants = participantsByExpense[expense.id] || []
+    const group = groupsById[expense.group_id]
+    const base = {
+      groupName: group?.name || 'Nhóm',
+      expenseName: expense.title || 'Chi tiêu',
+      date: expense.expense_date,
+    }
+
+    if (expense.paid_by_member_id === memberId) {
+      return expenseParticipants
+        .filter(p => p.member_id !== memberId && Number(p.share_amount || 0) > 0)
+        .map(p => ({
+          ...base,
+          id: `${expense.id}-${p.member_id}`,
+          direction: 'owedToMe',
+          counterpartyName: memberName(membersById, p.member_id),
+          amount: Number(p.share_amount || 0),
+        }))
+    }
+
+    const myShare = expenseParticipants.find(p => p.member_id === memberId)
+    const amount = Number(myShare?.share_amount || 0)
+    if (!myShare || amount <= 0) return []
+
+    return [{
+      ...base,
+      id: `${expense.id}-${memberId}`,
+      direction: 'iOwe',
+      counterpartyName: memberName(membersById, expense.paid_by_member_id),
+      amount,
+    }]
+  })
 }
 
 export function ScreenPersonal() {
@@ -36,21 +83,17 @@ export function ScreenPersonal() {
 
       const { member_id: memberId, member_name: memberName } = memberInfo
       const sb = createSupabase(token)
-      const [expensesR, participantsR, settlementsR, sessionsR, attendeesR, membersR, groupsR, pickleConfigR] = await Promise.all([
+      const [expensesR, participantsR, membersR, groupsR] = await Promise.all([
         sb.from('expenses').select('*').order('expense_date', { ascending: false }),
         sb.from('expense_participants').select('*'),
-        sb.from('settlements').select('*').order('settlement_date', { ascending: false }),
-        sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
-        sb.from('pickle_attendees').select('*'),
         sb.from('members').select('*'),
         sb.from('groups').select('*'),
-        sb.from('pickle_configs').select('*').limit(1).maybeSingle(),
       ])
-      assertNoError([expensesR, participantsR, settlementsR, sessionsR, attendeesR, membersR, groupsR, pickleConfigR])
+      assertNoError([expensesR, participantsR, membersR, groupsR])
 
       const members = membersR.data || []
-      const group = (groupsR.data || [])[0]
-      if (!group) {
+      const groups = groupsR.data || []
+      if (groups.length === 0) {
         setError('Không tải được dữ liệu nhóm.')
         setLoading(false)
         return
@@ -58,72 +101,9 @@ export function ScreenPersonal() {
 
       const expenses = (expensesR.data || []).filter(e => e.status === 'approved')
       const participants = participantsR.data || []
-      const settlements = settlementsR.data || []
-      const pickleSessions = sessionsR.data || []
-      const pickleAttendees = attendeesR.data || []
+      const transactions = buildDirectTransactions({ expenses, participants, members, groups, memberId })
 
-      const normalExpenses = expenses.map(e => {
-        const expenseParticipants = participants.filter(p => p.expense_id === e.id)
-        return {
-          id: e.id,
-          amount: Number(e.amount || 0),
-          paidBy: e.paid_by_member_id,
-          participants: expenseParticipants.map(p => p.member_id),
-          splits: expenseParticipants.map(p => ({
-            memberId: p.member_id,
-            amount: Number(p.share_amount || 0),
-          })),
-          pickleSessionId: e.pickle_session_id,
-        }
-      })
-
-      const normalSettlements = settlements.map(s => ({
-        id: s.id,
-        fromId: s.from_member_id,
-        toId: s.to_member_id,
-        amount: Number(s.amount || 0),
-        date: s.settlement_date,
-      }))
-
-      const groupObj = [{
-        id: group.id,
-        members: members.map(m => m.id),
-        expenses: normalExpenses,
-        settlements: normalSettlements,
-      }]
-      const balances = totalBalances(groupObj, memberId)
-      const groupBalance = Object.values(balances).reduce((sum, value) => sum + value, 0)
-
-      const normalSessions = pickleSessions.map(s => ({
-        id: s.id,
-        date: s.session_date,
-        status: s.status,
-        attendees: pickleAttendees
-          .filter(a => a.session_id === s.id && !a.is_guest)
-          .map(a => a.member_id),
-        guests: pickleAttendees.filter(a => a.session_id === s.id && a.is_guest),
-        expenses: normalExpenses.filter(e => e.pickleSessionId === s.id),
-      }))
-      const pickleState = {
-        sessions: normalSessions,
-        fixedMembers: members.filter(m => m.is_active !== false).map(m => m.id),
-        monthlyCourtFee: Number(pickleConfigR.data?.monthly_court_fee || 0),
-        guestFeePerSession: Number(pickleConfigR.data?.guest_fee_per_session || 0),
-      }
-      const pSummary = pickleSummary(pickleState)
-      const pickleOwes = pSummary.memberOwes?.[memberId] || 0
-
-      const now = new Date()
-      const paidThisMonth = normalSettlements
-        .filter(s => {
-          const paidDate = new Date(s.date)
-          return s.fromId === memberId
-            && paidDate.getMonth() === now.getMonth()
-            && paidDate.getFullYear() === now.getFullYear()
-        })
-        .reduce((sum, s) => sum + s.amount, 0)
-
-      setData({ memberName, groupBalance, pickleOwes, paidThisMonth, members })
+      setData({ memberName, transactions })
     } catch (err) {
       console.error('[personal] load error:', err)
       setError('Có lỗi xảy ra khi tải dữ liệu.')
@@ -148,58 +128,72 @@ export function ScreenPersonal() {
 
   const now = new Date()
   const monthLabel = now.toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
-  const totalOwed = (data.groupBalance < 0 ? Math.abs(data.groupBalance) : 0)
-    + (data.pickleOwes < 0 ? Math.abs(data.pickleOwes) : 0)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg-1)', padding: '24px 16px', fontFamily: 'var(--vb-font-body)' }}>
       <h2 style={{ color: 'var(--text-1)', margin: '0 0 4px', fontSize: 20 }}>
         {monthLabel} của {data.memberName}
       </h2>
-      <p style={{ color: 'var(--text-2)', fontSize: 13, margin: '0 0 24px' }}>Tóm tắt cá nhân</p>
+      <p style={{ color: 'var(--text-2)', fontSize: 13, margin: '0 0 24px' }}>Các khoản bạn trực tiếp nợ hoặc được nhận</p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 400 }}>
-        <div style={{ background: 'var(--surface-1)', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>📦 Chi tiêu nhóm</div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: data.groupBalance < 0 ? '#EF4444' : '#10B981' }}>
-                {data.groupBalance < 0 ? `Nợ ${money(data.groupBalance)}` : data.groupBalance > 0 ? `Được nhận ${money(data.groupBalance)}` : 'Cân bằng ✅'}
-              </div>
-            </div>
-          </div>
+      <div style={{ maxWidth: 440 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+          Giao dịch liên quan trực tiếp
         </div>
 
-        <div style={{ background: 'var(--surface-1)', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)', ...(data.pickleOwes < 0 ? { borderLeft: '4px solid var(--brand-1)' } : {}) }}>
-          <div>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
-              🏸 Pickleball {data.pickleOwes < 0 ? '⚡' : ''}
+        {data.transactions.length === 0 ? (
+          <div style={{ background: 'var(--surface-1)', borderRadius: 14, padding: '18px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-1)', marginBottom: 4 }}>
+              Chưa có khoản nào
             </div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: data.pickleOwes < 0 ? '#EF4444' : '#10B981' }}>
-              {data.pickleOwes < 0 ? `Nợ ${money(data.pickleOwes)}` : 'Cân bằng ✅'}
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.45 }}>
+              Chỉ các chi tiêu mà {data.memberName} là người trả hoặc người chia phần mới xuất hiện ở đây.
             </div>
           </div>
+        ) : (
+          <div style={{ background: 'var(--surface-1)', borderRadius: 14, boxShadow: '0 1px 6px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+            {data.transactions.map((transaction, index) => (
+              <TransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                divider={index < data.transactions.length - 1}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function TransactionRow({ transaction, divider }) {
+  const isOwedToMe = transaction.direction === 'owedToMe'
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      gap: 12,
+      padding: '14px 16px',
+      borderBottom: divider ? '1px solid var(--border-1)' : 'none',
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {transaction.groupName}
         </div>
-
-        {data.paidThisMonth > 0 && (
-          <div style={{ background: 'var(--surface-1)', borderRadius: 14, padding: '14px 16px', boxShadow: '0 1px 6px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>✅ Đã thanh toán</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#10B981' }}>
-              {data.paidThisMonth.toLocaleString('vi-VN')}đ tháng này
-            </div>
-          </div>
-        )}
-
-        {totalOwed > 0 && (
-          <div style={{ background: 'var(--brand-1)', borderRadius: 14, padding: '14px 16px', textAlign: 'center' }}>
-            <div style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>
-              Cần thanh toán: {totalOwed.toLocaleString('vi-VN')}đ
-            </div>
-            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 }}>
-              Mở app để thanh toán
-            </div>
-          </div>
-        )}
+        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {transaction.expenseName}
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginTop: 4 }}>
+          {isOwedToMe ? `${transaction.counterpartyName} nợ bạn` : `Bạn nợ ${transaction.counterpartyName}`}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+          {isOwedToMe ? 'Được nhận' : 'Cần trả'}
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: isOwedToMe ? '#10B981' : '#EF4444' }}>
+          {money(transaction.amount)}
+        </div>
       </div>
     </div>
   )

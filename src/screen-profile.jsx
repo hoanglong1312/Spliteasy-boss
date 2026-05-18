@@ -48,6 +48,7 @@ function ScreenProfile({ tweaks, push }) {
   const [bankName, setBankName] = useState(normalizeBankId(currentBankName));
   const [bankAccount, setBankAccount] = useState(currentBankAccount || '');
   const [bankAccountName, setBankAccountName] = useState(currentBankAccountName || '');
+  const [isEditingBank, setIsEditingBank] = useState(false);
   const [bankSaving, setBankSaving] = useState(false);
   const [bankMessage, setBankMessage] = useState(null);
   const [pinMode, setPinMode] = useState(null);
@@ -80,12 +81,31 @@ function ScreenProfile({ tweaks, push }) {
   const activeColor = me.color || '#574EFA';
   const currentBankLabel = getBankLabel(currentBankName);
   const maskedBankAccount = maskBankAccount(currentBankAccount);
+  const hasBankInfo = Boolean(currentBankName || currentBankAccount || currentBankAccountName);
 
   useEffect(() => {
     setBankName(normalizeBankId(currentBankName));
     setBankAccount(currentBankAccount || '');
     setBankAccountName(currentBankAccountName || '');
   }, [currentBankName, currentBankAccount, currentBankAccountName]);
+
+  function resetBankDraft() {
+    setBankName(normalizeBankId(currentBankName));
+    setBankAccount(currentBankAccount || '');
+    setBankAccountName(currentBankAccountName || '');
+  }
+
+  function openBankForm() {
+    resetBankDraft();
+    setBankMessage(null);
+    setIsEditingBank(true);
+  }
+
+  function handleCancelBankInfo() {
+    resetBankDraft();
+    setBankMessage(null);
+    setIsEditingBank(false);
+  }
 
   async function handleSaveBankInfo() {
     if (bankSaving) return;
@@ -99,6 +119,7 @@ function ScreenProfile({ tweaks, push }) {
         bankAccountName: bankAccountName.trim() || null,
       });
       setBankMessage({ type: 'success', text: 'Đã lưu thông tin ngân hàng' });
+      setIsEditingBank(false);
     } catch (err) {
       setBankMessage({ type: 'error', text: 'Không lưu được thông tin ngân hàng' });
     } finally {
@@ -233,69 +254,102 @@ function ScreenProfile({ tweaks, push }) {
         <div>
           <SectionHeader title="Tài khoản ngân hàng"/>
           <Card style={{ padding: 16 }}>
-            {(currentBankLabel || maskedBankAccount) && (
-              <div style={{
-                padding: '12px 14px',
-                borderRadius: 12,
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border-1)',
-                marginBottom: 14,
-              }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)' }}>
-                  {currentBankLabel || 'Ngân hàng'}
+            {!isEditingBank && hasBankInfo && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: 'var(--surface-2)',
+                  border: '1px solid var(--border-1)',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)' }}>
+                        {currentBankLabel || 'Ngân hàng'}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-1)', marginTop: 6 }}>
+                        {maskedBankAccount || 'Chưa có số tài khoản'}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginTop: 3 }}>
+                        {currentBankAccountName || 'Chưa có tên chủ tài khoản'}
+                      </div>
+                    </div>
+                    <Button variant="brandSoft" size="sm" onClick={openBankForm}>
+                      Sửa
+                    </Button>
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginTop: 3 }}>
-                  {maskedBankAccount}{currentBankAccountName ? ` • ${currentBankAccountName}` : ''}
-                </div>
+                {bankMessage && (
+                  <div style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: bankMessage.type === 'error' ? 'var(--vb-danger-700)' : 'var(--vb-success-700)',
+                  }}>
+                    {bankMessage.text}
+                  </div>
+                )}
               </div>
             )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <ProfileField label="Ngân hàng">
-                <select
-                  value={bankName}
-                  onChange={e => setBankName(e.target.value)}
-                  style={profileControlStyle()}
-                >
-                  <option value="">Chọn ngân hàng</option>
-                  {bankName && !getBank(bankName) && (
-                    <option value={bankName}>{getBankLabel(bankName)}</option>
-                  )}
-                  {BANK_LIST.map(bank => (
-                    <option key={bank.id} value={bank.id}>{bank.shortName}</option>
-                  ))}
-                </select>
-              </ProfileField>
-              <ProfileField label="Số tài khoản">
-                <input
-                  value={bankAccount}
-                  onChange={e => setBankAccount(e.target.value.replace(/[^\d]/g, ''))}
-                  inputMode="numeric"
-                  placeholder="Nhập số tài khoản"
-                  style={profileControlStyle()}
-                />
-              </ProfileField>
-              <ProfileField label="Tên chủ tài khoản">
-                <input
-                  value={bankAccountName}
-                  onChange={e => setBankAccountName(e.target.value)}
-                  placeholder="Nhập tên chủ tài khoản"
-                  style={profileControlStyle()}
-                />
-              </ProfileField>
-              <Button full onClick={handleSaveBankInfo} disabled={bankSaving}>
-                {bankSaving ? 'Đang lưu...' : 'Lưu'}
+            {!isEditingBank && !hasBankInfo && (
+              <Button variant="brandSoft" full onClick={openBankForm}>
+                Thêm tài khoản ngân hàng
               </Button>
-              {bankMessage && (
-                <div style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: bankMessage.type === 'error' ? 'var(--vb-danger-700)' : 'var(--vb-success-700)',
-                }}>
-                  {bankMessage.text}
+            )}
+
+            {isEditingBank && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <ProfileField label="Ngân hàng">
+                  <select
+                    value={bankName}
+                    onChange={e => setBankName(e.target.value)}
+                    style={profileControlStyle()}
+                  >
+                    <option value="">Chọn ngân hàng</option>
+                    {bankName && !getBank(bankName) && (
+                      <option value={bankName}>{getBankLabel(bankName)}</option>
+                    )}
+                    {BANK_LIST.map(bank => (
+                      <option key={bank.id} value={bank.id}>{bank.shortName}</option>
+                    ))}
+                  </select>
+                </ProfileField>
+                <ProfileField label="Số tài khoản">
+                  <input
+                    value={bankAccount}
+                    onChange={e => setBankAccount(e.target.value.replace(/[^\d]/g, ''))}
+                    inputMode="numeric"
+                    placeholder="Nhập số tài khoản"
+                    style={profileControlStyle()}
+                  />
+                </ProfileField>
+                <ProfileField label="Tên chủ tài khoản">
+                  <input
+                    value={bankAccountName}
+                    onChange={e => setBankAccountName(e.target.value)}
+                    placeholder="Nhập tên chủ tài khoản"
+                    style={profileControlStyle()}
+                  />
+                </ProfileField>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Button variant="secondary" style={{ flex: 1 }} onClick={handleCancelBankInfo} disabled={bankSaving}>
+                    Hủy
+                  </Button>
+                  <Button style={{ flex: 1 }} onClick={handleSaveBankInfo} disabled={bankSaving}>
+                    {bankSaving ? 'Đang lưu...' : 'Lưu'}
+                  </Button>
                 </div>
-              )}
-            </div>
+                {bankMessage && (
+                  <div style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: bankMessage.type === 'error' ? 'var(--vb-danger-700)' : 'var(--vb-success-700)',
+                  }}>
+                    {bankMessage.text}
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </div>
 

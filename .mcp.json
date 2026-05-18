@@ -3,9 +3,18 @@
     "codex": {
       "type": "stdio",
       "command": "codex",
-      "args": ["mcp-server"],
+      "args": [
+        "mcp-server"
+      ],
       "env": {
         "NINEROUTER_API_KEY": "${NINEROUTER_API_KEY}"
+      }
+    },
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp?project_ref=zdjcbenrtdotaqbprpky",
+      "headers": {
+        "Authorization": "Bearer ${SUPABASE_ACCESS_TOKEN}"
       }
     }
   }
