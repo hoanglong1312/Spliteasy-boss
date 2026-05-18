@@ -1,9 +1,35 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 
 const ToastContext = createContext(null)
 
+async function requestNotificationPermission() {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false
+  if (Notification.permission === 'granted') return true
+  if (Notification.permission === 'denied') return false
+  const result = await Notification.requestPermission()
+  return result === 'granted'
+}
+
+function showBrowserNotification(message, type) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return
+  if (typeof document === 'undefined' || !document.hidden) return
+  if (Notification.permission !== 'granted') return
+
+  const icons = { success: '✅', warning: '⚠️', info: 'ℹ️' }
+  new Notification('SpliteasyBoss', {
+    body: `${icons[type] || icons.info} ${message}`,
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    tag: 'spliteasy-' + Date.now(),
+  })
+}
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
+
+  useEffect(() => {
+    requestNotificationPermission()
+  }, [])
 
   const removeToast = useCallback((id) => {
     setToasts(ts => ts.filter(t => t.id !== id))
@@ -13,6 +39,7 @@ export function ToastProvider({ children }) {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2)
     setToasts(ts => [...ts, { id, message, type }])
     setTimeout(() => removeToast(id), 3000)
+    showBrowserNotification(message, type)
   }, [removeToast])
 
   return (
