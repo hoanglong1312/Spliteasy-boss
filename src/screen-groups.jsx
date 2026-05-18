@@ -129,6 +129,24 @@ function buildPeriodPayments(group, members, treasurerId, periodStart, periodEnd
     }
   }
 
+  const settlements = safeArray(group.settlements).filter(settlement => {
+    const d = normalizeDateISO(settlement.date ?? settlement.settlement_date);
+    return d && d >= start && d <= end;
+  });
+
+  for (const settlement of settlements) {
+    const fromId = settlement.fromId ?? settlement.from_member_id;
+    const toId = settlement.toId ?? settlement.to_member_id;
+    const amount = Number(settlement.amount) || 0;
+    if (!amount) continue;
+    if (memberSet.has(fromId)) {
+      net[fromId] = (net[fromId] || 0) + amount;
+    }
+    if (memberSet.has(toId)) {
+      net[toId] = (net[toId] || 0) - amount;
+    }
+  }
+
   const memberNames = getMemberMap(members);
   return groupMembers
     .filter(id => id !== treasurerId)
@@ -369,7 +387,8 @@ function ActivityRow({ e, divider, avatarStyle, showGroup }) {
 function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   const { state, dispatch } = useApp();
   const meId = state.currentUserId || ME;
-  const g = safeArray(state.groups).find(x => x.id === params?.groupId);
+  const currentGroupId = params?.groupId;
+  const g = safeArray(state.groups).find(x => x.id === currentGroupId);
   const [tab, setTab] = useState('activity');
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [periodFormOpen, setPeriodFormOpen] = useState(false);
@@ -381,11 +400,11 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   const pendingCount = safeArray(g ? safeGroup(g).expenses : []).filter(e => e.status === 'pending').length
   const groupPeriods = useMemo(
     () => safeArray(state.settlementPeriods)
-      .filter(p => paymentPeriodField(p, 'groupId', 'group_id') === params?.groupId)
+      .filter(p => paymentPeriodField(p, 'groupId', 'group_id') === currentGroupId)
       .sort((a, b) => normalizeDateISO(paymentPeriodField(b, 'periodEnd', 'period_end')).localeCompare(normalizeDateISO(paymentPeriodField(a, 'periodEnd', 'period_end')))),
-    [state.settlementPeriods, params?.groupId]
+    [state.settlementPeriods, currentGroupId]
   );
-  const openPeriod = groupPeriods.find(p => (p.status || 'open') === 'open');
+  const openPeriod = groupPeriods.find(p => p.status === 'open');
   const closedPeriods = groupPeriods.filter(p => p.status === 'closed');
   const groupMemberIds = safeArray(g?.members);
   const treasurerId = state.members.find(m => m.role === 'treasurer' && groupMemberIds.includes(m.id))?.id || (isTreasurer ? meId : null);
@@ -415,7 +434,7 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   }
 
   async function handleCreatePeriod() {
-    if (periodCreating || !periodRangeValid || periodPayments.length === 0) return;
+    if (periodCreating || openPeriod || !periodRangeValid || periodPayments.length === 0) return;
     setPeriodCreating(true);
     try {
       const periodId = await dispatch({
@@ -512,9 +531,25 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
           <Button variant="primary" full icon="plus" onClick={() => push('add-expense', { groupId: g.id })}>Thêm chi tiêu</Button>
           <Button variant="secondary" full icon="zap" onClick={() => push('settle-group', { groupId: g.id })}>Tất toán</Button>
           {isTreasurer && (
-            <Button variant="brandSoft" full icon="calendar" onClick={() => setPeriodFormOpen(v => !v)}>
-              Chốt sổ
-            </Button>
+            <div
+              title={openPeriod ? 'Đang có kỳ chốt sổ chưa hoàn thành' : undefined}
+              style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}
+            >
+              <Button
+                variant="brandSoft"
+                full
+                icon="calendar"
+                disabled={Boolean(openPeriod)}
+                onClick={() => setPeriodFormOpen(v => !v)}
+              >
+                Chốt sổ
+              </Button>
+              {openPeriod && (
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#B45309' }}>
+                  Đang có kỳ chốt sổ chưa hoàn thành
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -528,7 +563,7 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
         </div>
       )}
 
-      {periodFormOpen && (
+      {periodFormOpen && !openPeriod && (
         <SettlementPeriodForm
           periodStart={periodStart}
           periodEnd={periodEnd}

@@ -147,7 +147,7 @@ function ScreenProfile({ tweaks, push }) {
     setPinError(null);
     setPinMessage(null);
     try {
-      await dispatch({ type: 'RESET_MEMBER_PIN', memberId: me.id });
+      await dispatch({ type: 'SET_MEMBER_PIN', pin: null });
       setPinMode(null);
       setPinValue('');
       setPinConfirm('');

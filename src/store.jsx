@@ -569,6 +569,7 @@ export function AppProvider({ children, onToast }) {
             confirmed_at: new Date().toISOString(),
           })
           .eq('id', action.paymentId)
+          .eq('status', 'transferred')
         if (!isTreasurer) {
           query = query.eq('to_member_id', state.currentUserId)
         }
