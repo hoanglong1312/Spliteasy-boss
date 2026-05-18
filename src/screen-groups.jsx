@@ -176,9 +176,14 @@ function buildPeriodPayments(group, members, treasurerId, periodStart, periodEnd
 
 // ── Groups list ─────────────────────────────────────────────────────────────
 function ScreenGroups({ tweaks = {}, push }) {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const meId = state.currentUserId || ME;
   const [filter, setFilter] = useState('all');
+  const [joinOpen, setJoinOpen] = useState(false);
+  const [joinInviteCode, setJoinInviteCode] = useState('');
+  const [joinMemberName, setJoinMemberName] = useState(state.currentUserName || '');
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinError, setJoinError] = useState('');
   const filteredGroups = useMemo(() => {
     return safeArray(state.groups).filter(g => {
       if (filter === 'all') return true;
@@ -189,22 +194,184 @@ function ScreenGroups({ tweaks = {}, push }) {
     });
   }, [filter, state.groups, meId]);
   const openPeriod = safeArray(state.settlementPeriods).find(p => (p.status || 'open') === 'open');
+  const canJoin = joinInviteCode.trim() && joinMemberName.trim() && !joinLoading;
+
+  function openJoinDialog() {
+    setJoinInviteCode('');
+    setJoinMemberName(state.currentUserName || '');
+    setJoinError('');
+    setJoinOpen(true);
+  }
+
+  function closeJoinDialog() {
+    if (joinLoading) return;
+    setJoinOpen(false);
+    setJoinError('');
+  }
+
+  async function handleJoinSubmit(e) {
+    e.preventDefault();
+    if (!canJoin) return;
+    const inviteCode = joinInviteCode.trim().toUpperCase();
+    const memberName = joinMemberName.trim();
+    setJoinLoading(true);
+    setJoinError('');
+    try {
+      await dispatch({ type: 'JOIN_GROUP', inviteCode, memberName });
+      setJoinOpen(false);
+      setJoinInviteCode('');
+    } catch (err) {
+      const msg = err.message === 'invalid_invite_code'
+        ? 'Mã mời không đúng. Kiểm tra lại nhé.'
+        : err.message === 'invite_code_required'
+        ? 'Nhập mã mời để tiếp tục.'
+        : err.message === 'name_required'
+        ? 'Nhập tên của bạn trong nhóm.'
+        : 'Không tham gia được nhóm. Thử lại sau.';
+      setJoinError(msg);
+    } finally {
+      setJoinLoading(false);
+    }
+  }
 
   return (
     <div style={{ paddingBottom: 96 }}>
-      <div style={{ padding: '8px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
+      <div style={{ padding: '8px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 0, flex: '1 1 140px' }}>
           <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>Nhóm</div>
           <div style={{ fontFamily: 'var(--vb-font-body)', fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>{safeArray(state.groups).length} nhóm đang hoạt động</div>
         </div>
-        <button onClick={() => push('new-group')} style={{
-          appearance: 'none', height: 40, padding: '0 14px', cursor: 'pointer',
-          background: 'var(--brand-1)', color: '#fff', border: 0, borderRadius: 12,
-          fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 13,
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          whiteSpace: 'nowrap', flexShrink: 0,
-        }}><Icon name="plus" size={18} color="#fff"/>Nhóm mới</button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={openJoinDialog} style={{
+            appearance: 'none', height: 40, padding: '0 14px', cursor: 'pointer',
+            background: 'var(--surface-1)', color: 'var(--text-1)', border: '1px solid var(--border-1)', borderRadius: 12,
+            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 13,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            whiteSpace: 'nowrap', flexShrink: 0,
+          }}><Icon name="users" size={18} color="var(--text-1)"/>Tham gia nhóm</button>
+          <button onClick={() => push('new-group')} style={{
+            appearance: 'none', height: 40, padding: '0 14px', cursor: 'pointer',
+            background: 'var(--brand-1)', color: '#fff', border: 0, borderRadius: 12,
+            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 13,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            whiteSpace: 'nowrap', flexShrink: 0,
+          }}><Icon name="plus" size={18} color="#fff"/>Nhóm mới</button>
+        </div>
       </div>
+
+      {joinOpen && (
+        <div
+          onClick={closeJoinDialog}
+          style={{
+            position: 'fixed', inset: 0,
+            background: 'rgba(15,23,42,0.45)',
+            display: 'flex', alignItems: 'flex-end',
+            zIndex: 260,
+          }}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="join-group-title"
+            onClick={e => e.stopPropagation()}
+            onSubmit={handleJoinSubmit}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '18px 20px 32px',
+              background: 'var(--surface-1)',
+              borderRadius: '20px 20px 0 0',
+              boxShadow: 'var(--vb-shadow-modal)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div id="join-group-title" style={{ fontFamily: 'var(--vb-font-body)', fontSize: 18, fontWeight: 800, color: 'var(--text-1)' }}>
+                  Tham gia nhóm
+                </div>
+                <div style={{ marginTop: 2, fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>
+                  Nhập mã mời để thêm nhóm vào tài khoản hiện tại
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeJoinDialog}
+                disabled={joinLoading}
+                style={{
+                  appearance: 'none',
+                  width: 36,
+                  height: 36,
+                  border: 0,
+                  borderRadius: 10,
+                  background: 'var(--surface-2)',
+                  color: 'var(--text-1)',
+                  cursor: joinLoading ? 'default' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name="x" size={18} color="var(--text-1)"/>
+              </button>
+            </div>
+
+            <FormRow label="Mã mời" icon="tag">
+              <input
+                autoFocus
+                value={joinInviteCode}
+                onChange={e => setJoinInviteCode(e.target.value.toUpperCase())}
+                placeholder="VD: PICKLE-TEST"
+                style={{ ...inputStyle(), textTransform: 'uppercase', letterSpacing: '0.04em' }}
+              />
+            </FormRow>
+
+            <FormRow label="Tên của bạn trong nhóm" icon="user">
+              <input
+                value={joinMemberName}
+                onChange={e => setJoinMemberName(e.target.value)}
+                placeholder="VD: Nguyễn Văn A"
+                style={inputStyle()}
+              />
+            </FormRow>
+
+            {joinError && (
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: 'var(--vb-danger-50)',
+                color: 'var(--vb-danger-700)',
+                fontSize: 13,
+                fontWeight: 600,
+              }}>
+                {joinError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={!canJoin}
+              style={{
+                appearance: 'none',
+                height: 46,
+                border: 0,
+                borderRadius: 12,
+                background: canJoin ? 'var(--brand-1)' : 'var(--surface-2)',
+                color: canJoin ? '#fff' : 'var(--text-3)',
+                fontFamily: 'var(--vb-font-body)',
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: canJoin ? 'pointer' : 'default',
+              }}
+            >
+              {joinLoading ? 'Đang tham gia' : 'Tham gia'}
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div style={{

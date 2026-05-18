@@ -384,6 +384,34 @@ export function AppProvider({ children, onToast }) {
         break
       }
 
+      case 'REFRESH': {
+        await refresh(action.token)
+        break
+      }
+
+      case 'JOIN_GROUP': {
+        const inviteCode = String(action.inviteCode || '').trim().toUpperCase()
+        const memberName = String(action.memberName || '').trim()
+        if (!inviteCode) throw new Error('invite_code_required')
+        if (!memberName) throw new Error('name_required')
+
+        const existingToken = getStoredAuth().token || tokenRef.current
+        const result = await joinGroup(inviteCode, memberName, existingToken)
+        const nextToken = result?.token || existingToken
+        if (!nextToken || !result?.member_id) {
+          throw new Error('join_group_no_token')
+        }
+
+        storeAuth(nextToken, {
+          id: result.member_id,
+          groupId: result.group_id,
+          name: result.member_name || memberName,
+        })
+        tokenRef.current = nextToken
+        await refresh(nextToken)
+        return result
+      }
+
       case 'LOGOUT': {
         clearAuth()
         tokenRef.current = null
