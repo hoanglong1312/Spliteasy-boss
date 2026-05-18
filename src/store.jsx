@@ -709,7 +709,7 @@ export function AppProvider({ children, onToast }) {
 
         const { data: joined, error: joinError } = await createSupabase().rpc('join_group', {
           p_invite_code: newInviteCode,
-          p_name: currentMember?.name || state.currentUserName || memberNamesArray[0],
+          p_member_name: currentMember?.name || state.currentUserName || memberNamesArray[0],
         })
         if (joinError || joined?.error) {
           const err = joinError || new Error(joined.error)
