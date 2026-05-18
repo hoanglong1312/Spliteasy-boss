@@ -22,6 +22,7 @@ import ScreenHome from './screen-home.jsx'
 import ScreenGroups, {
   ScreenGroupDetail, ScreenExpenseDetail, ScreenAddExpense,
   ScreenSettleAll, ScreenNewGroup, ScreenNotifications, ScreenApprovalQueue,
+  ScreenPaymentFlow,
 } from './screen-groups.jsx'
 import ScreenPickleball, {
   ScreenSessionDetail, ScreenAddSessionExpense, ScreenAddExternalTicket,
@@ -278,6 +279,7 @@ function App() {
       case 'new-group':       return <ScreenNewGroup params={p} pop={pop}/>
       case 'notifications':   return <ScreenNotifications pop={pop} tweaks={t}/>
       case 'approval-queue':  return <ScreenApprovalQueue params={p} tweaks={t} pop={pop}/>
+      case 'payment-flow':    return <ScreenPaymentFlow tweaks={t} pop={pop}/>
       case 'session-detail':  return <ScreenSessionDetail params={p} pop={pop} tweaks={t}/>
       case 'add-session-expense': return <ScreenAddSessionExpense params={p} pop={pop} tweaks={t}/>
       case 'add-external-ticket': return <ScreenAddExternalTicket pop={pop} tweaks={t}/>
