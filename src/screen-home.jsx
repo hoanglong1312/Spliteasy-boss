@@ -1,615 +1,734 @@
-import React, { useMemo } from 'react'
-import { useApp } from './store.jsx'
-import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, recentActivity, groupBalance, groupNet, pickleSummary } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon, displayMemberName } from './components.jsx'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useApp, fetchPickleballSessions, fetchMonthlyExpenses } from './store.jsx'
+import { ME } from './data.jsx'
+import { Icon, iconBtnStyle, displayMemberName } from './components.jsx'
+import { getStoredAuth } from './lib/auth.js'
 
-// Home tab — dashboard with balance summary, recent activity, group cards
-// Has 3 layout variations exposed via Tweaks: 'overview' | 'feed' | 'compact'
+function ScreenHome({ push, switchTab }) {
+  const { state, dispatch } = useApp()
+  const { members, currentUserId } = state
+  const meId = currentUserId || ME
+  const [selectedMonth, setSelectedMonth] = useState(() => toYearMonth(new Date()))
 
-function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
-  const { state } = useApp();
-  const { groups, members, currentUserId } = state;
-  const meId = currentUserId || ME;
   const meMember = members.find(m => m.id === meId) || {
     name: state.currentUserName || 'Bạn',
     short: state.currentUserName || 'Bạn',
     initials: (state.currentUserName || 'B')[0].toUpperCase(),
     color: '#574EFA',
     isMe: true,
-  };
+  }
 
-  const [searchOpen, setSearchOpen] = React.useState(false);
-  const [searchQuery, setSearchQuery] = React.useState('');
+  useEffect(() => {
+    const { token } = getStoredAuth()
+    if (!token) return undefined
 
-  const totals = useMemo(() => totalBalances(groups, meId), [groups, meId]);
-  const youAreOwed = Object.values(totals).filter(v => v > 0).reduce((a,b) => a+b, 0);
-  const youOwe = Object.values(totals).filter(v => v < 0).reduce((a,b) => a+b, 0);
-  const net = youAreOwed + youOwe;
-  const layout = tweaks.homeLayout || 'overview';
+    let cancelled = false
+    Promise.all([
+      fetchPickleballSessions(token, selectedMonth),
+      fetchMonthlyExpenses(token, selectedMonth),
+    ]).then(([sessions, expenses]) => {
+      if (cancelled) return
+      dispatch({
+        type: 'FETCH_HOME_MONTH_SUCCESS',
+        yearMonth: selectedMonth,
+        sessions,
+        expenses,
+      })
+    }).catch(err => {
+      if (cancelled) return
+      dispatch({
+        type: 'FETCH_HOME_MONTH_ERROR',
+        error: err?.message || 'Không tải được dữ liệu tháng',
+      })
+    })
 
-  const activity = useMemo(() => recentActivity(groups, 20), [groups]);
+    return () => { cancelled = true }
+  }, [dispatch, selectedMonth])
 
-  const filteredGroups = searchQuery.trim()
-    ? groups.filter(g =>
-        g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (g.expenses || []).some(e => e.title.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : groups;
+  const homeMonthReady = state.homeMonth === selectedMonth
+  const homeMonthSessions = homeMonthReady ? (state.homeMonthSessions || []) : []
+  const homeMonthExpenses = homeMonthReady ? (state.homeMonthExpenses || []) : []
+
+  const monthNet = useMemo(
+    () => calcMonthNet(homeMonthExpenses, meId),
+    [homeMonthExpenses, meId],
+  )
+  const pickleExpenseSummaries = useMemo(
+    () => buildExpenseSummaries(homeMonthExpenses, meId, isPickleballExpense),
+    [homeMonthExpenses, meId],
+  )
+  const allExpenseSummaries = useMemo(
+    () => buildExpenseSummaries(homeMonthExpenses, meId),
+    [homeMonthExpenses, meId],
+  )
+  const pickleNet = pickleExpenseSummaries.reduce((sum, item) => sum + item.net, 0)
+  const groupNet = allExpenseSummaries.reduce((sum, item) => sum + item.net, 0)
+  const totalSpent = allExpenseSummaries.reduce((sum, item) => sum + item.total, 0)
+  const monthNumber = Number(selectedMonth.split('-')[1])
 
   return (
     <div style={{ paddingBottom: 96 }}>
-      {/* Top greeting */}
-      <div style={{ padding: '8px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: '#fff', padding: '16px 18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontFamily: 'var(--vb-font-meta)', fontWeight: 500, fontSize: 13, color: 'var(--text-2)' }}>Xin chào,</div>
-          <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>{displayMemberName(meMember, 'Bạn')} 👋</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {searchOpen ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm nhóm, chi tiêu..."
-                style={{
-                  appearance: 'none', height: 40, padding: '0 12px',
-                  background: 'var(--surface-2)', border: '1px solid var(--border-1)',
-                  borderRadius: 12, fontFamily: 'var(--vb-font-body)', fontSize: 14,
-                  color: 'var(--text-1)', outline: 'none', width: 180,
-                }}
-              />
-              <button style={iconBtnStyle()} onClick={() => { setSearchOpen(false); setSearchQuery(''); }}>
-                <Icon name="x" size={18} color="var(--text-1)"/>
-              </button>
-            </div>
-          ) : (
-            <button style={iconBtnStyle()} onClick={() => setSearchOpen(true)}>
-              <Icon name="search" size={20} color="var(--text-1)"/>
-            </button>
-          )}
-          <button style={iconBtnStyle()} onClick={() => push('notifications')}>
-            <Icon name="bell" size={20} color="var(--text-1)"/>
-          </button>
-        </div>
-      </div>
-
-      {/* Balance hero */}
-      <div style={{ padding: '0 20px 20px' }}>
-        <BalanceHero net={net} youAreOwed={youAreOwed} youOwe={youOwe} push={push}/>
-      </div>
-
-      <TreasurerHomeAlert push={push}/>
-
-      {layout === 'overview' && <OverviewLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
-      {layout === 'feed' && <FeedLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
-      {layout === 'compact' && <CompactLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
-    </div>
-  );
-}
-
-function TreasurerHomeAlert({ push }) {
-  const { state } = useApp()
-  const meId = state.currentUserId || ME
-  const isTreasurer = state.members.find(m => m.id === meId)?.role === 'treasurer'
-  const pendingCount = useMemo(() => {
-    return state.groups.flatMap(g => g.expenses || []).filter(e => e.status === 'pending').length
-  }, [state.groups])
-  const disputeCount = state.disputeCount || 0
-
-  if (!isTreasurer || (pendingCount === 0 && disputeCount === 0)) return null
-
-  return (
-    <div style={{ padding: '0 20px 20px' }}>
-      <div style={{
-        background: 'var(--vb-warn-100)', borderRadius: 12,
-        border: '1px solid rgba(245,158,11,0.25)',
-        padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8,
-      }}>
-        {pendingCount > 0 && (
-          <button
-            onClick={() => push('approval-queue', { groupId: state.currentGroupId || state.groups[0]?.id })}
-            style={{
-              appearance: 'none', cursor: 'pointer', background: 'none', border: 'none', padding: 0,
-              display: 'flex', alignItems: 'center', gap: 8,
-              fontFamily: 'var(--vb-font-body)', textAlign: 'left',
-            }}
-          >
-            <span style={{ fontSize: 14 }}>⏳</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
-              {pendingCount} chi tiêu chờ duyệt
-            </span>
-          </button>
-        )}
-        {disputeCount > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 14 }}>⚠️</span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
-              {disputeCount} sai sót cần xem
-            </span>
+          <div style={{ fontSize: 11, color: '#999', fontWeight: 500 }}>Xin chào,</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a2e' }}>
+            {displayMemberName(meMember, 'Bạn')} 👋
           </div>
+        </div>
+        <button type="button" style={{ ...iconBtnStyle(), borderRadius: '50%', background: '#f4f4f8', border: 0 }} onClick={() => push('notifications')} aria-label="Thông báo">
+          <Icon name="bell" size={18} color="#1a1a2e"/>
+        </button>
+      </div>
+
+      <MonthNav selectedMonth={selectedMonth} setSelectedMonth={setSelectedMonth}/>
+
+      <MonthSummaryCard
+        monthNumber={monthNumber}
+        net={monthNet}
+        onAddExpense={() => push('add-expense')}
+        onSettle={() => push('settle-all')}
+      />
+
+      <div style={{ padding: '0 14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {homeMonthSessions.length > 0 && (
+          <PickleballMonthCard
+            sessions={homeMonthSessions}
+            memberId={meId}
+            net={pickleNet}
+            onClick={() => switchTab('pickle')}
+          />
+        )}
+
+        {homeMonthExpenses.length > 0 && (
+          <GroupExpensesCard
+            summaries={allExpenseSummaries}
+            net={groupNet}
+            totalSpent={totalSpent}
+            onClick={() => switchTab('groups')}
+          />
+        )}
+
+        {monthNet < 0 && (
+          <PaymentCTA amount={Math.abs(monthNet)} onClick={() => push('payment-flow')}/>
         )}
       </div>
     </div>
   )
 }
 
-
-// ── Balance Hero (the big summary card at top) ──────────────────────────────
-function BalanceHero({ net, youAreOwed, youOwe, push }) {
-  const positive = net >= 0;
-  return (
-    <div style={{
-      borderRadius: 'var(--vb-radius-2xl)',
-      background: 'linear-gradient(135deg, var(--brand-1) 0%, var(--brand-2) 100%)',
-      color: '#fff',
-      padding: '20px 20px 16px',
-      position: 'relative',
-      overflow: 'hidden',
-      boxShadow: '0 8px 24px -8px var(--brand-shadow)',
-    }}>
-      {/* decorative orb */}
-      <div style={{ position: 'absolute', top: -40, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.08)' }}/>
-      <div style={{ position: 'absolute', bottom: -50, right: 40, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }}/>
-
-      <div style={{ position: 'relative', zIndex: 1 }}>
-        <div style={{ fontFamily: 'var(--vb-font-body)', fontSize: 12, fontWeight: 600, opacity: 0.8, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-          {positive ? 'Tổng cộng bạn được nhận' : 'Tổng cộng bạn còn nợ'}
-        </div>
-        <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 4 }}>
-          {fmtVNDFull(Math.abs(net))}
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <SubBalance label="Được nhận" amount={youAreOwed} positive/>
-          <SubBalance label="Phải trả" amount={Math.abs(youOwe)}/>
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-          <button onClick={() => push('add-expense')} style={{
-            appearance: 'none', flex: 1, height: 44, borderRadius: 12,
-            background: '#fff', color: 'var(--brand-1)', border: 0,
-            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 14,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer',
-          }}>
-            <Icon name="plus" size={18} color="var(--brand-1)"/> Thêm chi tiêu
-          </button>
-          <button onClick={() => push('settle-all')} style={{
-            appearance: 'none', flex: 1, height: 44, borderRadius: 12,
-            background: 'rgba(255,255,255,0.18)', color: '#fff', border: '1px solid rgba(255,255,255,0.25)',
-            backdropFilter: 'blur(8px)',
-            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 14,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer',
-          }}>
-            <Icon name="zap" size={18} color="#fff"/> Tất toán
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SubBalance({ label, amount, positive = false }) {
-  return (
-    <div style={{
-      flex: 1, padding: '10px 12px',
-      background: 'rgba(255,255,255,0.14)', borderRadius: 14,
-      backdropFilter: 'blur(8px)',
-      border: '1px solid rgba(255,255,255,0.16)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85, fontWeight: 600 }}>
-        <Icon name={positive ? 'arrow-down' : 'arrow-up'} size={12} color="#fff"/>{label}
-      </div>
-      <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 17, fontWeight: 700, marginTop: 2 }}>{fmtVNDFull(amount)}</div>
-    </div>
-  );
-}
-
-function SmartHomeSummary({ push, switchTab }) {
-  const { state } = useApp()
-  const meId = state.currentUserId || ME
-
-  // Nợ nhóm: tổng số âm từ totalBalances
-  const groupBalances = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId])
-  const groupDebt = Math.abs(Object.values(groupBalances).filter(v => v < 0).reduce((a, b) => a + b, 0))
-
-  // Nợ pickleball: memberOwes[meId] âm = nợ
-  const pSummary = useMemo(() => pickleSummary(state.pickle), [state.pickle])
-  const pickleOwes = pSummary.memberOwes?.[meId] || 0
-  const pickleDebt = pickleOwes < 0 ? Math.abs(pickleOwes) : 0
-
-  // Tổng cần thanh toán
-  const totalDebt = groupDebt + pickleDebt
-  const hasDebt = totalDebt > 0
-
-  const month = new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+function MonthNav({ selectedMonth, setSelectedMonth }) {
+  const current = isCurrentMonth(selectedMonth)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Month label */}
-      <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, textTransform: 'capitalize' }}>
-        {month}
-      </div>
-
-      {/* Two summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <SummaryCard
-          emoji="📦"
-          label="Chi tiêu nhóm"
-          debt={groupDebt}
-          subtitle={`${state.groups.length} nhóm`}
-          onClick={() => switchTab('groups')}
-        />
-        <SummaryCard
-          emoji="🏸"
-          label="Pickleball"
-          debt={pickleDebt}
-          subtitle="CLB Q7"
-          onClick={() => switchTab('pickle')}
-        />
-      </div>
-
-      {/* Thanh toán CTA */}
-      {hasDebt && (
+    <div style={{ background: '#fff', padding: '10px 18px 14px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', background: '#f0f0f7', borderRadius: 20, padding: 4 }}>
         <button
-          onClick={() => push('payment-flow')}
-          style={{
-            appearance: 'none', cursor: 'pointer', width: '100%', height: 48,
-            borderRadius: 14, border: 0,
-            background: 'var(--brand-1)', color: '#fff',
-            fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 15,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
+          type="button"
+          onClick={() => setSelectedMonth(prevMonth(selectedMonth))}
+          style={monthArrowStyle(false, true)}
+          aria-label="Tháng trước"
         >
-          → Thanh toán ngay {fmtVND(totalDebt)}
+          ‹
         </button>
-      )}
-      {!hasDebt && (
-        <div style={{
-          textAlign: 'center', padding: '12px 0',
-          fontSize: 14, color: 'var(--vb-success-700)', fontWeight: 600,
-        }}>
-          🎉 Tháng này bạn đang cân bằng
+        <div style={{ padding: '0 16px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap' }}>
+            {formatMonthLabel(selectedMonth)}
+          </div>
         </div>
-      )}
-
+        <button
+          type="button"
+          onClick={() => {
+            if (!current) setSelectedMonth(nextMonth(selectedMonth))
+          }}
+          disabled={current}
+          style={monthArrowStyle(current, false)}
+          aria-label="Tháng sau"
+        >
+          ›
+        </button>
+      </div>
     </div>
   )
 }
 
-function SummaryCard({ emoji, label, debt, subtitle, onClick }) {
-  const hasDebt = debt > 0
+function MonthSummaryCard({ monthNumber, net, onAddExpense, onSettle }) {
+  const label = net > 0
+    ? `Bạn được nhận ${formatVNDPlain(net)}`
+    : net < 0
+      ? `Bạn đang nợ ${formatVNDPlain(Math.abs(net))}`
+      : 'Cân bằng'
+
+  return (
+    <div style={{
+      margin: '0 14px 14px',
+      padding: 18,
+      background: 'linear-gradient(135deg,#5b4ede 0%,#7c6ff7 100%)',
+      borderRadius: 20,
+      color: '#fff',
+      boxShadow: '0 6px 24px rgba(91,78,222,.45)',
+    }}>
+      <div style={{ fontSize: 10, letterSpacing: 1, opacity: 0.75, marginBottom: 6 }}>
+        TỔNG THÁNG {monthNumber}
+      </div>
+      <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: -1 }}>
+        {formatSignedVND(net)}
+      </div>
+      <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 14 }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" onClick={onAddExpense} style={summaryButtonStyle(true)}>
+          + Thêm chi tiêu
+        </button>
+        <button type="button" onClick={onSettle} style={summaryButtonStyle(false)}>
+          ⚡ Thanh toán
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PickleballMonthCard({ sessions, memberId, net, onClick }) {
+  const today = toDateKey(new Date())
+  const sessionItems = useMemo(() => {
+    return (sessions || [])
+      .slice()
+      .sort((a, b) => getSessionDate(a).localeCompare(getSessionDate(b)))
+      .map(session => {
+        const date = getSessionDate(session)
+        return {
+          id: session.id || date,
+          date,
+          weekday: formatWeekday(date),
+          day: Number(date.split('-')[2]) || '',
+          status: getSessionStatus(session, memberId, today),
+        }
+      })
+      .filter(item => item.date)
+  }, [memberId, sessions, today])
+
+  const presentCount = sessionItems.filter(item => item.status === 'present').length
+  const absentCount = sessionItems.filter(item => item.status === 'absent').length
+  const upcomingCount = sessionItems.filter(item => item.status === 'upcoming').length
+  const debt = Math.max(-net, 0)
+  const statusText = net > 0
+    ? `Nhận ${formatVNDPlain(net)}`
+    : debt > 0
+      ? `Nợ ${formatVNDPlain(debt)}`
+      : 'Cân bằng'
+
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
-        appearance: 'none', cursor: 'pointer', textAlign: 'left',
-        padding: '12px 14px', borderRadius: 14,
-        background: 'var(--surface-1)', border: '1px solid var(--border-1)',
-        display: 'flex', flexDirection: 'column', gap: 4,
+        appearance: 'none',
+        width: '100%',
+        padding: 0,
+        border: 0,
+        textAlign: 'left',
+        fontFamily: 'var(--vb-font-body)',
+        background: 'linear-gradient(160deg,#1e1b4b 0%,#312e81 55%,#3730a3 100%)',
+        borderRadius: 20,
+        overflow: 'hidden',
+        boxShadow: '0 6px 24px rgba(30,27,75,.5)',
+        cursor: 'pointer',
+      }}
+      aria-label="Mở tab Pickleball"
+    >
+      <CardHeader
+        icon="🏓"
+        title="Pickleball CLB"
+        subtitle={statusText}
+        subtitleColor="#fca5a5"
+        action="Xem CLB ›"
+      />
+
+      <div style={{ padding: '2px 16px 8px' }}>
+        <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+          Điểm danh cá nhân · {formatSessionPattern(sessionItems)}
+        </div>
+      </div>
+
+      <div style={{ padding: '0 16px 10px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 5 }}>
+          {sessionItems.map(item => (
+            <AttendanceCell key={item.id} item={item}/>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
+          <LegendItem
+            label={`Có mặt (${presentCount})`}
+            color="rgba(167,243,208,.75)"
+            swatchBg="rgba(110,231,183,.4)"
+            swatchBorder="1px solid rgba(110,231,183,.6)"
+          />
+          <LegendItem
+            label={`Vắng (${absentCount})`}
+            color="rgba(253,164,175,.75)"
+            swatchBg="rgba(251,113,133,.3)"
+            swatchBorder="1px solid rgba(251,113,133,.5)"
+          />
+          <LegendItem
+            label={`Sắp tới (${upcomingCount})`}
+            color="rgba(255,255,255,.3)"
+            swatchBg="rgba(255,255,255,.05)"
+            swatchBorder="1px dashed rgba(255,255,255,.2)"
+          />
+        </div>
+      </div>
+
+      <StatsFooter
+        items={[
+          { value: presentCount, label: 'Có mặt', color: '#a7f3d0' },
+          { value: absentCount, label: 'Vắng', color: '#fecdd3' },
+          { value: sessionItems.length, label: 'Tổng buổi', color: 'rgba(255,255,255,.8)' },
+          { value: compactMoney(debt), label: 'Bạn nợ', color: '#fca5a5' },
+        ]}
+      />
+    </button>
+  )
+}
+
+function GroupExpensesCard({ summaries, net, totalSpent, onClick }) {
+  const recent = summaries.slice(0, 3)
+  const debt = Math.max(-net, 0)
+  const groupCount = new Set(summaries.map(item => item.groupId).filter(Boolean)).size
+  const subtitle = net > 0
+    ? `Nhận ${formatVNDPlain(net)}${groupCount ? ` · ${groupCount} nhóm` : ''}`
+    : debt > 0
+      ? `Nợ ${formatVNDPlain(debt)}${groupCount ? ` · ${groupCount} nhóm` : ''}`
+      : `Cân bằng${groupCount ? ` · ${groupCount} nhóm` : ''}`
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        appearance: 'none',
+        width: '100%',
+        padding: 0,
+        border: 0,
+        textAlign: 'left',
+        fontFamily: 'var(--vb-font-body)',
+        background: 'linear-gradient(160deg,#0c2340 0%,#0f3460 55%,#154a7a 100%)',
+        borderRadius: 20,
+        overflow: 'hidden',
+        boxShadow: '0 6px 24px rgba(12,35,64,.5)',
+        cursor: 'pointer',
+      }}
+      aria-label="Mở tab nhóm"
+    >
+      <CardHeader
+        icon="📦"
+        title="Chi tiêu nhóm"
+        subtitle={subtitle}
+        subtitleColor="#fcd34d"
+        action="Chi tiết ›"
+      />
+
+      {recent.length > 0 && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,.08)' }}>
+          {recent.map((item, index) => (
+            <ExpensePreviewRow
+              key={item.id}
+              item={item}
+              divider={index < recent.length - 1}
+            />
+          ))}
+        </div>
+      )}
+
+      <StatsFooter
+        items={[
+          { value: summaries.length, label: 'Giao dịch', color: 'rgba(255,255,255,.85)' },
+          { value: compactMoney(totalSpent), label: 'Tổng chi', color: 'rgba(255,255,255,.85)' },
+          { value: compactMoney(debt), label: 'Bạn nợ', color: '#fcd34d' },
+        ]}
+      />
+    </button>
+  )
+}
+
+function CardHeader({ icon, title, subtitle, subtitleColor, action }) {
+  return (
+    <div style={{ padding: '14px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <div style={{
+          width: 40,
+          height: 40,
+          background: 'rgba(255,255,255,.12)',
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 22,
+          flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {title}
+          </div>
+          <div style={{ fontSize: 11, color: subtitleColor, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {subtitle}
+          </div>
+        </div>
+      </div>
+      <div style={{
+        background: 'rgba(255,255,255,.1)',
+        border: '1px solid rgba(255,255,255,.15)',
+        padding: '5px 10px',
+        borderRadius: 20,
+        fontSize: 11,
+        color: 'rgba(255,255,255,.8)',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}>
+        {action}
+      </div>
+    </div>
+  )
+}
+
+function AttendanceCell({ item }) {
+  const styles = {
+    present: {
+      background: 'rgba(110,231,183,.25)',
+      border: '1px solid rgba(110,231,183,.5)',
+      labelColor: 'rgba(167,243,208,.8)',
+      numColor: '#d1fae5',
+      numWeight: 800,
+    },
+    absent: {
+      background: 'rgba(251,113,133,.2)',
+      border: '1px solid rgba(251,113,133,.45)',
+      labelColor: 'rgba(253,164,175,.85)',
+      numColor: '#fecdd3',
+      numWeight: 800,
+    },
+    upcoming: {
+      background: 'rgba(255,255,255,.05)',
+      border: '1.5px dashed rgba(255,255,255,.18)',
+      labelColor: 'rgba(255,255,255,.3)',
+      numColor: 'rgba(255,255,255,.4)',
+      numWeight: 700,
+    },
+  }[item.status] || {}
+
+  return (
+    <div style={{
+      aspectRatio: '1',
+      background: styles.background,
+      border: styles.border,
+      borderRadius: 8,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      <div style={{ fontSize: 7, fontWeight: item.status === 'upcoming' ? 500 : 700, color: styles.labelColor }}>
+        {item.weekday}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: styles.numWeight, color: styles.numColor }}>
+        {item.day}
+      </div>
+    </div>
+  )
+}
+
+function LegendItem({ label, color, swatchBg, swatchBorder }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, color }}>
+      <div style={{ width: 10, height: 10, background: swatchBg, border: swatchBorder, borderRadius: 3 }}/>
+      {label}
+    </div>
+  )
+}
+
+function ExpensePreviewRow({ item, divider }) {
+  const amountColor = item.net > 0 ? '#86efac' : item.net < 0 ? '#fca5a5' : 'rgba(255,255,255,.45)'
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      padding: '8px 16px',
+      borderBottom: divider ? '1px solid rgba(255,255,255,.06)' : 'none',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <div style={{ fontSize: 17, flexShrink: 0 }}>💰</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {item.title}
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {formatShortDate(item.date)} · {item.groupName}
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: amountColor, flexShrink: 0 }}>
+        {formatSignedCompact(item.net)}
+      </div>
+    </div>
+  )
+}
+
+function StatsFooter({ items }) {
+  return (
+    <div style={{ display: 'flex', padding: '9px 16px 13px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+      {items.map((item, index) => (
+        <React.Fragment key={item.label}>
+          {index > 0 && <div style={{ width: 1, background: 'rgba(255,255,255,.08)' }}/>}
+          <div style={{ flex: 1, textAlign: 'center', minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: item.color, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {item.value}
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,.35)', textTransform: 'uppercase', letterSpacing: 0.3, marginTop: 1 }}>
+              {item.label}
+            </div>
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+  )
+}
+
+function PaymentCTA({ amount, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        appearance: 'none',
+        width: '100%',
+        border: 0,
+        background: 'linear-gradient(135deg,#5b4ede,#7c6ff7)',
+        borderRadius: 16,
+        padding: '14px 18px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        cursor: 'pointer',
+        boxShadow: '0 4px 16px rgba(91,78,222,.35)',
         fontFamily: 'var(--vb-font-body)',
       }}
     >
-      <div style={{ fontSize: 22 }}>{emoji}</div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>
-        {label}
+      <div style={{ textAlign: 'left' }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,.7)' }}>Thanh toán tổng</div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{formatVNDPlain(amount)}</div>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: hasDebt ? 'var(--vb-danger-700)' : 'var(--vb-success-700)' }}>
-        {hasDebt ? `Nợ ${fmtVND(debt)}` : 'Cân bằng'}
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-        {subtitle}
+      <div style={{ background: 'rgba(255,255,255,.2)', padding: '10px 16px', borderRadius: 12, color: '#fff', fontSize: 13, fontWeight: 700 }}>
+        Thanh toán →
       </div>
     </button>
   )
 }
 
-// ── OVERVIEW layout (default) — groups + ai nợ ai + recent ──────────────────
-function OverviewLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
-  const { state: _s } = useApp();
-  const meId = (_s.currentUserId || ME);
-  const balances = useMemo(() => totalBalances(groups, meId), [groups, meId]);
-  const ranked = Object.entries(balances).filter(([id, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
-
-  return (
-    <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Smart summary block */}
-      <SmartHomeSummary push={push} pushToTab={pushToTab} switchTab={switchTab}/>
-
-      {/* Quick chips */}
-      <HScroll style={{ padding: '0 4px', marginLeft: -4, marginRight: -4 }}>
-        {[
-          { label: 'Chia đều', icon: 'split' },
-          { label: 'Thanh toán', icon: 'card' },
-          { label: 'Nhắc nợ', icon: 'send' },
-          { label: 'Pickleball', icon: 'pickle', onClick: () => switchTab('pickle') },
-        ].map((q, i) => (
-          <button key={i} onClick={q.onClick || undefined} style={{
-            appearance: 'none', flexShrink: 0,
-            padding: '10px 14px', height: 40,
-            background: 'var(--surface-1)', border: '1px solid var(--border-1)',
-            borderRadius: 'var(--vb-radius-pill)',
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--vb-font-body)', fontWeight: 600, fontSize: 13, color: 'var(--text-1)',
-            cursor: q.onClick ? 'pointer' : 'default',
-            opacity: q.onClick ? 1 : 0.5,
-          }}>
-            <Icon name={q.icon} size={16} color="var(--brand-1)"/>{q.label}
-          </button>
-        ))}
-      </HScroll>
-
-      {/* Ai nợ ai */}
-      <div>
-        <SectionHeader title="Ai nợ ai" action="Tất toán →" onAction={() => push('settle-all')}/>
-        <WhoOwesView ranked={ranked} variant={tweaks.balanceView || 'cards'} avatarStyle={tweaks.avatarStyle} push={push}/>
-      </div>
-
-      {/* Groups */}
-      <div>
-        <SectionHeader title="Nhóm của bạn" action="Xem tất cả →" onAction={() => switchTab('groups')}/>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {groups.slice(0, 3).map(g => <GroupCard key={g.id} g={g} onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })} avatarStyle={tweaks.avatarStyle}/>)}
-        </div>
-      </div>
-
-      {/* Recent */}
-      <div>
-        <SectionHeader title="Hoạt động gần đây"/>
-        <Card>
-          {activity.slice(0, 5).map((e, i) => (
-            <ActivityRow key={e.id} e={e} divider={i < 4} avatarStyle={tweaks.avatarStyle}/>
-          ))}
-        </Card>
-      </div>
-    </div>
-  );
+function calcMonthNet(expenses, currentMemberId) {
+  return buildExpenseSummaries(expenses, currentMemberId).reduce((sum, item) => sum + item.net, 0)
 }
 
-// ── FEED layout — emphasize activity ──────────────────────────────────────
-function FeedLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
-  const { state: _s } = useApp();
-  const meId = _s.currentUserId || ME;
-  return (
-    <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Active groups strip */}
-      <div>
-        <SectionHeader title="Nhóm" action="Xem tất cả →" onAction={() => switchTab('groups')}/>
-        <HScroll gap={10} pb={4} style={{ marginLeft: -4, marginRight: -4, paddingLeft: 4, paddingRight: 4 }}>
-          {groups.map(g => (
-            <button key={g.id} onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })} style={{
-              appearance: 'none', cursor: 'pointer', flexShrink: 0, textAlign: 'left',
-              width: 152, padding: 12, background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 14,
-            }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: hexA(g.color, 0.12), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{g.emoji}</div>
-              <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 14, color: 'var(--text-1)', marginTop: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 600 }}>{g.members.length} thành viên</div>
-              <div style={{ marginTop: 8 }}>
-                <Money value={groupNet(g, meId)} size={14} color={groupNet(g, meId) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
-              </div>
-            </button>
-          ))}
-        </HScroll>
-      </div>
+function buildExpenseSummaries(expenses, currentMemberId, predicate = () => true) {
+  const byExpense = new Map()
 
-      {/* Activity feed */}
-      <div>
-        <SectionHeader title="Hoạt động gần đây" action="Lọc" onAction={() => {}}/>
-        <Card>
-          {activity.map((e, i) => (
-            <ActivityRow key={e.id} e={e} divider={i < activity.length - 1} avatarStyle={tweaks.avatarStyle} showGroup/>
-          ))}
-        </Card>
-      </div>
-    </div>
-  );
-}
+  for (const row of expenses || []) {
+    const expense = getExpense(row)
+    if (!expense || !isApprovedExpense(expense) || !predicate(expense, row)) continue
 
-// ── COMPACT layout — minimal, list-driven ──────────────────────────────────
-function CompactLayout({ push, pushToTab, switchTab, tweaks, activity, groups }) {
-  const { state: _s } = useApp();
-  const meId = (_s.currentUserId || ME);
-  const balances = useMemo(() => totalBalances(groups, meId), [groups, meId]);
-  const ranked = Object.entries(balances).filter(([id, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    const id = getExpenseId(row, expense)
+    if (!id) continue
 
-  return (
-    <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <Card>
-        <ListRow
-          left={<div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--vb-success-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="arrow-down" size={18} color="var(--vb-success-700)"/></div>}
-          title="Bạn cho mượn"
-          subtitle={`${ranked.filter(([,v])=>v>0).length} người`}
-          right={<Money value={Object.values(balances).filter(v=>v>0).reduce((a,b)=>a+b,0)} size={16} color="var(--vb-success-700)"/>}
-          onClick={() => push('settle-all')}
-        />
-        <ListRow
-          left={<div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--vb-danger-50)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="arrow-up" size={18} color="var(--vb-danger-700)"/></div>}
-          title="Bạn nợ"
-          subtitle={`${ranked.filter(([,v])=>v<0).length} người`}
-          right={<Money value={Math.abs(Object.values(balances).filter(v=>v<0).reduce((a,b)=>a+b,0))} size={16} color="var(--vb-danger-700)"/>}
-          onClick={() => push('settle-all')}
-          divider={false}
-        />
-      </Card>
+    if (!byExpense.has(id)) {
+      const group = Array.isArray(expense.groups) ? expense.groups[0] : expense.groups
+      byExpense.set(id, {
+        id,
+        expense,
+        title: expense.title || expense.description || 'Chi tiêu',
+        date: normalizeDateText(expense.expense_date || expense.date),
+        groupId: expense.group_id || expense.groupId || group?.id,
+        groupName: group?.name || expense.groupName || 'Nhóm',
+        paidBy: expense.paid_by_member_id || expense.paidBy || expense.paid_by,
+        total: Number(expense.amount) || 0,
+        myShare: 0,
+        hasMe: false,
+        participantCount: 0,
+      })
+    }
 
-      <div>
-        <SectionHeader title="Nhóm" action="Xem tất cả →" onAction={() => switchTab('groups')}/>
-        <Card>
-          {groups.map((g, i) => (
-            <ListRow
-              key={g.id}
-              left={<div style={{ width: 36, height: 36, borderRadius: 10, background: hexA(g.color, 0.12), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{g.emoji}</div>}
-              title={g.name}
-              subtitle={`${g.members.length} thành viên • ${g.expenses.length} giao dịch`}
-              right={<Money value={groupNet(g, meId)} size={14} color={groupNet(g, meId) >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>}
-              onClick={() => pushToTab('groups', 'group-detail', { groupId: g.id })}
-              divider={i < groups.length - 1}
-            />
-          ))}
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-// ── Who owes who — 3 visual variants ────────────────────────────────────────
-function WhoOwesView({ ranked, variant, avatarStyle, push }) {
-  const { state } = useApp();
-  const M = getMemberMap(state.members);
-  if (ranked.length === 0) {
-    return <Card><EmptyState icon="check-circle" title="Mọi người đã thanh toán hết!" subtitle="Không có khoản nào chưa quyết toán"/></Card>;
+    const summary = byExpense.get(id)
+    summary.participantCount += 1
+    if (row.member_id === currentMemberId || row.memberId === currentMemberId) {
+      summary.myShare += getShareAmount(row)
+      summary.hasMe = true
+    }
   }
 
-  if (variant === 'list') {
-    return (
-      <Card>
-        {ranked.map(([id, v], i) => {
-          const m = M[id] || { name: '?', short: '?', initials: '?', color: '#999' }; const positive = v > 0;
-          return (
-            <ListRow key={id}
-              left={<Avatar member={m} size={40} style={avatarStyle}/>}
-              title={positive ? `${displayMemberName(m, '?')} nợ bạn` : `Bạn nợ ${displayMemberName(m, '?')}`}
-              subtitle={positive ? 'Tổng từ các nhóm' : 'Tổng từ các nhóm'}
-              right={<Money value={Math.abs(v)} size={15} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>}
-              divider={i < ranked.length - 1}
-            />
-          );
-        })}
-      </Card>
-    );
+  return Array.from(byExpense.values())
+    .map(summary => ({
+      ...summary,
+      net: summary.paidBy === currentMemberId
+        ? summary.total - summary.myShare
+        : summary.hasMe
+          ? -summary.myShare
+          : 0,
+    }))
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+}
+
+function getExpense(row) {
+  return row?.expenses || row?.expense || null
+}
+
+function getExpenseId(row, expense) {
+  return row?.expense_id || row?.expenseId || expense?.id
+}
+
+function getShareAmount(row) {
+  return Number(row?.share_amount ?? row?.shareAmount ?? row?.share ?? row?.amount ?? 0) || 0
+}
+
+function isApprovedExpense(expense) {
+  return !expense.status || expense.status === 'approved'
+}
+
+function isPickleballExpense(expense) {
+  return Boolean(
+    expense?.pickle_session_id
+    || expense?.pickleSessionId
+    || String(expense?.module || '').toLowerCase() === 'pickleball',
+  )
+}
+
+function getSessionDate(session) {
+  return normalizeDateText(session?.date || session?.session_date)
+}
+
+function getSessionStatus(session, memberId, today) {
+  const date = getSessionDate(session)
+  if (date && date > today) return 'upcoming'
+
+  const attendance = session?.pickleball_attendance || session?.attendance || []
+  const record = attendance.find(item => (item.member_id || item.memberId) === memberId)
+  const status = String(record?.status || '').toLowerCase()
+  if (['present', 'attended', 'yes', 'checked_in'].includes(status)) return 'present'
+  return 'absent'
+}
+
+function formatSessionPattern(items) {
+  const order = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+  const labels = Array.from(new Set(items.map(item => item.weekday).filter(Boolean)))
+  return labels.sort((a, b) => order.indexOf(a) - order.indexOf(b)).join(' ') || 'T2 T4 T6'
+}
+
+function toYearMonth(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function toDateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function formatMonthLabel(yearMonth) {
+  const [year, month] = String(yearMonth).split('-').map(Number)
+  return `Tháng ${month}, ${year}`
+}
+
+function isCurrentMonth(yearMonth) {
+  return yearMonth === toYearMonth(new Date())
+}
+
+function prevMonth(yearMonth) {
+  const [year, month] = String(yearMonth).split('-').map(Number)
+  const date = new Date(year, month - 2, 1)
+  return toYearMonth(date)
+}
+
+function nextMonth(yearMonth) {
+  const [year, month] = String(yearMonth).split('-').map(Number)
+  const date = new Date(year, month, 1)
+  return toYearMonth(date)
+}
+
+function normalizeDateText(value) {
+  return String(value || '').slice(0, 10)
+}
+
+function formatWeekday(dateText) {
+  const date = new Date(`${dateText}T00:00:00`)
+  return ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][date.getDay()] || ''
+}
+
+function formatShortDate(dateText) {
+  const date = normalizeDateText(dateText)
+  if (!date) return ''
+  const [, month, day] = date.split('-')
+  return `${day}/${month}`
+}
+
+function formatVNDPlain(value) {
+  return `${Math.round(Math.abs(Number(value) || 0)).toLocaleString('vi-VN')} đ`
+}
+
+function formatSignedVND(value) {
+  const amount = Number(value) || 0
+  if (amount === 0) return '0 đ'
+  return `${amount > 0 ? '+' : '-'}${formatVNDPlain(amount)}`
+}
+
+function compactMoney(value) {
+  const amount = Math.round(Math.abs(Number(value) || 0))
+  if (amount >= 1_000_000) {
+    return `${(amount / 1_000_000).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}tr`
   }
+  if (amount >= 1_000) return `${Math.round(amount / 1_000).toLocaleString('vi-VN')}k`
+  return `${amount.toLocaleString('vi-VN')}đ`
+}
 
-  if (variant === 'graph') {
-    const max = Math.max(...ranked.map(([,v]) => Math.abs(v)));
-    return (
-      <Card>
-        <div style={{ padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {ranked.map(([id, v]) => {
-            const m = M[id] || { name: '?', short: '?', initials: '?', color: '#999' }; const positive = v > 0;
-            const pct = (Math.abs(v) / max) * 100;
-            return (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Avatar member={m} size={32} style={avatarStyle}/>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{displayMemberName(m, m.short || '?')}</span>
-                    <Money value={v} size={13} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
-                  </div>
-                  <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
-                    <div style={{
-                      height: '100%', width: `${pct}%`,
-                      background: positive ? 'var(--vb-success-500)' : 'var(--vb-danger-600)',
-                      borderRadius: 999, transition: 'width .6s cubic-bezier(.2,.7,.2,1)',
-                    }}/>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </Card>
-    );
+function formatSignedCompact(value) {
+  const amount = Number(value) || 0
+  if (amount === 0) return '0đ'
+  return `${amount > 0 ? '+' : '-'}${compactMoney(amount)}`
+}
+
+function monthArrowStyle(disabled, raised) {
+  return {
+    appearance: 'none',
+    background: raised ? '#fff' : 'none',
+    border: 'none',
+    width: 32,
+    height: 32,
+    borderRadius: 14,
+    fontSize: 17,
+    color: disabled ? '#ccc' : '#5b4ede',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: raised ? '0 1px 4px rgba(0,0,0,.1)' : 'none',
+    fontFamily: 'var(--vb-font-body)',
+    lineHeight: 1,
   }
-
-  // cards (default): horizontal scroll cards
-  return (
-    <HScroll gap={10} pb={8} style={{ marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16, paddingTop: 4 }}>
-      {ranked.map(([id, v]) => {
-        const m = M[id] || { name: '?', short: '?', initials: '?', color: '#999' }; const positive = v > 0;
-        return (
-          <div key={id} style={{
-            flexShrink: 0, width: 168, padding: 14,
-            background: 'var(--surface-1)', border: '1px solid var(--border-1)',
-            borderRadius: 14, boxShadow: 'var(--vb-shadow-card)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <Avatar member={m} size={36} style={avatarStyle}/>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{displayMemberName(m, m.short || '?')}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{positive ? 'Nợ bạn' : 'Bạn nợ'}</div>
-              </div>
-            </div>
-            <Money value={Math.abs(v)} size={18} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
-            <button style={{
-              appearance: 'none', cursor: 'pointer', marginTop: 10, width: '100%', height: 32,
-              background: positive ? 'var(--vb-success-100)' : 'var(--vb-danger-50)',
-              color: positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)',
-              border: 0, borderRadius: 8, fontWeight: 700, fontSize: 12,
-            }}>{positive ? 'Nhắc trả' : 'Thanh toán'}</button>
-          </div>
-        );
-      })}
-    </HScroll>
-  );
 }
 
-// ── Group Card ──────────────────────────────────────────────────────────────
-function GroupCard({ g, onClick, avatarStyle }) {
-  const { state: _s } = useApp();
-  const meId = _s.currentUserId || ME;
-  const net = groupNet(g, meId);
-  return (
-    <Card interactive onClick={onClick}>
-      <div style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-          background: hexA(g.color, 0.12),
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
-        }}>{g.emoji}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</div>
-          <div style={{ marginTop: 6 }}>
-            <AvatarStack ids={g.members} size={22} overlap={7} avatarStyle={avatarStyle} max={5}/>
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>{net === 0 ? 'Cân bằng' : net > 0 ? 'Nhận lại' : 'Còn nợ'}</div>
-          <Money value={Math.abs(net)} size={15} color={net >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-// ── Activity row ────────────────────────────────────────────────────────────
-function ActivityRow({ e, divider, avatarStyle, showGroup }) {
-  const { state: _s } = useApp();
-  const me = _s.currentUserId || ME;
-  const M = getMemberMap(_s.members);
-  const myShare = e.participants.includes(me) ? Math.round(e.amount / e.participants.length) : 0;
-  const balance = e.paidBy === me ? e.amount - myShare : -myShare;
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 14px',
-      borderBottom: divider ? '1px solid var(--border-1)' : 'none',
-    }}>
-      <CategoryIcon cat={e.cat} size={40}/>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {showGroup ? <>{e.groupEmoji} {e.groupName} • </> : null}
-          {(() => {
-            const payer = M[e.paidBy] || { short: '?' };
-            return payer.short === 'Bạn' || e.paidBy === me ? 'Bạn trả' : `${displayMemberName(payer, payer.short || '?')} trả`;
-          })()} {fmtVND(e.amount)} • {e.date}
-        </div>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 10, color: 'var(--text-2)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {balance > 0 ? 'Bạn cho mượn' : balance < 0 ? 'Bạn nợ' : '—'}
-        </div>
-        <Money value={Math.abs(balance)} size={13} color={balance > 0 ? 'var(--vb-success-700)' : balance < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>
-      </div>
-    </div>
-  );
-}
-
-// utility: hex + alpha
-function hexA(hex, a) {
-  const h = hex.replace('#','');
-  const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
-  return `rgba(${r},${g},${b},${a})`;
+function summaryButtonStyle(primary) {
+  return {
+    appearance: 'none',
+    flex: 1,
+    background: primary ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.2)',
+    color: primary ? '#5b4ede' : '#fff',
+    border: 'none',
+    borderRadius: 12,
+    padding: '10px 8px',
+    fontSize: 12,
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'var(--vb-font-body)',
+  }
 }
 
 export default ScreenHome

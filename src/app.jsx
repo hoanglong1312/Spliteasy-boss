@@ -16,7 +16,7 @@ class ErrorBoundary extends React.Component {
 }
 import { useApp } from './store.jsx'
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakSelect, TweakToggle } from './tweaks-panel.jsx'
-import { GroupSwitcherBar, Icon, ScreenTransition } from './components.jsx'
+import { Icon, ScreenTransition } from './components.jsx'
 import { getStoredAuth, joinGroup } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { ScreenJoin } from './screen-join.jsx'
@@ -672,7 +672,6 @@ function App() {
         </div>
       )}
       <div style={{ height: 60, flexShrink: 0 }} aria-hidden="true"/>
-      <GroupSwitcherBar/>
       <div className="screen-scroll" data-screen-label={`${activeTab} • ${current.name}`} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         <ScreenTransition direction={navDir === 'tab' ? 'fade' : navDir} screenKey={`${activeTab}-${stack.length}-${animKey}`}>
           <ErrorBoundary>
