@@ -123,13 +123,15 @@ async function fetchGroupData(token) {
 
 function normalize(raw, currentMemberId) {
   const { members, groups, expenses, participants, settlements, settlementPeriods, periodPayments, pickleConfig, pickleSessions, pickleAttendees, disputeCount } = raw
-  const group = groups[0]
-  if (!group) return null  // signal: data empty but keep session
+  if (groups.length === 0) return null  // signal: data empty but keep session
 
   const me = members.find(m => m.id === currentMemberId)
+  const currentGroup = groups.find(g => g.id === me?.group_id) || groups[0]
 
   const normalExpenses = expenses.map(e => ({
     id: e.id,
+    groupId: e.group_id,
+    group_id: e.group_id,
     title: e.title,
     cat: e.cat || e.category || 'food',
     amount: Number(e.amount),
@@ -148,6 +150,8 @@ function normalize(raw, currentMemberId) {
 
   const normalSettlements = settlements.map(s => ({
     id: s.id,
+    groupId: s.group_id,
+    group_id: s.group_id,
     fromId: s.from_member_id,
     toId: s.to_member_id,
     amount: Number(s.amount),
@@ -202,9 +206,11 @@ function normalize(raw, currentMemberId) {
   return {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
-    currentGroupId: group.id,
+    currentGroupId: currentGroup.id,
     members: members.map(m => ({
       id: m.id,
+      groupId: m.group_id,
+      group_id: m.group_id,
       name: m.name,
       short: m.short || m.name.split(' ').pop(),
       initials: m.initials || m.name.slice(0, 2).toUpperCase(),
@@ -220,17 +226,17 @@ function normalize(raw, currentMemberId) {
       hasPin: memberHasPin(m),
       has_pin: memberHasPin(m),
     })),
-    groups: [{
+    groups: groups.map(group => ({
       id: group.id,
       name: group.name,
       emoji: group.emoji || '👥',
       color: group.color || '#574EFA',
       inviteCode: group.invite_code,
-      members: members.map(m => m.id),
-      expenses: normalExpenses,
-      settlements: normalSettlements,
+      members: members.filter(m => m.group_id === group.id).map(m => m.id),
+      expenses: normalExpenses.filter(e => e.groupId === group.id),
+      settlements: normalSettlements.filter(s => s.groupId === group.id),
       settlementPeriods: normalSettlementPeriods.filter(p => p.groupId === group.id),
-    }],
+    })),
     settlementPeriods: normalSettlementPeriods,
     pickle: {
       sessions: normalSessions,
@@ -705,40 +711,27 @@ export function AppProvider({ children, onToast }) {
           console.error('[store] CREATE_GROUP group:', err)
           throw err
         }
-        const newInviteCode = newGroup.invite_code || newGroup.inviteCode || inviteCode
-
-        const { data: joined, error: joinError } = await createSupabase().rpc('join_group', {
-          p_invite_code: newInviteCode,
-          p_member_name: currentMember?.name || state.currentUserName || memberNamesArray[0],
-        })
-        if (joinError || joined?.error) {
-          const err = joinError || new Error(joined.error)
-          console.error('[store] CREATE_GROUP join:', err)
-          throw err
-        }
-
-        storeAuth(joined.token, {
-          id: joined.member_id,
-          groupId: joined.group_id,
-          name: joined.member_name,
-        })
-        tokenRef.current = joined.token
-
-        const newSb = createSupabase(joined.token)
-        const { error: creatorError } = await newSb
+        const newGroupId = newGroup.group_id || newGroup.id
+        const { error: creatorError } = await sb
           .from('groups')
           .update({
-            created_by: joined.member_id,
+            created_by: state.currentUserId,
             emoji: group.emoji || '🎯',
             color: group.color || '#574EFA',
           })
-          .eq('id', joined.group_id)
+          .eq('id', newGroupId)
         if (creatorError) {
           console.warn('[store] CREATE_GROUP created_by:', creatorError)
         }
 
-        await refresh(joined.token)
-        return newGroup.group_id || newGroup.id
+        const raw = await fetchGroupData(tokenRef.current)
+        const next = normalize(raw, state.currentUserId)
+        if (next) {
+          setState(next)
+        } else {
+          setState(s => ({ ...s, _loading: false, _error: 'Không tải được dữ liệu nhóm. Kiểm tra kết nối.' }))
+        }
+        return newGroupId
       }
 
       case 'ADD_MEMBER': {

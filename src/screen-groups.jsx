@@ -180,8 +180,7 @@ function ScreenGroups({ tweaks = {}, push }) {
   const meId = state.currentUserId || ME;
   const [filter, setFilter] = useState('all');
   const filteredGroups = useMemo(() => {
-    const myGroups = safeArray(state.groups).filter(g => safeArray(g.members).includes(meId));
-    return myGroups.filter(g => {
+    return safeArray(state.groups).filter(g => {
       if (filter === 'all') return true;
       const myBal = groupNet(safeGroup(g), meId);
       if (filter === 'owed') return myBal < 0;
