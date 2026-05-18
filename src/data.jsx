@@ -54,7 +54,8 @@ function getShareMap(e) {
 function groupBalance(g, me = ME) {
   const bal = {}; // memberId -> +/- amount (positive = they owe me)
   g.members.forEach(id => { if (id !== me) bal[id] = 0; });
-  for (const e of g.expenses) {
+  const approvedExpenses = (g.expenses || []).filter(e => e.status === 'approved');
+  for (const e of approvedExpenses) {
     if (!e.participants || e.participants.length === 0) continue;
     const share = getShareMap(e);
     if (e.paidBy === me) {

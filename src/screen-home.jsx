@@ -79,11 +79,59 @@ function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
         <BalanceHero net={net} youAreOwed={youAreOwed} youOwe={youOwe} push={push}/>
       </div>
 
+      <TreasurerHomeAlert push={push}/>
+
       {layout === 'overview' && <OverviewLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
       {layout === 'feed' && <FeedLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
       {layout === 'compact' && <CompactLayout push={push} pushToTab={pushToTab} switchTab={switchTab} tweaks={tweaks} activity={activity} groups={filteredGroups}/>}
     </div>
   );
+}
+
+function TreasurerHomeAlert({ push }) {
+  const { state } = useApp()
+  const meId = state.currentUserId || ME
+  const isTreasurer = state.members.find(m => m.id === meId)?.role === 'treasurer'
+  const pendingCount = useMemo(() => {
+    return state.groups.flatMap(g => g.expenses || []).filter(e => e.status === 'pending').length
+  }, [state.groups])
+  const disputeCount = state.disputeCount || 0
+
+  if (!isTreasurer || (pendingCount === 0 && disputeCount === 0)) return null
+
+  return (
+    <div style={{ padding: '0 20px 20px' }}>
+      <div style={{
+        background: 'var(--vb-warn-100)', borderRadius: 12,
+        border: '1px solid rgba(245,158,11,0.25)',
+        padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8,
+      }}>
+        {pendingCount > 0 && (
+          <button
+            onClick={() => push('approval-queue', { groupId: state.currentGroupId || state.groups[0]?.id })}
+            style={{
+              appearance: 'none', cursor: 'pointer', background: 'none', border: 'none', padding: 0,
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontFamily: 'var(--vb-font-body)', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 14 }}>⏳</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
+              {pendingCount} chi tiêu chờ duyệt
+            </span>
+          </button>
+        )}
+        {disputeCount > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14 }}>⚠️</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
+              {disputeCount} sai sót cần xem
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 
@@ -160,8 +208,6 @@ function SubBalance({ label, amount, positive = false }) {
 function SmartHomeSummary({ push, switchTab }) {
   const { state } = useApp()
   const meId = state.currentUserId || ME
-  const M = getMemberMap(state.members)
-  const isTreasurer = M[meId]?.role === 'treasurer'
 
   // Nợ nhóm: tổng số âm từ totalBalances
   const groupBalances = useMemo(() => totalBalances(state.groups, meId), [state.groups, meId])
@@ -175,12 +221,6 @@ function SmartHomeSummary({ push, switchTab }) {
   // Tổng cần thanh toán
   const totalDebt = groupDebt + pickleDebt
   const hasDebt = totalDebt > 0
-
-  // Pending expenses (chờ duyệt)
-  const pendingCount = useMemo(() => {
-    return state.groups.flatMap(g => g.expenses || []).filter(e => e.status === 'pending').length
-  }, [state.groups])
-  const disputeCount = state.disputeCount || 0
 
   const month = new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
 
@@ -233,38 +273,6 @@ function SmartHomeSummary({ push, switchTab }) {
         </div>
       )}
 
-      {/* Treasurer block — chỉ hiện khi có dữ liệu */}
-      {isTreasurer && (pendingCount > 0 || disputeCount > 0) && (
-        <div style={{
-          background: 'var(--vb-warn-100)', borderRadius: 12,
-          border: '1px solid rgba(245,158,11,0.25)',
-          padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8,
-        }}>
-          {pendingCount > 0 && (
-            <button
-              onClick={() => push('approval-queue', { groupId: state.currentGroupId || state.groups[0]?.id })}
-              style={{
-                appearance: 'none', cursor: 'pointer', background: 'none', border: 'none', padding: 0,
-                display: 'flex', alignItems: 'center', gap: 8,
-                fontFamily: 'var(--vb-font-body)', textAlign: 'left',
-              }}
-            >
-              <span style={{ fontSize: 14 }}>⏳</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
-                {pendingCount} chi tiêu chờ duyệt
-              </span>
-            </button>
-          )}
-          {disputeCount > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 14 }}>⚠️</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
-                {disputeCount} sai sót cần xem
-              </span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
