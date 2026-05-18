@@ -25,6 +25,41 @@ function memberNameParts(name) {
   }
 }
 
+export function disambiguateMembers(members = []) {
+  const rows = safeArray(members).map((member, index) => ({ member, index }))
+  const byName = new Map()
+
+  rows.forEach(row => {
+    const key = String(row.member?.name || '').trim().toLowerCase()
+    if (!byName.has(key)) byName.set(key, [])
+    byName.get(key).push(row)
+  })
+
+  const suffixByIndex = new Map()
+  byName.forEach(group => {
+    if (group.length < 2) return
+    group
+      .slice()
+      .sort((a, b) => {
+        const at = Date.parse(a.member?.created_at || a.member?.createdAt || '')
+        const bt = Date.parse(b.member?.created_at || b.member?.createdAt || '')
+        const av = Number.isNaN(at) ? Number.MAX_SAFE_INTEGER : at
+        const bv = Number.isNaN(bt) ? Number.MAX_SAFE_INTEGER : bt
+        return av === bv ? a.index - b.index : av - bv
+      })
+      .forEach((row, position) => suffixByIndex.set(row.index, position + 1))
+  })
+
+  return rows.map(({ member, index }) => {
+    const name = String(member?.name || '').trim()
+    const suffix = suffixByIndex.get(index)
+    return {
+      ...member,
+      displayName: suffix ? `${name} (${suffix})` : name,
+    }
+  })
+}
+
 function randomInviteCode(name) {
   const prefix = String(name || 'GROUP')
     .normalize('NFD')
@@ -218,29 +253,33 @@ function normalize(raw, currentMemberId) {
     expenses: normalExpenses.filter(e => e.pickleSessionId === s.id),
   }))
 
+  const normalMembers = disambiguateMembers(members.map(m => ({
+    id: m.id,
+    groupId: m.group_id,
+    group_id: m.group_id,
+    name: String(m.name || '').trim(),
+    short: m.short || String(m.name || '').trim().split(' ').pop(),
+    initials: m.initials || String(m.name || '').trim().slice(0, 2).toUpperCase(),
+    color: m.color || '#574EFA',
+    role: m.role,
+    isMe: m.id === currentMemberId,
+    bankName: m.bank_name || '',
+    bankAccount: m.bank_account || '',
+    bankAccountName: m.bank_account_name || '',
+    bank_name: m.bank_name || '',
+    bank_account: m.bank_account || '',
+    bank_account_name: m.bank_account_name || '',
+    createdAt: m.created_at,
+    created_at: m.created_at,
+    hasPin: memberHasPin(m),
+    has_pin: memberHasPin(m),
+  })))
+
   return {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
     currentGroupId: currentGroup.id,
-    members: members.map(m => ({
-      id: m.id,
-      groupId: m.group_id,
-      group_id: m.group_id,
-      name: m.name,
-      short: m.short || m.name.split(' ').pop(),
-      initials: m.initials || m.name.slice(0, 2).toUpperCase(),
-      color: m.color || '#574EFA',
-      role: m.role,
-      isMe: m.id === currentMemberId,
-      bankName: m.bank_name || '',
-      bankAccount: m.bank_account || '',
-      bankAccountName: m.bank_account_name || '',
-      bank_name: m.bank_name || '',
-      bank_account: m.bank_account || '',
-      bank_account_name: m.bank_account_name || '',
-      hasPin: memberHasPin(m),
-      has_pin: memberHasPin(m),
-    })),
+    members: normalMembers,
     groups: groups.map(group => ({
       id: group.id,
       name: group.name,
@@ -337,8 +376,10 @@ export function AppProvider({ children, onToast }) {
     const sb      = createSupabase(null)
     const channel = sb.channel(`group-${groupId}`)
 
-    const getMemberName = (id) =>
-      stateRef.current.members.find(m => m.id === id)?.name || 'Ai đó'
+    const getMemberName = (id) => {
+      const member = stateRef.current.members.find(m => m.id === id)
+      return member?.displayName || member?.name || 'Ai đó'
+    }
     const getMyRole = () =>
       stateRef.current.members.find(m => m.isMe)?.role
 

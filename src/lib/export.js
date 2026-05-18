@@ -12,7 +12,10 @@ export function exportMonthlyCSV(state) {
   if (!group) return
 
   const members = state.members || []
-  const getName = (id) => members.find(m => m.id === id)?.name || id
+  const getName = (id) => {
+    const member = members.find(m => m.id === id)
+    return member?.displayName || member?.name || id
+  }
 
   const expenses = (group.expenses || []).filter(e => {
     const d = new Date(e.date)

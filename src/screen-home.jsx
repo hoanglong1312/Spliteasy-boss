@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, totalBalances, recentActivity, groupBalance, groupNet, pickleSummary } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon, displayMemberName } from './components.jsx'
 
 // Home tab — dashboard with balance summary, recent activity, group cards
 // Has 3 layout variations exposed via Tweaks: 'overview' | 'feed' | 'compact'
@@ -42,7 +42,7 @@ function ScreenHome({ tweaks, push, pushToTab, switchTab }) {
       <div style={{ padding: '8px 20px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontFamily: 'var(--vb-font-meta)', fontWeight: 500, fontSize: 13, color: 'var(--text-2)' }}>Xin chào,</div>
-          <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>{meMember.name} 👋</div>
+          <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 22, color: 'var(--text-1)', letterSpacing: '-0.01em' }}>{displayMemberName(meMember, 'Bạn')} 👋</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {searchOpen ? (
@@ -468,7 +468,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
           return (
             <ListRow key={id}
               left={<Avatar member={m} size={40} style={avatarStyle}/>}
-              title={positive ? `${m.name} nợ bạn` : `Bạn nợ ${m.name}`}
+              title={positive ? `${displayMemberName(m, '?')} nợ bạn` : `Bạn nợ ${displayMemberName(m, '?')}`}
               subtitle={positive ? 'Tổng từ các nhóm' : 'Tổng từ các nhóm'}
               right={<Money value={Math.abs(v)} size={15} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>}
               divider={i < ranked.length - 1}
@@ -492,7 +492,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
                 <Avatar member={m} size={32} style={avatarStyle}/>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{m.short}</span>
+                    <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{displayMemberName(m, m.short || '?')}</span>
                     <Money value={v} size={13} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} compact/>
                   </div>
                   <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
@@ -525,7 +525,7 @@ function WhoOwesView({ ranked, variant, avatarStyle, push }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <Avatar member={m} size={36} style={avatarStyle}/>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{m.short}</div>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-1)' }}>{displayMemberName(m, m.short || '?')}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{positive ? 'Nợ bạn' : 'Bạn nợ'}</div>
               </div>
             </div>
@@ -591,7 +591,7 @@ function ActivityRow({ e, divider, avatarStyle, showGroup }) {
           {showGroup ? <>{e.groupEmoji} {e.groupName} • </> : null}
           {(() => {
             const payer = M[e.paidBy] || { short: '?' };
-            return payer.short === 'Bạn' || e.paidBy === me ? 'Bạn trả' : `${payer.short} trả`;
+            return payer.short === 'Bạn' || e.paidBy === me ? 'Bạn trả' : `${displayMemberName(payer, payer.short || '?')} trả`;
           })()} {fmtVND(e.amount)} • {e.date}
         </div>
       </div>

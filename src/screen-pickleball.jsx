@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useApp } from './store.jsx'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, pickleSummary } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, SectionHeader, HScroll, EmptyState, CategoryIcon, displayMemberName } from './components.jsx'
 
 // Pickleball tab — special sub-app for the company's CLB Pickleball
 // Has 2 visual styles via Tweaks: 'sporty' (vibrant lime/orange) | 'consistent' (purple match)
@@ -458,7 +458,7 @@ function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) 
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                           <Icon name={cat === 'ball' ? 'ball' : cat === 'food' ? 'food' : 'drink'} size={14} color="var(--text-2)"/>
-                          <span style={{ color: 'var(--text-2)', flex: 1 }}>{lbl || 'Chi phí'} • {payer.short} trả</span>
+                          <span style={{ color: 'var(--text-2)', flex: 1 }}>{lbl || 'Chi phí'} • {displayMemberName(payer, payer.short || '?')} trả</span>
                           <Money value={Number(ex.amount) || 0} size={12} color="var(--text-1)" compact/>
                         </div>
                       );
@@ -579,7 +579,7 @@ function PickleExternal({ tweaks = {}, accent, accentBg, style, pickle, meId }) 
                         <span style={{
                           fontSize: 13, fontWeight: 700,
                           color: selected ? accent : 'var(--text-1)',
-                        }}>{member.short}</span>
+                        }}>{displayMemberName(member, member.short || '?')}</span>
                       </button>
                     );
                   })}
@@ -676,7 +676,7 @@ function PickleMembers({ tweaks = {}, summary, accent, accentBg, style, pickle }
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <Avatar member={member} size={40} style={tweaks?.avatarStyle}/>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{member.name}{member.isMe ? ' (bạn)' : ''}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{displayMemberName(member, '?')}{member.isMe ? ' (bạn)' : ''}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>
                       Đi {attendedCount}/{sessionCount} buổi
                     </div>
@@ -751,7 +751,7 @@ function ScreenSessionDetail({ params = {}, pop, tweaks = {} }) {
               <ListRow key={i}
                 left={<div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--brand-soft)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Icon name={cat === 'ball' ? 'ball' : cat === 'food' ? 'food' : 'drink'} size={18} color="var(--brand-1)"/></div>}
                 title={lbl || 'Chi phí'}
-                subtitle={`${payer.name} đã trả`}
+                subtitle={`${displayMemberName(payer, '?')} đã trả`}
                 right={<Money value={Number(ex.amount) || 0} size={14}/>}
                 divider={i < expenses.length - 1}
               />
@@ -768,7 +768,7 @@ function ScreenSessionDetail({ params = {}, pop, tweaks = {} }) {
             return (
             <ListRow key={id}
               left={<Avatar member={member} size={36} style={tweaks?.avatarStyle}/>}
-              title={member.name}
+              title={displayMemberName(member, '?')}
               right={<Pill bg="var(--vb-success-100)" color="var(--vb-success-700)" size="xs" icon="check">Có mặt</Pill>}
               divider={i < attended.length - 1}
             />
@@ -899,7 +899,7 @@ function ScreenAddSessionExpense({ params = {}, pop, tweaks = {} }) {
 
         <FormRow label="Người trả" icon="user">
           <select value={paidBy} onChange={(e)=>setPaidBy(e.target.value)} style={inputStyle()}>
-            {fixedMembers.map(id => <option key={id} value={id}>{memberOrFallback(M, id).name}</option>)}
+            {fixedMembers.map(id => <option key={id} value={id}>{displayMemberName(memberOrFallback(M, id), '?')}</option>)}
           </select>
         </FormRow>
 
@@ -981,7 +981,7 @@ function ScreenAddExternalTicket({ pop, tweaks = {} }) {
 
         <FormRow label="Người trả" icon="user">
           <select value={paidBy} onChange={(e)=>setPaidBy(e.target.value)} style={inputStyle()}>
-            {fixedMembers.map(id => <option key={id} value={id}>{memberOrFallback(M, id).name}</option>)}
+            {fixedMembers.map(id => <option key={id} value={id}>{displayMemberName(memberOrFallback(M, id), '?')}</option>)}
           </select>
         </FormRow>
 
@@ -997,7 +997,7 @@ function ScreenAddExternalTicket({ pop, tweaks = {} }) {
                 border: '1px solid ' + (participants.includes(id) ? 'var(--brand-1)' : 'var(--border-1)'),
                 color: participants.includes(id) ? 'var(--brand-1)' : 'var(--text-1)',
                 fontSize: 13, fontWeight: 600,
-              }}>{member.short}</button>
+              }}>{displayMemberName(member, member.short || '?')}</button>
               );
             })}
           </div>

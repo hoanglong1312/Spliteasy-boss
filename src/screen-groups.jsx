@@ -3,7 +3,7 @@ import { useApp } from './store.jsx'
 import { getStoredAuth, joinGroup } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances, pickleSummary } from './data.jsx'
-import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup, SwipeCard } from './components.jsx'
+import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup, SwipeCard, displayMemberName } from './components.jsx'
 
 // Groups tab — list / detail / add expense / settle
 // Several sub-screens, all driven by `push` from the nav stack.
@@ -171,7 +171,7 @@ function buildPeriodPayments(group, members, treasurerId, periodStart, periodEnd
           fromMemberId: memberId,
           toMemberId: treasurerId,
           amount: Math.abs(roundedNet),
-          sortName: memberNames[memberId]?.name || memberId,
+          sortName: displayMemberName(memberNames[memberId], memberId),
         };
       }
       if (roundedNet > 0) {
@@ -179,7 +179,7 @@ function buildPeriodPayments(group, members, treasurerId, periodStart, periodEnd
           fromMemberId: treasurerId,
           toMemberId: memberId,
           amount: roundedNet,
-          sortName: memberNames[memberId]?.name || memberId,
+          sortName: displayMemberName(memberNames[memberId], memberId),
         };
       }
       return null;
@@ -619,7 +619,7 @@ function ActivityRow({ e, divider, avatarStyle, showGroup }) {
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {showGroup ? <>{e?.groupEmoji} {e?.groupName} • </> : null}
-            {payer.short === 'Bạn' || e?.paidBy === me ? 'Bạn trả' : `${payer.short} trả`} {fmtVND(amount)} • {e?.date || '--/--'}
+            {payer.short === 'Bạn' || e?.paidBy === me ? 'Bạn trả' : `${displayMemberName(payer, payer.short || '?')} trả`} {fmtVND(amount)} • {e?.date || '--/--'}
           </div>
           <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <StatusBadge status={status} declineReason={e?.declineReason}/>
@@ -986,7 +986,7 @@ function SettlementPeriodForm({
                 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {fromMember.name} → {toMember.name}
+                      {displayMemberName(fromMember, '?')} → {displayMemberName(toMember, '?')}
                     </div>
                   </div>
                   <Money value={payment.amount} size={13} color="var(--text-1)"/>
@@ -1066,7 +1066,7 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
   const [confirmId, setConfirmId] = useState(null);
   const handleRemind = (id, amount) => {
     const m = memberOrFallback(M, id);
-    window.alert(`Nhắc ${m.name} thanh toán ${fmtVND(Math.abs(amount))}.`);
+    window.alert(`Nhắc ${displayMemberName(m, '?')} thanh toán ${fmtVND(Math.abs(amount))}.`);
   };
   // simplify debts: for each non-zero balance, show pairs
   const entries = Object.entries(balance).filter(([, v]) => v !== 0).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
@@ -1098,7 +1098,7 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
               </>}
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
-                  {positive ? `${m.short} trả bạn` : `Bạn trả ${m.short}`}
+                  {positive ? `${displayMemberName(m, m.short || '?')} trả bạn` : `Bạn trả ${displayMemberName(m, m.short || '?')}`}
                 </div>
                 <Money value={Math.abs(v)} size={13} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
               </div>
@@ -1266,7 +1266,7 @@ function GroupMembers({ g, balance, avatarStyle, joinRequests = [], isTreasurer 
           return (
             <ListRow key={id}
               left={<Avatar member={m} size={40} style={avatarStyle}/>}
-              title={m.isMe ? m.name + ' (bạn)' : m.name}
+              title={m.isMe ? `${displayMemberName(m, '?')} (bạn)` : displayMemberName(m, '?')}
               subtitle={m.isMe ? 'Quản trị viên' : 'Thành viên'}
               right={m.isMe ? null : <Money value={b} size={13} color={b > 0 ? 'var(--vb-success-700)' : b < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>}
               divider={i < members.length - 1}
@@ -1312,7 +1312,7 @@ function ScreenExpenseDetail({ params = {}, push, pop, tweaks = {} }) {
         </div>
         <div style={{ marginTop: 6, display: 'inline-flex', gap: 6, alignItems: 'center', fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>
           <Avatar member={paidByMember} size={20} style={tweaks.avatarStyle}/>
-          <span><b style={{ color: 'var(--text-1)' }}>{paidByMember.name}</b> đã trả • {e.date || '--/--'}/2026</span>
+          <span><b style={{ color: 'var(--text-1)' }}>{displayMemberName(paidByMember, '?')}</b> đã trả • {e.date || '--/--'}/2026</span>
         </div>
       </div>
 
@@ -1326,7 +1326,7 @@ function ScreenExpenseDetail({ params = {}, push, pop, tweaks = {} }) {
             return (
             <ListRow key={id}
               left={<Avatar member={member} size={36} style={tweaks.avatarStyle}/>}
-              title={member.name}
+              title={displayMemberName(member, '?')}
               subtitle={id === e.paidBy ? 'Người trả' : 'Chia phần'}
               right={<Money value={per} size={14} color={id === e.paidBy ? 'var(--vb-success-700)' : 'var(--text-1)'}/>}
               divider={i < participants.length - 1}
@@ -1542,7 +1542,7 @@ function ScreenAddExpense({ params = {}, push, pop, tweaks = {} }) {
                 return (
                 <ListRow key={id}
                   left={<Avatar member={member} size={36} style={tweaks.avatarStyle}/>}
-                  title={member.name}
+                  title={displayMemberName(member, '?')}
                   right={<RadioMark on={paidBy === id}/>}
                   onClick={() => setPaidBy(id)}
                   divider={i < groupMembers.length - 1}
@@ -1581,7 +1581,7 @@ function ScreenAddExpense({ params = {}, push, pop, tweaks = {} }) {
                   }}>
                     <Avatar member={member} size={36} style={tweaks.avatarStyle}/>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{member.name}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{displayMemberName(member, '?')}</div>
                       {on && splitMode === 'equal' && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{fmtVNDFull(per)}</div>}
                     </div>
                     <CheckMark on={on}/>
@@ -1601,7 +1601,7 @@ function ScreenAddExpense({ params = {}, push, pop, tweaks = {} }) {
                   <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <Avatar member={memberOrFallback(M, id)} size={32} style={tweaks.avatarStyle}/>
                     <div style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
-                      {memberOrFallback(M, id).short || memberOrFallback(M, id).name || id}
+                      {displayMemberName(memberOrFallback(M, id), memberOrFallback(M, id).short || id)}
                     </div>
                     <input
                       type="text"
@@ -1722,7 +1722,7 @@ function ScreenSettleAll({ pop, tweaks = {} }) {
                 return (
                 <ListRow key={id}
                   left={<Avatar member={member} size={40} style={tweaks.avatarStyle}/>}
-                  title={member.name}
+                  title={displayMemberName(member, '?')}
                   subtitle="Nhắc trả qua Zalo"
                   right={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1747,7 +1747,7 @@ function ScreenSettleAll({ pop, tweaks = {} }) {
                 return (
                 <ListRow key={id}
                   left={<Avatar member={member} size={40} style={tweaks.avatarStyle}/>}
-                  title={member.name}
+                  title={displayMemberName(member, '?')}
                   subtitle="Quét QR để thanh toán"
                   right={
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1952,7 +1952,7 @@ function ScreenNewGroup({ params = {}, pop }) {
               }}>
                 <Avatar member={m} size={36}/>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{m.name}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{displayMemberName(m, '?')}</div>
                 </div>
                 {isMe ? <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600 }}>Bạn</span> : <CheckMark on={selected.includes(m.id)}/>}
               </div>
@@ -2016,7 +2016,7 @@ function ScreenNotifications({ pop, tweaks = {} }) {
               return (
                 <ListRow key={n.id}
                   left={<Avatar member={member} size={40} style={tweaks.avatarStyle}/>}
-                  title={<><b>{member.name}</b> {n.text}</>}
+                  title={<><b>{displayMemberName(member, '?')}</b> {n.text}</>}
                   subtitle={`${n.group} • ${n.when}`}
                   divider={i < items.length - 1}
                 />
@@ -2264,7 +2264,7 @@ export function ScreenPaymentFlow({ tweaks = {}, pop }) {
                 <ListRow
                   key={d.memberId}
                   left={<Avatar member={m} size={40} style={tweaks.avatarStyle}/>}
-                  title={m.name}
+                  title={displayMemberName(m, '?')}
                   subtitle={d.sources.join(' + ')}
                   right={
                     <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 15, color: 'var(--vb-danger-700)' }}>
@@ -2309,7 +2309,7 @@ export function ScreenPaymentFlow({ tweaks = {}, pop }) {
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>
-              {consolidated.length === 1 ? (M[consolidated[0].memberId]?.name || '?') : 'Chuyển theo từng người'}
+              {consolidated.length === 1 ? displayMemberName(M[consolidated[0].memberId], '?') : 'Chuyển theo từng người'}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
               Nội dung: SP-{consolidated.map(d => (M[d.memberId]?.short || '?')).join('-')}

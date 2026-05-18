@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { createSupabase } from './lib/supabase.js'
+import { disambiguateMembers } from './store.jsx'
 
 const money = (value) => `${Math.round(Math.abs(value)).toLocaleString('vi-VN')}đ`
 
@@ -9,7 +10,7 @@ function assertNoError(results) {
 }
 
 function memberName(membersById, memberId) {
-  return membersById[memberId]?.short || membersById[memberId]?.name || 'Không rõ'
+  return membersById[memberId]?.displayName || membersById[memberId]?.short || membersById[memberId]?.name || 'Không rõ'
 }
 
 function buildDirectTransactions({ expenses, participants, members, groups, memberId }) {
@@ -91,7 +92,7 @@ export function ScreenPersonal() {
       ])
       assertNoError([expensesR, participantsR, membersR, groupsR])
 
-      const members = membersR.data || []
+      const members = disambiguateMembers(membersR.data || [])
       const groups = groupsR.data || []
       if (groups.length === 0) {
         setError('Không tải được dữ liệu nhóm.')
@@ -103,7 +104,7 @@ export function ScreenPersonal() {
       const participants = participantsR.data || []
       const transactions = buildDirectTransactions({ expenses, participants, members, groups, memberId })
 
-      setData({ memberName, transactions })
+      setData({ memberName: members.find(m => m.id === memberId)?.displayName || memberName, transactions })
     } catch (err) {
       console.error('[personal] load error:', err)
       setError('Có lỗi xảy ra khi tải dữ liệu.')

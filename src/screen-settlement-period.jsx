@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { useApp } from './store.jsx'
 import { getMemberMap, fmtVNDFull } from './data.jsx'
-import { Avatar, Button, Card, EmptyState, Icon, Money, NavHeader } from './components.jsx'
+import { Avatar, Button, Card, EmptyState, Icon, Money, NavHeader, displayMemberName } from './components.jsx'
 import { BANK_LIST, generateQRUrl, openBankingApp } from './lib/vietqr.js'
 
 function safeArray(value) {
@@ -174,7 +174,7 @@ function ScreenSettlementPeriod({ params = {}, pop, tweaks = {} }) {
                     <Avatar member={toMember} size={34} style={tweaks.avatarStyle}/>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {fromMember.name} → {toMember.name}
+                        {displayMemberName(fromMember, '?')} → {displayMemberName(toMember, '?')}
                       </div>
                       <Money value={Number(payment.amount) || 0} size={14} color="var(--text-1)"/>
                     </div>
@@ -238,7 +238,7 @@ function PaymentSheet({ payment, period, members, busy, onClose, onMarkTransferr
   const accountName = toMember.bankAccountName ?? toMember.bank_account_name ?? toMember.name
   const amount = Number(payment.amount) || 0
   const { month, year } = getMonthYear(field(period, 'periodEnd', 'period_end'))
-  const description = `SpliteasyBoss T${month}/${year} - ${fromMember.name}`
+  const description = `SpliteasyBoss T${month}/${year} - ${displayMemberName(fromMember, '?')}`
   const hasBankInfo = Boolean(bankId && account)
 
   const payArgs = { bankId, account, accountName, amount, description }
@@ -271,7 +271,7 @@ function PaymentSheet({ payment, period, members, busy, onClose, onMarkTransferr
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--text-1)' }}>
-              Chuyển khoản cho {toMember.short || toMember.name}
+              Chuyển khoản cho {displayMemberName(toMember, toMember.short || '?')}
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginTop: 2 }}>
               {fmtVNDFull(amount)} • {description}

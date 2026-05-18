@@ -4,6 +4,10 @@ import { getMemberMap, fmtVND, fmtVNDFull } from './data.jsx'
 
 // Shared UI primitives for Spliteasy
 
+function displayMemberName(member, fallback = '') {
+  return member?.displayName || member?.name || fallback
+}
+
 // ── Icons ───────────────────────────────────────────────────────────────────
 function Icon({ name, size = 20, color = 'currentColor', stroke = 1.75 }) {
   const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: stroke, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -59,6 +63,7 @@ function Icon({ name, size = 20, color = 'currentColor', stroke = 1.75 }) {
 // ── Avatar ──────────────────────────────────────────────────────────────────
 function Avatar({ member, size = 32, style: avatarStyle = 'initials', ring = false }) {
   if (!member) return null;
+  const label = displayMemberName(member);
   const useInitials = avatarStyle === 'initials' || (avatarStyle === 'mixed' && member.isMe);
   const wrap = {
     width: size, height: size, borderRadius: '50%',
@@ -71,9 +76,9 @@ function Avatar({ member, size = 32, style: avatarStyle = 'initials', ring = fal
     overflow: 'hidden',
   };
   if (useInitials || !member.photo) {
-    return <div style={{ ...wrap, background: member.color }} aria-label={member.name}>{member.initials}</div>;
+    return <div style={{ ...wrap, background: member.color }} aria-label={label}>{member.initials}</div>;
   }
-  return <img src={member.photo} alt={member.name} style={{ ...wrap, objectFit: 'cover' }}/>;
+  return <img src={member.photo} alt={label} style={{ ...wrap, objectFit: 'cover' }}/>;
 }
 
 function AvatarStack({ ids, size = 26, overlap = 9, avatarStyle = 'initials', max = 5 }) {
@@ -518,7 +523,7 @@ function SwipeCard({ expense, members, onApprove, onDecline }) {
           {fmtVND(expense.amount || 0)}
         </div>
         <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 2 }}>
-          {payer.name} đề xuất
+          {displayMemberName(payer, '?')} đề xuất
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
           {expense.date || ''}
@@ -538,6 +543,7 @@ function SwipeCard({ expense, members, onApprove, onDecline }) {
 }
 
 export {
+  displayMemberName,
   Icon, Avatar, AvatarStack, Money, Button, Card, Pill, SectionHeader,
   CategoryIcon, ScreenTransition, NavHeader, ListRow, EmptyState, HScroll,
   iconBtnStyle, StatusBadge, DisputePopup, SwipeCard,

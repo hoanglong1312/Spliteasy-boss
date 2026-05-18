@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useApp } from './store.jsx'
 import { ME, totalBalances } from './data.jsx'
-import { Icon, Avatar, Money, Button, Card, iconBtnStyle, ListRow, SectionHeader, NavHeader } from './components.jsx'
+import { Icon, Avatar, Money, Button, Card, iconBtnStyle, ListRow, SectionHeader, NavHeader, displayMemberName } from './components.jsx'
 import { exportMonthlyCSV } from './lib/export.js'
 import { BANK_LIST } from './lib/vietqr.js'
 
@@ -195,7 +195,7 @@ function ScreenProfile({ tweaks, push }) {
         <Card style={{ padding: '22px 18px', textAlign: 'center' }}>
           <Avatar member={me} size={72} style={tweaks.avatarStyle} ring/>
           <div style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-1)', marginTop: 12 }}>
-            {userName || me.name}
+            {displayMemberName(me, userName || 'Bạn')}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600, marginTop: 3 }}>
             {me.short?.toLowerCase()}@spliteasy.vn
