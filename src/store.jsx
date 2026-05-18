@@ -121,6 +121,51 @@ async function fetchGroupData(token) {
   }
 }
 
+function mergeById(raws, key) {
+  const seen = new Set()
+  const merged = []
+  raws.forEach(raw => {
+    safeArray(raw?.[key]).forEach(item => {
+      if (!item?.id) {
+        merged.push(item)
+        return
+      }
+      if (!seen.has(item.id)) {
+        seen.add(item.id)
+        merged.push(item)
+      }
+    })
+  })
+  return merged
+}
+
+function mergeGroupData(raws) {
+  return {
+    members:           mergeById(raws, 'members'),
+    groups:            mergeById(raws, 'groups'),
+    expenses:          mergeById(raws, 'expenses'),
+    participants:      mergeById(raws, 'participants'),
+    settlements:       mergeById(raws, 'settlements'),
+    settlementPeriods: mergeById(raws, 'settlementPeriods'),
+    periodPayments:    mergeById(raws, 'periodPayments'),
+    pickleConfig:      raws.find(raw => raw?.pickleConfig != null)?.pickleConfig || null,
+    pickleSessions:    mergeById(raws, 'pickleSessions'),
+    pickleAttendees:   mergeById(raws, 'pickleAttendees'),
+    disputeCount:      raws.reduce((sum, raw) => sum + Number(raw?.disputeCount || 0), 0),
+  }
+}
+
+function getAuthSessions(auth) {
+  const seen = new Set()
+  const sessions = safeArray(auth?.sessions).filter(session => {
+    if (!session?.token || seen.has(session.token)) return false
+    seen.add(session.token)
+    return true
+  })
+  if (sessions.length > 0) return sessions
+  return auth?.token ? [{ token: auth.token, member: auth.member }] : []
+}
+
 function normalize(raw, currentMemberId) {
   const { members, groups, expenses, participants, settlements, settlementPeriods, periodPayments, pickleConfig, pickleSessions, pickleAttendees, disputeCount } = raw
   if (groups.length === 0) return null  // signal: data empty but keep session
@@ -254,7 +299,10 @@ function normalize(raw, currentMemberId) {
 }
 
 export function AppProvider({ children, onToast }) {
-  const { token: storedToken, member: storedMember } = getStoredAuth()
+  const storedAuth = getStoredAuth()
+  const storedSessions = getAuthSessions(storedAuth)
+  const storedToken = storedSessions[0]?.token || null
+  const storedMember = storedSessions[0]?.member || null
 
   const [state, setState] = useState(() => {
     if (storedToken && storedMember) {
@@ -262,7 +310,7 @@ export function AppProvider({ children, onToast }) {
         ...buildEmptyState(),
         currentUserId: storedMember.id,
         currentUserName: storedMember.name,
-        currentGroupId: storedMember.groupId,
+        currentGroupId: storedMember.groupId || storedMember.group_id,
         _loading: true,
       }
     }
@@ -277,13 +325,18 @@ export function AppProvider({ children, onToast }) {
   useEffect(() => { stateRef.current = state })
 
   const refresh = useCallback(async (tok) => {
-    const t = tok ?? tokenRef.current
-    if (!t) return
+    const auth = getStoredAuth()
+    const sessions = getAuthSessions(auth)
+    const activeToken = tok ?? tokenRef.current ?? sessions[0]?.token
+    const activeSession = sessions.find(session => session.token === activeToken) || sessions[0]
+    if (!activeSession?.token) return
+    tokenRef.current = activeSession.token
+
     setState(s => ({ ...s, _loading: true }))
     try {
-      const { member } = getStoredAuth()
-      const raw = await fetchGroupData(t)
-      const next = normalize(raw, member?.id)
+      const raws = await Promise.all(sessions.map(session => fetchGroupData(session.token)))
+      const raw = mergeGroupData(raws)
+      const next = normalize(raw, activeSession.member?.id)
       if (next) {
         setState(next)
       } else {
@@ -310,7 +363,7 @@ export function AppProvider({ children, onToast }) {
   }, [])
 
   useEffect(() => {
-    if (storedToken) refresh(storedToken)
+    if (storedToken) refresh()
   }, [])
 
   useEffect(() => {
@@ -380,7 +433,7 @@ export function AppProvider({ children, onToast }) {
         const { token: newToken, memberId, groupId, memberName } = action
         storeAuth(newToken, { id: memberId, groupId, name: memberName })
         tokenRef.current = newToken
-        await refresh(newToken)
+        await refresh()
         break
       }
 
@@ -747,7 +800,7 @@ export function AppProvider({ children, onToast }) {
           console.warn('[store] CREATE_GROUP created_by:', creatorError)
         }
 
-        await refresh(joined.token)
+        await refresh()
         return newGroupId
       }
 
