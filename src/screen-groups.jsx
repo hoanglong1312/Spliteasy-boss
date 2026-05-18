@@ -195,10 +195,10 @@ function ScreenGroups({ tweaks = {}, push }) {
   const [filter, setFilter] = useState('all');
   const [joinOpen, setJoinOpen] = useState(false);
   const [joinInviteCode, setJoinInviteCode] = useState('');
-  const [joinMemberName, setJoinMemberName] = useState(state.currentUserName || '');
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState('');
   const [joinInfo, setJoinInfo] = useState('');
+  const currentJoinName = (state.currentUserName || '').trim();
   const filteredGroups = useMemo(() => {
     return safeArray(state.groups).filter(g => {
       if (filter === 'all') return true;
@@ -209,11 +209,10 @@ function ScreenGroups({ tweaks = {}, push }) {
     });
   }, [filter, state.groups, meId]);
   const openPeriod = safeArray(state.settlementPeriods).find(p => (p.status || 'open') === 'open');
-  const canJoin = joinInviteCode.trim() && joinMemberName.trim() && !joinLoading;
+  const canJoin = Boolean(joinInviteCode.trim() && currentJoinName && !joinLoading);
 
   function openJoinDialog() {
     setJoinInviteCode('');
-    setJoinMemberName(state.currentUserName || '');
     setJoinError('');
     setJoinInfo('');
     setJoinOpen(true);
@@ -230,7 +229,7 @@ function ScreenGroups({ tweaks = {}, push }) {
     e.preventDefault();
     if (!canJoin) return;
     const inviteCode = joinInviteCode.trim().toUpperCase();
-    const memberName = joinMemberName.trim();
+    const memberName = currentJoinName;
     setJoinLoading(true);
     setJoinError('');
     setJoinInfo('');
@@ -412,14 +411,22 @@ function ScreenGroups({ tweaks = {}, push }) {
               />
             </FormRow>
 
-            <FormRow label="Tên của bạn trong nhóm" icon="user">
-              <input
-                value={joinMemberName}
-                onChange={e => setJoinMemberName(e.target.value)}
-                placeholder="VD: Nguyễn Văn A"
-                style={inputStyle()}
-              />
-            </FormRow>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 12px',
+              borderRadius: 10,
+              background: 'var(--surface-2)',
+              color: 'var(--text-2)',
+              fontSize: 13,
+              fontWeight: 600,
+            }}>
+              <Icon name="user" size={16} color="var(--text-2)"/>
+              <span>
+                Tham gia với tên: <strong style={{ color: 'var(--text-1)' }}>{currentJoinName || 'Chưa có tên đăng nhập'}</strong>
+              </span>
+            </div>
 
             {joinInfo && (
               <div style={{
