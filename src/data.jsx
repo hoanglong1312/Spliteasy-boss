@@ -131,6 +131,11 @@ function pickleSummary(pickle = {}) {
       if (memberOwes[payerId] !== undefined) memberOwes[payerId] = (memberOwes[payerId]||0) + ex.amount;
     }
   }
+  // Apply court fee (all fixed members owe it) minus guest revenue credit
+  const netCourtPerMember = courtPerMember - guestCreditPer;
+  for (const id of fixed) {
+    memberOwes[id] = (memberOwes[id] || 0) - netCourtPerMember;
+  }
   return { courtPerMember, totalGuests, guestRevenue, guestCreditPer, memberOwes };
 }
 

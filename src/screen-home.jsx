@@ -157,7 +157,7 @@ function SubBalance({ label, amount, positive = false }) {
   );
 }
 
-function SmartHomeSummary({ push, pushToTab, switchTab }) {
+function SmartHomeSummary({ push, switchTab }) {
   const { state } = useApp()
   const meId = state.currentUserId || ME
   const M = getMemberMap(state.members)
