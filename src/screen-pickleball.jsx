@@ -64,6 +64,26 @@ function dateDay(value) {
   return s;
 }
 
+function todayInputValue() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 10);
+}
+
+function localDateFromInput(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function formatExternalDate(value) {
+  const d = localDateFromInput(value);
+  if (!d) return value || '--/--/----';
+  const weekday = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][d.getDay()];
+  return `${weekday} ${d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+}
+
 function guestName(guest) {
   if (typeof guest === 'string') return guest;
   return guest?.name || guest?.guest_name || guest?.displayName || 'Khách';
@@ -456,77 +476,181 @@ function PickleSessions({ push, tweaks = {}, accent, accentBg, style, pickle }) 
 }
 
 // ── External tab — vé lẻ outside the club ───────────────────────────────────
-function PickleExternal({ push, tweaks = {}, accent, accentBg, style, pickle, meId }) {
-  const { state } = useApp();
+function PickleExternal({ tweaks = {}, accent, accentBg, style, pickle, meId }) {
+  const { state, dispatch } = useApp();
   const M = getMemberMap(state.members);
-  const tickets = [...(pickle.external || []), ...(pickle.externalTickets || [])];
-  const total = tickets.reduce((a,e)=>a+(Number(e.amount) || 0), 0);
+  const externalSessions = safeArray(pickle.sessions).filter(s => s.status === 'external')
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const memberIds = pickle.fixedMembers.length > 0
+    ? pickle.fixedMembers
+    : safeArray(state.members).map(m => m.id);
+  const defaultAttendeeIds = memberIds.includes(meId)
+    ? [meId]
+    : (memberIds[0] ? [memberIds[0]] : []);
+  const [showForm, setShowForm] = useState(false);
+  const [date, setDate] = useState(todayInputValue);
+  const [notes, setNotes] = useState('');
+  const [attendeeIds, setAttendeeIds] = useState(defaultAttendeeIds);
+  const [saving, setSaving] = useState(false);
 
-  if (tickets.length === 0) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <EmptyState icon="sparkle" title="Chưa có vé lẻ nào" subtitle={'Bấm "Thêm buổi vé lẻ" để ghi lại'}/>
-        <Button variant="primary" full size="lg" icon="plus" onClick={() => push('add-external-ticket')}>Thêm buổi vé lẻ</Button>
-      </div>
+  const canSave = !!date && attendeeIds.length > 0 && !saving;
+
+  const toggleAttendee = (id) => {
+    setAttendeeIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
-  }
+  };
+
+  const resetForm = () => {
+    setDate(todayInputValue());
+    setNotes('');
+    setAttendeeIds(defaultAttendeeIds);
+  };
+
+  const saveExternalSession = async () => {
+    if (!canSave) return;
+    setSaving(true);
+    try {
+      await dispatch({
+        type: 'ADD_PICKLE_SESSION',
+        date,
+        notes: notes.trim(),
+        attendeeIds,
+        status: 'external',
+      });
+      resetForm();
+      setShowForm(false);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{
-        padding: '14px 16px', borderRadius: 14,
-        background: 'var(--vb-warn-100)', border: '1px solid #FCE3B0',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-          <Icon name="sparkle" size={18} color="#A05C0C"/>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#A05C0C' }}>Xé vé lẻ ngoài CLB</div>
-        </div>
-        <div style={{ fontSize: 12, color: '#8A5008', lineHeight: 1.5 }}>
-          Những buổi đánh tự phát ngoài lịch cố định. Tiền chỉ chia cho người tham gia, không tính vào quỹ tháng.
-        </div>
-      </div>
+      <Button
+        variant={showForm ? 'secondary' : 'primary'}
+        full
+        size="lg"
+        icon={showForm ? 'x' : 'plus'}
+        onClick={() => {
+          setShowForm(prev => !prev);
+          if (attendeeIds.length === 0) setAttendeeIds(defaultAttendeeIds);
+        }}
+      >
+        {showForm ? 'Đóng' : 'Thêm vé lẻ'}
+      </Button>
 
-      <Card>
-        <div style={{ padding: '14px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', borderBottom: '1px solid var(--border-1)' }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>Tổng tháng này</span>
-          <Money value={total} size={18}/>
-        </div>
-        {tickets.map((ex, i) => {
-          const amount = Number(ex.amount) || 0;
-          const participants = safeArray(ex.participants);
-          const per = participants.length > 0 ? Math.round(amount / participants.length) : 0;
-          const inIt = participants.includes(meId);
-          const myDelta = ex.paidBy === meId ? amount - per : (inIt ? -per : 0);
-          const payer = memberOrFallback(M, ex.paidBy);
-          return (
-            <div key={ex.id} style={{
-              padding: 14, borderBottom: i < tickets.length - 1 ? '1px solid var(--border-1)' : 'none',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: 'var(--vb-warn-100)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                }}><Icon name="ball" size={18} color="#A05C0C"/></div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{ex.label || ex.title || 'Vé lẻ'}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 2, fontWeight: 500 }}>{ex.date || '--/--'}/2026 • {payer.short} trả</div>
+      {showForm && (
+        <Card>
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <FormRow label="Ngày đánh" icon="calendar">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                style={inputStyle()}
+              />
+            </FormRow>
+
+            <FormRow label="Tên sân / ghi chú" icon="edit">
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="VD: Sân TPHCM Quận 3"
+                style={inputStyle()}
+              />
+            </FormRow>
+
+            <FormRow label="Thành viên tham gia" icon="users">
+              {memberIds.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {memberIds.map(id => {
+                    const member = memberOrFallback(M, id);
+                    const selected = attendeeIds.includes(id);
+                    return (
+                      <button key={id} onClick={() => toggleAttendee(id)} style={{
+                        appearance: 'none', cursor: 'pointer',
+                        padding: '6px 10px 6px 6px', borderRadius: 24,
+                        background: selected ? accentBg : 'var(--surface-2)',
+                        border: '1px solid ' + (selected ? accent : 'var(--border-1)'),
+                        display: 'inline-flex', alignItems: 'center', gap: 7,
+                      }}>
+                        <Avatar member={member} size={24} style={tweaks?.avatarStyle}/>
+                        <span style={{
+                          fontSize: 13, fontWeight: 700,
+                          color: selected ? accent : 'var(--text-1)',
+                        }}>{member.short}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <Money value={amount} size={14}/>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <AvatarStack ids={participants} size={22} overlap={7} avatarStyle={tweaks?.avatarStyle} max={5}/>
-                {myDelta !== 0 && (
-                  <Pill bg={myDelta > 0 ? 'var(--vb-success-100)' : 'var(--vb-danger-50)'} color={myDelta > 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} size="xs">
-                    {myDelta > 0 ? `Nhận ${fmtVND(myDelta)}` : `Trả ${fmtVND(Math.abs(myDelta))}`}
-                  </Pill>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </Card>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Chưa có thành viên để chọn</div>
+              )}
+            </FormRow>
 
-      <Button variant="primary" full size="lg" icon="plus" onClick={() => push('add-external-ticket')}>Thêm buổi vé lẻ</Button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <Button variant="secondary" full onClick={resetForm}>Xoá form</Button>
+              <Button variant="primary" full disabled={!canSave} onClick={saveExternalSession}>{saving ? 'Đang lưu' : 'Lưu'}</Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {externalSessions.length === 0 ? (
+        <EmptyState icon="sparkle" title="Chưa có buổi nào tự phát" subtitle="Thêm vé lẻ để ghi lại buổi đánh ngoài lịch cố định"/>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {externalSessions.map(s => {
+            const attendees = sessionMemberIds(s);
+            const expenses = safeArray(s.expenses);
+            const totalExpense = expenses.reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+            const isGoing = attendees.includes(meId);
+            return (
+              <Card key={s.id}>
+                <div style={{ padding: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 52, height: 56, borderRadius: 12, flexShrink: 0,
+                      background: accentBg, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      <Icon name="calendar" size={16} color={accent}/>
+                      <div style={{ fontFamily: 'var(--vb-font-num)', fontSize: 12, fontWeight: 800, color: accent, marginTop: 4 }}>
+                        {dateDay(s.date)}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)' }}>{formatExternalDate(s.date)}</div>
+                      <div style={{
+                        fontSize: 13, color: 'var(--text-2)', marginTop: 3, fontWeight: 600,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {s.notes || s.court || 'Buổi tự phát'}
+                      </div>
+                      <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <AvatarStack ids={attendees} size={22} overlap={7} avatarStyle={tweaks?.avatarStyle} max={5}/>
+                        <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 700 }}>
+                          {attendees.length} người • {totalExpense === 0 ? '0k' : fmtVND(totalExpense)} chi tiêu
+                        </span>
+                      </div>
+                    </div>
+                    <button onClick={() => dispatch({ type: 'CONFIRM_ATTENDANCE', sessionId: s.id, memberId: meId, attending: !isGoing })} style={{
+                      appearance: 'none', cursor: 'pointer', height: 34, padding: '0 12px',
+                      background: isGoing ? 'var(--surface-2)' : accent,
+                      color: isGoing ? 'var(--text-1)' : (style === 'sporty' ? '#0E1726' : '#fff'),
+                      border: '1px solid ' + (isGoing ? 'var(--border-1)' : accent),
+                      borderRadius: 10, fontWeight: 800, fontSize: 12,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {isGoing ? 'Huỷ' : 'Tham gia'}
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

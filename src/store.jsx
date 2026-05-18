@@ -437,6 +437,33 @@ export function AppProvider({ children, onToast }) {
         break
       }
 
+      case 'ADD_PICKLE_SESSION': {
+        if (!sb) return
+        const { date, notes, attendeeIds } = action
+        const { data: newSession, error } = await sb
+          .from('pickle_sessions')
+          .insert({
+            group_id: state.currentGroupId,
+            session_date: date,
+            status: action.status || 'external',
+            notes: notes || null,
+          })
+          .select()
+          .single()
+        if (error) { console.error('[store] ADD_PICKLE_SESSION:', error); return }
+        if (attendeeIds?.length > 0) {
+          await sb.from('pickle_attendees').insert(
+            attendeeIds.map(memberId => ({
+              session_id: newSession.id,
+              member_id: memberId,
+              is_guest: false,
+            }))
+          )
+        }
+        await refresh()
+        break
+      }
+
       case 'APPROVE_EXPENSE': {
         const { expenseId } = action
         const { error } = await sb.from('expenses').update({
