@@ -64,8 +64,8 @@ Phase 0: Phân tích & Thiết kế    ✅ XONG
 Phase 1: UI/UX Design            ✅ XONG
   Plan 1 — Approval Workflow     ✅ (StatusBadge, SwipeCard, ApprovalQueue)
   Plan 2 — SmartHome + Payment   ✅ (SmartHomeSummary, ScreenPaymentFlow)
-  Plan 3 — Pickleball + JoinGroup ⏳ TIẾP THEO
+  Plan 3 — Pickleball + JoinGroup ✅ (SessionCalendar, ScreenJoin)
 Phase 3: Thực thi Database       ✅ XONG (migrations đã chạy)
 Phase 4: Frontend Migration      ✅ XONG (Vite + Supabase)
-Phase 5: Tính năng mới           ⏳ SAU PHASE 1
+Phase 5: Tính năng mới           ⏳ TIẾP THEO
 ```
