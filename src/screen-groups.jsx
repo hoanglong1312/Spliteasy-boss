@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useApp } from './store.jsx'
+import { getStoredAuth, joinGroup } from './lib/auth.js'
+import { createSupabase } from './lib/supabase.js'
 import { ME, getMemberMap, fmtVND, fmtVNDFull, fmtDate, groupBalance, groupNet, splitEqual, totalBalances, pickleSummary } from './data.jsx'
 import { Icon, Avatar, AvatarStack, Money, Button, Card, Pill, iconBtnStyle, NavHeader, ListRow, EmptyState, HScroll, SectionHeader, CategoryIcon, StatusBadge, DisputePopup, SwipeCard } from './components.jsx'
 
@@ -71,6 +73,18 @@ function formatDateVN(value) {
   const [y, m, d] = iso.split('-');
   if (!y || !m || !d) return value || '--/--';
   return `${d}/${m}/${y}`;
+}
+
+function formatDateTimeVN(value) {
+  if (!value) return '--/--';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function paymentPeriodField(period, camel, snake) {
@@ -184,6 +198,7 @@ function ScreenGroups({ tweaks = {}, push }) {
   const [joinMemberName, setJoinMemberName] = useState(state.currentUserName || '');
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState('');
+  const [joinInfo, setJoinInfo] = useState('');
   const filteredGroups = useMemo(() => {
     return safeArray(state.groups).filter(g => {
       if (filter === 'all') return true;
@@ -200,6 +215,7 @@ function ScreenGroups({ tweaks = {}, push }) {
     setJoinInviteCode('');
     setJoinMemberName(state.currentUserName || '');
     setJoinError('');
+    setJoinInfo('');
     setJoinOpen(true);
   }
 
@@ -207,6 +223,7 @@ function ScreenGroups({ tweaks = {}, push }) {
     if (joinLoading) return;
     setJoinOpen(false);
     setJoinError('');
+    setJoinInfo('');
   }
 
   async function handleJoinSubmit(e) {
@@ -216,11 +233,77 @@ function ScreenGroups({ tweaks = {}, push }) {
     const memberName = joinMemberName.trim();
     setJoinLoading(true);
     setJoinError('');
+    setJoinInfo('');
+
+    const existingToken = getStoredAuth().token;
+    const loginWithJoinResult = async (result) => {
+      const nextToken = result?.token || existingToken;
+      const memberId = result?.member_id || result?.memberId;
+      const groupId = result?.group_id || result?.groupId;
+      if (!nextToken || !memberId) throw new Error('join_group_no_token');
+      await dispatch({
+        type: 'LOGIN',
+        token: nextToken,
+        memberId,
+        groupId,
+        memberName: result?.member_name || result?.memberName || memberName,
+      });
+    };
+
     try {
-      await dispatch({ type: 'JOIN_GROUP', inviteCode, memberName });
+      const joined = await joinGroup(inviteCode, memberName, existingToken);
+      await loginWithJoinResult(joined);
       setJoinOpen(false);
       setJoinInviteCode('');
     } catch (err) {
+      if (err.message === 'member_not_found') {
+        try {
+          const sb = createSupabase(null);
+          const { data, error: rpcErr } = await sb.rpc('request_to_join', {
+            p_invite_code: inviteCode,
+            p_name: memberName,
+          });
+          if (rpcErr) throw rpcErr;
+
+          const requestResult = Array.isArray(data) ? data[0] : data;
+          if (requestResult?.error === 'name_exists') {
+            const retry = await joinGroup(inviteCode, memberName, existingToken);
+            await loginWithJoinResult(retry);
+            setJoinOpen(false);
+            setJoinInviteCode('');
+            return;
+          }
+          if (requestResult?.error === 'group_not_found') {
+            setJoinError('Mã mời không đúng. Kiểm tra lại nhé.');
+            return;
+          }
+          if (
+            requestResult?.error === 'already_pending'
+            || requestResult?.error === 'pending'
+            || requestResult?.status === 'already_pending'
+            || requestResult?.already_pending === true
+            || requestResult?.existing === true
+            || requestResult?.created === false
+          ) {
+            setJoinInfo('Yêu cầu của bạn đang chờ duyệt.');
+            return;
+          }
+          if (requestResult?.status === 'pending') {
+            setJoinInfo('Tên của bạn chưa có trong nhóm. Yêu cầu tham gia đã được gửi — thủ quỹ sẽ duyệt sớm.');
+            return;
+          }
+          throw new Error(requestResult?.error || 'request_to_join_failed');
+        } catch (requestErr) {
+          const msg = requestErr.message === 'name_exists'
+            ? 'Tên đã có trong nhóm. Thử tham gia lại nhé.'
+            : requestErr.message === 'group_not_found'
+            ? 'Mã mời không đúng. Kiểm tra lại nhé.'
+            : 'Không gửi được yêu cầu tham gia. Thử lại sau.';
+          setJoinError(msg);
+          return;
+        }
+      }
+
       const msg = err.message === 'invalid_invite_code'
         ? 'Mã mời không đúng. Kiểm tra lại nhé.'
         : err.message === 'invite_code_required'
@@ -337,6 +420,19 @@ function ScreenGroups({ tweaks = {}, push }) {
                 style={inputStyle()}
               />
             </FormRow>
+
+            {joinInfo && (
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: 'var(--brand-soft)',
+                color: 'var(--brand-1)',
+                fontSize: 13,
+                fontWeight: 700,
+              }}>
+                {joinInfo}
+              </div>
+            )}
 
             {joinError && (
               <div style={{
@@ -564,6 +660,13 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   const net = useMemo(() => g ? groupNet(safeGroup(g), meId) : 0, [g, meId]);
   const isTreasurer = state.members.find(m => m.id === meId)?.role === 'treasurer'
   const pendingCount = safeArray(g ? safeGroup(g).expenses : []).filter(e => e.status === 'pending').length
+  const joinRequests = useMemo(
+    () => safeArray(state.joinRequests)
+      .filter(req => (req.groupId || req.group_id) === currentGroupId)
+      .sort((a, b) => String(a.createdAt || a.created_at || '').localeCompare(String(b.createdAt || b.created_at || ''))),
+    [state.joinRequests, currentGroupId]
+  );
+  const joinRequestCount = isTreasurer ? joinRequests.length : 0;
   const groupPeriods = useMemo(
     () => safeArray(state.settlementPeriods)
       .filter(p => paymentPeriodField(p, 'groupId', 'group_id') === currentGroupId)
@@ -748,7 +851,7 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
         {[
           { id: 'activity', label: 'Hoạt động' },
           { id: 'balance', label: 'Số dư' },
-          { id: 'members', label: 'Thành viên' },
+          { id: 'members', label: 'Thành viên', badge: joinRequestCount },
         ].map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             appearance: 'none', flex: 1, height: 44, cursor: 'pointer',
@@ -756,8 +859,24 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
             position: 'relative',
             fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 14,
             color: tab === t.id ? 'var(--brand-1)' : 'var(--text-2)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           }}>
-            {t.label}
+            <span>{t.label}</span>
+            {t.badge > 0 && (
+              <span style={{
+                minWidth: 18,
+                height: 18,
+                padding: '0 5px',
+                borderRadius: 9,
+                background: 'var(--vb-danger-600)',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 900,
+                lineHeight: '18px',
+              }}>
+                {t.badge}
+              </span>
+            )}
             {tab === t.id && <div style={{ position: 'absolute', bottom: -1, left: 16, right: 16, height: 2, background: 'var(--brand-1)', borderRadius: 2 }}/>}
           </button>
         ))}
@@ -766,7 +885,7 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
       <div style={{ padding: 16 }}>
         {tab === 'activity' && <GroupActivity g={group} push={push} avatarStyle={tweaks.avatarStyle}/>}
         {tab === 'balance' && <GroupBalance g={group} balance={balance} avatarStyle={tweaks.avatarStyle} meId={meId}/>}
-        {tab === 'members' && <GroupMembers g={group} balance={balance} avatarStyle={tweaks.avatarStyle}/>}
+        {tab === 'members' && <GroupMembers g={group} balance={balance} avatarStyle={tweaks.avatarStyle} joinRequests={joinRequests} isTreasurer={isTreasurer}/>}
       </div>
 
       <SettlementPeriodHistory
@@ -1027,25 +1146,128 @@ function GroupBalance({ g, balance, avatarStyle, meId }) {
   );
 }
 
-function GroupMembers({ g, balance, avatarStyle }) {
-  const { state } = useApp();
+function GroupMembers({ g, balance, avatarStyle, joinRequests = [], isTreasurer = false }) {
+  const { state, dispatch } = useApp();
   const M = getMemberMap(state.members);
   const members = safeArray(g?.members);
+  const requests = safeArray(joinRequests).filter(req => (req.status || 'pending') === 'pending');
+  const [busyRequestId, setBusyRequestId] = useState(null);
+
+  async function handleJoinRequest(type, requestId) {
+    if (busyRequestId || !requestId) return;
+    setBusyRequestId(requestId);
+    try {
+      await dispatch({ type, requestId });
+    } catch (err) {
+      console.error(`[GroupMembers] ${type}:`, err);
+      window.alert('Không xử lý được yêu cầu. Thử lại sau.');
+      setBusyRequestId(null);
+    }
+  }
+
   return (
-    <Card>
-      {members.map((id, i) => {
-        const m = memberOrFallback(M, id); const b = balance[id] || 0;
-        return (
-          <ListRow key={id}
-            left={<Avatar member={m} size={40} style={avatarStyle}/>}
-            title={m.isMe ? m.name + ' (bạn)' : m.name}
-            subtitle={m.isMe ? 'Quản trị viên' : 'Thành viên'}
-            right={m.isMe ? null : <Money value={b} size={13} color={b > 0 ? 'var(--vb-success-700)' : b < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>}
-            divider={i < members.length - 1}
-          />
-        );
-      })}
-    </Card>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {isTreasurer && requests.length > 0 && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 4px 8px' }}>
+            <div style={{ fontFamily: 'var(--vb-font-body)', fontWeight: 700, fontSize: 13, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--text-2)' }}>
+              Yêu cầu tham gia
+            </div>
+            <span style={{
+              minWidth: 20,
+              height: 20,
+              padding: '0 6px',
+              borderRadius: 10,
+              background: 'var(--vb-danger-600)',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 900,
+              lineHeight: '20px',
+              textAlign: 'center',
+            }}>
+              {requests.length}
+            </span>
+          </div>
+          <Card>
+            {requests.map((req, i) => {
+              const busy = busyRequestId === req.id;
+              return (
+                <div key={req.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '12px 14px',
+                  borderBottom: i < requests.length - 1 ? '1px solid var(--border-1)' : 'none',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {req.name} <span style={{ color: 'var(--text-2)', fontWeight: 700 }}>· {formatDateTimeVN(req.createdAt || req.created_at)}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={() => handleJoinRequest('APPROVE_JOIN_REQUEST', req.id)}
+                      disabled={busy}
+                      style={{
+                        appearance: 'none',
+                        height: 32,
+                        padding: '0 10px',
+                        border: 0,
+                        borderRadius: 8,
+                        background: 'var(--vb-success-700)',
+                        color: '#fff',
+                        fontFamily: 'var(--vb-font-body)',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: busy ? 'default' : 'pointer',
+                        opacity: busy ? 0.6 : 1,
+                      }}
+                    >
+                      Duyệt
+                    </button>
+                    <button
+                      onClick={() => handleJoinRequest('REJECT_JOIN_REQUEST', req.id)}
+                      disabled={busy}
+                      style={{
+                        appearance: 'none',
+                        height: 32,
+                        padding: '0 10px',
+                        border: 0,
+                        borderRadius: 8,
+                        background: 'var(--vb-danger-700)',
+                        color: '#fff',
+                        fontFamily: 'var(--vb-font-body)',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: busy ? 'default' : 'pointer',
+                        opacity: busy ? 0.6 : 1,
+                      }}
+                    >
+                      Từ chối
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        </div>
+      )}
+
+      <Card>
+        {members.map((id, i) => {
+          const m = memberOrFallback(M, id); const b = balance[id] || 0;
+          return (
+            <ListRow key={id}
+              left={<Avatar member={m} size={40} style={avatarStyle}/>}
+              title={m.isMe ? m.name + ' (bạn)' : m.name}
+              subtitle={m.isMe ? 'Quản trị viên' : 'Thành viên'}
+              right={m.isMe ? null : <Money value={b} size={13} color={b > 0 ? 'var(--vb-success-700)' : b < 0 ? 'var(--vb-danger-700)' : 'var(--text-2)'} compact/>}
+              divider={i < members.length - 1}
+            />
+          );
+        })}
+      </Card>
+    </div>
   );
 }
 

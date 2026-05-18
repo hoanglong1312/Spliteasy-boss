@@ -62,6 +62,7 @@ function buildEmptyState() {
     currentGroupId: null,
     members: [],
     groups: [],
+    joinRequests: [],
     settlementPeriods: [],
     pickle: {
       sessions: [],
@@ -88,7 +89,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, eR, pR, sR, spR, ppR, pcR, psR, paR, dR] = await Promise.all([
+  const [mR, gR, eR, pR, sR, spR, ppR, pcR, psR, paR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -100,12 +101,14 @@ async function fetchGroupData(token) {
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
+    sb.from('join_requests').select('*').eq('status', 'pending'),
   ])
   if (mR.error) throw mR.error
   if (gR.error) throw gR.error
   if (spR.error) console.warn('[store] settlement_periods query failed:', spR.error)
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
+  if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
     members:         mR.data || [],
     groups:          gR.data || [],
@@ -118,15 +121,27 @@ async function fetchGroupData(token) {
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
     disputeCount:    (dR.data || []).length,
+    joinRequests:    jR.data || [],
   }
 }
 
 function normalize(raw, currentMemberId) {
-  const { members, groups, expenses, participants, settlements, settlementPeriods, periodPayments, pickleConfig, pickleSessions, pickleAttendees, disputeCount } = raw
+  const { members, groups, expenses, participants, settlements, settlementPeriods, periodPayments, pickleConfig, pickleSessions, pickleAttendees, disputeCount, joinRequests = [] } = raw
   if (groups.length === 0) return null  // signal: data empty but keep session
 
   const me = members.find(m => m.id === currentMemberId)
   const currentGroup = groups.find(g => g.id === me?.group_id) || groups[0]
+  const normalJoinRequests = safeArray(joinRequests)
+    .filter(r => r.group_id === currentGroup.id)
+    .map(r => ({
+      id: r.id,
+      groupId: r.group_id,
+      group_id: r.group_id,
+      name: r.name,
+      status: r.status || 'pending',
+      createdAt: r.created_at,
+      created_at: r.created_at,
+    }))
 
   const normalExpenses = expenses.map(e => ({
     id: e.id,
@@ -237,6 +252,7 @@ function normalize(raw, currentMemberId) {
       settlements: normalSettlements.filter(s => s.groupId === group.id),
       settlementPeriods: normalSettlementPeriods.filter(p => p.groupId === group.id),
     })),
+    joinRequests: normalJoinRequests,
     settlementPeriods: normalSettlementPeriods,
     pickle: {
       sessions: normalSessions,
@@ -798,6 +814,38 @@ export function AppProvider({ children, onToast }) {
         return newMember
       }
 
+      case 'APPROVE_JOIN_REQUEST': {
+        if (!sb) return
+        const requestId = action.requestId ?? action.p_request_id
+        if (!requestId) return
+        const { data, error } = await sb.rpc('approve_join_request', {
+          p_request_id: requestId,
+        })
+        if (error || data?.error) {
+          const err = error || new Error(data.error)
+          console.error('[store] APPROVE_JOIN_REQUEST:', err)
+          throw err
+        }
+        scheduleRefresh()
+        return data
+      }
+
+      case 'REJECT_JOIN_REQUEST': {
+        if (!sb) return
+        const requestId = action.requestId ?? action.p_request_id
+        if (!requestId) return
+        const { data, error } = await sb.rpc('reject_join_request', {
+          p_request_id: requestId,
+        })
+        if (error || data?.error) {
+          const err = error || new Error(data.error)
+          console.error('[store] REJECT_JOIN_REQUEST:', err)
+          throw err
+        }
+        scheduleRefresh()
+        return data
+      }
+
       case 'CONFIRM_ATTENDANCE': {
         if (!sb) return
         const { sessionId, memberId, attending } = action
@@ -920,7 +968,7 @@ export function AppProvider({ children, onToast }) {
       default:
         console.warn('[store] Unknown action:', action.type)
     }
-  }, [state.currentUserId, state.currentGroupId, refresh, broadcastChange])
+  }, [state.currentUserId, state.currentGroupId, refresh, scheduleRefresh, broadcastChange])
 
   return (
     <AppContext.Provider value={{ state, dispatch, genId }}>
