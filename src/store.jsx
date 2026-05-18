@@ -8,6 +8,53 @@ export function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
 }
 
+function safeArray(value) {
+  return Array.isArray(value) ? value : []
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))
+}
+
+function memberNameParts(name) {
+  const trimmed = String(name || '').trim()
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  return {
+    short: words.at(-1) || trimmed,
+    initials: words.map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?',
+  }
+}
+
+function randomInviteCode(name) {
+  const prefix = String(name || 'GROUP')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 6)
+    .toUpperCase() || 'GROUP'
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const bytes = new Uint8Array(6)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes)
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256)
+  }
+  const suffix = Array.from(bytes, b => alphabet[b % alphabet.length]).join('')
+  return `${prefix}-${suffix}`
+}
+
+function memberInsertRow(groupId, member, role) {
+  const parts = memberNameParts(member?.name)
+  return {
+    group_id: groupId,
+    name: String(member?.name || '').trim(),
+    short: member?.short || parts.short,
+    initials: member?.initials || parts.initials,
+    color: member?.color || '#574EFA',
+    role,
+  }
+}
+
 function buildEmptyState() {
   return {
     currentUserId: null,
@@ -622,20 +669,109 @@ export function AppProvider({ children, onToast }) {
         break
       }
 
+      case 'CREATE_GROUP':
+      case 'ADD_GROUP': {
+        if (!sb || !state.currentUserId) return null
+        const group = action.group || {}
+        const name = String(group.name || '').trim()
+        if (!name) return null
+
+        const memberIds = safeArray(action.memberIds ?? group.members)
+        const currentMembers = stateRef.current.members || []
+        const currentMember = currentMembers.find(m => m.id === state.currentUserId)
+        const selectedMembers = memberIds
+          .map(id => currentMembers.find(m => m.id === id))
+          .filter(Boolean)
+        if (currentMember && !selectedMembers.some(m => m.id === currentMember.id)) {
+          selectedMembers.unshift(currentMember)
+        }
+        if (selectedMembers.length === 0) return null
+
+        let newGroup = null
+        let groupError = null
+        for (let attempt = 0; attempt < 3 && !newGroup; attempt += 1) {
+          const inviteCode = group.inviteCode || group.invite_code || randomInviteCode(name)
+          const { data, error } = await sb
+            .from('groups')
+            .insert({
+              name,
+              emoji: group.emoji || '🎯',
+              color: group.color || '#574EFA',
+              invite_code: inviteCode,
+            })
+            .select()
+            .single()
+          if (!error) {
+            newGroup = data
+            break
+          }
+          groupError = error
+          if (error.code !== '23505') break
+        }
+        if (groupError && !newGroup) {
+          console.error('[store] CREATE_GROUP group:', groupError)
+          throw groupError
+        }
+
+        const memberRows = selectedMembers.map(member =>
+          memberInsertRow(
+            newGroup.id,
+            member,
+            member.id === state.currentUserId ? 'treasurer' : 'member'
+          )
+        )
+        const { error: membersError } = await sb.from('members').insert(memberRows)
+        if (membersError) {
+          console.error('[store] CREATE_GROUP members:', membersError)
+          throw membersError
+        }
+
+        const { data: joined, error: joinError } = await createSupabase().rpc('join_group', {
+          p_invite_code: newGroup.invite_code,
+          p_name: currentMember?.name || state.currentUserName || memberRows[0].name,
+        })
+        if (joinError || joined?.error) {
+          const err = joinError || new Error(joined.error)
+          console.error('[store] CREATE_GROUP join:', err)
+          throw err
+        }
+
+        storeAuth(joined.token, {
+          id: joined.member_id,
+          groupId: joined.group_id,
+          name: joined.member_name,
+        })
+        tokenRef.current = joined.token
+
+        const newSb = createSupabase(joined.token)
+        const { error: creatorError } = await newSb
+          .from('groups')
+          .update({ created_by: joined.member_id })
+          .eq('id', joined.group_id)
+        if (creatorError) {
+          console.warn('[store] CREATE_GROUP created_by:', creatorError)
+        }
+
+        await refresh(joined.token)
+        return newGroup.id
+      }
+
       case 'ADD_MEMBER': {
         if (!sb) return
         const { member } = action
-        await sb.from('members').insert({
-          id: member.id,
-          group_id: state.currentGroupId,
-          name: member.name,
-          short: member.short,
-          initials: member.initials,
-          color: member.color || '#574EFA',
-          role: member.role || 'member',
-        })
+        const insertRow = memberInsertRow(state.currentGroupId, member, member.role || 'member')
+        if (isUuid(member.id)) insertRow.id = member.id
+        const { data: newMember, error } = await sb
+          .from('members')
+          .insert(insertRow)
+          .select()
+          .single()
+        if (error) {
+          console.error('[store] ADD_MEMBER:', error)
+          throw error
+        }
         await refresh()
-        break
+        return newMember
       }
 
       case 'CONFIRM_ATTENDANCE': {
@@ -747,7 +883,6 @@ export function AppProvider({ children, onToast }) {
         break
       }
 
-      case 'ADD_GROUP':
       case 'DELETE_GROUP':
       case 'ADD_EXTERNAL_TICKET':
       case 'TOGGLE_UPCOMING':

@@ -1382,62 +1382,88 @@ function ScreenNewGroup({ params = {}, pop }) {
   const [emoji, setEmoji] = useState(existingGroup?.emoji || '🎯');
   const [selected, setSelected] = useState(existingGroup?.members || (myId ? [myId] : []));
   const [newMemberName, setNewMemberName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const allMemberIds = useMemo(() => members.map(m => m.id), [members]);
+  const allSelected = allMemberIds.length > 0 && allMemberIds.every(id => selected.includes(id));
+  const canSave = name.trim() && selected.length >= 1 && !saving;
   const toggle = (id) => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
+  const selectAll = () => setSelected(allMemberIds);
+  const clearSelection = () => setSelected(myId && allMemberIds.includes(myId) ? [myId] : []);
 
-  function handleAddMember() {
+  async function handleAddMember() {
     const trimmed = newMemberName.trim();
-    if (!trimmed) return;
-    const newId = 'u_' + Math.random().toString(36).slice(2, 10);
+    if (!trimmed || saving) return;
     const words = trimmed.split(' ');
     const newMem = {
-      id: newId,
       name: trimmed,
       short: words[words.length - 1],
       initials: words.map(w => w[0]).join('').slice(0, 2).toUpperCase(),
       color: ['#574EFA','#E040FB','#F4511E','#0B8043','#039BE5'][Math.floor(Math.random()*5)],
       isMe: false,
     };
-    dispatch({ type: 'ADD_MEMBER', member: newMem });
-    setSelected(s => [...s, newId]);
-    setNewMemberName('');
+    setSaving(true);
+    setError('');
+    try {
+      const created = await dispatch({ type: 'ADD_MEMBER', member: newMem });
+      if (created?.id) {
+        setSelected(s => s.includes(created.id) ? s : [...s, created.id]);
+      }
+      setNewMemberName('');
+    } catch (err) {
+      console.error('[ScreenNewGroup] add member:', err);
+      setError('Không thêm được thành viên. Thử lại sau.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleCreate() {
-    if (!name.trim() || selected.length < 1) return;
-    if (existingGroup) {
-      dispatch({
-        type: 'EDIT_GROUP',
-        group: {
-          ...existingGroup,
+  async function handleCreate() {
+    if (!canSave) return;
+    setSaving(true);
+    setError('');
+    try {
+      const selectedIds = Array.from(new Set(selected.filter(Boolean)));
+      if (existingGroup) {
+        await dispatch({
+          type: 'EDIT_GROUP',
+          group: {
+            ...existingGroup,
+            name: name.trim(),
+            emoji: emoji,
+            members: selectedIds,
+          },
+        });
+      } else {
+        const group = {
+          id: genId(),
           name: name.trim(),
           emoji: emoji,
-          members: selected,
-        },
-      });
-    } else {
-      const group = {
-        id: genId(),
-        name: name.trim(),
-        emoji: emoji,
-        color: '#574EFA',
-        members: selected,
-        expenses: [],
-        settlements: [],
-        createdAt: new Date().toISOString(),
-      };
-      dispatch({ type: 'ADD_GROUP', group });
+          color: '#574EFA',
+          members: selectedIds,
+          expenses: [],
+          settlements: [],
+          createdAt: new Date().toISOString(),
+        };
+        await dispatch({ type: 'CREATE_GROUP', group });
+      }
+      pop();
+    } catch (err) {
+      console.error('[ScreenNewGroup] save group:', err);
+      setError('Không tạo được nhóm. Kiểm tra quyền tạo nhóm hoặc thử lại sau.');
+    } finally {
+      setSaving(false);
     }
-    pop();
   }
 
   return (
     <div style={{ paddingBottom: 32 }}>
-      <NavHeader title={existingGroup ? 'Sửa nhóm' : 'Tạo nhóm mới'} onBack={pop} right={<button onClick={handleCreate} style={{
+      <NavHeader title={existingGroup ? 'Sửa nhóm' : 'Tạo nhóm mới'} onBack={pop} right={<button onClick={handleCreate} disabled={!canSave} style={{
         appearance: 'none', height: 32, padding: '0 12px', cursor: 'pointer',
-        background: name && selected.length >= 1 ? 'var(--brand-1)' : 'var(--surface-2)',
-        color: name && selected.length >= 1 ? '#fff' : 'var(--text-3)',
+        background: canSave ? 'var(--brand-1)' : 'var(--surface-2)',
+        color: canSave ? '#fff' : 'var(--text-3)',
         border: 0, borderRadius: 8, fontWeight: 700, fontSize: 13,
-      }}>{existingGroup ? 'Lưu' : 'Tạo'}</button>}/>
+      }}>{saving ? 'Đang lưu' : existingGroup ? 'Lưu' : 'Tạo'}</button>}/>
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center', padding: 8 }}>
           <div style={{
@@ -1460,8 +1486,67 @@ function ScreenNewGroup({ params = {}, pop }) {
         <FormRow label="Tên nhóm" icon="tag">
           <input value={name} onChange={(e)=>setName(e.target.value)} placeholder="VD: Ăn trưa team Eng" style={inputStyle()}/>
         </FormRow>
+        {error && (
+          <div style={{
+            padding: '10px 12px',
+            borderRadius: 10,
+            background: 'var(--vb-danger-50)',
+            color: 'var(--vb-danger-700)',
+            fontSize: 13,
+            fontWeight: 600,
+          }}>
+            {error}
+          </div>
+        )}
         <FormRow label={`Thành viên (${selected.length})`} icon="users">
           <Card>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              padding: '10px 12px',
+              borderBottom: '1px solid var(--border-1)',
+            }}>
+              <button
+                onClick={selectAll}
+                disabled={allSelected || allMemberIds.length === 0}
+                style={{
+                  appearance: 'none',
+                  height: 30,
+                  padding: '0 10px',
+                  border: '1px solid var(--border-1)',
+                  borderRadius: 8,
+                  background: allSelected ? 'var(--surface-2)' : 'var(--surface-1)',
+                  color: allSelected ? 'var(--text-3)' : 'var(--text-1)',
+                  fontFamily: 'var(--vb-font-body)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: allSelected ? 'default' : 'pointer',
+                }}
+              >
+                Chọn tất cả
+              </button>
+              <button
+                onClick={clearSelection}
+                disabled={selected.length <= (myId && selected.includes(myId) ? 1 : 0)}
+                style={{
+                  appearance: 'none',
+                  height: 30,
+                  padding: '0 10px',
+                  border: '1px solid var(--border-1)',
+                  borderRadius: 8,
+                  background: 'var(--surface-1)',
+                  color: 'var(--text-2)',
+                  fontFamily: 'var(--vb-font-body)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: selected.length <= (myId && selected.includes(myId) ? 1 : 0) ? 'default' : 'pointer',
+                }}
+              >
+                Bỏ chọn tất cả
+              </button>
+            </div>
             {members.map((m, i) => {
               const isMe = m.id === myId;
               return (
