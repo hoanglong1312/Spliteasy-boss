@@ -679,56 +679,37 @@ export function AppProvider({ children, onToast }) {
         const memberIds = safeArray(action.memberIds ?? group.members)
         const currentMembers = stateRef.current.members || []
         const currentMember = currentMembers.find(m => m.id === state.currentUserId)
-        const selectedMembers = memberIds
+        let selectedMembers = memberIds
           .map(id => currentMembers.find(m => m.id === id))
           .filter(Boolean)
-        if (currentMember && !selectedMembers.some(m => m.id === currentMember.id)) {
-          selectedMembers.unshift(currentMember)
+        if (currentMember) {
+          selectedMembers = [
+            currentMember,
+            ...selectedMembers.filter(m => m.id !== currentMember.id),
+          ]
         }
         if (selectedMembers.length === 0) return null
 
-        let newGroup = null
-        let groupError = null
-        for (let attempt = 0; attempt < 3 && !newGroup; attempt += 1) {
-          const inviteCode = group.inviteCode || group.invite_code || randomInviteCode(name)
-          const { data, error } = await sb
-            .from('groups')
-            .insert({
-              name,
-              emoji: group.emoji || '🎯',
-              color: group.color || '#574EFA',
-              invite_code: inviteCode,
-            })
-            .select()
-            .single()
-          if (!error) {
-            newGroup = data
-            break
-          }
-          groupError = error
-          if (error.code !== '23505') break
+        const memberNamesArray = selectedMembers
+          .map(member => String(member?.name || '').trim())
+          .filter(Boolean)
+        const inviteCode = group.inviteCode || group.invite_code || randomInviteCode(name)
+        const { data, error } = await sb.rpc('create_group', {
+          p_name: name,
+          p_invite_code: inviteCode,
+          p_member_names: memberNamesArray,
+        })
+        const newGroup = Array.isArray(data) ? data[0] : data
+        if (error || data?.error || newGroup?.error || !newGroup) {
+          const err = error || new Error(data?.error || newGroup?.error || 'create_group_no_data')
+          console.error('[store] CREATE_GROUP group:', err)
+          throw err
         }
-        if (groupError && !newGroup) {
-          console.error('[store] CREATE_GROUP group:', groupError)
-          throw groupError
-        }
-
-        const memberRows = selectedMembers.map(member =>
-          memberInsertRow(
-            newGroup.id,
-            member,
-            member.id === state.currentUserId ? 'treasurer' : 'member'
-          )
-        )
-        const { error: membersError } = await sb.from('members').insert(memberRows)
-        if (membersError) {
-          console.error('[store] CREATE_GROUP members:', membersError)
-          throw membersError
-        }
+        const newInviteCode = newGroup.invite_code || newGroup.inviteCode || inviteCode
 
         const { data: joined, error: joinError } = await createSupabase().rpc('join_group', {
-          p_invite_code: newGroup.invite_code,
-          p_name: currentMember?.name || state.currentUserName || memberRows[0].name,
+          p_invite_code: newInviteCode,
+          p_name: currentMember?.name || state.currentUserName || memberNamesArray[0],
         })
         if (joinError || joined?.error) {
           const err = joinError || new Error(joined.error)
@@ -746,14 +727,18 @@ export function AppProvider({ children, onToast }) {
         const newSb = createSupabase(joined.token)
         const { error: creatorError } = await newSb
           .from('groups')
-          .update({ created_by: joined.member_id })
+          .update({
+            created_by: joined.member_id,
+            emoji: group.emoji || '🎯',
+            color: group.color || '#574EFA',
+          })
           .eq('id', joined.group_id)
         if (creatorError) {
           console.warn('[store] CREATE_GROUP created_by:', creatorError)
         }
 
         await refresh(joined.token)
-        return newGroup.id
+        return newGroup.group_id || newGroup.id
       }
 
       case 'ADD_MEMBER': {

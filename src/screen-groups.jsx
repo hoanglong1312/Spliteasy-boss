@@ -1450,7 +1450,7 @@ function ScreenNewGroup({ params = {}, pop }) {
       pop();
     } catch (err) {
       console.error('[ScreenNewGroup] save group:', err);
-      setError('Không tạo được nhóm. Kiểm tra quyền tạo nhóm hoặc thử lại sau.');
+      setError(err?.message || 'Không tạo được nhóm. Kiểm tra quyền tạo nhóm hoặc thử lại sau.');
     } finally {
       setSaving(false);
     }
