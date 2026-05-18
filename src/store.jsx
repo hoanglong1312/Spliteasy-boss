@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { createSupabase } from './lib/supabase.js'
-import { getStoredAuth, storeAuth, clearAuth } from './lib/auth.js'
+import { getStoredAuth, storeAuth, clearAuth, joinGroup } from './lib/auth.js'
 
 const AppContext = createContext(null)
 
@@ -712,25 +712,42 @@ export function AppProvider({ children, onToast }) {
           throw err
         }
         const newGroupId = newGroup.group_id || newGroup.id
-        const { error: creatorError } = await sb
+        const newInviteCode = newGroup.invite_code || newGroup.inviteCode || inviteCode
+        const creatorName = currentMember?.name || state.currentUserName || memberNamesArray[0]
+        let joined = null
+        try {
+          joined = await joinGroup(newInviteCode, creatorName)
+        } catch (err) {
+          console.error('[store] CREATE_GROUP join:', err)
+          throw err
+        }
+        if (!joined?.token || !joined?.member_id) {
+          const err = new Error('join_group_no_token')
+          console.error('[store] CREATE_GROUP join:', err)
+          throw err
+        }
+
+        storeAuth(joined.token, {
+          id: joined.member_id,
+          groupId: joined.group_id || newGroupId,
+          name: joined.member_name || creatorName,
+        })
+        tokenRef.current = joined.token
+
+        const joinedSb = createSupabase(joined.token)
+        const { error: creatorError } = await joinedSb
           .from('groups')
           .update({
-            created_by: state.currentUserId,
+            created_by: joined.member_id,
             emoji: group.emoji || '🎯',
             color: group.color || '#574EFA',
           })
-          .eq('id', newGroupId)
+          .eq('id', joined.group_id || newGroupId)
         if (creatorError) {
           console.warn('[store] CREATE_GROUP created_by:', creatorError)
         }
 
-        const raw = await fetchGroupData(tokenRef.current)
-        const next = normalize(raw, state.currentUserId)
-        if (next) {
-          setState(next)
-        } else {
-          setState(s => ({ ...s, _loading: false, _error: 'Không tải được dữ liệu nhóm. Kiểm tra kết nối.' }))
-        }
+        await refresh(joined.token)
         return newGroupId
       }
 

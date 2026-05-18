@@ -29,7 +29,7 @@ export async function joinGroup(inviteCode, name) {
   const sb = createSupabase()
   const { data, error } = await sb.rpc('join_group', {
     p_invite_code: inviteCode,
-    p_name: name,
+    p_member_name: name,
   })
   if (error) throw error
   if (data?.error) throw new Error(data.error)
