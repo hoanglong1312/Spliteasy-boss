@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { createSupabase } from './lib/supabase.js'
 import { getStoredAuth, joinGroup } from './lib/auth.js'
-import { disambiguateMembers, useApp } from './store.jsx'
+import { useApp } from './store.jsx'
 
 function sameMemberName(a, b) {
   return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+}
+
+function memberInitials(member) {
+  const fallback = String(member?.name || '?').trim().slice(0, 2).toUpperCase() || '?'
+  return member?.initials || fallback
 }
 
 export function ScreenJoin({ push }) {
@@ -12,17 +17,13 @@ export function ScreenJoin({ push }) {
 
   const [code, setCode] = useState('')
   const [preview, setPreview] = useState(null)
-  const [storedMatch, setStoredMatch] = useState(null)
-  const [showMemberPicker, setShowMemberPicker] = useState(true)
+  const [selectedMember, setSelectedMember] = useState(null)
   const [newName, setNewName] = useState('')
+  const [duplicateMember, setDuplicateMember] = useState(null)
   const [requestSent, setRequestSent] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState(null)
-  const [pinMember, setPinMember] = useState(null)
-  const [pin, setPin] = useState('')
-  const [pinError, setPinError] = useState(null)
-  const [verifyingPin, setVerifyingPin] = useState(false)
 
   useEffect(() => {
     const hash = window.location.hash
@@ -34,34 +35,32 @@ export function ScreenJoin({ push }) {
     }
   }, [])
 
+  function resetStep2() {
+    setSelectedMember(null)
+    setNewName('')
+    setDuplicateMember(null)
+    setRequestSent(false)
+  }
+
+  function findExistingMember(name) {
+    return (preview?.members || []).find(m => sameMemberName(m.name, name))
+  }
+
   async function doPreview(inviteCode) {
     const c = (inviteCode || code).toUpperCase().trim()
-    if (!c) return
+    if (!c || previewing) return
     setPreviewing(true)
     setError(null)
     setPreview(null)
-    setStoredMatch(null)
-    setShowMemberPicker(true)
-    setNewName('')
-    setRequestSent(false)
-    setPinMember(null)
-    setPin('')
-    setPinError(null)
+    resetStep2()
     try {
       const sb = createSupabase(null)
       const { data, error: rpcErr } = await sb.rpc('preview_group', { p_invite_code: c })
       if (rpcErr || data?.error) {
         setError('Mã nhóm không hợp lệ. Kiểm tra lại mã hoặc liên hệ thủ quỹ.')
-      } else {
-        const members = disambiguateMembers(data?.members || [])
-        const nextPreview = { ...data, members }
-        const storedAuth = getStoredAuth()
-        const storedName = storedAuth.member?.name
-        const match = storedName ? members.find(m => sameMemberName(m.name, storedName)) : null
-        setPreview(nextPreview)
-        setStoredMatch(match ? { ...match, storedName } : null)
-        setShowMemberPicker(!match)
+        return
       }
+      setPreview({ ...data, members: data?.members || [] })
     } catch (e) {
       setError('Không kết nối được. Kiểm tra mạng và thử lại.')
     } finally {
@@ -82,21 +81,17 @@ export function ScreenJoin({ push }) {
     push('home')
   }
 
-  async function handleJoinName(memberName, member = null) {
-    const cleanName = String(memberName || '').trim()
-    if (!cleanName || joining) return
+  async function handleJoinExisting(member = duplicateMember || selectedMember) {
+    if (!member || joining) return
     const inviteCode = code.toUpperCase().trim()
     const existingToken = getStoredAuth().token
     setJoining(true)
     setError(null)
-    setPinError(null)
     try {
-      const data = await joinGroup(inviteCode, cleanName, existingToken)
-      await loginWithToken(data, member || { name: cleanName }, existingToken)
+      const data = await joinGroup(inviteCode, member.name, existingToken)
+      await loginWithToken(data, member, existingToken)
     } catch (e) {
-      const msg = e.message === 'member_not_found'
-        ? 'Tên này chưa có trong nhóm. Nhập tên mới để gửi yêu cầu tham gia.'
-        : e.message === 'invalid_invite_code'
+      const msg = e.message === 'invalid_invite_code'
         ? 'Mã nhóm không hợp lệ. Kiểm tra lại mã hoặc liên hệ thủ quỹ.'
         : 'Không thể tham gia nhóm. Thử lại hoặc liên hệ thủ quỹ.'
       setError(msg)
@@ -105,78 +100,9 @@ export function ScreenJoin({ push }) {
     }
   }
 
-  async function handleConfirmStoredName() {
-    if (!storedMatch) return
-    await handleJoinName(storedMatch.storedName || storedMatch.name, storedMatch)
-  }
-
-  async function handleJoinMember(member) {
-    await handleJoinName(member.name, member)
-  }
-
-  function handleSelectMember(member) {
-    if (member.has_pin === true || member.hasPin === true) {
-      setPinMember(member)
-      setPin('')
-      setPinError(null)
-      setError(null)
-      return
-    }
-    handleJoinMember(member)
-  }
-
-  async function handleConfirmPin(member = pinMember) {
-    const cleanPin = pin.trim()
-    if (!member || !/^\d{4,6}$/.test(cleanPin) || verifyingPin) return
-    setVerifyingPin(true)
+  async function requestJoin(cleanName) {
     setJoining(true)
     setError(null)
-    setPinError(null)
-    try {
-      const sb = createSupabase(null)
-      const { data, error: rpcErr } = await sb.rpc('verify_member_pin', {
-        p_invite_code: code.toUpperCase().trim(),
-        p_member_id: member.id,
-        p_pin: cleanPin,
-      })
-      if (rpcErr) {
-        setError('Không thể xác nhận PIN. Thử lại.')
-        return
-      }
-      if (data?.token) {
-        await loginWithToken(data, member)
-        return
-      }
-      if (data?.error === 'wrong_pin') {
-        setPinError('Mã PIN không đúng')
-        setPin('')
-        return
-      }
-      setError('Không thể xác nhận PIN. Thử lại.')
-    } catch (e) {
-      setError('Có lỗi xảy ra. Thử lại.')
-    } finally {
-      setVerifyingPin(false)
-      setJoining(false)
-    }
-  }
-
-  async function handleSubmitName(e) {
-    e?.preventDefault()
-    const cleanName = newName.trim()
-    if (!cleanName || joining || requestSent) return
-
-    const existing = (preview?.members || []).find(m =>
-      sameMemberName(m.name, cleanName) || sameMemberName(m.displayName, cleanName)
-    )
-    if (existing) {
-      handleSelectMember(existing)
-      return
-    }
-
-    setJoining(true)
-    setError(null)
-    setPinError(null)
     try {
       const inviteCode = code.toUpperCase().trim()
       const sb = createSupabase(null)
@@ -188,22 +114,23 @@ export function ScreenJoin({ push }) {
 
       const result = Array.isArray(data) ? data[0] : data
       if (result?.error === 'name_exists') {
-        const existingToken = getStoredAuth().token
-        const joined = await joinGroup(inviteCode, cleanName, existingToken)
-        await loginWithToken(joined, { name: cleanName }, existingToken)
+        setDuplicateMember({ name: cleanName })
         return
       }
-      if (result?.error === 'group_not_found') {
+      if (result?.error === 'group_not_found' || result?.error === 'invalid_invite_code') {
         setError('Mã nhóm không hợp lệ. Kiểm tra lại mã hoặc liên hệ thủ quỹ.')
         return
       }
-      if (result?.error && !['already_pending', 'pending'].includes(result.error)) {
+      if (
+        result?.error
+        && !['already_pending', 'pending'].includes(result.error)
+        && result?.status !== 'pending'
+      ) {
         throw new Error(result.error)
       }
       setRequestSent(true)
-      setShowMemberPicker(false)
-      setPinMember(null)
-      setPin('')
+      setSelectedMember(null)
+      setDuplicateMember(null)
       setNewName('')
     } catch (e) {
       setError('Không gửi được yêu cầu tham gia. Thử lại sau.')
@@ -212,7 +139,42 @@ export function ScreenJoin({ push }) {
     }
   }
 
+  async function handleSubmitStep2(e) {
+    e?.preventDefault()
+    if (joining || requestSent) return
+    if (selectedMember) {
+      setDuplicateMember(selectedMember)
+      setError(null)
+      return
+    }
+
+    const cleanName = newName.trim()
+    if (!cleanName) return
+    const existing = findExistingMember(cleanName)
+    if (existing) {
+      setDuplicateMember(existing)
+      setError(null)
+      return
+    }
+    await requestJoin(cleanName)
+  }
+
+  function handleUseDifferentName() {
+    setSelectedMember(null)
+    setDuplicateMember(null)
+    setNewName('')
+    setError(null)
+  }
+
+  function handleBackToCode() {
+    setPreview(null)
+    resetStep2()
+    setError(null)
+  }
+
   const groupName = preview?.group_name || preview?.groupName || 'nhóm'
+  const canContinue = code.trim() && !previewing
+  const canJoin = Boolean((selectedMember || newName.trim()) && !joining && !requestSent)
 
   return (
     <div style={{
@@ -230,60 +192,54 @@ export function ScreenJoin({ push }) {
         Nhập mã từ thủ quỹ hoặc mở link nhóm
       </p>
 
-      <div style={{ width: '100%', maxWidth: 340, marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <input
-            value={code}
-            onChange={e => setCode(e.target.value.toUpperCase())}
-            placeholder="Mã nhóm (vd: PICKLE-X7K2)"
-            style={{
-              flex: 1, padding: '12px 14px', borderRadius: 10,
-              border: '1.5px solid var(--border-1)',
-              background: 'var(--surface-1)',
-              color: 'var(--text-1)',
-              fontSize: 15, letterSpacing: 1,
-              outline: 'none',
-            }}
-            onKeyDown={e => e.key === 'Enter' && doPreview()}
-          />
-          <button
-            onClick={() => doPreview()}
-            disabled={previewing || !code.trim()}
-            style={{
-              padding: '12px 16px', borderRadius: 10,
-              background: 'var(--brand-1)', color: '#fff',
-              border: 'none', fontWeight: 600, cursor: 'pointer',
-              opacity: (previewing || !code.trim()) ? 0.5 : 1,
-            }}
-          >
-            {previewing ? '...' : 'Tìm'}
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div style={{
-          color: '#EF4444', fontSize: 13,
-          marginBottom: 12, textAlign: 'center',
-          maxWidth: 320,
-        }}>
-          {error}
-        </div>
-      )}
-
-      {preview && (
-        <div style={{
-          width: '100%', maxWidth: 340,
-          background: 'var(--surface-1)',
-          borderRadius: 16, padding: 20,
-          boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
-        }}>
-          <div style={{ fontWeight: 700, fontSize: 17, color: 'var(--text-1)', marginBottom: 4 }}>
-            {groupName}
-          </div>
-          {requestSent ? (
+      <div style={{
+        width: '100%', maxWidth: 360,
+        background: preview ? 'var(--surface-1)' : 'transparent',
+        borderRadius: 16,
+        padding: preview ? 20 : 0,
+        boxShadow: preview ? '0 2px 12px rgba(0,0,0,0.12)' : 'none',
+      }}>
+        {!preview ? (
+          <form onSubmit={(e) => { e.preventDefault(); doPreview() }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', marginBottom: 6 }}>
+              Mã nhóm
+            </div>
+            <input
+              value={code}
+              onChange={e => setCode(e.target.value.toUpperCase())}
+              placeholder="VD: PICKLE-X7K2"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '12px 14px', borderRadius: 10,
+                border: '1.5px solid var(--border-1)',
+                background: 'var(--surface-1)',
+                color: 'var(--text-1)',
+                fontSize: 15, letterSpacing: 1,
+                outline: 'none',
+                marginBottom: 12,
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!canContinue}
+              style={{
+                width: '100%',
+                padding: '12px 16px', borderRadius: 10,
+                background: canContinue ? 'var(--brand-1)' : 'var(--border-1)',
+                color: canContinue ? '#fff' : 'var(--text-3)',
+                border: 'none', fontWeight: 700,
+                cursor: canContinue ? 'pointer' : 'default',
+              }}
+            >
+              {previewing ? 'Đang tải...' : 'Tiếp tục'}
+            </button>
+          </form>
+        ) : requestSent ? (
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-1)', marginBottom: 12 }}>
+              Nhóm: {groupName}
+            </div>
             <div style={{
-              marginTop: 14,
               padding: 14,
               borderRadius: 12,
               background: 'var(--surface-2)',
@@ -294,206 +250,202 @@ export function ScreenJoin({ push }) {
             }}>
               Yêu cầu đã gửi, chờ thủ quỹ duyệt
             </div>
-          ) : storedMatch && !showMemberPicker ? (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontSize: 15, lineHeight: 1.45, color: 'var(--text-1)', marginBottom: 14 }}>
-                Vào nhóm {groupName} với tên <strong>{storedMatch.storedName || storedMatch.name}</strong>?
-              </div>
-              <button
-                onClick={handleConfirmStoredName}
-                disabled={joining}
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  borderRadius: 10,
-                  background: 'var(--brand-1)',
-                  color: '#fff',
-                  border: 'none',
-                  fontWeight: 700,
-                  cursor: joining ? 'default' : 'pointer',
-                  opacity: joining ? 0.6 : 1,
-                }}
-              >
-                {joining ? 'Đang tham gia...' : 'Xác nhận'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowMemberPicker(true)
-                  setPinMember(null)
-                  setPin('')
-                  setPinError(null)
-                  setError(null)
-                }}
-                disabled={joining}
-                style={{
-                  appearance: 'none',
-                  display: 'block',
-                  margin: '12px auto 0',
-                  padding: 0,
-                  background: 'transparent',
-                  border: 0,
-                  color: 'var(--text-2)',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: joining ? 'default' : 'pointer',
-                }}
-              >
-                Dùng tên khác
-              </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmitStep2}>
+            <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text-1)', marginBottom: 12 }}>
+              Nhóm: {groupName}
             </div>
-          ) : (
-            <>
-              <div style={{ fontSize: 13, color: 'var(--text-2)', margin: '12px 0 12px' }}>
-                Bạn là ai trong nhóm này?
-              </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {(preview.members || []).map(m => {
-                  const selectedForPin = pinMember?.id === m.id
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => !joining && !verifyingPin && handleSelectMember(m)}
-                      disabled={joining || verifyingPin}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        minHeight: 38,
-                        maxWidth: '100%',
-                        padding: '6px 10px 6px 6px',
-                        borderRadius: 999,
-                        background: selectedForPin ? 'var(--brand-soft)' : 'var(--surface-2)',
-                        border: `1.5px solid ${selectedForPin ? 'var(--brand-1)' : 'var(--border-1)'}`,
-                        cursor: joining || verifyingPin ? 'default' : 'pointer',
-                        opacity: joining || verifyingPin ? 0.6 : 1,
-                      }}
-                    >
-                      <span style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: '50%',
-                        background: m.color || 'var(--brand-1)',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#fff',
-                        fontSize: 11,
-                        fontWeight: 800,
-                        flexShrink: 0,
-                      }}>
-                        {m.initials}
-                      </span>
-                      <span style={{
-                        minWidth: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        color: 'var(--text-1)',
-                        fontSize: 14,
-                        fontWeight: 700,
-                      }}>
-                        {m.displayName || m.name}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {pinMember && (
-                <div style={{
-                  marginTop: 12,
-                  padding: 12,
-                  borderRadius: 12,
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border-1)',
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', marginBottom: 8 }}>
-                    Nhập PIN cho {pinMember.displayName || pinMember.name}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      value={pin}
-                      onChange={e => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      onKeyDown={e => e.key === 'Enter' && handleConfirmPin(pinMember)}
-                      type="password"
-                      inputMode="numeric"
-                      autoFocus
-                      placeholder="PIN 4-6 số"
-                      style={{
-                        flex: 1, minWidth: 0,
-                        padding: '10px 12px', borderRadius: 10,
-                        border: `1.5px solid ${pinError ? '#EF4444' : 'var(--border-1)'}`,
-                        background: 'var(--surface-1)',
-                        color: 'var(--text-1)',
-                        fontSize: 15,
-                        outline: 'none',
-                      }}
-                    />
-                    <button
-                      onClick={() => handleConfirmPin(pinMember)}
-                      disabled={!/^\d{4,6}$/.test(pin) || verifyingPin}
-                      style={{
-                        padding: '10px 12px', borderRadius: 10,
-                        background: 'var(--brand-1)', color: '#fff',
-                        border: 'none', fontWeight: 700, cursor: 'pointer',
-                        opacity: (!/^\d{4,6}$/.test(pin) || verifyingPin) ? 0.5 : 1,
-                      }}
-                    >
-                      {verifyingPin ? '...' : 'Xác nhận'}
-                    </button>
-                  </div>
-                  {pinError && (
-                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: '#EF4444' }}>
-                      {pinError}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmitName} style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    placeholder="Hoặc nhập tên mới..."
-                    style={{
-                      flex: 1, minWidth: 0,
-                      padding: '11px 12px',
-                      borderRadius: 10,
-                      border: '1.5px solid var(--border-1)',
-                      background: 'var(--surface-2)',
-                      color: 'var(--text-1)',
-                      fontSize: 14,
-                      outline: 'none',
-                    }}
-                  />
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
+              Chọn tên có sẵn trong nhóm
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(preview.members || []).map(m => {
+                const selected = selectedMember?.id === m.id
+                return (
                   <button
-                    type="submit"
-                    disabled={joining || !newName.trim()}
+                    key={m.id || m.name}
+                    type="button"
+                    onClick={() => {
+                      if (joining) return
+                      setSelectedMember(m)
+                      setNewName('')
+                      setDuplicateMember(m)
+                      setError(null)
+                    }}
+                    disabled={joining}
                     style={{
-                      padding: '11px 12px',
-                      borderRadius: 10,
-                      background: 'var(--brand-1)',
-                      color: '#fff',
-                      border: 'none',
-                      fontWeight: 700,
-                      cursor: joining || !newName.trim() ? 'default' : 'pointer',
-                      opacity: joining || !newName.trim() ? 0.5 : 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      minHeight: 38,
+                      maxWidth: '100%',
+                      padding: '6px 10px 6px 6px',
+                      borderRadius: 999,
+                      background: selected ? 'var(--brand-soft)' : 'var(--surface-2)',
+                      border: `1.5px solid ${selected ? 'var(--brand-1)' : 'var(--border-1)'}`,
+                      cursor: joining ? 'default' : 'pointer',
+                      opacity: joining ? 0.6 : 1,
                     }}
                   >
-                    Gửi
+                    <span style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: '50%',
+                      background: m.color || 'var(--brand-1)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}>
+                      {memberInitials(m)}
+                    </span>
+                    <span style={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: 'var(--text-1)',
+                      fontSize: 14,
+                      fontWeight: 700,
+                    }}>
+                      {m.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-2)', marginBottom: 6 }}>
+                Hoặc nhập tên mới
+              </div>
+              <input
+                value={newName}
+                onChange={e => {
+                  const value = e.target.value
+                  setNewName(value)
+                  setSelectedMember(null)
+                  setDuplicateMember(findExistingMember(value) || null)
+                  setError(null)
+                }}
+                placeholder="VD: Nguyễn Văn A"
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '11px 12px',
+                  borderRadius: 10,
+                  border: '1.5px solid var(--border-1)',
+                  background: 'var(--surface-2)',
+                  color: 'var(--text-1)',
+                  fontSize: 14,
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {duplicateMember && (
+              <div style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 12,
+                background: 'var(--vb-warn-100)',
+                border: '1px solid rgba(238,162,62,0.35)',
+                color: 'var(--text-1)',
+              }}>
+                <div style={{ fontSize: 14, lineHeight: 1.45, marginBottom: 10 }}>
+                  Tên <strong>{duplicateMember.name}</strong> đã có trong nhóm. Đây có phải là bạn không?
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleJoinExisting(duplicateMember)}
+                    disabled={joining}
+                    style={{
+                      flex: '1 1 140px',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: 'var(--brand-1)',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: joining ? 'default' : 'pointer',
+                      opacity: joining ? 0.6 : 1,
+                    }}
+                  >
+                    {joining ? 'Đang tham gia...' : 'Đúng, đó là tôi'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseDifferentName}
+                    disabled={joining}
+                    style={{
+                      flex: '1 1 140px',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid var(--border-1)',
+                      background: 'var(--surface-1)',
+                      color: 'var(--text-1)',
+                      fontWeight: 700,
+                      cursor: joining ? 'default' : 'pointer',
+                      opacity: joining ? 0.6 : 1,
+                    }}
+                  >
+                    Không, đổi tên khác
                   </button>
                 </div>
-              </form>
-            </>
-          )}
+              </div>
+            )}
 
-          {joining && !requestSent && (
-            <div style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-2)' }}>
-              Đang tham gia...
+            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={handleBackToCode}
+                disabled={joining}
+                style={{
+                  flex: '0 0 96px',
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--border-1)',
+                  background: 'var(--surface-1)',
+                  color: 'var(--text-1)',
+                  fontWeight: 700,
+                  cursor: joining ? 'default' : 'pointer',
+                }}
+              >
+                Quay lại
+              </button>
+              <button
+                type="submit"
+                disabled={!canJoin}
+                style={{
+                  flex: 1,
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  background: canJoin ? 'var(--brand-1)' : 'var(--border-1)',
+                  color: canJoin ? '#fff' : 'var(--text-3)',
+                  border: 'none',
+                  fontWeight: 700,
+                  cursor: canJoin ? 'pointer' : 'default',
+                }}
+              >
+                {joining ? 'Đang xử lý...' : 'Tham gia'}
+              </button>
             </div>
-          )}
+          </form>
+        )}
+      </div>
+
+      {error && (
+        <div style={{
+          color: '#EF4444', fontSize: 13,
+          marginTop: 12, textAlign: 'center',
+          maxWidth: 340,
+        }}>
+          {error}
         </div>
       )}
     </div>

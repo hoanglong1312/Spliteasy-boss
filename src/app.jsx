@@ -17,7 +17,8 @@ class ErrorBoundary extends React.Component {
 import { useApp } from './store.jsx'
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakSelect, TweakToggle } from './tweaks-panel.jsx'
 import { Icon, ScreenTransition } from './components.jsx'
-import { joinGroup } from './lib/auth.js'
+import { getStoredAuth, joinGroup } from './lib/auth.js'
+import { createSupabase } from './lib/supabase.js'
 import { ScreenJoin } from './screen-join.jsx'
 import { ScreenPersonal } from './screen-personal.jsx'
 import ScreenHome from './screen-home.jsx'
@@ -38,6 +39,15 @@ function hexA(hex, a) {
   const g = parseInt(hex.slice(3, 5), 16)
   const b = parseInt(hex.slice(5, 7), 16)
   return `rgba(${r},${g},${b},${a})`
+}
+
+function sameMemberName(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+}
+
+function memberInitials(member) {
+  const fallback = String(member?.name || '?').trim().slice(0, 2).toUpperCase() || '?'
+  return member?.initials || fallback
 }
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -67,41 +77,155 @@ const FONTS = {
 
 function ScreenJoinGroup() {
   const { dispatch } = useApp()
-  const [code, setCode]   = useState('')
-  const [name, setName]   = useState('')
-  const [loading, setLoading] = useState(false)
+  const [code, setCode] = useState('')
+  const [preview, setPreview] = useState(null)
+  const [selectedMember, setSelectedMember] = useState(null)
+  const [newName, setNewName] = useState('')
+  const [duplicateMember, setDuplicateMember] = useState(null)
+  const [requestSent, setRequestSent] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [joining, setJoining] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleJoin() {
+  function resetStep2() {
+    setSelectedMember(null)
+    setNewName('')
+    setDuplicateMember(null)
+    setRequestSent(false)
+  }
+
+  function findExistingMember(name) {
+    return (preview?.members || []).find(m => sameMemberName(m.name, name))
+  }
+
+  async function handlePreview(e) {
+    e?.preventDefault()
     const trimCode = code.trim().toUpperCase()
-    const trimName = name.trim()
-    if (!trimCode || !trimName) return
-    setLoading(true)
+    if (!trimCode || previewing) return
+    setPreviewing(true)
     setError('')
+    setPreview(null)
+    resetStep2()
     try {
-      const result = await joinGroup(trimCode, trimName)
-      await dispatch({
-        type: 'LOGIN',
-        token: result.token,
-        memberId: result.member_id,
-        groupId: result.group_id,
-        memberName: result.member_name,
-      })
+      const sb = createSupabase(null)
+      const { data, error: rpcErr } = await sb.rpc('preview_group', { p_invite_code: trimCode })
+      if (rpcErr || data?.error) {
+        setError('Mã nhóm không đúng. Kiểm tra lại nhé!')
+        return
+      }
+      setPreview({ ...data, members: data?.members || [] })
     } catch (err) {
-      const msg = err.message === 'invalid_invite_code'
-        ? 'Mã nhóm không đúng. Kiểm tra lại nhé!'
-        : err.message === 'invite_code_required'
-        ? 'Nhập mã nhóm để tiếp tục.'
-        : err.message === 'name_required'
-        ? 'Nhập tên của bạn.'
-        : 'Lỗi kết nối. Thử lại sau.'
-      setError(msg)
+      setError('Lỗi kết nối. Thử lại sau.')
     } finally {
-      setLoading(false)
+      setPreviewing(false)
     }
   }
 
-  const canJoin = code.trim() && name.trim() && !loading
+  async function loginWithJoinResult(result, member, existingToken = null) {
+    const nextToken = result?.token || existingToken
+    if (!nextToken) throw new Error('join_group_no_token')
+    await dispatch({
+      type: 'LOGIN',
+      token: nextToken,
+      memberId: result.member_id || result.memberId || member?.id,
+      groupId: result.group_id || result.groupId || preview?.group_id || preview?.groupId,
+      memberName: result.member_name || result.memberName || member?.name,
+    })
+  }
+
+  async function handleJoinExisting(member = duplicateMember || selectedMember) {
+    if (!member || joining) return
+    const trimCode = code.trim().toUpperCase()
+    const existingToken = getStoredAuth().token
+    setJoining(true)
+    setError('')
+    try {
+      const result = await joinGroup(trimCode, member.name, existingToken)
+      await loginWithJoinResult(result, member, existingToken)
+    } catch (err) {
+      const msg = err.message === 'invalid_invite_code'
+        ? 'Mã nhóm không đúng. Kiểm tra lại nhé!'
+        : 'Không tham gia được nhóm. Thử lại sau.'
+      setError(msg)
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  async function requestJoin(cleanName) {
+    setJoining(true)
+    setError('')
+    try {
+      const sb = createSupabase(null)
+      const { data, error: rpcErr } = await sb.rpc('request_to_join', {
+        p_invite_code: code.trim().toUpperCase(),
+        p_name: cleanName,
+      })
+      if (rpcErr) throw rpcErr
+
+      const result = Array.isArray(data) ? data[0] : data
+      if (result?.error === 'name_exists') {
+        setDuplicateMember({ name: cleanName })
+        return
+      }
+      if (result?.error === 'group_not_found' || result?.error === 'invalid_invite_code') {
+        setError('Mã nhóm không đúng. Kiểm tra lại nhé!')
+        return
+      }
+      if (
+        result?.error
+        && !['already_pending', 'pending'].includes(result.error)
+        && result?.status !== 'pending'
+      ) {
+        throw new Error(result.error)
+      }
+      setRequestSent(true)
+      setSelectedMember(null)
+      setDuplicateMember(null)
+      setNewName('')
+    } catch (err) {
+      setError('Không gửi được yêu cầu tham gia. Thử lại sau.')
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  async function handleJoin(e) {
+    e?.preventDefault()
+    if (joining || requestSent) return
+    if (selectedMember) {
+      setDuplicateMember(selectedMember)
+      setError('')
+      return
+    }
+
+    const trimName = newName.trim()
+    if (!trimName) return
+    const existing = findExistingMember(trimName)
+    if (existing) {
+      setDuplicateMember(existing)
+      setError('')
+      return
+    }
+    await requestJoin(trimName)
+  }
+
+  function handleUseDifferentName() {
+    setSelectedMember(null)
+    setDuplicateMember(null)
+    setNewName('')
+    setError('')
+  }
+
+  function handleBackToCode() {
+    setPreview(null)
+    resetStep2()
+    setError('')
+  }
+
+  const groupName = preview?.group_name || preview?.groupName || 'nhóm'
+  const canContinue = code.trim() && !previewing
+  const canJoin = Boolean((selectedMember || newName.trim()) && !joining && !requestSent)
 
   return (
     <div style={{
@@ -123,72 +247,275 @@ function ScreenJoinGroup() {
         Nhập mã nhóm để vào nhóm của bạn
       </div>
 
-      <div style={{ width: '100%', marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
-          Mã nhóm
-        </div>
-        <input
-          type="text"
-          placeholder="VD: PICKLE-TEST"
-          value={code}
-          onChange={e => setCode(e.target.value.toUpperCase())}
-          onKeyDown={e => e.key === 'Enter' && canJoin && handleJoin()}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            padding: '12px 14px', borderRadius: 12,
-            border: '1.5px solid var(--border-1)',
-            fontSize: 15, fontWeight: 600, letterSpacing: '0.04em',
-            background: 'var(--surface-1)', color: 'var(--text-1)',
-            outline: 'none', fontFamily: 'var(--vb-font-body)',
-            textTransform: 'uppercase',
-          }}
-        />
+      <div style={{ width: '100%', maxWidth: 360 }}>
+        {!preview ? (
+          <form onSubmit={handlePreview}>
+            <div style={{ width: '100%', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+                Mã nhóm
+              </div>
+              <input
+                type="text"
+                placeholder="VD: PICKLE-TEST"
+                value={code}
+                onChange={e => setCode(e.target.value.toUpperCase())}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px', borderRadius: 12,
+                  border: '1.5px solid var(--border-1)',
+                  fontSize: 15, fontWeight: 600, letterSpacing: '0.04em',
+                  background: 'var(--surface-1)', color: 'var(--text-1)',
+                  outline: 'none', fontFamily: 'var(--vb-font-body)',
+                  textTransform: 'uppercase',
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={!canContinue}
+              style={{
+                width: '100%', height: 48, borderRadius: 14, border: 0,
+                background: canContinue ? 'var(--brand-1)' : 'var(--border-1)',
+                color: canContinue ? '#fff' : 'var(--text-3)',
+                fontSize: 15, fontWeight: 700,
+                cursor: canContinue ? 'pointer' : 'default',
+                fontFamily: 'var(--vb-font-body)',
+                transition: 'background .15s',
+              }}
+            >
+              {previewing ? 'Đang tải...' : 'Tiếp tục'}
+            </button>
+          </form>
+        ) : requestSent ? (
+          <div style={{
+            background: 'var(--surface-1)',
+            borderRadius: 16,
+            padding: 20,
+            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+          }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', marginBottom: 12 }}>
+              Nhóm: {groupName}
+            </div>
+            <div style={{
+              padding: 14,
+              borderRadius: 12,
+              background: 'var(--surface-2)',
+              color: 'var(--text-1)',
+              fontSize: 14,
+              fontWeight: 700,
+              textAlign: 'center',
+            }}>
+              Yêu cầu đã gửi, chờ thủ quỹ duyệt
+            </div>
+          </div>
+        ) : (
+          <form
+            onSubmit={handleJoin}
+            style={{
+              background: 'var(--surface-1)',
+              borderRadius: 16,
+              padding: 20,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+            }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text-1)', marginBottom: 12 }}>
+              Nhóm: {groupName}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 10 }}>
+              Chọn tên có sẵn trong nhóm
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(preview.members || []).map(m => {
+                const selected = selectedMember?.id === m.id
+                return (
+                  <button
+                    key={m.id || m.name}
+                    type="button"
+                    onClick={() => {
+                      if (joining) return
+                      setSelectedMember(m)
+                      setNewName('')
+                      setDuplicateMember(m)
+                      setError('')
+                    }}
+                    disabled={joining}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      minHeight: 38,
+                      maxWidth: '100%',
+                      padding: '6px 10px 6px 6px',
+                      borderRadius: 999,
+                      background: selected ? 'var(--brand-soft)' : 'var(--surface-2)',
+                      border: `1.5px solid ${selected ? 'var(--brand-1)' : 'var(--border-1)'}`,
+                      cursor: joining ? 'default' : 'pointer',
+                      opacity: joining ? 0.6 : 1,
+                    }}
+                  >
+                    <span style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: '50%',
+                      background: m.color || 'var(--brand-1)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}>
+                      {memberInitials(m)}
+                    </span>
+                    <span style={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: 'var(--text-1)',
+                      fontSize: 14,
+                      fontWeight: 700,
+                    }}>
+                      {m.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ marginTop: 16, marginBottom: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
+                Hoặc nhập tên mới
+              </div>
+              <input
+                type="text"
+                placeholder="VD: Nguyễn Văn A"
+                value={newName}
+                onChange={e => {
+                  const value = e.target.value
+                  setNewName(value)
+                  setSelectedMember(null)
+                  setDuplicateMember(findExistingMember(value) || null)
+                  setError('')
+                }}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px', borderRadius: 12,
+                  border: '1.5px solid var(--border-1)',
+                  fontSize: 15, fontWeight: 500,
+                  background: 'var(--surface-2)', color: 'var(--text-1)',
+                  outline: 'none', fontFamily: 'var(--vb-font-body)',
+                }}
+              />
+            </div>
+
+            {duplicateMember && (
+              <div style={{
+                marginBottom: 14,
+                padding: 12,
+                borderRadius: 12,
+                background: 'var(--vb-warn-100)',
+                border: '1px solid rgba(238,162,62,0.35)',
+                color: 'var(--text-1)',
+              }}>
+                <div style={{ fontSize: 14, lineHeight: 1.45, marginBottom: 10 }}>
+                  Tên <strong>{duplicateMember.name}</strong> đã có trong nhóm. Đây có phải là bạn không?
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleJoinExisting(duplicateMember)}
+                    disabled={joining}
+                    style={{
+                      flex: '1 1 140px',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: 'var(--brand-1)',
+                      color: '#fff',
+                      fontWeight: 700,
+                      cursor: joining ? 'default' : 'pointer',
+                      opacity: joining ? 0.6 : 1,
+                    }}
+                  >
+                    {joining ? 'Đang tham gia...' : 'Đúng, đó là tôi'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUseDifferentName}
+                    disabled={joining}
+                    style={{
+                      flex: '1 1 140px',
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: '1px solid var(--border-1)',
+                      background: 'var(--surface-1)',
+                      color: 'var(--text-1)',
+                      fontWeight: 700,
+                      cursor: joining ? 'default' : 'pointer',
+                      opacity: joining ? 0.6 : 1,
+                    }}
+                  >
+                    Không, đổi tên khác
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleBackToCode}
+                disabled={joining}
+                style={{
+                  flex: '0 0 96px',
+                  height: 48,
+                  borderRadius: 14,
+                  border: '1px solid var(--border-1)',
+                  background: 'var(--surface-1)',
+                  color: 'var(--text-1)',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: joining ? 'default' : 'pointer',
+                  fontFamily: 'var(--vb-font-body)',
+                }}
+              >
+                Quay lại
+              </button>
+              <button
+                type="submit"
+                disabled={!canJoin}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  borderRadius: 14,
+                  border: 0,
+                  background: canJoin ? 'var(--brand-1)' : 'var(--border-1)',
+                  color: canJoin ? '#fff' : 'var(--text-3)',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: canJoin ? 'pointer' : 'default',
+                  fontFamily: 'var(--vb-font-body)',
+                  transition: 'background .15s',
+                }}
+              >
+                {joining ? 'Đang xử lý...' : 'Tham gia'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {error && (
+          <div style={{ width: '100%', marginTop: 12, padding: '10px 14px',
+            boxSizing: 'border-box',
+            borderRadius: 10, background: 'var(--vb-danger-50)',
+            color: 'var(--vb-danger-700)', fontSize: 13, fontWeight: 500 }}>
+            {error}
+          </div>
+        )}
       </div>
-
-      <div style={{ width: '100%', marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6 }}>
-          Tên của bạn
-        </div>
-        <input
-          type="text"
-          placeholder="VD: Nguyễn Văn A"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && canJoin && handleJoin()}
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            padding: '12px 14px', borderRadius: 12,
-            border: '1.5px solid var(--border-1)',
-            fontSize: 15, fontWeight: 500,
-            background: 'var(--surface-1)', color: 'var(--text-1)',
-            outline: 'none', fontFamily: 'var(--vb-font-body)',
-          }}
-        />
-      </div>
-
-      {error && (
-        <div style={{ width: '100%', marginBottom: 12, padding: '10px 14px',
-          borderRadius: 10, background: 'var(--vb-danger-50)',
-          color: 'var(--vb-danger-700)', fontSize: 13, fontWeight: 500 }}>
-          {error}
-        </div>
-      )}
-
-      <button
-        onClick={handleJoin}
-        disabled={!canJoin}
-        style={{
-          width: '100%', height: 48, borderRadius: 14, border: 0,
-          background: canJoin ? 'var(--brand-1)' : 'var(--border-1)',
-          color: canJoin ? '#fff' : 'var(--text-3)',
-          fontSize: 15, fontWeight: 700,
-          cursor: canJoin ? 'pointer' : 'default',
-          fontFamily: 'var(--vb-font-body)',
-          transition: 'background .15s',
-        }}
-      >
-        {loading ? 'Đang vào nhóm...' : 'Vào nhóm →'}
-      </button>
     </div>
   )
 }

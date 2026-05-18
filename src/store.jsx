@@ -253,7 +253,7 @@ function normalize(raw, currentMemberId) {
     expenses: normalExpenses.filter(e => e.pickleSessionId === s.id),
   }))
 
-  const normalMembers = disambiguateMembers(members.map(m => ({
+  const normalMembers = members.map(m => ({
     id: m.id,
     groupId: m.group_id,
     group_id: m.group_id,
@@ -273,7 +273,7 @@ function normalize(raw, currentMemberId) {
     created_at: m.created_at,
     hasPin: memberHasPin(m),
     has_pin: memberHasPin(m),
-  })))
+  }))
 
   return {
     currentUserId: currentMemberId,
