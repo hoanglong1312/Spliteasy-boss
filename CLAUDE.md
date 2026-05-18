@@ -1,6 +1,6 @@
 # CLAUDE.md — SpliteasyBoss
 
-> Quy tắc làm việc chung: xem `rules/` (multi-agent, RTK, superpowers, communication)
+> Quy tắc làm việc: xem [`rules/codex-workflow.md`](rules/codex-workflow.md)
 
 ---
 
@@ -57,12 +57,14 @@ supabase/migrations/   ← SQL migrations (đã chạy hết)
 
 ---
 
-## Lộ trình phát triển
+## Lộ trình phát triển (UI/UX Plans)
 
 ```
 Phase 0: Phân tích & Thiết kế    ✅ XONG
-Phase 1: UI/UX Design            🔄 ĐANG LÀM
-Phase 2: Kế hoạch kỹ thuật       ⏳ SAU PHASE 1
+Phase 1: UI/UX Design            ✅ XONG
+  Plan 1 — Approval Workflow     ✅ (StatusBadge, SwipeCard, ApprovalQueue)
+  Plan 2 — SmartHome + Payment   ✅ (SmartHomeSummary, ScreenPaymentFlow)
+  Plan 3 — Pickleball + JoinGroup ⏳ TIẾP THEO
 Phase 3: Thực thi Database       ✅ XONG (migrations đã chạy)
 Phase 4: Frontend Migration      ✅ XONG (Vite + Supabase)
 Phase 5: Tính năng mới           ⏳ SAU PHASE 1
