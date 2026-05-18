@@ -296,6 +296,17 @@ export function AppProvider({ children, onToast }) {
         break
       }
 
+      case 'UPDATE_MEMBER_COLOR': {
+        if (!sb) return
+        const { error } = await sb
+          .from('members')
+          .update({ color: action.color })
+          .eq('id', state.currentUserId)
+        if (error) { console.error('[store] UPDATE_MEMBER_COLOR:', error); return }
+        await refresh()
+        break
+      }
+
       case 'ADD_EXPENSE': {
         if (!sb) return
         const { groupId, expense } = action
