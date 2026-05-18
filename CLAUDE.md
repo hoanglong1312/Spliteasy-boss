@@ -67,5 +67,12 @@ Phase 1: UI/UX Design            ✅ XONG
   Plan 3 — Pickleball + JoinGroup ✅ (SessionCalendar, ScreenJoin)
 Phase 3: Thực thi Database       ✅ XONG (migrations đã chạy)
 Phase 4: Frontend Migration      ✅ XONG (Vite + Supabase)
-Phase 5: Tính năng mới           ⏳ TIẾP THEO
+Phase 5: Tính năng mới
+  B1 — Realtime sync + Toast       ✅ XONG (cần bật Realtime trên Supabase dashboard)
+  A1 — Tab Hồ sơ                   ⏳ TIẾP THEO
+  A2 — Tab Nhóm nâng cao           ⏳
+  A3 — Vé lẻ Pickleball            ⏳
+  A4 — Personal Dashboard          ⏳
+  B3 — Export báo cáo              ⏳
+  B2 — Push notifications          ⏳
 ```
