@@ -43,12 +43,15 @@ function ScreenGroups({ tweaks = {}, push }) {
   const { state } = useApp();
   const meId = state.currentUserId || ME;
   const [filter, setFilter] = useState('all');
-  const filtered = useMemo(() => {
+  const filteredGroups = useMemo(() => {
     const myGroups = safeArray(state.groups).filter(g => safeArray(g.members).includes(meId));
-    if (filter === 'owe') return myGroups.filter(g => groupNet(safeGroup(g), meId) < 0);
-    if (filter === 'owed') return myGroups.filter(g => groupNet(safeGroup(g), meId) > 0);
-    if (filter === 'settled') return myGroups.filter(g => groupNet(safeGroup(g), meId) === 0);
-    return myGroups;
+    return myGroups.filter(g => {
+      if (filter === 'all') return true;
+      const myBal = groupNet(safeGroup(g), meId);
+      if (filter === 'owed') return myBal < 0;
+      if (filter === 'balanced') return myBal >= 0;
+      return true;
+    });
   }, [filter, state.groups, meId]);
 
   return (
@@ -67,34 +70,43 @@ function ScreenGroups({ tweaks = {}, push }) {
         }}><Icon name="plus" size={18} color="#fff"/>Nhóm mới</button>
       </div>
 
-      {/* Filter pills */}
-      <HScroll style={{ padding: '0 16px 16px' }}>
+      {/* Filter tabs */}
+      <div style={{
+        display: 'flex', gap: 6, padding: '0 16px 12px',
+        overflowX: 'auto',
+      }}>
         {[
-          { id: 'all', label: 'Tất cả' },
-          { id: 'owed', label: 'Được nhận' },
-          { id: 'owe', label: 'Phải trả' },
-          { id: 'settled', label: 'Đã cân bằng' },
+          { key: 'all', label: 'Tất cả' },
+          { key: 'owed', label: 'Còn nợ' },
+          { key: 'balanced', label: 'Cân bằng' },
         ].map(f => (
-          <button key={f.id} onClick={() => setFilter(f.id)} style={{
-            appearance: 'none', flexShrink: 0,
-            height: 34, padding: '0 14px',
-            background: filter === f.id ? 'var(--text-1)' : 'var(--surface-1)',
-            color: filter === f.id ? 'var(--surface-1)' : 'var(--text-1)',
-            border: '1px solid ' + (filter === f.id ? 'var(--text-1)' : 'var(--border-1)'),
-            borderRadius: 'var(--vb-radius-pill)',
-            fontFamily: 'var(--vb-font-body)', fontWeight: 600, fontSize: 13,
-            cursor: 'pointer',
-          }}>{f.label}</button>
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            style={{
+              appearance: 'none',
+              padding: '6px 14px', borderRadius: 20,
+              border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
+              whiteSpace: 'nowrap',
+              background: filter === f.key ? 'var(--brand-1)' : 'var(--surface-2)',
+              color: filter === f.key ? '#fff' : 'var(--text-2)',
+              transition: 'background 0.15s, color 0.15s',
+              fontFamily: 'var(--vb-font-body)',
+              flexShrink: 0,
+            }}
+          >
+            {f.label}
+          </button>
         ))}
-      </HScroll>
+      </div>
 
-      {filtered.length === 0 ? (
+      {filteredGroups.length === 0 ? (
         <div style={{ padding: '0 16px' }}>
           <EmptyState icon="users" title="Chưa có nhóm nào" subtitle="Bấm + để tạo nhóm mới"/>
         </div>
       ) : (
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(g => <GroupCard key={g.id} g={g} avatarStyle={tweaks.avatarStyle} onClick={() => push('group-detail', { groupId: g.id })}/>)}
+          {filteredGroups.map(g => <GroupCard key={g.id} g={g} avatarStyle={tweaks.avatarStyle} onClick={() => push('group-detail', { groupId: g.id })}/>)}
         </div>
       )}
     </div>
