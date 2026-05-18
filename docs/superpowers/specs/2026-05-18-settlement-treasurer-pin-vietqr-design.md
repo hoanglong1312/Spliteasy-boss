@@ -1,4 +1,4 @@
-# Settlement Period + Treasurer PIN + VietQR — Design Spec
+# Settlement Period + Member PIN + VietQR — Design Spec
 
 **Ngày:** 2026-05-18
 **Trạng thái:** Đã duyệt
@@ -6,41 +6,61 @@
 
 ---
 
-## 1. Treasurer PIN (A1)
+## 1. Member PIN (bảo vệ tài khoản cá nhân)
 
 ### Vấn đề
-JoinGroup hiện show tất cả thành viên kể cả thủ quỹ — ai cũng có thể claim quyền thủ quỹ.
+Ai có link mời nhóm đều có thể click vào tên bất kỳ thành viên và xem toàn bộ dữ liệu của người đó (số nợ, lịch sử, quyền duyệt nếu là thủ quỹ).
 
 ### Giải pháp
-- Ẩn thủ quỹ khỏi danh sách member trong JoinGroup
-- Thêm nút nhỏ "Đăng nhập thủ quỹ" ở cuối trang
-- Bấm → dialog nhập PIN → đúng PIN → vào app với role treasurer
-- PIN do thủ quỹ tự đặt lần đầu qua tab Hồ sơ → có thể đổi sau
+PIN là **của từng người**, tự nguyện đặt. Nếu đặt PIN thì khi ai click vào tên mình trong JoinGroup phải nhập đúng PIN mới vào được. Nếu không đặt → vào bình thường như cũ.
 
 ### DB changes
 ```sql
-ALTER TABLE groups ADD COLUMN treasurer_pin_hash text; -- SHA-256 of PIN
+ALTER TABLE members ADD COLUMN pin_hash text; -- SHA-256 of PIN, nullable
 ```
 
-### Flow
-1. **Set PIN (lần đầu):** Thủ quỹ vào Hồ sơ → "Đặt PIN bảo vệ" → nhập PIN → confirm → lưu hash
-2. **Join as treasurer:** `/#/join/CODE` → danh sách chỉ show member (không có treasurer) → nút "🔐 Đăng nhập thủ quỹ" → dialog nhập PIN → hash so sánh với DB → đúng thì join
-3. **Đổi PIN:** Hồ sơ → "Đổi PIN" → nhập PIN cũ + PIN mới
+### Flow đặt PIN
+1. Vào tab Hồ sơ → section "Bảo mật" → nút "Đặt mã PIN"
+2. Nhập 4–6 chữ số → nhập lại để confirm → lưu hash vào DB
+3. Ghi chú hiển thị bên dưới: *"Mã PIN bảo vệ tài khoản của bạn. Nếu quên PIN, nhờ thủ quỹ reset trong tab Quản lý thành viên."*
 
-### Supabase RPC cần thêm
-- `set_treasurer_pin(p_group_id, p_pin)` — SECURITY DEFINER, chỉ gọi được khi token thuộc treasurer
-- `verify_treasurer_pin(p_invite_code, p_pin)` → `{ member_id, token }` — anon callable, trả token của treasurer nếu PIN đúng
+### Flow đổi / xóa PIN
+- Hồ sơ → "Đổi PIN" → nhập PIN cũ → nhập PIN mới → confirm
+- Hồ sơ → "Xóa PIN" → nhập PIN hiện tại → xác nhận → `pin_hash = null`
+
+### Flow reset PIN (thủ quỹ)
+- Thủ quỹ → tab Quản lý thành viên → chọn thành viên → "Reset PIN" → xóa `pin_hash` của người đó
+
+### Flow JoinGroup
+- Danh sách thành viên hiện tất cả (không ẩn ai)
+- Click tên người **có PIN** → dialog nhập PIN → đúng thì vào, sai thì báo lỗi
+- Click tên người **không có PIN** → vào thẳng như cũ
+
+### Supabase RPC
+- `verify_member_pin(p_invite_code, p_member_name, p_pin)` → `{ member_id, token }` — anon callable
+- `set_member_pin(p_pin)` — authenticated, cập nhật pin_hash của member hiện tại
+- `reset_member_pin(p_member_id)` — chỉ treasurer được gọi
 
 ---
 
 ## 2. Chốt tháng (Settlement Period)
 
-### Mô hình
-- Thủ quỹ bấm "Chốt sổ" → chọn ngày kết thúc kỳ → app tính toán ai nợ ai dựa trên expenses approved trong kỳ
-- Kết quả được snapshot vào DB (không live-recalculate) → các thành viên thấy số tiền cần chuyển
-- Thành viên bấm "Đã chuyển" → creditor bấm "Đã nhận" → khoản đó closed
-- Kỳ đóng hoàn toàn khi tất cả period_payments đều confirmed
-- Thành viên vẫn được báo sai sót (dispute) sau khi chốt
+### Mô hình luồng tiền
+Mọi giao dịch được **gộp qua thủ quỹ** — mỗi thành viên chỉ có tối đa 1 giao dịch:
+- Net âm (nợ tổng) → chuyển tiền **vào thủ quỹ**
+- Net dương (được nợ tổng) → nhận tiền **từ thủ quỹ**
+
+Dữ liệu chi tiết (ai nợ ai theo expense) vẫn lưu đầy đủ để tra cứu. Chỉ luồng **chuyển tiền thực tế** mới gộp lại.
+
+Ví dụ:
+```
+Tính toán gốc:        Long nợ An 100k, Long nợ Bình 80k, Chi nợ An 30k
+Net mỗi người:        Long -180k | An +70k | Bình +80k | Chi -30k
+Luồng chuyển tiền:    Long → thủ quỹ 180k
+                      Chi  → thủ quỹ 30k
+                      thủ quỹ → An 70k
+                      thủ quỹ → Bình 80k
+```
 
 ### DB changes
 ```sql
@@ -55,11 +75,12 @@ CREATE TABLE settlement_periods (
   created_at            timestamptz DEFAULT now()
 );
 
+-- Mỗi dòng = 1 giao dịch cần thực hiện (đã gộp qua thủ quỹ)
 CREATE TABLE period_payments (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id        uuid NOT NULL REFERENCES settlement_periods(id),
-  from_member_id   uuid NOT NULL REFERENCES members(id),
-  to_member_id     uuid NOT NULL REFERENCES members(id),
+  from_member_id   uuid NOT NULL REFERENCES members(id),  -- người chuyển
+  to_member_id     uuid NOT NULL REFERENCES members(id),  -- người nhận (thường là thủ quỹ)
   amount           numeric NOT NULL CHECK (amount > 0),
   status           text NOT NULL DEFAULT 'pending'
                    CHECK (status IN ('pending', 'transferred', 'confirmed')),
@@ -67,26 +88,42 @@ CREATE TABLE period_payments (
   confirmed_at     timestamptz
 );
 
--- Bank info per member (for QR generation)
-ALTER TABLE members ADD COLUMN bank_name    text;
-ALTER TABLE members ADD COLUMN bank_account text;
+-- Bank info để tạo QR
+ALTER TABLE members ADD COLUMN bank_name         text;
+ALTER TABLE members ADD COLUMN bank_account      text;
 ALTER TABLE members ADD COLUMN bank_account_name text;
 ```
 
-### Tính toán ai nợ ai
-Dùng logic `totalBalances` hiện có (chỉ count expenses `status = 'approved'` trong khoảng ngày), tối giản hóa debt (A nợ B 100k + B nợ C 50k → A nợ C 50k, A nợ B 50k).
+### UI flow chi tiết
 
-### UI flow
-1. **Thủ quỹ:** Tab Nhóm → "Chốt sổ" → date picker (period_start tự động = ngày sau kỳ trước hoặc đầu tháng, period_end = chọn) → Preview bảng ai nợ ai → Xác nhận tạo
-2. **Màn hình kỳ chốt** (`screen-settlement-period.jsx`): Danh sách `period_payments`, mỗi dòng: `[Tên nợ] → [Tên nhận]: [Số tiền]` + trạng thái badge
-3. **Người nợ thấy:** Nút "Chuyển khoản" → mở QR sheet (VietQR) + nút "Đã chuyển" → status → `transferred`
-4. **Người nhận thấy:** Sau khi đối phương transferred → nút "Xác nhận đã nhận" → status → `confirmed`
-5. Khi tất cả `confirmed` → period tự động `closed`
+**Thủ quỹ tạo kỳ chốt:**
+1. Group detail → nút "Chốt sổ"
+2. Date picker chọn ngày kết thúc (period_start tự động = ngày sau kỳ trước, hoặc ngày có expense đầu tiên nếu chưa có kỳ nào)
+3. Preview bảng gộp:
+   ```
+   Kỳ: 01/05 – 18/05/2026
+   ─────────────────────────────
+   Long  → thủ quỹ  180,000đ
+   Chi   → thủ quỹ   30,000đ
+   thủ quỹ → An      70,000đ
+   thủ quỹ → Bình    80,000đ
+   ```
+4. Xác nhận → tạo `settlement_period` + các `period_payments`
 
-### Navigation
-- Thủ quỹ: nút "Chốt sổ" trong group detail
-- Tất cả thành viên: banner alert khi có kỳ `open` chưa hoàn thành
-- History: tab "Lịch sử chốt sổ" trong group detail (list các kỳ đã closed)
+**Thành viên thấy banner:**
+Khi có kỳ `open` → banner vàng trên Home và Groups: *"Đã chốt sổ 01/05–18/05 · Bạn cần chuyển 180,000đ"* (hoặc "Bạn sẽ nhận 70,000đ") → tap vào màn hình kỳ chốt.
+
+**Màn hình kỳ chốt (`screen-settlement-period.jsx`):**
+- Danh sách `period_payments` của kỳ đó
+- Mỗi dòng: `[Tên] → [Tên]: [Số tiền]` + badge trạng thái
+- **Người chuyển thấy:** Nút "Chuyển khoản" → bottom sheet QR + nút "Đã chuyển" → status `transferred`
+- **Người nhận thấy:** Khi đối phương bấm "Đã chuyển" → nút "Xác nhận đã nhận" hiện → bấm → `confirmed`
+- Khi tất cả `confirmed` → period tự chuyển `closed` → banner biến mất
+- **Thủ quỹ** thấy toàn bộ danh sách, có thể confirm thay cho thành viên nếu cần
+
+**Disputes sau khi chốt:** Vẫn báo sai được. Thủ quỹ resolve → nếu số tiền thay đổi đáng kể thì xóa kỳ và tạo lại.
+
+**Lịch sử:** Tab "Lịch sử chốt sổ" trong group detail → list các kỳ đã `closed`.
 
 ---
 
@@ -100,32 +137,44 @@ https://img.vietqr.io/image/{BANK_ID}-{ACCOUNT_NO}-compact2.png
   &addInfo={DESCRIPTION}
   &accountName={ACCOUNT_NAME}
 ```
+`DESCRIPTION` = `"SpliteasyBoss T5/2026 - {tên người chuyển}"`
 
-`BANK_ID` = mã ngân hàng VietQR (VCB, TCB, MB, ACB...) — thủ quỹ chọn từ dropdown.
-
-### Mở app ngân hàng
+### Mở app ngân hàng (deeplink)
 ```js
 window.open(`https://dl.vietqr.io/pay?app=UNIVERSAL&amount=${amount}&description=${desc}&account=${account}&bank=${bank}`)
 ```
-URL này mở trang VietQR cho phép user chọn app ngân hàng để mở.
+Trang VietQR liệt kê các app ngân hàng hỗ trợ, user chọn app để mở thẳng với thông tin điền sẵn.
+
+### Bottom sheet QR
+```
+┌──────────────────────────────┐
+│  Chuyển cho Nguyễn An        │
+│  ┌──────────────────────┐    │
+│  │      [QR image]      │    │
+│  └──────────────────────┘    │
+│  MB Bank · 0123456789        │
+│  Nguyễn Văn An               │
+│  Nội dung: SpliteasyBoss T5  │
+│  Số tiền: 180,000đ           │
+│                              │
+│  [Mở app ngân hàng]          │
+│  [✓ Đã chuyển khoản]        │
+└──────────────────────────────┘
+```
 
 ### Setup bank info
-- Thủ quỹ + thành viên đều có thể nhập bank info trong tab Hồ sơ
-- Nếu creditor chưa có bank info: trong màn hình period payment, creditor thấy prompt "Nhập tài khoản để nhận tiền" → form inline → lưu → QR hiện ra cho debtor
-
-### Danh sách bank_id hỗ trợ
-VietQR hỗ trợ 40+ ngân hàng VN. App chỉ cần lưu mã BIN (3-6 ký tự) và tên hiển thị.
-Dropdown có search để chọn ngân hàng.
+- Mọi thành viên nhập bank info trong tab Hồ sơ: chọn ngân hàng (dropdown có search, 40+ NH VN) → số tài khoản → tên chủ tài khoản
+- Nếu người nhận chưa có bank info: debtor thấy *"Nguyễn An chưa cập nhật tài khoản ngân hàng. Liên hệ trực tiếp."* + nút "Đã chuyển" vẫn hiện để tự báo
 
 ---
 
 ## 4. Không làm (YAGNI)
 
 - Không tích hợp trực tiếp với banking API (chỉ deeplink)
-- Không auto-detect thanh toán thành công (user tự bấm "Đã chuyển")
-- Không nhắc nhở tự động (push notification) cho period payments
+- Không auto-detect thanh toán thành công
+- Không push notification cho period payments
 - Không multi-currency
-- Không export PDF kỳ chốt (có CSV rồi)
+- Không export PDF kỳ chốt
 
 ---
 
@@ -133,12 +182,12 @@ Dropdown có search để chọn ngân hàng.
 
 | File | Action | Purpose |
 |------|--------|---------|
-| `supabase/migrations/20260518000003_settlement_period.sql` | Create | Tạo bảng + alter members + RLS |
-| `supabase/migrations/20260518000004_treasurer_pin_rpc.sql` | Create | set_treasurer_pin + verify_treasurer_pin RPCs |
+| `supabase/migrations/20260518000003_settlement_period.sql` | Create | Tạo bảng settlement_periods, period_payments + alter members (bank info + pin_hash) + RLS |
+| `supabase/migrations/20260518000004_member_pin_rpc.sql` | Create | verify_member_pin, set_member_pin, reset_member_pin RPCs |
 | `src/lib/vietqr.js` | Create | generateQRUrl(), openBankingApp(), BANK_LIST |
-| `src/screen-join.jsx` | Modify | Ẩn treasurer, thêm PIN flow |
-| `src/screen-profile.jsx` | Modify | Thêm bank info form + set/change PIN |
-| `src/screen-settlement-period.jsx` | Create | Màn hình kỳ chốt sổ |
-| `src/screen-groups.jsx` | Modify | Thêm nút "Chốt sổ" + alert banner kỳ open |
-| `src/store.jsx` | Modify | Actions: CREATE_PERIOD, MARK_TRANSFERRED, CONFIRM_RECEIVED, UPDATE_BANK_INFO, SET_TREASURER_PIN |
+| `src/screen-join.jsx` | Modify | Thêm PIN dialog khi click member có pin_hash |
+| `src/screen-profile.jsx` | Modify | Thêm bank info form + set/change/remove PIN section |
+| `src/screen-settlement-period.jsx` | Create | Màn hình kỳ chốt sổ + QR bottom sheet |
+| `src/screen-groups.jsx` | Modify | Nút "Chốt sổ" + banner kỳ open + tab lịch sử |
+| `src/store.jsx` | Modify | Actions: CREATE_PERIOD, MARK_TRANSFERRED, CONFIRM_RECEIVED, UPDATE_BANK_INFO, SET_MEMBER_PIN, RESET_MEMBER_PIN |
 | `src/app.jsx` | Modify | Route 'settlement-period' |
