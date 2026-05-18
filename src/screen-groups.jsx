@@ -38,6 +38,124 @@ function hexA(hex, a) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+function dateISO(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeDateISO(value) {
+  if (!value) return '';
+  const s = String(value);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+  if (m) {
+    const year = m[3] || String(new Date().getFullYear());
+    return `${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  const d = new Date(s);
+  if (!Number.isNaN(d.getTime())) return dateISO(d);
+  return s;
+}
+
+function addDaysISO(value, days) {
+  const iso = normalizeDateISO(value);
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return dateISO();
+  return dateISO(new Date(y, m - 1, d + days));
+}
+
+function formatDateVN(value) {
+  const iso = normalizeDateISO(value);
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return value || '--/--';
+  return `${d}/${m}/${y}`;
+}
+
+function paymentPeriodField(period, camel, snake) {
+  return period?.[camel] ?? period?.[snake];
+}
+
+function nextPeriodStart(group, periods) {
+  const lastEnd = safeArray(periods)
+    .map(p => normalizeDateISO(paymentPeriodField(p, 'periodEnd', 'period_end')))
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  if (lastEnd) return addDaysISO(lastEnd, 1);
+
+  const firstExpenseDate = safeArray(group?.expenses)
+    .map(e => normalizeDateISO(e?.date))
+    .filter(Boolean)
+    .sort()[0];
+  return firstExpenseDate || dateISO();
+}
+
+function shareMapForExpense(expense) {
+  const splits = safeArray(expense?.splits);
+  if (splits.length > 0) {
+    return Object.fromEntries(splits.map(s => [s.memberId, Number(s.amount) || 0]));
+  }
+  const participants = safeArray(expense?.participants);
+  return Object.fromEntries(splitEqual(Number(expense?.amount) || 0, participants).map(s => [s.memberId, s.amount]));
+}
+
+function buildPeriodPayments(group, members, treasurerId, periodStart, periodEnd) {
+  if (!group || !treasurerId) return [];
+  const groupMembers = safeArray(group.members);
+  const memberSet = new Set(groupMembers);
+  const start = normalizeDateISO(periodStart);
+  const end = normalizeDateISO(periodEnd);
+  if (!start || !end || start > end) return [];
+
+  const net = Object.fromEntries(groupMembers.map(id => [id, 0]));
+  const expenses = safeArray(group.expenses).filter(expense => {
+    if ((expense.status || 'approved') !== 'approved') return false;
+    const d = normalizeDateISO(expense.date);
+    return d && d >= start && d <= end;
+  });
+
+  for (const expense of expenses) {
+    const participants = safeArray(expense.participants).filter(id => memberSet.has(id));
+    if (participants.length === 0) continue;
+    const amount = Number(expense.amount) || 0;
+    const share = shareMapForExpense(expense);
+    for (const memberId of participants) {
+      net[memberId] = (net[memberId] || 0) - (Number(share[memberId]) || 0);
+    }
+    if (memberSet.has(expense.paidBy)) {
+      net[expense.paidBy] = (net[expense.paidBy] || 0) + amount;
+    }
+  }
+
+  const memberNames = getMemberMap(members);
+  return groupMembers
+    .filter(id => id !== treasurerId)
+    .map(memberId => {
+      const roundedNet = Math.round(net[memberId] || 0);
+      if (roundedNet < 0) {
+        return {
+          fromMemberId: memberId,
+          toMemberId: treasurerId,
+          amount: Math.abs(roundedNet),
+          sortName: memberNames[memberId]?.name || memberId,
+        };
+      }
+      if (roundedNet > 0) {
+        return {
+          fromMemberId: treasurerId,
+          toMemberId: memberId,
+          amount: roundedNet,
+          sortName: memberNames[memberId]?.name || memberId,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.sortName.localeCompare(b.sortName, 'vi'));
+}
+
 // ── Groups list ─────────────────────────────────────────────────────────────
 function ScreenGroups({ tweaks = {}, push }) {
   const { state } = useApp();
@@ -53,6 +171,7 @@ function ScreenGroups({ tweaks = {}, push }) {
       return true;
     });
   }, [filter, state.groups, meId]);
+  const openPeriod = safeArray(state.settlementPeriods).find(p => (p.status || 'open') === 'open');
 
   return (
     <div style={{ paddingBottom: 96 }}>
@@ -100,6 +219,15 @@ function ScreenGroups({ tweaks = {}, push }) {
         ))}
       </div>
 
+      {openPeriod && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <SettlementOpenBanner
+            period={openPeriod}
+            onClick={() => push('settlement-period', { periodId: openPeriod.id })}
+          />
+        </div>
+      )}
+
       {filteredGroups.length === 0 ? (
         <div style={{ padding: '0 16px' }}>
           <EmptyState icon="users" title="Chưa có nhóm nào" subtitle="Bấm + để tạo nhóm mới"/>
@@ -139,6 +267,40 @@ function GroupCard({ g, onClick, avatarStyle }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+function SettlementOpenBanner({ period, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        appearance: 'none',
+        width: '100%',
+        cursor: 'pointer',
+        border: '1px solid rgba(245,158,11,0.28)',
+        background: 'var(--vb-warn-100)',
+        borderRadius: 12,
+        padding: '11px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        color: '#B45309',
+        fontFamily: 'var(--vb-font-body)',
+        textAlign: 'left',
+      }}
+    >
+      <Icon name="calendar" size={20} color="#B45309"/>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 900 }}>
+          Đang có kỳ chốt sổ chưa hoàn thành
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700, opacity: 0.85 }}>
+          {formatDateVN(paymentPeriodField(period, 'periodStart', 'period_start'))} - {formatDateVN(paymentPeriodField(period, 'periodEnd', 'period_end'))}
+        </div>
+      </div>
+      <Icon name="chevron-right" size={18} color="#B45309"/>
+    </button>
   );
 }
 
@@ -210,10 +372,29 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
   const g = safeArray(state.groups).find(x => x.id === params?.groupId);
   const [tab, setTab] = useState('activity');
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [periodFormOpen, setPeriodFormOpen] = useState(false);
+  const [periodEnd, setPeriodEnd] = useState(() => dateISO());
+  const [periodCreating, setPeriodCreating] = useState(false);
   const balance = useMemo(() => g ? groupBalance(safeGroup(g), meId) : {}, [g, meId]);
   const net = useMemo(() => g ? groupNet(safeGroup(g), meId) : 0, [g, meId]);
   const isTreasurer = state.members.find(m => m.id === meId)?.role === 'treasurer'
   const pendingCount = safeArray(g ? safeGroup(g).expenses : []).filter(e => e.status === 'pending').length
+  const groupPeriods = useMemo(
+    () => safeArray(state.settlementPeriods)
+      .filter(p => paymentPeriodField(p, 'groupId', 'group_id') === params?.groupId)
+      .sort((a, b) => normalizeDateISO(paymentPeriodField(b, 'periodEnd', 'period_end')).localeCompare(normalizeDateISO(paymentPeriodField(a, 'periodEnd', 'period_end')))),
+    [state.settlementPeriods, params?.groupId]
+  );
+  const openPeriod = groupPeriods.find(p => (p.status || 'open') === 'open');
+  const closedPeriods = groupPeriods.filter(p => p.status === 'closed');
+  const groupMemberIds = safeArray(g?.members);
+  const treasurerId = state.members.find(m => m.role === 'treasurer' && groupMemberIds.includes(m.id))?.id || (isTreasurer ? meId : null);
+  const periodStart = useMemo(() => nextPeriodStart(g ? safeGroup(g) : null, groupPeriods), [g, groupPeriods]);
+  const periodPayments = useMemo(
+    () => buildPeriodPayments(g ? safeGroup(g) : null, state.members, treasurerId, periodStart, periodEnd),
+    [g, state.members, treasurerId, periodStart, periodEnd]
+  );
+  const periodRangeValid = normalizeDateISO(periodStart) <= normalizeDateISO(periodEnd);
 
   React.useEffect(() => {
     if (!menuOpen) return;
@@ -231,6 +412,27 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
     if (!window.confirm(`Xóa nhóm "${group.name || 'Nhóm'}"? Không thể hoàn tác.`)) return;
     dispatch({ type: 'DELETE_GROUP', groupId: g.id });
     pop();
+  }
+
+  async function handleCreatePeriod() {
+    if (periodCreating || !periodRangeValid || periodPayments.length === 0) return;
+    setPeriodCreating(true);
+    try {
+      const periodId = await dispatch({
+        type: 'CREATE_PERIOD',
+        periodStart,
+        periodEnd,
+        payments: periodPayments,
+      });
+      if (periodId) {
+        setPeriodFormOpen(false);
+        push('settlement-period', { periodId });
+      }
+    } catch (err) {
+      window.alert('Không tạo được kỳ chốt sổ.');
+    } finally {
+      setPeriodCreating(false);
+    }
   }
 
   return (
@@ -309,8 +511,36 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
           )}
           <Button variant="primary" full icon="plus" onClick={() => push('add-expense', { groupId: g.id })}>Thêm chi tiêu</Button>
           <Button variant="secondary" full icon="zap" onClick={() => push('settle-group', { groupId: g.id })}>Tất toán</Button>
+          {isTreasurer && (
+            <Button variant="brandSoft" full icon="calendar" onClick={() => setPeriodFormOpen(v => !v)}>
+              Chốt sổ
+            </Button>
+          )}
         </div>
       </div>
+
+      {openPeriod && (
+        <div style={{ padding: '12px 16px 0' }}>
+          <SettlementOpenBanner
+            period={openPeriod}
+            onClick={() => push('settlement-period', { periodId: openPeriod.id })}
+          />
+        </div>
+      )}
+
+      {periodFormOpen && (
+        <SettlementPeriodForm
+          periodStart={periodStart}
+          periodEnd={periodEnd}
+          setPeriodEnd={setPeriodEnd}
+          payments={periodPayments}
+          members={state.members}
+          rangeValid={periodRangeValid}
+          creating={periodCreating}
+          onCancel={() => setPeriodFormOpen(false)}
+          onConfirm={handleCreatePeriod}
+        />
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', padding: '0 16px', background: 'var(--surface-1)', borderBottom: '1px solid var(--border-1)', position: 'sticky', top: 56, zIndex: 4 }}>
@@ -337,6 +567,140 @@ function ScreenGroupDetail({ params = {}, tweaks = {}, push, pop }) {
         {tab === 'balance' && <GroupBalance g={group} balance={balance} avatarStyle={tweaks.avatarStyle} meId={meId}/>}
         {tab === 'members' && <GroupMembers g={group} balance={balance} avatarStyle={tweaks.avatarStyle}/>}
       </div>
+
+      <SettlementPeriodHistory
+        periods={closedPeriods}
+        onOpen={(periodId) => push('settlement-period', { periodId })}
+      />
+    </div>
+  );
+}
+
+function SettlementPeriodForm({
+  periodStart,
+  periodEnd,
+  setPeriodEnd,
+  payments,
+  members,
+  rangeValid,
+  creating,
+  onCancel,
+  onConfirm,
+}) {
+  const M = getMemberMap(members);
+  const canConfirm = rangeValid && payments.length > 0 && !creating;
+
+  return (
+    <div style={{ padding: '12px 16px 0' }}>
+      <Card style={{ padding: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <Icon name="calendar" size={20} color="var(--brand-1)"/>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-1)' }}>Chốt sổ</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginTop: 2 }}>
+              {formatDateVN(periodStart)} - {formatDateVN(periodEnd)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-2)', marginBottom: 6 }}>
+              Từ ngày
+            </div>
+            <input value={periodStart} readOnly style={{ ...inputStyle(), opacity: 0.75 }}/>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-2)', marginBottom: 6 }}>
+              Đến ngày
+            </div>
+            <input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} style={inputStyle()}/>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, fontWeight: 900, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+          Thanh toán dự kiến
+        </div>
+
+        {!rangeValid ? (
+          <div style={{
+            padding: '12px 14px',
+            borderRadius: 10,
+            background: 'var(--vb-danger-50)',
+            color: 'var(--vb-danger-700)',
+            fontSize: 13,
+            fontWeight: 800,
+          }}>
+            Ngày kết thúc cần sau ngày bắt đầu.
+          </div>
+        ) : payments.length === 0 ? (
+          <div style={{
+            padding: '12px 14px',
+            borderRadius: 10,
+            background: 'var(--surface-2)',
+            color: 'var(--text-2)',
+            fontSize: 13,
+            fontWeight: 700,
+          }}>
+            Không có khoản nào cần chốt trong kỳ này.
+          </div>
+        ) : (
+          <div style={{ border: '1px solid var(--border-1)', borderRadius: 12, overflow: 'hidden' }}>
+            {payments.map((payment, i) => {
+              const fromMember = memberOrFallback(M, payment.fromMemberId);
+              const toMember = memberOrFallback(M, payment.toMemberId);
+              return (
+                <div key={`${payment.fromMemberId}-${payment.toMemberId}`} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 12px',
+                  borderBottom: i < payments.length - 1 ? '1px solid var(--border-1)' : 'none',
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {fromMember.name} → {toMember.name}
+                    </div>
+                  </div>
+                  <Money value={payment.amount} size={13} color="var(--text-1)"/>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          <Button variant="secondary" full onClick={onCancel}>Hủy</Button>
+          <Button full icon="check" onClick={onConfirm} disabled={!canConfirm}>
+            {creating ? 'Đang chốt...' : 'Xác nhận chốt'}
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function SettlementPeriodHistory({ periods, onOpen }) {
+  if (safeArray(periods).length === 0) return null;
+  return (
+    <div style={{ padding: '0 16px 16px' }}>
+      <SectionHeader title="Lịch sử chốt sổ"/>
+      <Card>
+        {periods.map((period, i) => {
+          const payments = safeArray(period.payments);
+          const total = payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
+          return (
+            <ListRow
+              key={period.id}
+              title={`${formatDateVN(paymentPeriodField(period, 'periodStart', 'period_start'))} - ${formatDateVN(paymentPeriodField(period, 'periodEnd', 'period_end'))}`}
+              subtitle={`${payments.length} khoản • ${fmtVND(total)}`}
+              right={<Icon name="chevron-right" size={18} color="var(--text-2)"/>}
+              onClick={() => onOpen(period.id)}
+              divider={i < periods.length - 1}
+            />
+          );
+        })}
+      </Card>
     </div>
   );
 }

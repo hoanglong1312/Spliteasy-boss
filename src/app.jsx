@@ -26,6 +26,7 @@ import ScreenGroups, {
   ScreenSettleAll, ScreenNewGroup, ScreenNotifications, ScreenApprovalQueue,
   ScreenPaymentFlow,
 } from './screen-groups.jsx'
+import ScreenSettlementPeriod from './screen-settlement-period.jsx'
 import ScreenPickleball, {
   ScreenSessionDetail, ScreenAddSessionExpense, ScreenAddExternalTicket,
 } from './screen-pickleball.jsx'
@@ -288,6 +289,7 @@ function App() {
       case 'notifications':   return <ScreenNotifications pop={pop} tweaks={t}/>
       case 'approval-queue':  return <ScreenApprovalQueue params={p} tweaks={t} pop={pop}/>
       case 'payment-flow':    return <ScreenPaymentFlow tweaks={t} pop={pop}/>
+      case 'settlement-period': return <ScreenSettlementPeriod params={p} tweaks={t} pop={pop}/>
       case 'session-detail':  return <ScreenSessionDetail params={p} pop={pop} tweaks={t}/>
       case 'add-session-expense': return <ScreenAddSessionExpense params={p} pop={pop} tweaks={t}/>
       case 'add-external-ticket': return <ScreenAddExternalTicket pop={pop} tweaks={t}/>

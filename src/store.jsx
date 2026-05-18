@@ -15,6 +15,7 @@ function buildEmptyState() {
     currentGroupId: null,
     members: [],
     groups: [],
+    settlementPeriods: [],
     pickle: {
       sessions: [],
       upcoming: [],
@@ -40,12 +41,14 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, eR, pR, sR, pcR, psR, paR, dR] = await Promise.all([
+  const [mR, gR, eR, pR, sR, spR, ppR, pcR, psR, paR, dR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('expenses').select('*').order('expense_date', { ascending: false }),
     sb.from('expense_participants').select('*'),
     sb.from('settlements').select('*').order('settlement_date', { ascending: false }),
+    sb.from('settlement_periods').select('*').order('period_end', { ascending: false }),
+    sb.from('period_payments').select('*'),
     sb.from('pickle_configs').select('*').limit(1).maybeSingle(),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
@@ -53,6 +56,8 @@ async function fetchGroupData(token) {
   ])
   if (mR.error) throw mR.error
   if (gR.error) throw gR.error
+  if (spR.error) console.warn('[store] settlement_periods query failed:', spR.error)
+  if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   return {
     members:         mR.data || [],
@@ -60,6 +65,8 @@ async function fetchGroupData(token) {
     expenses:        eR.data || [],
     participants:    pR.data || [],
     settlements:     sR.data || [],
+    settlementPeriods: spR.data || [],
+    periodPayments:    ppR.data || [],
     pickleConfig:    pcR.data,
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
@@ -68,7 +75,7 @@ async function fetchGroupData(token) {
 }
 
 function normalize(raw, currentMemberId) {
-  const { members, groups, expenses, participants, settlements, pickleConfig, pickleSessions, pickleAttendees, disputeCount } = raw
+  const { members, groups, expenses, participants, settlements, settlementPeriods, periodPayments, pickleConfig, pickleSessions, pickleAttendees, disputeCount } = raw
   const group = groups[0]
   if (!group) return null  // signal: data empty but keep session
 
@@ -98,6 +105,38 @@ function normalize(raw, currentMemberId) {
     toId: s.to_member_id,
     amount: Number(s.amount),
     date: s.settlement_date,
+  }))
+
+  const normalPeriodPayments = (periodPayments || []).map(p => ({
+    id: p.id,
+    periodId: p.period_id,
+    period_id: p.period_id,
+    fromMemberId: p.from_member_id,
+    from_member_id: p.from_member_id,
+    toMemberId: p.to_member_id,
+    to_member_id: p.to_member_id,
+    amount: Number(p.amount),
+    status: p.status || 'pending',
+    transferredAt: p.transferred_at,
+    transferred_at: p.transferred_at,
+    confirmedAt: p.confirmed_at,
+    confirmed_at: p.confirmed_at,
+  }))
+
+  const normalSettlementPeriods = (settlementPeriods || []).map(p => ({
+    id: p.id,
+    groupId: p.group_id,
+    group_id: p.group_id,
+    periodStart: p.period_start,
+    period_start: p.period_start,
+    periodEnd: p.period_end,
+    period_end: p.period_end,
+    status: p.status || 'open',
+    createdByMemberId: p.created_by_member_id,
+    created_by_member_id: p.created_by_member_id,
+    createdAt: p.created_at,
+    created_at: p.created_at,
+    payments: normalPeriodPayments.filter(pay => pay.periodId === p.id),
   }))
 
   const normalSessions = pickleSessions.map(s => ({
@@ -143,7 +182,9 @@ function normalize(raw, currentMemberId) {
       members: members.map(m => m.id),
       expenses: normalExpenses,
       settlements: normalSettlements,
+      settlementPeriods: normalSettlementPeriods.filter(p => p.groupId === group.id),
     }],
+    settlementPeriods: normalSettlementPeriods,
     pickle: {
       sessions: normalSessions,
       upcoming: [],
@@ -447,6 +488,124 @@ export function AppProvider({ children, onToast }) {
           from_member_id: settlement.fromId,
           to_member_id: settlement.toId,
         })
+        await refresh()
+        break
+      }
+
+      case 'CREATE_PERIOD': {
+        if (!sb || !state.currentGroupId || !state.currentUserId) return null
+        const cleanPayments = (action.payments || [])
+          .map(p => ({
+            from_member_id: p.fromMemberId ?? p.from_member_id,
+            to_member_id: p.toMemberId ?? p.to_member_id,
+            amount: Number(p.amount) || 0,
+          }))
+          .filter(p => p.from_member_id && p.to_member_id && p.amount > 0)
+
+        const { data: newPeriod, error } = await sb
+          .from('settlement_periods')
+          .insert({
+            group_id: state.currentGroupId,
+            period_start: action.periodStart,
+            period_end: action.periodEnd,
+            created_by_member_id: state.currentUserId,
+          })
+          .select('id')
+          .single()
+        if (error) {
+          console.error('[store] CREATE_PERIOD:', error)
+          throw error
+        }
+
+        if (cleanPayments.length > 0) {
+          const { error: paymentsError } = await sb
+            .from('period_payments')
+            .insert(cleanPayments.map(p => ({
+              period_id: newPeriod.id,
+              from_member_id: p.from_member_id,
+              to_member_id: p.to_member_id,
+              amount: p.amount,
+            })))
+          if (paymentsError) {
+            console.error('[store] CREATE_PERIOD payments:', paymentsError)
+            throw paymentsError
+          }
+        }
+
+        broadcastChange('settlement_periods', 'INSERT', {
+          id: newPeriod.id,
+          group_id: state.currentGroupId,
+        })
+        await refresh()
+        return newPeriod.id
+      }
+
+      case 'MARK_TRANSFERRED': {
+        if (!sb || !state.currentUserId) return
+        const { error } = await sb
+          .from('period_payments')
+          .update({
+            status: 'transferred',
+            transferred_at: new Date().toISOString(),
+          })
+          .eq('id', action.paymentId)
+          .eq('from_member_id', state.currentUserId)
+        if (error) {
+          console.error('[store] MARK_TRANSFERRED:', error)
+          throw error
+        }
+        broadcastChange('period_payments', 'UPDATE', { id: action.paymentId })
+        await refresh()
+        break
+      }
+
+      case 'CONFIRM_RECEIVED': {
+        if (!sb || !state.currentUserId) return
+        const isTreasurer = stateRef.current.members.find(m => m.id === state.currentUserId)?.role === 'treasurer'
+        let query = sb
+          .from('period_payments')
+          .update({
+            status: 'confirmed',
+            confirmed_at: new Date().toISOString(),
+          })
+          .eq('id', action.paymentId)
+        if (!isTreasurer) {
+          query = query.eq('to_member_id', state.currentUserId)
+        }
+
+        const { data: updatedPayment, error } = await query
+          .select('period_id')
+          .maybeSingle()
+        if (error) {
+          console.error('[store] CONFIRM_RECEIVED:', error)
+          throw error
+        }
+        if (!updatedPayment?.period_id) {
+          await refresh()
+          break
+        }
+
+        const { data: payments, error: paymentsError } = await sb
+          .from('period_payments')
+          .select('id,status')
+          .eq('period_id', updatedPayment.period_id)
+        if (paymentsError) {
+          console.error('[store] CONFIRM_RECEIVED check period:', paymentsError)
+          throw paymentsError
+        }
+        const allConfirmed = (payments || []).length > 0 && payments.every(p => p.status === 'confirmed')
+        if (allConfirmed) {
+          const { error: periodError } = await sb
+            .from('settlement_periods')
+            .update({ status: 'closed' })
+            .eq('id', updatedPayment.period_id)
+          if (periodError) {
+            console.error('[store] CONFIRM_RECEIVED close period:', periodError)
+            throw periodError
+          }
+          broadcastChange('settlement_periods', 'UPDATE', { id: updatedPayment.period_id, status: 'closed' })
+        }
+        broadcastChange('period_payments', 'UPDATE', { id: action.paymentId })
         await refresh()
         break
       }
