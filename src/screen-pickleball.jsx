@@ -259,20 +259,20 @@ function SessionDetailPanel({ session, attendance, groupMembers, isTreasurer, ma
   const isToday = dateStr === todayStr;
 
   return (
-    <div style={{ marginTop: 12, background: 'var(--surface-2, #1e2235)', borderRadius: 14, padding: '14px 16px', border: '1px solid var(--border-1)' }}>
+    <div style={{ marginTop: 12, background: '#1e2235', borderRadius: 14, padding: '14px 16px', border: '1px solid rgba(255,255,255,0.08)' }}>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-1)' }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: '#f1f5f9' }}>
           Buổi #{sessionNum} · {dow}, {dd}/{mmm}
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+        <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
           {isToday ? '🟢 Hôm nay' : isPast ? '✓ Đã đánh' : '📅 Sắp tới'}
         </div>
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Điểm danh</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Điểm danh</div>
         {!hasAttendance ? (
-          <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: '#4b5563', fontStyle: 'italic', marginBottom: 6 }}>
             Chưa điểm danh — mặc định tất cả có mặt
           </div>
         ) : allPresent ? (
@@ -308,17 +308,17 @@ function SessionDetailPanel({ session, attendance, groupMembers, isTreasurer, ma
       </div>
 
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Chi phí</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Chi phí</div>
         {courtFeePerSession > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingBottom: 4 }}>
-            <span style={{ color: 'var(--text-2)' }}>🏸 Tiền sân / người</span>
-            <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtVND(courtFeePerSession)} đ</span>
+            <span style={{ color: '#9ca3af' }}>🏸 Tiền sân / người</span>
+            <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{fmtVND(courtFeePerSession)} đ</span>
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingBottom: 4 }}>
-          <span style={{ color: 'var(--text-2)' }}>💧 Tiền nước / người</span>
+          <span style={{ color: '#9ca3af' }}>💧 Tiền nước / người</span>
           <span style={{
-            color: waterPerPerson != null ? 'var(--text-1)' : 'var(--text-3)',
+            color: waterPerPerson != null ? '#f1f5f9' : '#4b5563',
             fontWeight: waterPerPerson != null ? 600 : 400,
             fontStyle: waterPerPerson == null ? 'italic' : 'normal',
           }}>
@@ -329,8 +329,8 @@ function SessionDetailPanel({ session, attendance, groupMembers, isTreasurer, ma
           const memberIds = safeArray(item.member_ids);
           return (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingBottom: 4 }}>
-              <span style={{ color: 'var(--text-2)' }}>📦 {item.name}</span>
-              <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>
+              <span style={{ color: '#9ca3af' }}>📦 {item.name}</span>
+              <span style={{ color: '#f1f5f9', fontWeight: 600 }}>
                 {memberIds.length > 0
                   ? `${fmtVND(Math.round(item.amount / memberIds.length))} đ/người`
                   : `${fmtVND(item.amount)} đ`}
@@ -339,10 +339,10 @@ function SessionDetailPanel({ session, attendance, groupMembers, isTreasurer, ma
           );
         })}
         {courtFeePerSession === 0 && !session.water_amount && sessionItems.length === 0 && (
-          <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>Chưa nhập chi phí</div>
+          <div style={{ fontSize: 12, color: '#4b5563', fontStyle: 'italic' }}>Chưa nhập chi phí</div>
         )}
         {session.water_amount > 0 && presentCount > 1 && (
-          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 10, color: '#6c7280', marginTop: 4 }}>
             💡 Tiền nước chia đều {presentCount} người có mặt
           </div>
         )}
@@ -382,12 +382,12 @@ function PickleCalendar({
   }
 
   return (
-    <div>
+    <div style={{ background: '#0f1117', borderRadius: 16, padding: '12px 0 4px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <button onClick={prevMonth} style={{ ...iconBtnStyle(), width: 32, height: 32 }}>
           <Icon name="chevron-left" size={16}/>
         </button>
-        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: '#f1f5f9' }}>
           Tháng {month} / {year}
         </span>
         <button onClick={nextMonth} style={{ ...iconBtnStyle(), width: 32, height: 32 }}>
@@ -397,7 +397,7 @@ function PickleCalendar({
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
         {DOW_LABELS.map(d => (
-          <div key={d} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-3)', fontWeight: 600, paddingBottom: 4 }}>{d}</div>
+          <div key={d} style={{ textAlign: 'center', fontSize: 10, color: '#6c7280', fontWeight: 600, paddingBottom: 4 }}>{d}</div>
         ))}
       </div>
 
@@ -412,7 +412,7 @@ function PickleCalendar({
 
           let bg = 'transparent';
           let border = '1px solid transparent';
-          let textColor = session ? 'var(--text-1)' : 'var(--text-3)';
+          let textColor = session ? '#f1f5f9' : '#374151';
 
           if (session) {
             const attendance = sessionAttendanceMap[session.id] || {};
@@ -527,7 +527,7 @@ function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyC
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}/>
-      <div style={{ position: 'relative', background: 'var(--surface-1, #1a1d27)', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: '85vh', overflowY: 'auto' }}>
+      <div style={{ position: 'relative', background: '#1a1d27', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: '85vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <span style={{ fontWeight: 800, fontSize: 16 }}>⚙️ Cài đặt CLB</span>
           <button onClick={onClose} style={{ ...iconBtnStyle(), width: 30, height: 30 }}>
@@ -535,9 +535,9 @@ function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyC
           </button>
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Lịch tháng tự động</div>
-        <div style={{ background: 'var(--surface-2, #1e2235)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>Các thứ trong tuần</div>
+        <div style={{ fontSize: 11, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Lịch tháng tự động</div>
+        <div style={{ background: '#1e2235', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8 }}>Các thứ trong tuần</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {SCHEDULE_WEEKDAYS.map(wd => {
               const active = scheduleWeekdays.includes(wd.value);
@@ -549,9 +549,9 @@ function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyC
                   )}
                   style={{
                     padding: '5px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                    background: active ? '#6366f1' : 'var(--surface-1)',
-                    color: active ? '#fff' : 'var(--text-2)',
-                    border: '1px solid ' + (active ? '#6366f1' : 'var(--border-1)'),
+                    background: active ? '#6366f1' : '#13161f',
+                    color: active ? '#fff' : '#9ca3af',
+                    border: '1px solid ' + (active ? '#6366f1' : 'rgba(255,255,255,0.1)'),
                     cursor: 'pointer',
                   }}
                 >{wd.label}</button>
@@ -559,12 +559,12 @@ function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyC
             })}
           </div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>Ngày bắt đầu tháng tới</div>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>Ngày bắt đầu tháng tới</div>
             <input
               type="date"
               value={scheduleStartDay}
               onChange={e => setScheduleStartDay(e.target.value)}
-              style={{ background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, width: '100%' }}
+              style={{ background: '#13161f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f1f5f9', fontSize: 13, width: '100%' }}
             />
           </div>
           {previewDates.length > 0 && (
@@ -574,18 +574,18 @@ function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyC
           )}
         </div>
 
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Chi phí tháng</div>
-        <div style={{ background: 'var(--surface-2, #1e2235)', borderRadius: 12, padding: 14, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>Tiền sân tháng {ymMonth}</div>
+        <div style={{ fontSize: 11, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Chi phí tháng</div>
+        <div style={{ background: '#1e2235', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>Tiền sân tháng {ymMonth}</div>
           <input
             type="number"
             value={courtFee}
             onChange={e => setCourtFee(e.target.value)}
             placeholder="vd: 4550000"
-            style={{ background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, width: '100%' }}
+            style={{ background: '#13161f', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f1f5f9', fontSize: 13, width: '100%' }}
           />
           {perSession > 0 && (
-            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
               {sessionCount} buổi → {fmtVND(perSession)} đ / buổi
             </div>
           )}
@@ -702,19 +702,19 @@ function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sess
   });
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 210, background: 'var(--bg, #0f1117)', overflowY: 'auto', paddingBottom: 40 }}>
-      <div style={{ padding: '20px 16px 0', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, position: 'sticky', top: 0, background: 'var(--bg, #0f1117)', zIndex: 1 }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 210, background: '#0f1117', overflowY: 'auto', paddingBottom: 40 }}>
+      <div style={{ padding: '20px 16px 0', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, position: 'sticky', top: 0, background: '#0f1117', zIndex: 1 }}>
         <button onClick={onClose} style={{ ...iconBtnStyle(), width: 34, height: 34 }}>
           <Icon name="chevron-left" size={20}/>
         </button>
         <div>
           <div style={{ fontWeight: 800, fontSize: 16 }}>📋 Chi phí sân tháng</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Nước, bóng, phụ kiện theo buổi</div>
+          <div style={{ fontSize: 11, color: '#6c7280' }}>Nước, bóng, phụ kiện theo buổi</div>
         </div>
       </div>
 
       <div style={{ padding: '0 16px' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
           Buổi đã đánh · {pastSessions.length}/{pickSessions.length}
         </div>
 
@@ -732,17 +732,17 @@ function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sess
           const hasData = waterAmt > 0 || extraTotal > 0;
 
           return (
-            <div key={session.id} style={{ background: 'var(--surface-2, #1e2235)', borderRadius: 12, padding: 12, marginBottom: 8, border: hasData ? '1px solid rgba(52,211,153,0.2)' : '1px solid transparent' }}>
+            <div key={session.id} style={{ background: '#1e2235', borderRadius: 12, padding: 12, marginBottom: 8, border: hasData ? '1px solid rgba(52,211,153,0.2)' : '1px solid transparent' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: hasData ? '#1a2e1a' : 'var(--surface-1, #13161f)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: hasData ? '#34d399' : 'var(--text-1)', lineHeight: 1 }}>{dd}</span>
-                  <span style={{ fontSize: 7, color: hasData ? '#34d399' : 'var(--text-3)' }}>{dow}</span>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: hasData ? '#1a2e1a' : '#13161f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: hasData ? '#34d399' : '#f1f5f9', lineHeight: 1 }}>{dd}</span>
+                  <span style={{ fontSize: 7, color: hasData ? '#34d399' : '#6c7280' }}>{dow}</span>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 11, fontWeight: 600 }}>Buổi #{sessionIdx + 1} · {dd}/{mm}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{presentCount} có mặt</div>
+                  <div style={{ fontSize: 9, color: '#6c7280' }}>{presentCount} có mặt</div>
                 </div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: hasData ? '#34d399' : 'var(--text-3)', fontStyle: hasData ? 'normal' : 'italic' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: hasData ? '#34d399' : '#4b5563', fontStyle: hasData ? 'normal' : 'italic' }}>
                   {hasData ? `${fmtVND(waterAmt + extraTotal)} đ` : 'Chưa nhập'}
                 </div>
               </div>
@@ -750,9 +750,9 @@ function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sess
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 <span style={{ fontSize: 14, flexShrink: 0 }}>💧</span>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-2)' }}>Tiền nước</div>
+                  <div style={{ fontSize: 10, color: '#9ca3af' }}>Tiền nước</div>
                   {waterPerPerson > 0 && (
-                    <div style={{ fontSize: 8, color: 'var(--text-3)' }}>Chia đều {presentCount} người → {fmtVND(waterPerPerson)} đ/người</div>
+                    <div style={{ fontSize: 8, color: '#6c7280' }}>Chia đều {presentCount} người → {fmtVND(waterPerPerson)} đ/người</div>
                   )}
                 </div>
                 <input
@@ -760,28 +760,28 @@ function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sess
                   value={draft.water}
                   onChange={e => setWater(session.id, e.target.value)}
                   placeholder="vd: 88000"
-                  style={{ background: 'var(--surface-1)', border: `1px solid ${draft.water ? 'rgba(52,211,153,0.4)' : 'var(--border-1)'}`, borderRadius: 7, padding: '6px 9px', fontSize: 11, color: draft.water ? '#34d399' : 'var(--text-1)', width: 110, textAlign: 'right' }}
+                  style={{ background: '#13161f', border: `1px solid ${draft.water ? 'rgba(52,211,153,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 7, padding: '6px 9px', fontSize: 11, color: draft.water ? '#34d399' : '#f1f5f9', width: 110, textAlign: 'right' }}
                 />
               </div>
 
               {draft.items.map((item, idx) => (
-                <div key={idx} style={{ background: 'var(--surface-1)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                <div key={idx} style={{ background: '#13161f', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <input
                       value={item.name}
                       onChange={e => updateItem(session.id, idx, 'name', e.target.value)}
                       placeholder="Tên khoản (vd: Bóng BX)"
-                      style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border-1)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-1)' }}
+                      style={{ flex: 1, background: '#1e2235', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#f1f5f9' }}
                     />
                     <input
                       type="number"
                       value={item.amount}
                       onChange={e => updateItem(session.id, idx, 'amount', e.target.value)}
                       placeholder="Tiền"
-                      style={{ background: 'var(--surface-2)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#fbbf24', width: 90, textAlign: 'right' }}
+                      style={{ background: '#1e2235', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#fbbf24', width: 90, textAlign: 'right' }}
                     />
                   </div>
-                  <div style={{ fontSize: 8, color: 'var(--text-3)', marginBottom: 4 }}>Áp dụng cho:</div>
+                  <div style={{ fontSize: 8, color: '#6c7280', marginBottom: 4 }}>Áp dụng cho:</div>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                     {groupMembers.map(m => {
                       const sel = item.memberIds.includes(m.id);
@@ -807,7 +807,7 @@ function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sess
 
               <button
                 onClick={() => addItem(session.id)}
-                style={{ width: '100%', padding: '6px 0', background: 'transparent', border: '1px dashed var(--border-1)', borderRadius: 7, color: 'var(--text-3)', fontSize: 10, cursor: 'pointer', marginTop: 4 }}
+                style={{ width: '100%', padding: '6px 0', background: 'transparent', border: '1px dashed rgba(255,255,255,0.12)', borderRadius: 7, color: '#4b5563', fontSize: 10, cursor: 'pointer', marginTop: 4 }}
               >+ Thêm bóng / phụ kiện</button>
             </div>
           );
@@ -815,30 +815,30 @@ function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sess
 
         {futureSessions.length > 0 && (
           <>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '12px 0 8px' }}>
+            <div style={{ fontSize: 11, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '12px 0 8px' }}>
               Buổi sắp tới · {futureSessions.length}/{pickSessions.length}
             </div>
             {futureSessions.map(session => (
-              <div key={session.id} style={{ opacity: 0.4, background: 'var(--surface-2)', borderRadius: 12, padding: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <div key={session.id} style={{ opacity: 0.4, background: '#1e2235', borderRadius: 12, padding: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: '#13161f', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <span style={{ fontSize: 14, fontWeight: 800, lineHeight: 1 }}>{session.date.slice(8, 10)}</span>
-                  <span style={{ fontSize: 7, color: 'var(--text-3)' }}>{formatDow(session.date)}</span>
+                  <span style={{ fontSize: 7, color: '#4b5563' }}>{formatDow(session.date)}</span>
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>Chưa đến</span>
+                <span style={{ fontSize: 11, color: '#4b5563', fontStyle: 'italic' }}>Chưa đến</span>
               </div>
             ))}
           </>
         )}
 
-        <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', margin: '16px 0 12px' }}>
-          <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Tổng kết đã nhập</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-2)', paddingBottom: 4 }}>
-            <span>💧 Tiền nước</span><span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtVND(totalWater)} đ</span>
+        <div style={{ background: '#252840', borderRadius: 10, padding: '12px 14px', margin: '16px 0 12px' }}>
+          <div style={{ fontSize: 9, color: '#6c7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Tổng kết đã nhập</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', paddingBottom: 4 }}>
+            <span>💧 Tiền nước</span><span style={{ color: '#f1f5f9', fontWeight: 600 }}>{fmtVND(totalWater)} đ</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-2)', paddingBottom: 4 }}>
-            <span>📦 Phụ kiện</span><span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtVND(totalItems)} đ</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#9ca3af', paddingBottom: 4 }}>
+            <span>📦 Phụ kiện</span><span style={{ color: '#f1f5f9', fontWeight: 600 }}>{fmtVND(totalItems)} đ</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--border-1)', marginTop: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.08)', marginTop: 4 }}>
             <span style={{ fontWeight: 700, fontSize: 13 }}>Tổng tháng</span>
             <span style={{ fontWeight: 800, fontSize: 15, color: '#fbbf24' }}>{fmtVND(totalWater + totalItems)} đ</span>
           </div>
