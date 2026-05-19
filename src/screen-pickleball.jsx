@@ -934,6 +934,7 @@ function ScreenPickleball({ tweaks = {}, push }) {
       ]);
 
       if (sessionsRes.error) throw sessionsRes.error;
+      if (configRes.error) throw configRes.error;
       const sessions = sessionsRes.data || [];
       setPickSessions(sessions);
       setMonthlyConfig(configRes.data || null);
