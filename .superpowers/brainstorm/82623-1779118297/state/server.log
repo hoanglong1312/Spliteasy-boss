@@ -1,0 +1,7 @@
+{"type":"server-started","port":58198,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:58198","screen_dir":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/content","state_dir":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/state"}
+{"type":"screen-added","file":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/content/home-redesign.html"}
+{"type":"screen-added","file":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/content/home-v2.html"}
+{"type":"screen-added","file":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/content/home-v3.html"}
+{"type":"screen-added","file":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/content/home-v4.html"}
+{"type":"screen-added","file":"/Users/giinlow./Spliteasy-boss/.superpowers/brainstorm/82623-1779118297/content/home-v5.html"}
+{"type":"server-stopped","reason":"idle timeout"}

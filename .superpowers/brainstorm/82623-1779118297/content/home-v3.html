@@ -1,0 +1,243 @@
+<h2>Home v3 — Cards màu sắc + session grid cá nhân</h2>
+<p class="subtitle">Cards có gradient đậm · Pickleball = lịch cá nhân · Click → sang tab CLB</p>
+
+<div style="display:flex;justify-content:center;">
+<div style="width:340px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:#f0f0f7;border-radius:28px;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,.15);">
+
+  <!-- Header -->
+  <div style="background:#fff;padding:16px 18px 0;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-size:11px;color:#999;">Xin chào,</div>
+      <div style="font-size:18px;font-weight:800;color:#1a1a2e;">Nguyễn An 👋</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <div style="width:36px;height:36px;background:#f4f4f8;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;">🔔</div>
+    </div>
+  </div>
+
+  <!-- Month Nav — pill dưới header -->
+  <div style="background:#fff;padding:10px 18px 14px;display:flex;justify-content:center;">
+    <div style="display:inline-flex;align-items:center;background:#f0f0f7;border-radius:20px;padding:4px;">
+      <button style="background:#fff;border:none;width:32px;height:32px;border-radius:14px;font-size:17px;color:#5b4ede;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.1);">‹</button>
+      <div style="padding:0 16px;text-align:center;">
+        <div style="font-size:13px;font-weight:700;color:#1a1a2e;white-space:nowrap;">Tháng 5, 2026</div>
+      </div>
+      <button style="background:none;border:none;width:32px;height:32px;border-radius:14px;font-size:17px;color:#ccc;cursor:not-allowed;display:flex;align-items:center;justify-content:center;">›</button>
+    </div>
+  </div>
+
+  <!-- Summary card -->
+  <div style="margin:0 14px 14px;padding:18px;background:linear-gradient(135deg,#5b4ede 0%,#7c6ff7 100%);border-radius:20px;color:#fff;box-shadow:0 6px 24px rgba(91,78,222,.45);">
+    <div style="font-size:10px;letter-spacing:1px;opacity:.75;margin-bottom:6px;">TỔNG THÁNG 5</div>
+    <div style="font-size:28px;font-weight:800;letter-spacing:-1px;">−343.000 đ</div>
+    <div style="font-size:12px;opacity:.75;margin-bottom:14px;">Bạn đang nợ tổng cộng tháng này</div>
+    <div style="display:flex;gap:8px;">
+      <button style="flex:1;background:rgba(255,255,255,.95);color:#5b4ede;border:none;border-radius:12px;padding:10px 8px;font-size:12px;font-weight:700;">+ Thêm chi tiêu</button>
+      <button style="flex:1;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:12px;padding:10px 8px;font-size:12px;font-weight:700;">⚡ Thanh toán</button>
+    </div>
+  </div>
+
+  <!-- Scroll content -->
+  <div style="padding:0 14px;display:flex;flex-direction:column;gap:12px;padding-bottom:20px;">
+
+    <!-- ===== PICKLEBALL CARD ===== -->
+    <div style="background:linear-gradient(145deg,#1a1a3e 0%,#2d2b6b 60%,#3d3580 100%);border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(30,20,80,.35);cursor:pointer;" onclick="this.style.transform='scale(.98)'">
+      <!-- Card header -->
+      <div style="padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:40px;height:40px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;">🏓</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#fff;">Pickleball CLB Q7</div>
+            <div style="font-size:11px;color:rgba(255,100,100,1);font-weight:600;">Nợ 334.000 đ</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.12);padding:5px 10px;border-radius:20px;font-size:11px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:4px;">
+          Xem CLB <span style="font-size:14px;">›</span>
+        </div>
+      </div>
+
+      <!-- Personal attendance label -->
+      <div style="padding:0 16px 8px;display:flex;align-items:center;gap:6px;">
+        <div style="width:6px;height:6px;background:#7c6ff7;border-radius:50%;"></div>
+        <div style="font-size:10px;color:rgba(255,255,255,.55);letter-spacing:.5px;text-transform:uppercase;">Lịch đánh của bạn · T2 T4 T6</div>
+      </div>
+
+      <!-- Session grid — dynamic: T5/2026 = 13 buổi (T2T4T6), 1 buổi dời ngày -->
+      <div style="padding:0 16px 12px;">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;">
+
+          <!-- Đã đánh -->
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.9);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:8px;font-weight:600;color:#5b4ede;">T2</div>
+            <div style="font-size:13px;font-weight:800;color:#1a1a2e;">5</div>
+            <div style="width:4px;height:4px;background:#2ecc71;border-radius:50%;margin-top:1px;"></div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.9);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:8px;font-weight:600;color:#5b4ede;">T4</div>
+            <div style="font-size:13px;font-weight:800;color:#1a1a2e;">7</div>
+            <div style="width:4px;height:4px;background:#2ecc71;border-radius:50%;margin-top:1px;"></div>
+          </div>
+          <!-- Dời ngày (badge) -->
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.9);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+            <div style="font-size:8px;font-weight:600;color:#e67e22;">T5*</div>
+            <div style="font-size:13px;font-weight:800;color:#1a1a2e;">9</div>
+            <div style="width:4px;height:4px;background:#2ecc71;border-radius:50%;margin-top:1px;"></div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.9);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:8px;font-weight:600;color:#5b4ede;">T2</div>
+            <div style="font-size:13px;font-weight:800;color:#1a1a2e;">12</div>
+            <div style="width:4px;height:4px;background:#2ecc71;border-radius:50%;margin-top:1px;"></div>
+          </div>
+          <!-- Vắng mặt -->
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.2);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.15);">
+            <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.5);">T4</div>
+            <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.7);">14</div>
+            <div style="width:4px;height:4px;background:#e74c3c;border-radius:50%;margin-top:1px;"></div>
+          </div>
+
+          <!-- Đã đánh -->
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.9);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:8px;font-weight:600;color:#5b4ede;">T6</div>
+            <div style="font-size:13px;font-weight:800;color:#1a1a2e;">16</div>
+            <div style="width:4px;height:4px;background:#2ecc71;border-radius:50%;margin-top:1px;"></div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.9);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <div style="font-size:8px;font-weight:600;color:#5b4ede;">T2</div>
+            <div style="font-size:13px;font-weight:800;color:#1a1a2e;">19</div>
+            <div style="width:4px;height:4px;background:#2ecc71;border-radius:50%;margin-top:1px;"></div>
+          </div>
+
+          <!-- Sắp tới -->
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.08);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px dashed rgba(255,255,255,.25);">
+            <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.45);">T4</div>
+            <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.6);">21</div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.08);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px dashed rgba(255,255,255,.25);">
+            <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.45);">T6</div>
+            <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.6);">23</div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.08);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px dashed rgba(255,255,255,.25);">
+            <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.45);">T2</div>
+            <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.6);">26</div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.08);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px dashed rgba(255,255,255,.25);">
+            <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.45);">T4</div>
+            <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.6);">28</div>
+          </div>
+          <div style="aspect-ratio:1;background:rgba(255,255,255,.08);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1.5px dashed rgba(255,255,255,.25);">
+            <div style="font-size:8px;font-weight:600;color:rgba(255,255,255,.45);">T6</div>
+            <div style="font-size:13px;font-weight:800;color:rgba(255,255,255,.6);">30</div>
+          </div>
+
+        </div>
+        <!-- Legend -->
+        <div style="display:flex;gap:12px;margin-top:10px;">
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.6);">
+            <div style="width:6px;height:6px;background:#2ecc71;border-radius:50%;"></div> Có mặt (6)
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.6);">
+            <div style="width:6px;height:6px;background:#e74c3c;border-radius:50%;"></div> Vắng (1)
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,.45);">
+            <div style="width:6px;height:6px;background:rgba(255,255,255,.3);border-radius:50%;border:1px dashed rgba(255,255,255,.4);"></div> Sắp tới (5)
+          </div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(230,126,34,.9);">
+            T5* Dời ngày
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CHI TIÊU NHÓM CARD ===== -->
+    <div style="background:linear-gradient(145deg,#0f3460 0%,#16537e 60%,#1a6b96 100%);border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(15,52,96,.4);cursor:pointer;">
+      <!-- Card header -->
+      <div style="padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:40px;height:40px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;">📦</div>
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#fff;">Chi tiêu nhóm</div>
+            <div style="font-size:11px;color:rgba(255,180,100,1);font-weight:600;">Nợ 9.000 đ · 2 nhóm</div>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,.12);padding:5px 10px;border-radius:20px;font-size:11px;color:rgba(255,255,255,.8);display:flex;align-items:center;gap:4px;">
+          Chi tiết <span style="font-size:14px;">›</span>
+        </div>
+      </div>
+
+      <!-- Recent transactions -->
+      <div style="padding:0 16px;display:flex;flex-direction:column;gap:0;border-top:1px solid rgba(255,255,255,.1);">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:18px;">🍕</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:#fff;">Đặt pizza sau trận</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.45);">16/05 · PB Q7</div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#ff7675;">−45k</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.08);">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:18px;">💧</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:#fff;">Nước uống</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.45);">15/05 · PB Q7</div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#55efc4;">+12k</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="font-size:18px;">🏸</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:#fff;">Mua cầu lông mới</div>
+              <div style="font-size:10px;color:rgba(255,255,255,.45);">10/05 · Nhóm mới</div>
+            </div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#ff7675;">−80k</div>
+        </div>
+      </div>
+
+      <!-- Footer stats -->
+      <div style="display:flex;padding:10px 16px 14px;gap:0;border-top:1px solid rgba(255,255,255,.1);">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:15px;font-weight:800;color:#fff;">5</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.5);">Giao dịch</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.1);"></div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:15px;font-weight:800;color:#fff;">450k</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.5);">Tổng chi</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,.1);"></div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:15px;font-weight:800;color:rgba(255,180,100,1);">9k</div>
+          <div style="font-size:10px;color:rgba(255,255,255,.5);">Bạn nợ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Thanh toán CTA -->
+    <div style="background:linear-gradient(135deg,#5b4ede,#7c6ff7);border-radius:16px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;box-shadow:0 4px 16px rgba(91,78,222,.35);">
+      <div>
+        <div style="font-size:11px;color:rgba(255,255,255,.7);">Thanh toán tổng</div>
+        <div style="font-size:18px;font-weight:800;color:#fff;">343.000 đ</div>
+      </div>
+      <div style="background:rgba(255,255,255,.2);padding:10px 16px;border-radius:12px;color:#fff;font-size:13px;font-weight:700;">
+        Thanh toán →
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div style="margin-top:20px;padding:14px;background:#f5f5fb;border-radius:10px;max-width:700px;margin-left:auto;margin-right:auto;">
+  <p style="margin:0 0 8px;font-size:13px;font-weight:700;">Chi chú thiết kế:</p>
+  <ul style="font-size:13px;line-height:1.8;margin:0;padding-left:18px;color:#555;">
+    <li><b>Pickleball card</b>: nền tối #1a1a3e, grid cá nhân — chấm xanh = có mặt, chấm đỏ = vắng, ô nét đứt = sắp tới. Ngày dời = badge T5* màu cam.</li>
+    <li><b>Click vào Pickleball card</b> → navigate sang tab Pickleball (tab hiện có)</li>
+    <li><b>Chi tiêu card</b>: nền xanh navy, 3 giao dịch gần nhất + stats footer</li>
+    <li>Grid tự động tính T2/T4/T6 từ ngày bắt đầu thủ quỹ nhập, số ô = số buổi thực tế tháng đó</li>
+  </ul>
+</div>

@@ -2,6 +2,8 @@
 
 > Quy tắc làm việc: xem [`rules/codex-workflow.md`](rules/codex-workflow.md)
 
+> **Ngôn ngữ:** Khi dùng từ chuyên ngành tiếng Anh, ưu tiên dịch sang tiếng Việt và mở ngoặc từ gốc. Ví dụ: "kho trạng thái (store)", "di chuyển cơ sở dữ liệu (migration)", "chính sách bảo mật hàng (RLS)", "thủ tục từ xa (RPC)".
+
 ---
 
 ## Tài liệu dự án (luôn đọc trước khi làm)

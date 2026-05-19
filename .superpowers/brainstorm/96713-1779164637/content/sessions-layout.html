@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sessions Layout Options</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; font-family: -apple-system, sans-serif; color: #fff; padding: 20px; }
+h2 { font-size: 18px; margin-bottom: 6px; }
+.subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+
+.options-row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+
+/* Phone shell */
+.phone { width: 300px; background: #1a1d27; border-radius: 24px; overflow: hidden; border: 1.5px solid #2a2d3a; }
+.phone-label { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 10px 0 0; }
+.phone-body { padding: 10px 10px 16px; }
+.tab-row { display: flex; background: #13161f; margin: 0 -10px 10px; padding: 0 10px; gap: 4px; }
+.tab { padding: 8px 6px; font-size: 9px; color: #555; }
+.tab.active { color: #34d399; border-bottom: 2px solid #34d399; }
+
+/* ── OPTION A: Current list ── */
+.list-row { display: flex; align-items: center; gap: 8px; background: #1e2235; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+.list-date-box { width: 36px; height: 36px; border-radius: 8px; background: #2a2d45; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.list-date-box .d { font-size: 14px; font-weight: 800; }
+.list-date-box .w { font-size: 7px; color: #888; }
+.list-info { flex: 1; }
+.list-info .t { font-size: 11px; font-weight: 600; }
+.list-info .s { font-size: 9px; color: #666; margin-top: 1px; }
+.chevron { color: #444; font-size: 12px; }
+
+/* ── OPTION B: Calendar grid ── */
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cal-title { font-size: 11px; font-weight: 700; color: #fff; }
+.cal-nav { font-size: 14px; color: #6366f1; }
+.cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px; }
+.cal-dow span { text-align: center; font-size: 8px; color: #666; padding: 2px 0; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.cal-cell { aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; cursor: pointer; position: relative; }
+.cal-cell.empty { background: transparent; }
+.cal-cell.normal { background: #1e2235; color: #666; }
+.cal-cell.session { background: #1a2e1a; color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+.cal-cell.session.absent { background: #2e1a1a; color: #fb7185; border: 1px solid rgba(251,113,133,0.3); }
+.cal-cell.today { background: #3730a3; color: #fff; border: 1px solid #6366f1; }
+.cal-cell.future { background: #1e2235; color: #444; border: 1px dashed #2a2d3a; }
+.cal-cell .dot { width: 4px; height: 4px; border-radius: 50%; background: #34d399; position: absolute; bottom: 3px; }
+.cal-cell.absent .dot { background: #fb7185; }
+.cal-legend { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.cal-legend span { font-size: 8px; color: #9ca3af; display: flex; align-items: center; gap: 3px; }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+/* Expanded detail below calendar */
+.session-detail { background: linear-gradient(135deg, #1a2e1a, #1e3320); border-radius: 10px; padding: 10px 12px; margin-top: 8px; border: 1px solid rgba(52,211,153,0.2); }
+.sd-title { font-size: 11px; font-weight: 700; color: #34d399; margin-bottom: 6px; }
+.sd-row { display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.sd-row:last-child { border-bottom: none; }
+.sd-val { color: #fff; font-weight: 600; }
+.members-mini { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.member-chip { padding: 2px 6px; border-radius: 10px; font-size: 8px; font-weight: 700; background: rgba(52,211,153,0.15); color: #34d399; }
+.member-chip.absent { background: rgba(251,113,133,0.15); color: #fb7185; }
+
+/* ── OPTION C: Compact card grid ── */
+.card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.s-card { background: #1e2235; border-radius: 10px; padding: 10px; cursor: pointer; border: 1px solid transparent; }
+.s-card.today { border-color: rgba(99,102,241,0.5); background: #1e2040; }
+.s-card.absent { border-color: rgba(251,113,133,0.3); }
+.s-card .date { font-size: 18px; font-weight: 800; line-height: 1; }
+.s-card .month { font-size: 8px; color: #666; margin-bottom: 4px; }
+.s-card .badge { display: inline-block; padding: 1px 5px; border-radius: 8px; font-size: 7px; font-weight: 700; margin-bottom: 4px; }
+.s-card .badge.present { background: rgba(52,211,153,0.15); color: #34d399; }
+.s-card .badge.mixed { background: rgba(251,113,133,0.15); color: #fb7185; }
+.s-card .badge.future { background: rgba(99,102,241,0.15); color: #818cf8; }
+.s-card .fee { font-size: 9px; color: #9ca3af; }
+.s-card .fee b { color: #fff; }
+</style>
+</head>
+<body>
+
+<h2>Tab Buổi đánh — 3 Layout Options</h2>
+<p class="subtitle">Chọn layout phù hợp nhất cho danh sách 12–13 buổi/tháng</p>
+
+<div class="options-row">
+
+  <!-- OPTION A: List hiện tại -->
+  <div>
+    <p style="text-align:center;font-size:11px;color:#6c6f80;margin-bottom:8px">A — Danh sách dọc (hiện tại)</p>
+    <div class="phone">
+      <div class="phone-label">Hiện tại — khó scan</div>
+      <div class="phone-body">
+        <div class="tab-row">
+          <div class="tab">Tổng quan</div><div class="tab active">Buổi đánh</div><div class="tab">Vé lẻ</div><div class="tab">TV</div>
+        </div>
+        <div class="list-row" style="border:1px solid rgba(99,102,241,0.4)">
+          <div class="list-date-box" style="background:#3730a3"><div class="d">19</div><div class="w" style="color:#c7d2fe">HN</div></div>
+          <div class="list-info"><div class="t">Buổi #9 <span style="color:#fbbf24;font-size:9px">· Hôm nay</span></div><div class="s">6 có mặt · 1 vắng</div></div>
+          <div class="chevron" style="color:#6366f1">⌄</div>
+        </div>
+        <div class="list-row">
+          <div class="list-date-box"><div class="d">15</div><div class="w">T5</div></div>
+          <div class="list-info"><div class="t">Buổi #8</div><div class="s">7 có mặt · 0 vắng</div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="list-row">
+          <div class="list-date-box"><div class="d">13</div><div class="w">T3</div></div>
+          <div class="list-info"><div class="t">Buổi #7</div><div class="s">5 có mặt · 2 vắng</div></div>
+          <div class="chevron">›</div>
+        </div>
+        <div class="list-row" style="opacity:0.4;border:1px dashed #2a2d3a">
+          <div class="list-date-box" style="background:#1a1d27"><div class="d" style="color:#444">20</div><div class="w">T4</div></div>
+          <div class="list-info"><div class="t" style="color:#555">Buổi #10</div><div class="s">Sắp tới</div></div>
+        </div>
+        <div style="text-align:center;color:#555;font-size:9px;padding:6px 0">↓ cuộn thêm 9 buổi nữa...</div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#555;margin-top:6px">❌ Phải scroll dài để thấy hết tháng</p>
+  </div>
+
+  <!-- OPTION B: Calendar grid + expand -->
+  <div>
+    <p style="text-align:center;font-size:11px;color:#34d399;margin-bottom:8px">B — Lịch tháng + expand (Recommended)</p>
+    <div class="phone">
+      <div class="phone-label">Lịch tháng — thấy hết 1 màn hình</div>
+      <div class="phone-body">
+        <div class="tab-row">
+          <div class="tab">Tổng quan</div><div class="tab active">Buổi đánh</div><div class="tab">Vé lẻ</div><div class="tab">TV</div>
+        </div>
+        <div class="cal-header">
+          <div class="cal-nav">‹</div>
+          <div class="cal-title">Tháng 5 / 2026</div>
+          <div class="cal-nav">›</div>
+        </div>
+        <div class="cal-dow">
+          <span>CN</span><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span>
+        </div>
+        <div class="cal-grid">
+          <!-- Week 1 -->
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell normal">1</div>
+          <div class="cal-cell normal">2</div>
+          <div class="cal-cell normal">3</div>
+          <div class="cal-cell normal">4</div>
+          <!-- Week 2 -->
+          <div class="cal-cell normal">5</div>
+          <div class="cal-cell session">6<div class="dot"></div></div>
+          <div class="cal-cell normal">7</div>
+          <div class="cal-cell session absent">8<div class="dot"></div></div>
+          <div class="cal-cell normal">9</div>
+          <div class="cal-cell session">10<div class="dot"></div></div>
+          <div class="cal-cell normal">11</div>
+          <!-- Week 3 -->
+          <div class="cal-cell normal">12</div>
+          <div class="cal-cell session">13<div class="dot"></div></div>
+          <div class="cal-cell normal">14</div>
+          <div class="cal-cell session">15<div class="dot"></div></div>
+          <div class="cal-cell normal">16</div>
+          <div class="cal-cell session">17<div class="dot"></div></div>
+          <div class="cal-cell normal">18</div>
+          <!-- Week 4 -->
+          <div class="cal-cell normal">19</div><!-- hôm nay không có session -->
+          <div class="cal-cell today" style="border:2px solid #6366f1">19</div>
+          <div class="cal-cell normal">20</div><!-- actually should be 20 -->
+          <div class="cal-cell future">21</div>
+          <div class="cal-cell normal">22</div>
+          <div class="cal-cell future">23</div>
+          <div class="cal-cell normal">24</div>
+          <!-- Week 5 -->
+          <div class="cal-cell normal">25</div>
+          <div class="cal-cell future">26</div>
+          <div class="cal-cell normal">27</div>
+          <div class="cal-cell future">28</div>
+          <div class="cal-cell normal">29</div>
+          <div class="cal-cell future">30</div>
+          <div class="cal-cell normal">31</div>
+        </div>
+
+        <div class="cal-legend">
+          <span><div class="legend-dot" style="background:#1a2e1a;border:1px solid #34d399"></div> Có buổi</span>
+          <span><div class="legend-dot" style="background:#2e1a1a;border:1px solid #fb7185"></div> Bạn vắng</span>
+          <span><div class="legend-dot" style="background:#1e2235;border:1px dashed #444"></div> Sắp tới</span>
+        </div>
+
+        <!-- Expanded detail khi tap vào ngày 15 -->
+        <div class="session-detail">
+          <div class="sd-title">📅 Buổi #8 — T5, 15/05</div>
+          <div class="sd-row"><span>Tiền sân</span><span class="sd-val">350.000 đ</span></div>
+          <div class="sd-row"><span>Tiền nước</span><span class="sd-val">80.000 đ</span></div>
+          <div class="sd-row"><span>Khách vãng lai</span><span class="sd-val">+50.000 đ</span></div>
+          <div style="font-size:8px;color:#666;margin-top:6px;margin-bottom:3px">Điểm danh:</div>
+          <div class="members-mini">
+            <span class="member-chip">NA ✓</span>
+            <span class="member-chip">TB ✓</span>
+            <span class="member-chip absent">LC ✗</span>
+            <span class="member-chip">PD ✓</span>
+            <span class="member-chip">NH ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#34d399;margin-top:6px">✅ Thấy cả tháng 1 màn hình, tap ngày để xem chi tiết</p>
+  </div>
+
+  <!-- OPTION C: Card grid 2 cột -->
+  <div>
+    <p style="text-align:center;font-size:11px;color:#6c6f80;margin-bottom:8px">C — Grid 2 cột</p>
+    <div class="phone">
+      <div class="phone-label">Card grid — compact nhưng ít context</div>
+      <div class="phone-body">
+        <div class="tab-row">
+          <div class="tab">Tổng quan</div><div class="tab active">Buổi đánh</div><div class="tab">Vé lẻ</div><div class="tab">TV</div>
+        </div>
+        <div class="card-grid">
+          <div class="s-card today">
+            <div class="date">19</div>
+            <div class="month">T2, 19/05</div>
+            <div class="badge present">Hôm nay</div>
+            <div class="fee">Sân <b>58k</b></div>
+          </div>
+          <div class="s-card">
+            <div class="date">15</div>
+            <div class="month">T5, 15/05</div>
+            <div class="badge present">7 có mặt</div>
+            <div class="fee">Sân <b>58k</b> · Nước <b>12k</b></div>
+          </div>
+          <div class="s-card absent">
+            <div class="date">13</div>
+            <div class="month">T3, 13/05</div>
+            <div class="badge mixed">Bạn vắng</div>
+            <div class="fee">Sân <b>58k</b></div>
+          </div>
+          <div class="s-card">
+            <div class="date">10</div>
+            <div class="month">T6, 10/05</div>
+            <div class="badge present">7 có mặt</div>
+            <div class="fee">Sân <b>58k</b></div>
+          </div>
+          <div class="s-card" style="opacity:0.4;border:1px dashed #2a2d3a">
+            <div class="date" style="color:#444">21</div>
+            <div class="month">T4, 21/05</div>
+            <div class="badge future">Sắp tới</div>
+            <div class="fee" style="color:#444">—</div>
+          </div>
+          <div class="s-card" style="opacity:0.4;border:1px dashed #2a2d3a">
+            <div class="date" style="color:#444">23</div>
+            <div class="month">T6, 23/05</div>
+            <div class="badge future">Sắp tới</div>
+            <div class="fee" style="color:#444">—</div>
+          </div>
+        </div>
+        <div style="text-align:center;color:#555;font-size:9px;padding:8px 0">↓ cuộn thêm 7 card nữa...</div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#555;margin-top:6px">⚠️ Vẫn phải scroll, khó thấy full tháng</p>
+  </div>
+
+</div>
+
+<p style="text-align:center;color:#555;font-size:11px;margin-top:24px">Cho tôi biết bạn thích option nào trong terminal nhé</p>
+
+</body>
+</html>

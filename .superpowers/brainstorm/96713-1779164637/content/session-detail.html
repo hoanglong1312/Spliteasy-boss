@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Detail Panel</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; font-family: -apple-system, sans-serif; color: #fff; padding: 20px; }
+h2 { font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #888; font-size: 12px; margin-bottom: 24px; }
+
+.row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+
+.phone { width: 300px; background: #1a1d27; border-radius: 22px; overflow: hidden; border: 1.5px solid #2a2d3a; }
+.phone-label { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 8px 0 0; }
+.phone-body { padding: 10px 10px 14px; }
+
+/* Calendar mini */
+.cal-mini { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 10px; }
+.cc { aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 600; }
+.cc.empty { background: transparent; }
+.cc.normal { background: #181b28; color: #2a2d45; }
+.cc.session { background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.35); color: #34d399; }
+.cc.absent { background: rgba(251,113,133,0.12); border: 1px solid rgba(251,113,133,0.3); color: #fb7185; }
+.cc.selected { background: rgba(99,102,241,0.35); border: 2px solid #6366f1; color: #a5b4fc; }
+.cc.future-s { background: rgba(255,255,255,0.03); border: 1px dashed #2a2d3a; color: #333; }
+
+/* Session detail expand */
+.detail-panel { background: #1e2235; border-radius: 12px; padding: 12px; border: 1px solid rgba(99,102,241,0.3); }
+.dp-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+.dp-title { font-size: 13px; font-weight: 700; color: #fff; }
+.dp-sub { font-size: 10px; color: #9ca3af; margin-top: 1px; }
+.dp-badge { background: rgba(99,102,241,0.2); color: #a5b4fc; font-size: 8px; padding: 2px 7px; border-radius: 10px; }
+
+/* People section */
+.people-section { margin-bottom: 10px; }
+.ps-label { font-size: 8px; color: #6c6f80; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 5px; }
+.absent-row { display: flex; align-items: center; gap: 6px; }
+.absent-icon { font-size: 10px; }
+.absent-names { font-size: 11px; color: #fb7185; font-weight: 600; }
+.guest-names { font-size: 11px; color: #fbbf24; font-weight: 600; }
+.all-present { font-size: 10px; color: #34d399; }
+
+/* Cost section */
+.cost-section { margin-bottom: 10px; }
+.cost-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.cost-row:last-child { border-bottom: none; }
+.cost-label { font-size: 10px; color: #9ca3af; display: flex; align-items: center; gap: 5px; }
+.cost-label .icon { font-size: 11px; }
+.cost-val { font-size: 11px; font-weight: 700; color: #fff; }
+.cost-val.pending { color: #6c6f80; font-style: italic; font-weight: 400; font-size: 9px; }
+.cost-total-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0 0; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.1); }
+.cost-total-label { font-size: 10px; color: #9ca3af; font-weight: 600; }
+.cost-total-val { font-size: 13px; font-weight: 800; color: #34d399; }
+
+/* Water monthly note */
+.water-note { background: rgba(251,191,36,0.08); border: 1px solid rgba(251,191,36,0.2); border-radius: 8px; padding: 7px 10px; margin-bottom: 10px; display: flex; gap: 6px; align-items: flex-start; }
+.water-note .icon { font-size: 12px; flex-shrink: 0; margin-top: 1px; }
+.water-note .text { font-size: 9px; color: #fbbf24; line-height: 1.4; }
+
+/* Action buttons */
+.action-row { display: flex; gap: 6px; }
+.btn { flex: 1; padding: 8px 0; border-radius: 8px; border: none; font-size: 10px; font-weight: 700; cursor: pointer; text-align: center; }
+.btn-attend { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+.btn-expense { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+
+/* Monthly water entry form */
+.monthly-form { background: #1e2235; border-radius: 12px; padding: 12px; border: 1px solid rgba(251,191,36,0.25); }
+.mf-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.mf-title { font-size: 12px; font-weight: 700; }
+.mf-badge { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 8px; padding: 2px 7px; border-radius: 10px; }
+.mf-row { margin-bottom: 8px; }
+.mf-label { font-size: 9px; color: #6c6f80; margin-bottom: 4px; }
+.mf-input { background: #13161f; border: 1px solid #2a2d3a; border-radius: 7px; padding: 7px 10px; font-size: 11px; color: #fff; width: 100%; }
+.mf-hint { font-size: 8px; color: #555; margin-top: 3px; }
+.mf-preview { background: #13161f; border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; }
+.mf-preview-row { display: flex; justify-content: space-between; font-size: 9px; color: #9ca3af; padding: 2px 0; }
+.mf-preview-row .v { color: #fff; font-weight: 600; }
+.btn-save { width: 100%; padding: 9px 0; border-radius: 8px; border: none; background: linear-gradient(135deg,#fbbf24,#f59e0b); color: #000; font-size: 11px; font-weight: 800; cursor: pointer; }
+
+.section-divider { font-size: 11px; color: #6c6f80; margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid #2a2d3a; }
+</style>
+</head>
+<body>
+
+<h2>Session Detail — Thiết kế chi tiết buổi đánh</h2>
+<p class="subtitle">Khi tap vào ngày có buổi trên calendar → expand panel bên dưới</p>
+
+<div class="row">
+
+  <!-- PHONE 1: Session detail (có vắng + khách) -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#9ca3af;margin-bottom:6px">Panel chi tiết buổi — có vắng + khách</p>
+    <div class="phone">
+      <div class="phone-label">Tap ngày 15/05 → expand</div>
+      <div class="phone-body">
+
+        <!-- Mini calendar context -->
+        <div class="cal-mini">
+          <div class="cc empty"></div><div class="cc empty"></div><div class="cc empty"></div><div class="cc normal">1</div><div class="cc normal">2</div><div class="cc normal">3</div><div class="cc normal">4</div>
+          <div class="cc normal">5</div><div class="cc session">6</div><div class="cc normal">7</div><div class="cc absent">8</div><div class="cc normal">9</div><div class="cc session">10</div><div class="cc normal">11</div>
+          <div class="cc normal">12</div><div class="cc absent">13</div><div class="cc normal">14</div><div class="cc selected">15</div><div class="cc normal">16</div><div class="cc session">17</div><div class="cc normal">18</div>
+          <div class="cc normal">19</div><div class="cc session">19</div><div class="cc normal">20</div><div class="cc future-s">21</div><div class="cc normal">22</div><div class="cc future-s">23</div><div class="cc normal">24</div>
+        </div>
+
+        <!-- Detail panel -->
+        <div class="detail-panel">
+          <div class="dp-header">
+            <div>
+              <div class="dp-title">Buổi #8 · T5, 15/05</div>
+              <div class="dp-sub">7 thành viên tham gia · 1 khách</div>
+            </div>
+            <div class="dp-badge">Đã đánh</div>
+          </div>
+
+          <!-- People -->
+          <div class="people-section">
+            <div class="ps-label">Thành viên vắng</div>
+            <div class="absent-row">
+              <span class="absent-icon">✗</span>
+              <span class="absent-names">Long, Minh</span>
+            </div>
+          </div>
+          <div class="people-section">
+            <div class="ps-label">Khách vãng lai</div>
+            <div class="absent-row">
+              <span style="font-size:10px">👤</span>
+              <span class="guest-names">Hoàng (+50.000 đ)</span>
+            </div>
+          </div>
+
+          <!-- Costs -->
+          <div class="cost-section">
+            <div class="ps-label" style="margin-bottom:6px">Chi phí buổi</div>
+            <div class="cost-row">
+              <span class="cost-label"><span class="icon">🏟️</span> Tiền sân</span>
+              <span class="cost-val">350.000 đ</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label"><span class="icon">💧</span> Tiền nước</span>
+              <span class="cost-val pending">Cuối tháng</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label"><span class="icon">🧴</span> Xịt khoáng</span>
+              <span class="cost-val">30.000 đ</span>
+            </div>
+            <div class="cost-total-row">
+              <span class="cost-total-label">Tổng thu được</span>
+              <span class="cost-total-val">+50.000 đ</span>
+            </div>
+          </div>
+
+          <!-- Water note -->
+          <div class="water-note">
+            <span class="icon">ℹ️</span>
+            <span class="text">Tiền nước nhập 1 lần cuối tháng, chia đều theo số buổi tham gia</span>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="action-row">
+            <button class="btn btn-attend">✓ Điểm danh</button>
+            <button class="btn btn-expense">+ Thêm chi phí</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PHONE 2: Session detail (đủ mặt, không khách) -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#9ca3af;margin-bottom:6px">Panel chi tiết — đủ mặt, không khách</p>
+    <div class="phone">
+      <div class="phone-label">Buổi đủ người — gọn nhẹ</div>
+      <div class="phone-body">
+
+        <div class="cal-mini">
+          <div class="cc empty"></div><div class="cc empty"></div><div class="cc empty"></div><div class="cc normal">1</div><div class="cc normal">2</div><div class="cc normal">3</div><div class="cc normal">4</div>
+          <div class="cc normal">5</div><div class="cc selected">6</div><div class="cc normal">7</div><div class="cc normal">8</div><div class="cc normal">9</div><div class="cc normal">10</div><div class="cc normal">11</div>
+          <div class="cc normal">12</div><div class="cc normal">13</div><div class="cc normal">14</div><div class="cc normal">15</div><div class="cc normal">16</div><div class="cc normal">17</div><div class="cc normal">18</div>
+          <div class="cc normal">19</div><div class="cc session">19</div><div class="cc normal">20</div><div class="cc future-s">21</div><div class="cc normal">22</div><div class="cc future-s">23</div><div class="cc normal">24</div>
+        </div>
+
+        <div class="detail-panel" style="border-color:rgba(52,211,153,0.3)">
+          <div class="dp-header">
+            <div>
+              <div class="dp-title">Buổi #3 · T2, 06/05</div>
+              <div class="dp-sub">8 thành viên · đủ mặt</div>
+            </div>
+            <div class="dp-badge" style="background:rgba(52,211,153,0.15);color:#34d399">✓ Đủ mặt</div>
+          </div>
+
+          <div class="people-section">
+            <div class="all-present">✓ Tất cả thành viên có mặt</div>
+          </div>
+
+          <div class="cost-section">
+            <div class="ps-label" style="margin-bottom:6px">Chi phí buổi</div>
+            <div class="cost-row">
+              <span class="cost-label"><span class="icon">🏟️</span> Tiền sân</span>
+              <span class="cost-val">350.000 đ</span>
+            </div>
+            <div class="cost-row">
+              <span class="cost-label"><span class="icon">💧</span> Tiền nước</span>
+              <span class="cost-val pending">Cuối tháng</span>
+            </div>
+            <div class="cost-total-row">
+              <span class="cost-total-label">Khách vãng lai</span>
+              <span class="cost-total-val" style="color:#9ca3af;font-size:11px">Không có</span>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="btn btn-attend">✓ Điểm danh</button>
+            <button class="btn btn-expense">+ Thêm chi phí</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PHONE 3: Form nhập tiền nước cuối tháng -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#fbbf24;margin-bottom:6px">Form nhập tiền nước cuối tháng</p>
+    <div class="phone">
+      <div class="phone-label">Nhập 1 lần, chia tự động</div>
+      <div class="phone-body">
+
+        <div class="section-divider">💧 Tiền nước tháng 5</div>
+
+        <div class="monthly-form">
+          <div class="mf-header">
+            <span style="font-size:16px">💧</span>
+            <span class="mf-title">Tiền nước tháng 5</span>
+            <span class="mf-badge">Cuối tháng</span>
+          </div>
+
+          <div class="mf-row">
+            <div class="mf-label">Tổng tiền nước tháng này</div>
+            <div class="mf-input">480.000 đ</div>
+            <div class="mf-hint">Chủ sân gửi tổng, app tự chia theo số buổi tham gia</div>
+          </div>
+
+          <!-- Preview chia tiền -->
+          <div class="mf-preview">
+            <div style="font-size:9px;color:#fbbf24;margin-bottom:5px;font-weight:700">Tự động chia theo lượt tham dự</div>
+            <div class="mf-preview-row"><span>13 buổi · 8 thành viên</span><span class="v">~62 lượt</span></div>
+            <div class="mf-preview-row"><span>Tiền nước / lượt</span><span class="v">~7.700 đ</span></div>
+            <div style="border-top:1px solid #2a2d3a;margin:5px 0"></div>
+            <div class="mf-preview-row"><span>Nguyễn An (13/13)</span><span class="v">100.000 đ</span></div>
+            <div class="mf-preview-row"><span>Long (11/13)</span><span class="v">84.700 đ</span></div>
+            <div class="mf-preview-row"><span>Minh (9/13 có mặt)</span><span class="v">69.300 đ</span></div>
+            <div class="mf-preview-row" style="color:#555"><span>+ 5 thành viên khác...</span><span></span></div>
+          </div>
+
+          <div class="mf-row">
+            <div class="mf-label">Chi phí phụ khác (tùy chọn)</div>
+            <div class="mf-input" style="color:#555">Tên khoản · Số tiền · Chọn người</div>
+          </div>
+
+          <button class="btn-save">Lưu & áp dụng tháng 5</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p style="text-align:center;color:#555;font-size:11px;margin-top:20px">Cho tôi biết ý kiến trong terminal nhé</p>
+
+</body>
+</html>

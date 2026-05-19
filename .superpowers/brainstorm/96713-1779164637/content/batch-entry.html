@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Entry Form</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; font-family: -apple-system, sans-serif; color: #fff; padding: 20px; }
+h2 { font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #888; font-size: 12px; margin-bottom: 24px; }
+
+.row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+.phone { width: 320px; background: #1a1d27; border-radius: 22px; overflow: hidden; border: 1.5px solid #2a2d3a; }
+.phone-label { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 8px 0 0; }
+.phone-body { padding: 12px 12px 16px; overflow-y: auto; max-height: 680px; }
+
+.form-header { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.form-icon { font-size: 22px; }
+.form-title { font-size: 14px; font-weight: 800; }
+.form-sub { font-size: 10px; color: #9ca3af; }
+.form-badge { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 8px; padding: 2px 8px; border-radius: 10px; margin-left: auto; white-space: nowrap; }
+
+.info-box { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-size: 9px; color: #a5b4fc; line-height: 1.5; }
+
+/* Session rows */
+.session-row { background: #1e2235; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+.sr-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sr-date-box { width: 34px; height: 34px; border-radius: 8px; background: #2a2d45; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.sr-date-box .d { font-size: 13px; font-weight: 800; }
+.sr-date-box .w { font-size: 7px; color: #888; }
+.sr-title { flex: 1; font-size: 11px; font-weight: 600; }
+.sr-total { font-size: 11px; font-weight: 700; color: #34d399; }
+.sr-total.empty { color: #3a3d55; font-weight: 400; font-style: italic; font-size: 10px; }
+
+.input-row { display: flex; gap: 6px; }
+.input-group { flex: 1; }
+.input-label { font-size: 8px; color: #6c6f80; margin-bottom: 3px; }
+.inp { background: #13161f; border: 1px solid #2a2d3a; border-radius: 6px; padding: 6px 8px; font-size: 11px; color: #fff; width: 100%; }
+.inp:focus { outline: none; border-color: #6366f1; }
+.inp.filled { border-color: rgba(52,211,153,0.4); color: #34d399; }
+
+/* Summary bar */
+.summary-bar { background: #252840; border-radius: 10px; padding: 10px 12px; margin-top: 10px; margin-bottom: 10px; }
+.sb-title { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.sb-row { display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; padding: 3px 0; }
+.sb-row .v { color: #fff; font-weight: 600; }
+.sb-total { display: flex; justify-content: space-between; padding: 7px 0 0; border-top: 1px solid #2a2d3a; margin-top: 4px; }
+.sb-total .l { font-size: 11px; font-weight: 700; color: #fff; }
+.sb-total .v { font-size: 14px; font-weight: 800; color: #fbbf24; }
+
+.btn-save { width: 100%; padding: 10px 0; border-radius: 10px; border: none; background: linear-gradient(135deg, #fbbf24, #f59e0b); color: #000; font-size: 12px; font-weight: 800; cursor: pointer; }
+
+/* Session row entered state */
+.session-row.entered { border: 1px solid rgba(52,211,153,0.25); }
+.session-row.future-s { opacity: 0.4; }
+
+.divider { font-size: 10px; color: #6c6f80; margin: 10px 0 8px; display: flex; align-items: center; gap: 6px; }
+.divider::after { content: ''; flex: 1; height: 1px; background: #2a2d3a; }
+</style>
+</head>
+<body>
+
+<h2>Form nhập chi phí cuối tháng — Batch Entry</h2>
+<p class="subtitle">Chủ sân gửi bảng Excel → nhập tổng "Thành tiền" mỗi buổi vào app</p>
+
+<div class="row">
+
+  <!-- PHONE 1: Form nhập batch -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#fbbf24;margin-bottom:6px">Form nhập từ bảng chủ sân</p>
+    <div class="phone">
+      <div class="phone-label">Nhập 1 lần cuối tháng</div>
+      <div class="phone-body">
+
+        <div class="form-header">
+          <div class="form-icon">📋</div>
+          <div>
+            <div class="form-title">Chi phí sân tháng 5</div>
+            <div class="form-sub">Nhập từ bảng chủ sân gửi</div>
+          </div>
+          <div class="form-badge">13 buổi</div>
+        </div>
+
+        <div class="info-box">
+          💡 Nhập "Thành tiền" mỗi buổi từ bảng Excel của chủ sân. App tự chia đều cho người tham dự hôm đó.
+        </div>
+
+        <!-- Sessions đã qua -->
+        <div class="divider">Buổi đã đánh · 8/13</div>
+
+        <div class="session-row entered">
+          <div class="sr-header">
+            <div class="sr-date-box" style="background:#1a2e1a"><div class="d" style="color:#34d399">04</div><div class="w" style="color:#34d399">T2</div></div>
+            <div class="sr-title">Buổi #1 · 04/05</div>
+            <div class="sr-total">88.000 đ</div>
+          </div>
+          <div class="input-row">
+            <div class="input-group">
+              <div class="input-label">Nước + phụ kiện (đ)</div>
+              <div class="inp filled">88.000</div>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Bóng (nếu có)</div>
+              <div class="inp">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="session-row entered">
+          <div class="sr-header">
+            <div class="sr-date-box" style="background:#1a2e1a"><div class="d" style="color:#34d399">06</div><div class="w" style="color:#34d399">T4</div></div>
+            <div class="sr-title">Buổi #2 · 06/05</div>
+            <div class="sr-total">112.000 đ</div>
+          </div>
+          <div class="input-row">
+            <div class="input-group">
+              <div class="input-label">Nước + phụ kiện (đ)</div>
+              <div class="inp filled">112.000</div>
+            </div>
+            <div class="input-group">
+              <div class="input-label">Bóng (nếu có)</div>
+              <div class="inp">50.000</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="session-row">
+          <div class="sr-header">
+            <div class="sr-date-box"><div class="d">08</div><div class="w">T6</div></div>
+            <div class="sr-title">Buổi #3 · 08/05</div>
+            <div class="sr-total empty">Chưa nhập</div>
+          </div>
+          <div class="input-row">
+            <div class="input-group">
+              <div class="input-label">Nước + phụ kiện (đ)</div>
+              <input class="inp" placeholder="vd: 76.000" />
+            </div>
+            <div class="input-group">
+              <div class="input-label">Bóng (nếu có)</div>
+              <input class="inp" placeholder="0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="session-row">
+          <div class="sr-header">
+            <div class="sr-date-box"><div class="d">11</div><div class="w">T2</div></div>
+            <div class="sr-title">Buổi #4 · 11/05</div>
+            <div class="sr-total empty">Chưa nhập</div>
+          </div>
+          <div class="input-row">
+            <div class="input-group">
+              <div class="input-label">Nước + phụ kiện (đ)</div>
+              <input class="inp" placeholder="vd: 88.000" />
+            </div>
+            <div class="input-group">
+              <div class="input-label">Bóng (nếu có)</div>
+              <input class="inp" placeholder="0" />
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center;color:#555;font-size:9px;padding:4px 0">... 4 buổi nữa ...</div>
+
+        <!-- Sắp tới - không nhập -->
+        <div class="divider">Buổi sắp tới · 5/13</div>
+        <div class="session-row future-s">
+          <div class="sr-header">
+            <div class="sr-date-box"><div class="d">20</div><div class="w">T4</div></div>
+            <div class="sr-title">Buổi #9 · 20/05</div>
+            <div class="sr-total empty">Chưa đến</div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-bar">
+          <div class="sb-title">Tổng kết đã nhập</div>
+          <div class="sb-row"><span>Nước + phụ kiện</span><span class="v">200.000 đ</span></div>
+          <div class="sb-row"><span>Bóng</span><span class="v">50.000 đ</span></div>
+          <div class="sb-row"><span>Buổi đã nhập</span><span class="v">2 / 8 buổi</span></div>
+          <div class="sb-total">
+            <span class="l">Tổng tháng 5</span>
+            <span class="v">250.000 đ</span>
+          </div>
+        </div>
+
+        <button class="btn-save">💾 Lưu tất cả</button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PHONE 2: Cách mở form này -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#9ca3af;margin-bottom:6px">Cách truy cập form này</p>
+    <div class="phone">
+      <div class="phone-label">Từ Settings ⚙️ tab Pickleball</div>
+      <div class="phone-body">
+
+        <!-- Settings sheet mockup -->
+        <div style="background:#1e2235;border-radius:12px;padding:12px;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;margin-bottom:12px">⚙️ Cài đặt CLB</div>
+
+          <!-- Schedule config -->
+          <div style="font-size:9px;color:#6c6f80;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Lịch tháng tự động</div>
+          <div style="background:#13161f;border-radius:8px;padding:10px;margin-bottom:10px">
+            <div style="font-size:10px;color:#9ca3af;margin-bottom:4px">Bắt đầu từ ngày</div>
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:8px">02 mỗi tháng · T2, T4, T6</div>
+            <div style="font-size:9px;color:#6366f1">Tháng 6 sẽ tạo từ 01/06 ›</div>
+          </div>
+
+          <!-- Monthly cost entry -->
+          <div style="font-size:9px;color:#6c6f80;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Chi phí tháng</div>
+
+          <div style="background:#13161f;border-radius:8px;padding:10px;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#fff">Tiền sân tháng 5</div>
+                <div style="font-size:9px;color:#9ca3af;margin-top:2px">4.550.000 đ · 13 buổi</div>
+              </div>
+              <div style="font-size:11px;font-weight:700;color:#34d399">350k/buổi</div>
+            </div>
+          </div>
+
+          <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:8px;padding:10px;cursor:pointer">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:11px;font-weight:600;color:#fbbf24">📋 Nhập chi phí sân</div>
+                <div style="font-size:9px;color:#9ca3af;margin-top:2px">Nước, bóng, phụ kiện theo buổi</div>
+              </div>
+              <div style="font-size:14px;color:#fbbf24">›</div>
+            </div>
+            <div style="font-size:8px;color:#666;margin-top:4px">2/8 buổi đã nhập · 6 buổi còn trống</div>
+          </div>
+        </div>
+
+        <div style="text-align:center;font-size:9px;color:#555;padding:4px">
+          Tap "Nhập chi phí sân" → mở form batch entry bên trái
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p style="text-align:center;color:#555;font-size:11px;margin-top:20px">Xem xong cho tôi biết ý kiến trong terminal nhé</p>
+
+</body>
+</html>

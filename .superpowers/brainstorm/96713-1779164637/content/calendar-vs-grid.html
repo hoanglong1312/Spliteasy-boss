@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendar vs Session Grid</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; font-family: -apple-system, sans-serif; color: #fff; padding: 20px; }
+h2 { font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #888; font-size: 12px; margin-bottom: 24px; }
+.section-title { font-size: 13px; color: #9ca3af; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #2a2d3a; }
+
+.row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
+
+.phone { width: 290px; background: #1a1d27; border-radius: 22px; overflow: hidden; border: 1.5px solid #2a2d3a; }
+.phone-label { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 8px 0 0; }
+.phone-body { padding: 10px 10px 14px; }
+
+/* Tab bar */
+.tab-row { display: flex; background: #13161f; margin: 0 -10px 10px; padding: 0 10px; gap: 4px; }
+.tab { padding: 7px 5px; font-size: 9px; color: #555; }
+.tab.active { color: #34d399; border-bottom: 2px solid #34d399; }
+
+/* ── SESSION-ONLY GRID (như home) ── */
+.session-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.sg-cell { aspect-ratio: 1; border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; font-weight: 700; cursor: pointer; }
+.sg-cell.present { background: rgba(52,211,153,0.18); border: 1px solid rgba(52,211,153,0.4); color: #34d399; }
+.sg-cell.absent { background: rgba(251,113,133,0.15); border: 1px solid rgba(251,113,133,0.35); color: #fb7185; }
+.sg-cell.future { background: rgba(255,255,255,0.04); border: 1px dashed #2a2d3a; color: #444; }
+.sg-cell.today { background: rgba(99,102,241,0.25); border: 1px solid rgba(99,102,241,0.6); color: #a5b4fc; }
+.sg-cell .day { font-size: 10px; font-weight: 800; }
+.sg-cell .dow { font-size: 6px; opacity: 0.7; }
+
+/* ── FULL CALENDAR ── */
+.cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.cal-title { font-size: 10px; font-weight: 700; }
+.cal-nav { font-size: 12px; color: #6366f1; }
+.cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 2px; }
+.cal-dow span { text-align: center; font-size: 7px; color: #555; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cc { aspect-ratio: 1; border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 9px; font-weight: 600; }
+.cc.empty { background: transparent; }
+.cc.normal { background: #181b28; color: #3a3d55; }
+.cc.session { background: rgba(52,211,153,0.15); border: 1px solid rgba(52,211,153,0.35); color: #34d399; }
+.cc.absent { background: rgba(251,113,133,0.12); border: 1px solid rgba(251,113,133,0.3); color: #fb7185; }
+.cc.today-mark { background: rgba(99,102,241,0.3); border: 1px solid #6366f1; color: #a5b4fc; }
+.cc.future-s { background: rgba(255,255,255,0.03); border: 1px dashed #2a2d3a; color: #444; }
+
+/* Expand detail */
+.expand-box { background: linear-gradient(135deg,#1a2e1a,#1e3320); border-radius: 8px; padding: 8px 10px; margin-top: 8px; border: 1px solid rgba(52,211,153,0.2); }
+.eb-title { font-size: 10px; font-weight: 700; color: #34d399; margin-bottom: 5px; }
+.eb-row { display: flex; justify-content: space-between; font-size: 9px; color: #9ca3af; padding: 2px 0; }
+.eb-val { color: #fff; font-weight: 600; }
+.members-row { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 5px; }
+.mc { padding: 1px 5px; border-radius: 8px; font-size: 7px; font-weight: 700; background: rgba(52,211,153,0.15); color: #34d399; }
+.mc.ab { background: rgba(251,113,133,0.15); color: #fb7185; }
+
+/* ── HOME CARD — Current ── */
+.home-card-current { background: linear-gradient(135deg, #1e1b4b, #3730a3); border-radius: 14px; padding: 12px 14px; }
+.hc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.hc-title { font-size: 12px; font-weight: 700; }
+.hc-sub { font-size: 9px; color: #c7d2fe; margin-bottom: 8px; }
+.hc-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-bottom: 8px; }
+.hg { aspect-ratio: 1; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 6px; font-weight: 700; }
+.hg.p { background: rgba(110,231,183,.22); border: 1px solid rgba(110,231,183,.5); color: #d1fae5; }
+.hg.a { background: rgba(251,113,133,.18); border: 1px solid rgba(251,113,133,.4); color: #fecdd3; }
+.hg.f { background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.12); color: #555; }
+.hg .n { font-size: 8px; font-weight: 800; }
+.hg .d { font-size: 5px; opacity: 0.7; }
+.hc-stats { display: flex; justify-content: space-between; font-size: 9px; color: #c7d2fe; }
+
+/* ── HOME CARD — Simplified ── */
+.home-card-simple { background: linear-gradient(135deg, #1e1b4b, #3730a3); border-radius: 14px; padding: 14px; }
+.hs-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.hs-icon { font-size: 20px; }
+.hs-month { font-size: 9px; color: #c7d2fe; }
+.hs-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.hs-stats { display: flex; gap: 14px; margin-bottom: 12px; }
+.hs-stat { }
+.hs-stat .v { font-size: 18px; font-weight: 800; }
+.hs-stat .l { font-size: 8px; color: #c7d2fe; }
+.hs-bar-bg { height: 4px; background: rgba(255,255,255,0.1); border-radius: 4px; margin-bottom: 10px; }
+.hs-bar { height: 4px; background: #34d399; border-radius: 4px; width: 62%; }
+.hs-btn { background: rgba(255,255,255,0.12); border: none; border-radius: 8px; padding: 8px 0; width: 100%; color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; }
+
+.badge-rec { display: inline-block; background: #34d399; color: #000; font-size: 8px; font-weight: 800; padding: 2px 7px; border-radius: 10px; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<h2>So sánh layout cho 2 câu hỏi</h2>
+<p class="subtitle">Trái = hiện tại / phương án A &nbsp;·&nbsp; Phải = đề xuất / phương án B</p>
+
+<!-- SECTION 1: Tab Buổi đánh -->
+<div class="section-title">① Tab Buổi đánh — Chỉ hiện session dates vs Full calendar tháng</div>
+<div class="row">
+
+  <!-- Session-only grid -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#9ca3af;margin-bottom:6px">Chỉ hiện ngày có buổi (như home)</p>
+    <div class="phone">
+      <div class="phone-label">Session-only — gọn nhưng thiếu context vị trí</div>
+      <div class="phone-body">
+        <div class="tab-row"><div class="tab">Tổng quan</div><div class="tab active">Buổi đánh</div><div class="tab">Vé lẻ</div><div class="tab">TV</div></div>
+        <div style="font-size:9px;color:#6c6f80;margin-bottom:6px">Tháng 5 · 13 buổi</div>
+        <div class="session-grid">
+          <div class="sg-cell present"><div class="day">4</div><div class="dow">T2</div></div>
+          <div class="sg-cell present"><div class="day">6</div><div class="dow">T4</div></div>
+          <div class="sg-cell absent"><div class="day">8</div><div class="dow">T6</div></div>
+          <div class="sg-cell present"><div class="day">11</div><div class="dow">T2</div></div>
+          <div class="sg-cell absent"><div class="day">13</div><div class="dow">T4</div></div>
+          <div class="sg-cell present"><div class="day">15</div><div class="dow">T6</div></div>
+          <div class="sg-cell present"><div class="day">18</div><div class="dow">T2</div></div>
+          <div class="sg-cell today"><div class="day">19</div><div class="dow">HN</div></div>
+          <div class="sg-cell future"><div class="day">20</div><div class="dow">T4</div></div>
+          <div class="sg-cell future"><div class="day">22</div><div class="dow">T6</div></div>
+          <div class="sg-cell future"><div class="day">25</div><div class="dow">T2</div></div>
+          <div class="sg-cell future"><div class="day">27</div><div class="dow">T4</div></div>
+          <div class="sg-cell future"><div class="day">29</div><div class="dow">T6</div></div>
+        </div>
+        <!-- Expand detail khi tap -->
+        <div class="expand-box" style="margin-top:10px">
+          <div class="eb-title">📅 Buổi #7 — T2, 18/05</div>
+          <div class="eb-row"><span>Tiền sân</span><span class="eb-val">350.000 đ</span></div>
+          <div class="eb-row"><span>Tiền nước</span><span class="eb-val">80.000 đ</span></div>
+          <div class="members-row">
+            <span class="mc">NA ✓</span><span class="mc">TB ✓</span><span class="mc ab">LC ✗</span><span class="mc">PD ✓</span><span class="mc">NH ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#9ca3af;margin-top:5px">⚠️ Không thấy ngày nào trong tuần không đánh</p>
+  </div>
+
+  <!-- Full calendar -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#34d399;margin-bottom:6px">Full calendar tháng <span class="badge-rec">Recommend</span></p>
+    <div class="phone">
+      <div class="phone-label">Full calendar — thấy rõ cấu trúc tuần</div>
+      <div class="phone-body">
+        <div class="tab-row"><div class="tab">Tổng quan</div><div class="tab active">Buổi đánh</div><div class="tab">Vé lẻ</div><div class="tab">TV</div></div>
+        <div class="cal-header">
+          <div class="cal-nav">‹</div><div class="cal-title">Tháng 5 / 2026</div><div class="cal-nav">›</div>
+        </div>
+        <div class="cal-dow"><span>CN</span><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span></div>
+        <div class="cal-grid">
+          <div class="cc empty"></div><div class="cc empty"></div><div class="cc empty"></div><div class="cc normal">1</div><div class="cc normal">2</div><div class="cc normal">3</div><div class="cc normal">4</div>
+          <div class="cc normal">5</div><div class="cc session">6</div><div class="cc normal">7</div><div class="cc absent">8</div><div class="cc normal">9</div><div class="cc session">10</div><div class="cc normal">11</div>
+          <div class="cc normal">12</div><div class="cc absent">13</div><div class="cc normal">14</div><div class="cc session">15</div><div class="cc normal">16</div><div class="cc session">17</div><div class="cc normal">18</div>
+          <div class="cc normal">19</div><div class="cc today-mark">19</div><div class="cc normal">20</div><div class="cc future-s">21</div><div class="cc normal">22</div><div class="cc future-s">23</div><div class="cc normal">24</div>
+          <div class="cc normal">25</div><div class="cc future-s">26</div><div class="cc normal">27</div><div class="cc future-s">28</div><div class="cc normal">29</div><div class="cc future-s">30</div><div class="cc normal">31</div>
+        </div>
+        <div class="expand-box">
+          <div class="eb-title">📅 Buổi #8 — T5, 15/05</div>
+          <div class="eb-row"><span>Tiền sân</span><span class="eb-val">350.000 đ</span></div>
+          <div class="eb-row"><span>Tiền nước</span><span class="eb-val">80.000 đ</span></div>
+          <div class="members-row">
+            <span class="mc">NA ✓</span><span class="mc">TB ✓</span><span class="mc ab">LC ✗</span><span class="mc">PD ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#34d399;margin-top:5px">✅ Thấy pattern T2/T4/T6, ngày trống rõ ràng</p>
+  </div>
+
+</div>
+
+<!-- SECTION 2: Home card -->
+<div class="section-title">② Trang chủ — Card Pickleball hiện tại vs Đơn giản hóa</div>
+<div class="row">
+
+  <!-- Home current -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#9ca3af;margin-bottom:6px">Hiện tại — lưới điểm danh inline</p>
+    <div style="width:290px;padding:4px">
+      <div class="home-card-current">
+        <div class="hc-header">
+          <div>🏓 <span style="font-size:11px;font-weight:700">Pickleball Quận 7</span></div>
+          <div style="font-size:9px;color:#c7d2fe">Xem CLB ›</div>
+        </div>
+        <div class="hc-sub">Tháng 5 · Bạn còn nợ −380.000 đ</div>
+        <div class="hc-grid">
+          <div class="hg p"><div class="n">4</div><div class="d">T2</div></div>
+          <div class="hg p"><div class="n">6</div><div class="d">T4</div></div>
+          <div class="hg a"><div class="n">8</div><div class="d">T6</div></div>
+          <div class="hg p"><div class="n">11</div><div class="d">T2</div></div>
+          <div class="hg a"><div class="n">13</div><div class="d">T4</div></div>
+          <div class="hg p"><div class="n">15</div><div class="d">T6</div></div>
+          <div class="hg p"><div class="n">18</div><div class="d">T2</div></div>
+          <div class="hg f"><div class="n">20</div><div class="d">T4</div></div>
+          <div class="hg f"><div class="n">22</div><div class="d">T6</div></div>
+          <div class="hg f"><div class="n">25</div><div class="d">T2</div></div>
+          <div class="hg f"><div class="n">27</div><div class="d">T4</div></div>
+          <div class="hg f"><div class="n">29</div><div class="d">T6</div></div>
+        </div>
+        <div class="hc-stats">
+          <span>7 có mặt</span><span>2 vắng</span><span>13 buổi</span><span style="color:#fca5a5">−380k</span>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#9ca3af;margin-top:8px">⚠️ Nhiều thông tin, card nặng</p>
+  </div>
+
+  <!-- Home simplified -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#34d399;margin-bottom:6px">Đơn giản hóa <span class="badge-rec">Recommend</span></p>
+    <div style="width:290px;padding:4px">
+      <div class="home-card-simple">
+        <div class="hs-top">
+          <div>
+            <div style="font-size:9px;color:#c7d2fe;margin-bottom:2px">🏓 Pickleball Quận 7</div>
+            <div class="hs-title">Tháng 5 / 2026</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:18px;font-weight:800;color:#fb7185">−380k</div>
+            <div style="font-size:8px;color:#c7d2fe">bạn còn nợ</div>
+          </div>
+        </div>
+        <div class="hs-stats">
+          <div class="hs-stat"><div class="v">7</div><div class="l">đã đánh</div></div>
+          <div class="hs-stat"><div class="v" style="color:#fb7185">2</div><div class="l">lần vắng</div></div>
+          <div class="hs-stat"><div class="v">13</div><div class="l">tổng buổi</div></div>
+        </div>
+        <div class="hs-bar-bg"><div class="hs-bar"></div></div>
+        <button class="hs-btn">Xem lịch & chi tiết →</button>
+      </div>
+    </div>
+    <p style="text-align:center;font-size:9px;color:#34d399;margin-top:8px">✅ Gọn, số liệu quan trọng nổi bật, tap để vào lịch</p>
+  </div>
+
+</div>
+
+<p style="text-align:center;color:#555;font-size:11px;margin-top:8px">Xem xong cho tôi biết ý kiến trong terminal nhé</p>
+
+</body>
+</html>

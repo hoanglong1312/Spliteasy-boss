@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batch Entry v2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0f1117; font-family: -apple-system, sans-serif; color: #fff; padding: 20px; }
+h2 { font-size: 16px; margin-bottom: 4px; }
+.subtitle { color: #888; font-size: 12px; margin-bottom: 24px; }
+.row { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+
+.phone { width: 320px; background: #1a1d27; border-radius: 22px; overflow: hidden; border: 1.5px solid #2a2d3a; }
+.phone-label { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 1px; text-align: center; padding: 8px 0 0; }
+.phone-body { padding: 12px 12px 16px; }
+
+.form-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.form-title { font-size: 14px; font-weight: 800; }
+.form-sub { font-size: 10px; color: #9ca3af; }
+.form-badge { background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 8px; padding: 2px 8px; border-radius: 10px; margin-left: auto; }
+
+.info-box { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; font-size: 9px; color: #a5b4fc; line-height: 1.5; }
+
+/* Session card */
+.session-card { background: #1e2235; border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+.session-card.entered { border: 1px solid rgba(52,211,153,0.2); }
+.sc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.sc-date { width: 36px; height: 36px; border-radius: 9px; background: #2a2d45; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.sc-date.done { background: #1a2e1a; }
+.sc-date .d { font-size: 14px; font-weight: 800; }
+.sc-date .w { font-size: 7px; color: #888; }
+.sc-date.done .d { color: #34d399; }
+.sc-date.done .w { color: #34d399; }
+.sc-meta { flex: 1; }
+.sc-title { font-size: 11px; font-weight: 600; }
+.sc-att { font-size: 9px; color: #666; margin-top: 1px; }
+.sc-sum { font-size: 11px; font-weight: 700; color: #34d399; }
+.sc-sum.empty { color: #3a3d55; font-style: italic; font-size: 9px; font-weight: 400; }
+
+/* Water row */
+.water-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.water-icon { font-size: 14px; flex-shrink: 0; }
+.water-label { font-size: 10px; color: #9ca3af; flex: 1; }
+.water-sub { font-size: 8px; color: #555; }
+.inp { background: #13161f; border: 1px solid #2a2d3a; border-radius: 7px; padding: 6px 9px; font-size: 11px; color: #fff; width: 110px; text-align: right; }
+.inp.filled { border-color: rgba(52,211,153,0.4); color: #34d399; }
+.inp::placeholder { color: #3a3d55; }
+
+/* Extra items */
+.extra-item { background: #13161f; border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+.ei-row1 { display: flex; gap: 6px; margin-bottom: 6px; }
+.ei-name { flex: 1; background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 6px; padding: 5px 8px; font-size: 10px; color: #fff; }
+.ei-amount { background: #1a1d27; border: 1px solid rgba(251,191,36,0.3); border-radius: 6px; padding: 5px 8px; font-size: 10px; color: #fbbf24; width: 90px; text-align: right; }
+.ei-row2-label { font-size: 8px; color: #6c6f80; margin-bottom: 4px; }
+.member-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip { padding: 3px 8px; border-radius: 10px; font-size: 8px; font-weight: 700; background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.2); cursor: pointer; }
+.chip.selected { background: rgba(99,102,241,0.3); color: #a5b4fc; border-color: rgba(99,102,241,0.5); }
+.chip.all { background: rgba(99,102,241,0.2); color: #a5b4fc; }
+
+.add-extra-btn { width: 100%; padding: 6px 0; background: transparent; border: 1px dashed #2a2d3a; border-radius: 7px; color: #555; font-size: 10px; cursor: pointer; margin-top: 4px; }
+.add-extra-btn:hover { border-color: #6366f1; color: #6366f1; }
+
+/* Divider */
+.divider { font-size: 9px; color: #6c6f80; margin: 10px 0 8px; display: flex; align-items: center; gap: 6px; }
+.divider::after { content: ''; flex: 1; height: 1px; background: #2a2d3a; }
+
+/* Summary */
+.summary-bar { background: #252840; border-radius: 10px; padding: 10px 12px; margin-top: 8px; margin-bottom: 10px; }
+.sb-row { display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; padding: 2px 0; }
+.sb-row .v { color: #fff; font-weight: 600; }
+.sb-total { display: flex; justify-content: space-between; padding: 7px 0 0; border-top: 1px solid #2a2d3a; margin-top: 5px; }
+.btn-save { width: 100%; padding: 10px 0; border-radius: 10px; border: none; background: linear-gradient(135deg,#fbbf24,#f59e0b); color: #000; font-size: 12px; font-weight: 800; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<h2>Batch Entry v2 — Tiền nước chia đều, phụ kiện chọn người</h2>
+<p class="subtitle">Mỗi buổi: nhập tiền nước → chia theo điểm danh. Thêm bóng/phụ kiện → chọn ai áp dụng.</p>
+
+<div class="row">
+
+  <!-- PHONE 1: Buổi đã nhập đủ -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#34d399;margin-bottom:6px">Buổi đã nhập — có bóng + phụ kiện</p>
+    <div class="phone">
+      <div class="phone-label">Session với extra items</div>
+      <div class="phone-body">
+
+        <div class="form-header">
+          <div>
+            <div class="form-title">📋 Chi phí sân tháng 5</div>
+            <div class="form-sub">Nhập từ bảng chủ sân gửi</div>
+          </div>
+          <div class="form-badge">13 buổi</div>
+        </div>
+
+        <div class="info-box">
+          💡 Tiền nước: chia đều cho người có mặt hôm đó.<br>
+          Bóng / phụ kiện: tự thêm → chọn người áp dụng.
+        </div>
+
+        <div class="divider">Buổi đã đánh</div>
+
+        <!-- Session 06/05 — nhập đầy đủ -->
+        <div class="session-card entered">
+          <div class="sc-header">
+            <div class="sc-date done"><div class="d">06</div><div class="w">T4</div></div>
+            <div class="sc-meta">
+              <div class="sc-title">Buổi #2 · 06/05</div>
+              <div class="sc-att">8 có mặt · 0 vắng</div>
+            </div>
+            <div class="sc-sum">248.000 đ</div>
+          </div>
+
+          <!-- Tiền nước -->
+          <div class="water-row">
+            <div class="water-icon">💧</div>
+            <div>
+              <div class="water-label">Tiền nước</div>
+              <div class="water-sub">Chia đều 8 người có mặt → 14.000đ/người</div>
+            </div>
+            <input class="inp filled" value="112.000" />
+          </div>
+
+          <!-- Extra: Bóng -->
+          <div class="extra-item">
+            <div class="ei-row1">
+              <input class="ei-name" value="Bóng BX" />
+              <input class="ei-amount" value="50.000" />
+            </div>
+            <div class="ei-row2-label">Áp dụng cho:</div>
+            <div class="member-chips">
+              <span class="chip selected">NA</span>
+              <span class="chip selected">TB</span>
+              <span class="chip">LC</span>
+              <span class="chip selected">PD</span>
+              <span class="chip selected">NH</span>
+              <span class="chip">Long</span>
+              <span class="chip">Minh</span>
+              <span class="chip">Hoa</span>
+            </div>
+          </div>
+
+          <!-- Extra: Phụ kiện -->
+          <div class="extra-item">
+            <div class="ei-row1">
+              <input class="ei-name" value="Tất (vớ)" />
+              <input class="ei-amount" value="15.000" />
+            </div>
+            <div class="ei-row2-label">Áp dụng cho:</div>
+            <div class="member-chips">
+              <span class="chip selected">Long</span>
+              <span class="chip">NA</span>
+              <span class="chip">TB</span>
+              <span class="chip">LC</span>
+              <span class="chip">PD</span>
+              <span class="chip">NH</span>
+              <span class="chip">Minh</span>
+              <span class="chip">Hoa</span>
+            </div>
+          </div>
+
+          <button class="add-extra-btn">+ Thêm khoản phụ</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- PHONE 2: Buổi chưa nhập -->
+  <div>
+    <p style="text-align:center;font-size:10px;color:#9ca3af;margin-bottom:6px">Buổi chưa nhập + tóm tắt</p>
+    <div class="phone">
+      <div class="phone-label">Nhập mới + summary</div>
+      <div class="phone-body">
+
+        <div class="divider">Buổi đã đánh</div>
+
+        <!-- Session 08/05 — chưa nhập -->
+        <div class="session-card">
+          <div class="sc-header">
+            <div class="sc-date"><div class="d">08</div><div class="w">T6</div></div>
+            <div class="sc-meta">
+              <div class="sc-title">Buổi #3 · 08/05</div>
+              <div class="sc-att">6 có mặt · Long, Minh vắng</div>
+            </div>
+            <div class="sc-sum empty">Chưa nhập</div>
+          </div>
+
+          <div class="water-row">
+            <div class="water-icon">💧</div>
+            <div>
+              <div class="water-label">Tiền nước</div>
+              <div class="water-sub">Sẽ chia đều 6 người có mặt</div>
+            </div>
+            <input class="inp" placeholder="vd: 88.000" />
+          </div>
+
+          <button class="add-extra-btn">+ Thêm bóng / phụ kiện</button>
+        </div>
+
+        <!-- Session 11/05 — chưa nhập -->
+        <div class="session-card">
+          <div class="sc-header">
+            <div class="sc-date"><div class="d">11</div><div class="w">T2</div></div>
+            <div class="sc-meta">
+              <div class="sc-title">Buổi #4 · 11/05</div>
+              <div class="sc-att">8 có mặt · 0 vắng</div>
+            </div>
+            <div class="sc-sum empty">Chưa nhập</div>
+          </div>
+
+          <div class="water-row">
+            <div class="water-icon">💧</div>
+            <div>
+              <div class="water-label">Tiền nước</div>
+              <div class="water-sub">Sẽ chia đều 8 người có mặt</div>
+            </div>
+            <input class="inp" placeholder="vd: 88.000" />
+          </div>
+
+          <button class="add-extra-btn">+ Thêm bóng / phụ kiện</button>
+        </div>
+
+        <div style="text-align:center;color:#555;font-size:9px;padding:4px 0">... 4 buổi nữa ...</div>
+
+        <!-- Summary -->
+        <div class="summary-bar">
+          <div style="font-size:9px;color:#6c6f80;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Tổng kết đã nhập</div>
+          <div class="sb-row"><span>💧 Tiền nước (2 buổi)</span><span class="v">200.000 đ</span></div>
+          <div class="sb-row"><span>🎾 Bóng</span><span class="v">50.000 đ</span></div>
+          <div class="sb-row"><span>🧦 Phụ kiện</span><span class="v">15.000 đ</span></div>
+          <div class="sb-row"><span>Còn lại chưa nhập</span><span class="v" style="color:#fbbf24">6 buổi</span></div>
+          <div class="sb-total">
+            <span style="font-size:11px;font-weight:700;color:#fff">Tổng tháng 5</span>
+            <span style="font-size:14px;font-weight:800;color:#fbbf24">265.000 đ</span>
+          </div>
+        </div>
+
+        <button class="btn-save">💾 Lưu tất cả</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p style="text-align:center;color:#555;font-size:11px;margin-top:20px">Cho tôi biết ý kiến trong terminal nhé</p>
+</body>
+</html>

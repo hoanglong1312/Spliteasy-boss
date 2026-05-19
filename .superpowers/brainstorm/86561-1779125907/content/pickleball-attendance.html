@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pickleball Attendance Redesign</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1117; font-family: -apple-system, sans-serif; color: #fff; padding: 24px; }
+  h2 { color: #fff; font-size: 18px; margin-bottom: 6px; }
+  .subtitle { color: #888; font-size: 13px; margin-bottom: 28px; }
+
+  .split { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+  .phone { width: 320px; background: #1a1d27; border-radius: 28px; overflow: hidden; border: 1.5px solid #2a2d3a; }
+  .phone-header { background: #1a1d27; padding: 16px 16px 0; }
+  .phone-label { font-size: 10px; color: #6c6f80; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; text-align: center; }
+  .phone-body { padding: 0 12px 20px; }
+
+  /* Tab bar */
+  .tab-bar { display: flex; background: #13161f; border-bottom: 1px solid #2a2d3a; }
+  .tab { flex: 1; padding: 10px 4px; text-align: center; font-size: 10px; color: #555; cursor: pointer; }
+  .tab.active { color: #6366f1; border-bottom: 2px solid #6366f1; }
+
+  /* Cards */
+  .card { background: #232635; border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .card-label { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; }
+
+  /* Today session card */
+  .today-card { background: linear-gradient(135deg, #3730a3, #4f46e5); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+  .today-badge { display: inline-block; background: rgba(255,255,255,0.15); color: #c7d2fe; font-size: 9px; padding: 2px 8px; border-radius: 20px; margin-bottom: 8px; }
+  .today-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+  .today-sub { font-size: 11px; color: #c7d2fe; margin-bottom: 10px; }
+  .btn-attend { background: #fff; color: #4f46e5; border: none; border-radius: 8px; padding: 8px 0; font-size: 12px; font-weight: 700; width: 100%; cursor: pointer; }
+
+  /* Session list */
+  .session-row { background: #232635; border-radius: 12px; margin-bottom: 8px; overflow: hidden; }
+  .session-header { display: flex; align-items: center; padding: 12px 14px; cursor: pointer; gap: 10px; }
+  .session-date { width: 38px; height: 38px; background: #2e3248; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+  .session-date .day { font-size: 16px; font-weight: 800; line-height: 1; }
+  .session-date .dow { font-size: 8px; color: #888; text-transform: uppercase; }
+  .session-info { flex: 1; }
+  .session-info .title { font-size: 12px; font-weight: 600; }
+  .session-info .sub { font-size: 10px; color: #666; margin-top: 2px; }
+  .session-chevron { color: #444; font-size: 14px; }
+  .session-row.expanded .session-chevron { transform: rotate(90deg); }
+
+  /* Attendance member grid */
+  .attendance-body { padding: 0 12px 12px; border-top: 1px solid #2a2d3a; }
+  .attend-title { font-size: 9px; color: #6c6f80; text-transform: uppercase; letter-spacing: 0.8px; padding: 8px 0 6px; }
+  .member-list { display: flex; flex-direction: column; gap: 6px; }
+  .member-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; transition: background 0.15s; }
+  .member-row.present { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.25); }
+  .member-row.absent { background: rgba(251,113,133,0.12); border: 1px solid rgba(251,113,133,0.3); }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .avatar.present { background: rgba(52,211,153,0.2); color: #34d399; }
+  .avatar.absent { background: rgba(251,113,133,0.2); color: #fb7185; }
+  .member-name { flex: 1; font-size: 12px; font-weight: 500; }
+  .member-status { font-size: 10px; font-weight: 600; }
+  .member-row.present .member-status { color: #34d399; }
+  .member-row.absent .member-status { color: #fb7185; }
+
+  .hint { font-size: 9px; color: #555; text-align: center; padding: 6px 0 2px; font-style: italic; }
+
+  /* Overview settle card */
+  .settle-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #2a2d3a; }
+  .settle-row:last-child { border-bottom: none; }
+  .settle-label { font-size: 11px; color: #999; }
+  .settle-val { font-size: 11px; font-weight: 600; }
+  .settle-val.neg { color: #fb7185; }
+  .settle-val.pos { color: #34d399; }
+
+  .section-label { font-size: 10px; color: #6c6f80; text-transform: uppercase; letter-spacing: 0.8px; margin: 14px 0 8px; }
+</style>
+</head>
+<body>
+
+<h2>Pickleball Tab — Redesign Điểm danh</h2>
+<p class="subtitle">Trái: Tab Tổng quan (có card "Buổi hôm nay") — Phải: Tab Buổi đánh (attendance inline)</p>
+
+<div class="split">
+
+  <!-- PHONE 1: Tab Tổng quan -->
+  <div class="phone">
+    <div class="phone-label">Tab Tổng quan</div>
+    <div class="tab-bar">
+      <div class="tab active">Tổng quan</div>
+      <div class="tab">Buổi đánh</div>
+      <div class="tab">Vé lẻ</div>
+      <div class="tab">Thành viên</div>
+    </div>
+    <div class="phone-body" style="padding-top:12px">
+
+      <!-- Card buổi hôm nay — CHỈ HIỆN KHI CÓ BUỔI -->
+      <div class="today-card">
+        <div class="today-badge">📅 Hôm nay · T2, 19/05</div>
+        <div class="today-title">Buổi #12 · Sân A3</div>
+        <div class="today-sub">6/7 có mặt · 1 vắng</div>
+        <button class="btn-attend">✓ Điểm danh buổi này</button>
+      </div>
+
+      <!-- Quyết toán cá nhân -->
+      <div class="card">
+        <div class="card-label">Quyết toán tháng 5 của bạn</div>
+        <div class="settle-row">
+          <span class="settle-label">Phí sân (10 buổi)</span>
+          <span class="settle-val neg">−500.000 đ</span>
+        </div>
+        <div class="settle-row">
+          <span class="settle-label">Tiền khách mang về</span>
+          <span class="settle-val pos">+120.000 đ</span>
+        </div>
+        <div class="settle-row" style="margin-top:4px">
+          <span class="settle-label" style="font-weight:700;color:#fff">Bạn đang nợ</span>
+          <span class="settle-val neg" style="font-size:14px;font-weight:800">−380.000 đ</span>
+        </div>
+      </div>
+
+      <!-- Tiến độ tháng -->
+      <div class="card">
+        <div class="card-label">Tiến độ tháng 5</div>
+        <div style="font-size:22px;font-weight:800;margin-bottom:2px">10 <span style="font-size:13px;color:#666;font-weight:400">/ 13 buổi</span></div>
+        <div style="background:#2e3248;border-radius:6px;height:6px;margin-bottom:8px">
+          <div style="background:#6366f1;height:6px;border-radius:6px;width:77%"></div>
+        </div>
+        <div style="font-size:10px;color:#666">Còn 3 buổi · Sắp tới: T4 21/05, T6 23/05</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PHONE 2: Tab Buổi đánh với attendance inline -->
+  <div class="phone">
+    <div class="phone-label">Tab Buổi đánh (thủ quỹ)</div>
+    <div class="tab-bar">
+      <div class="tab">Tổng quan</div>
+      <div class="tab active">Buổi đánh</div>
+      <div class="tab">Vé lẻ</div>
+      <div class="tab">Thành viên</div>
+    </div>
+    <div class="phone-body" style="padding-top:12px">
+
+      <div class="section-label">Tháng 5 · 13 buổi</div>
+
+      <!-- Session đã qua, ĐÓNG -->
+      <div class="session-row">
+        <div class="session-header">
+          <div class="session-date">
+            <span class="day">15</span>
+            <span class="dow">T5</span>
+          </div>
+          <div class="session-info">
+            <div class="title">Buổi #10</div>
+            <div class="sub">7 có mặt · 0 vắng</div>
+          </div>
+          <div class="session-chevron">›</div>
+        </div>
+      </div>
+
+      <!-- Session MỞ — có attendance -->
+      <div class="session-row expanded">
+        <div class="session-header">
+          <div class="session-date" style="background:#3730a3">
+            <span class="day">19</span>
+            <span class="dow" style="color:#c7d2fe">HN</span>
+          </div>
+          <div class="session-info">
+            <div class="title">Buổi #11 · <span style="color:#fbbf24;font-size:10px">Hôm nay</span></div>
+            <div class="sub">6 có mặt · 1 vắng</div>
+          </div>
+          <div class="session-chevron" style="color:#6366f1">›</div>
+        </div>
+
+        <!-- Danh sách điểm danh -->
+        <div class="attendance-body">
+          <div class="attend-title">Tap để đánh dấu vắng</div>
+          <div class="member-list">
+            <div class="member-row present">
+              <div class="avatar present">NA</div>
+              <div class="member-name">Nguyễn An</div>
+              <div class="member-status">✓ Có mặt</div>
+            </div>
+            <div class="member-row present">
+              <div class="avatar present">TB</div>
+              <div class="member-name">Trần Bình</div>
+              <div class="member-status">✓ Có mặt</div>
+            </div>
+            <div class="member-row absent">
+              <div class="avatar absent">LC</div>
+              <div class="member-name">Lê Chi</div>
+              <div class="member-status">✗ Vắng</div>
+            </div>
+            <div class="member-row present">
+              <div class="avatar present">PD</div>
+              <div class="member-name">Phạm Dũng</div>
+              <div class="member-status">✓ Có mặt</div>
+            </div>
+            <div class="member-row present">
+              <div class="avatar present">NH</div>
+              <div class="member-name">Ngô Hà</div>
+              <div class="member-status">✓ Có mặt</div>
+            </div>
+          </div>
+          <div class="hint">Tap vào tên để toggle vắng / có mặt</div>
+        </div>
+      </div>
+
+      <!-- Session sắp tới -->
+      <div class="session-row" style="opacity:0.5">
+        <div class="session-header">
+          <div class="session-date" style="background:#1e2235;border:1px dashed #3a3d55">
+            <span class="day" style="color:#666">21</span>
+            <span class="dow">T4</span>
+          </div>
+          <div class="session-info">
+            <div class="title" style="color:#666">Buổi #12</div>
+            <div class="sub">Chưa đến · Chưa điểm danh</div>
+          </div>
+          <div class="session-chevron">›</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<p style="text-align:center;color:#555;font-size:11px;margin-top:20px">Xem xong cho tôi biết ý kiến trong terminal nhé</p>
+
+</body>
+</html>
