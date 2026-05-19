@@ -231,6 +231,252 @@ const SCHEDULE_WEEKDAYS = [
   { label: 'CN', value: 0 },
 ];
 
+function SessionDetailPanel({ session, attendance, groupMembers, isTreasurer, markAttendance, monthlyConfig, sessionItems, pickSessions, todayStr }) {
+  const sessionIndex = pickSessions.findIndex(s => s.id === session.id);
+  const sessionNum = sessionIndex + 1;
+  const dateStr = session.date;
+  const dow = formatDow(dateStr);
+  const dd = dateStr.slice(8, 10);
+  const mmm = dateStr.slice(5, 7);
+
+  const hasAttendance = Object.keys(attendance).length > 0;
+  const absentIds = groupMembers
+    .map(m => m.id)
+    .filter(id => attendance[id] === 'absent' || (hasAttendance && attendance[id] !== 'present'));
+  const presentIds = groupMembers.map(m => m.id).filter(id => !absentIds.includes(id));
+  const presentCount = presentIds.length || groupMembers.length;
+  const allPresent = absentIds.length === 0 && hasAttendance;
+
+  const sessionCount = pickSessions.length || 1;
+  const courtFeePerSession = monthlyConfig?.court_fee
+    ? Math.round(monthlyConfig.court_fee / sessionCount)
+    : 0;
+  const waterPerPerson = session.water_amount > 0 && presentCount > 0
+    ? Math.round(session.water_amount / presentCount)
+    : null;
+
+  const isPast = dateStr < todayStr;
+  const isToday = dateStr === todayStr;
+
+  return (
+    <div style={{ marginTop: 12, background: 'var(--surface-2, #1e2235)', borderRadius: 14, padding: '14px 16px', border: '1px solid var(--border-1)' }}>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text-1)' }}>
+          Buổi #{sessionNum} · {dow}, {dd}/{mmm}
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
+          {isToday ? '🟢 Hôm nay' : isPast ? '✓ Đã đánh' : '📅 Sắp tới'}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Điểm danh</div>
+        {!hasAttendance ? (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic', marginBottom: 6 }}>
+            Chưa điểm danh — mặc định tất cả có mặt
+          </div>
+        ) : allPresent ? (
+          <div style={{ fontSize: 12, color: '#34d399', marginBottom: 6 }}>✓ Tất cả thành viên có mặt</div>
+        ) : (
+          <div style={{ fontSize: 12, color: '#f87171', marginBottom: 6 }}>
+            ✗ Vắng: {absentIds.map(id => groupMembers.find(m => m.id === id)?.name || id).join(', ')}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {groupMembers.map(m => {
+            const status = attendance[m.id];
+            const isPresent = status === 'present' || (!hasAttendance && status !== 'absent');
+            return (
+              <div
+                key={m.id}
+                onClick={() => isTreasurer && markAttendance(session.id, m.id, isPresent ? 'absent' : 'present')}
+                style={{
+                  padding: '4px 10px', borderRadius: 20,
+                  fontSize: 11, fontWeight: 600,
+                  background: isPresent ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.12)',
+                  color: isPresent ? '#34d399' : '#f87171',
+                  border: `1px solid ${isPresent ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.3)'}`,
+                  cursor: isTreasurer ? 'pointer' : 'default',
+                  userSelect: 'none',
+                }}
+              >
+                {m.name}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Chi phí</div>
+        {courtFeePerSession > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingBottom: 4 }}>
+            <span style={{ color: 'var(--text-2)' }}>🏸 Tiền sân / người</span>
+            <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtVND(courtFeePerSession)} đ</span>
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingBottom: 4 }}>
+          <span style={{ color: 'var(--text-2)' }}>💧 Tiền nước / người</span>
+          <span style={{
+            color: waterPerPerson != null ? 'var(--text-1)' : 'var(--text-3)',
+            fontWeight: waterPerPerson != null ? 600 : 400,
+            fontStyle: waterPerPerson == null ? 'italic' : 'normal',
+          }}>
+            {waterPerPerson != null ? `${fmtVND(waterPerPerson)} đ` : 'Cuối tháng'}
+          </span>
+        </div>
+        {sessionItems.map(item => {
+          const memberIds = safeArray(item.member_ids);
+          return (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, paddingBottom: 4 }}>
+              <span style={{ color: 'var(--text-2)' }}>📦 {item.name}</span>
+              <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>
+                {memberIds.length > 0
+                  ? `${fmtVND(Math.round(item.amount / memberIds.length))} đ/người`
+                  : `${fmtVND(item.amount)} đ`}
+              </span>
+            </div>
+          );
+        })}
+        {courtFeePerSession === 0 && !session.water_amount && sessionItems.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>Chưa nhập chi phí</div>
+        )}
+        {session.water_amount > 0 && presentCount > 1 && (
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 4 }}>
+            💡 Tiền nước chia đều {presentCount} người có mặt
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PickleCalendar({
+  viewMonth, setViewMonth, pickSessions, todayStr,
+  expandedSession, toggleSessionExpand, sessionAttendanceMap,
+  groupMembers, isTreasurer, markAttendance,
+  monthlyConfig, sessionItemsMap,
+}) {
+  const [year, month] = viewMonth.split('-').map(Number);
+  const firstDay = new Date(year, month - 1, 1);
+  const lastDay = new Date(year, month, 0);
+  const startOffset = (firstDay.getDay() + 6) % 7;
+  const totalDays = lastDay.getDate();
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= totalDays; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const sessionByDate = {};
+  pickSessions.forEach(s => { sessionByDate[s.date] = s; });
+  const mm = String(month).padStart(2, '0');
+  const DOW_LABELS = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+  function prevMonth() {
+    const d = new Date(year, month - 2, 1);
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  function nextMonth() {
+    const d = new Date(year, month, 1);
+    setViewMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <button onClick={prevMonth} style={{ ...iconBtnStyle(), width: 32, height: 32 }}>
+          <Icon name="chevron-left" size={16}/>
+        </button>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-1)' }}>
+          Tháng {month} / {year}
+        </span>
+        <button onClick={nextMonth} style={{ ...iconBtnStyle(), width: 32, height: 32 }}>
+          <Icon name="chevron-right" size={16}/>
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
+        {DOW_LABELS.map(d => (
+          <div key={d} style={{ textAlign: 'center', fontSize: 10, color: 'var(--text-3)', fontWeight: 600, paddingBottom: 4 }}>{d}</div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3 }}>
+        {cells.map((day, i) => {
+          if (!day) return <div key={`e${i}`}/>;
+          const dateStr = `${year}-${mm}-${String(day).padStart(2, '0')}`;
+          const session = sessionByDate[dateStr];
+          const isToday = dateStr === todayStr;
+          const isPast = dateStr < todayStr;
+          const isExpanded = session && expandedSession === session.id;
+
+          let bg = 'transparent';
+          let border = '1px solid transparent';
+          let textColor = session ? 'var(--text-1)' : 'var(--text-3)';
+
+          if (session) {
+            const attendance = sessionAttendanceMap[session.id] || {};
+            const hasMarked = Object.keys(attendance).length > 0;
+            if (isToday) {
+              bg = '#4f46e5'; border = '1px solid #3730a3'; textColor = '#fff';
+            } else if (isPast && hasMarked) {
+              bg = 'rgba(52,211,153,0.12)'; border = '1px solid rgba(52,211,153,0.4)'; textColor = '#34d399';
+            } else if (isPast) {
+              bg = 'rgba(248,113,113,0.10)'; border = '1px solid rgba(248,113,113,0.3)'; textColor = '#f87171';
+            } else {
+              bg = 'rgba(99,102,241,0.08)'; border = '1px dashed rgba(99,102,241,0.4)'; textColor = '#a5b4fc';
+            }
+          }
+
+          return (
+            <div
+              key={dateStr}
+              onClick={() => session && toggleSessionExpand(session.id)}
+              style={{
+                aspectRatio: '1',
+                borderRadius: 8,
+                background: bg,
+                border,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: session ? 'pointer' : 'default',
+                transition: 'all 0.15s',
+                outline: isExpanded ? `2px solid ${isToday ? '#818cf8' : '#34d399'}` : 'none',
+                outlineOffset: 1,
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: session ? 700 : 400, color: textColor, lineHeight: 1 }}>{day}</span>
+              {session && (
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: textColor, marginTop: 2, opacity: 0.8, display: 'block' }}/>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {expandedSession && (() => {
+        const session = pickSessions.find(s => s.id === expandedSession);
+        if (!session) return null;
+        return (
+          <SessionDetailPanel
+            session={session}
+            attendance={sessionAttendanceMap[expandedSession] || {}}
+            groupMembers={groupMembers}
+            isTreasurer={isTreasurer}
+            markAttendance={markAttendance}
+            monthlyConfig={monthlyConfig}
+            sessionItems={sessionItemsMap[expandedSession] || []}
+            pickSessions={pickSessions}
+            todayStr={todayStr}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
 function ScreenPickleball({ tweaks = {}, push }) {
   const { state } = useApp();
   const [tab, setTab] = useState('overview'); // overview | sessions | members | external
@@ -454,7 +700,22 @@ function ScreenPickleball({ tweaks = {}, push }) {
 
       <div style={{ padding: 16 }}>
         {tab === 'overview' && <PickleOverview push={push} tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId} onShowSessions={() => setTab('sessions')} isTreasurer={isTreasurer} todaySession={todaySession} sessionAttendanceMap={sessionAttendanceMap} groupMembers={groupMembers} setActiveTab={setTab} toggleSessionExpand={toggleSessionExpand} pickSessions={pickSessions} todayStr={todayStr}/>}
-        {tab === 'sessions' && <PickleSessions accent={accent} style={style} pickle={pickle} pickleballGroup={pickleballGroup} isTreasurer={isTreasurer} groupMembers={groupMembers} pickSessions={pickSessions} sessionsLoading={sessionsLoading} todayStr={todayStr} expandedSession={expandedSession} setExpandedSession={setExpandedSession} sessionAttendanceMap={sessionAttendanceMap} setSessionAttendanceMap={setSessionAttendanceMap} toggleSessionExpand={toggleSessionExpand} markAttendance={markAttendance} loadSessions={loadSessions}/>}
+        {tab === 'sessions' && (
+          <PickleCalendar
+            viewMonth={viewMonth}
+            setViewMonth={setViewMonth}
+            pickSessions={pickSessions}
+            todayStr={todayStr}
+            expandedSession={expandedSession}
+            toggleSessionExpand={toggleSessionExpand}
+            sessionAttendanceMap={sessionAttendanceMap}
+            groupMembers={groupMembers}
+            isTreasurer={isTreasurer}
+            markAttendance={markAttendance}
+            monthlyConfig={monthlyConfig}
+            sessionItemsMap={sessionItemsMap}
+          />
+        )}
         {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
       </div>
