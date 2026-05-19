@@ -453,20 +453,19 @@ function DonutProgress({ done, total }) {
   const circ = 2 * Math.PI * r;
   const pct = total > 0 ? done / total : 0;
   const dash = pct * circ;
-  const gap = circ - dash;
 
   return (
-    <svg width={88} height={88} viewBox="0 0 88 88">
-      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={10}/>
+    <svg width={88} height={88} viewBox="0 0 88 88" style={{ flexShrink: 0 }}>
+      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={10}/>
       <circle
         cx={44} cy={44} r={r} fill="none"
         stroke="#6366f1" strokeWidth={10}
-        strokeDasharray={`${dash} ${gap}`}
+        strokeDasharray={`${dash} ${circ - dash}`}
         strokeLinecap="round"
         transform="rotate(-90 44 44)"
       />
-      <text x={44} y={40} textAnchor="middle" fill="#1a1a2e" fontSize={16} fontWeight={800}>{done}</text>
-      <text x={44} y={54} textAnchor="middle" fill="#333" fontSize={9}>/{total} buổi</text>
+      <text x={44} y={41} textAnchor="middle" fill="#fff" fontSize={18} fontWeight={800}>{done}</text>
+      <text x={44} y={56} textAnchor="middle" fill="#9ca3af" fontSize={9}>/{total} buổi</text>
     </svg>
   );
 }
@@ -474,22 +473,30 @@ function DonutProgress({ done, total }) {
 function SessionProgressBlock({ completedCount, total, upcomingSessions, currentMonthLabel }) {
   return (
     <div style={{ padding: '0 16px 8px' }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
+      <div style={{
+        background: 'linear-gradient(135deg, #1e2235, #252840)',
+        borderRadius: 16,
+        padding: '16px 18px',
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+      }}>
         <DonutProgress done={completedCount} total={total} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: '#4b5563', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>
             Buổi tháng {currentMonthLabel}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#1a1a2e', marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
             {completedCount} đã đánh · {total - completedCount} còn lại
           </div>
           {upcomingSessions.slice(0, 2).map(s => (
-            <div key={s.id} style={{ fontSize: 11, color: '#4b5563', marginBottom: 2 }}>
+            <div key={s.id} style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>
               · {formatDow(s.date)}, {formatShortDate(s.date)}
             </div>
           ))}
           {upcomingSessions.length > 2 && (
-            <div style={{ fontSize: 10, color: '#4b5563' }}>
+            <div style={{ fontSize: 10, color: '#6c6f80', marginTop: 2 }}>
               +{upcomingSessions.length - 2} buổi nữa
             </div>
           )}
