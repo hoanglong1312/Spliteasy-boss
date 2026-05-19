@@ -1265,7 +1265,10 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
             <button
               onClick={() => {
                 setActiveTab('sessions');
-                setTimeout(() => toggleSessionExpand(todaySession.id), 50);
+                const target = todaySession || pickSessions.find(s => s.date >= todayStr);
+                if (target) {
+                  setTimeout(() => toggleSessionExpand(target.id), 80);
+                }
               }}
               style={{
                 width: '100%', padding: '8px 0', background: '#fff',
