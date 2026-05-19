@@ -448,49 +448,53 @@ function PickleHeroStat({ label, value, positive = false, accent }) {
 }
 
 // ── Overview tab ────────────────────────────────────────────────────────────
-function SessionProgressBlock({ done, total, pct, upcoming, accent = 'var(--brand-1)' }) {
+function DonutProgress({ done, total }) {
+  const r = 36;
+  const circ = 2 * Math.PI * r;
+  const pct = total > 0 ? done / total : 0;
+  const dash = pct * circ;
+  const gap = circ - dash;
+
+  return (
+    <svg width={88} height={88} viewBox="0 0 88 88">
+      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={10}/>
+      <circle
+        cx={44} cy={44} r={r} fill="none"
+        stroke="#6366f1" strokeWidth={10}
+        strokeDasharray={`${dash} ${gap}`}
+        strokeLinecap="round"
+        transform="rotate(-90 44 44)"
+      />
+      <text x={44} y={40} textAnchor="middle" fill="#fff" fontSize={16} fontWeight={800}>{done}</text>
+      <text x={44} y={54} textAnchor="middle" fill="#6c6f80" fontSize={9}>/{total} buổi</text>
+    </svg>
+  );
+}
+
+function SessionProgressBlock({ completedCount, total, upcomingSessions, currentMonthLabel }) {
   return (
     <div style={{ padding: '0 16px 8px' }}>
-      <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>
-        Buổi {new Date().toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <div style={{
-          flex: 1, height: 8, borderRadius: 4,
-          background: 'var(--surface-2)',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            width: `${pct}%`, height: '100%',
-            background: accent,
-            borderRadius: 4,
-            transition: 'width 0.3s ease',
-          }} />
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>
-          {done}/{total} buổi
-        </span>
-      </div>
-      {upcoming.length > 0 && (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>Sắp tới:</div>
-          {upcoming.map(s => (
-            <div key={s.id} style={{
-              fontSize: 13, color: 'var(--text-1)',
-              padding: '3px 0', display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <span style={{ color: accent }}>•</span>
-              {new Date(s.date).toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit' })}
-              {s.notes ? <span style={{ color: 'var(--text-2)' }}> — {s.notes}</span> : null}
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
+        <DonutProgress done={completedCount} total={total} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>
+            Buổi tháng {currentMonthLabel}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+            {completedCount} đã đánh · {total - completedCount} còn lại
+          </div>
+          {upcomingSessions.slice(0, 2).map(s => (
+            <div key={s.id} style={{ fontSize: 11, color: '#6c6f80', marginBottom: 2 }}>
+              · {formatDow(s.date)}, {formatShortDate(s.date)}
             </div>
           ))}
+          {upcomingSessions.length > 2 && (
+            <div style={{ fontSize: 10, color: '#4b5563' }}>
+              +{upcomingSessions.length - 2} buổi nữa
+            </div>
+          )}
         </div>
-      )}
-      {total === 0 && (
-        <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
-          Chưa có buổi nào tháng này
-        </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -504,14 +508,15 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
   // Compute "what you contributed vs what you owe" for me
   const myNet = summary.memberOwes[meId] || 0;
 
-  const doneSessions = monthPickSessions.filter(s => s.date <= todayStr);
+  const completedCount = monthPickSessions.filter(s => s.date <= todayStr).length;
   const upcomingSessions = monthPickSessions
     .filter(s => s.date > todayStr)
     .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
   const sessionTotal = monthPickSessions.length;
-  const sessionPct   = sessionTotal > 0
-    ? Math.round((doneSessions.length / sessionTotal) * 100)
-    : 0;
+  const [currentYear, currentMonth] = String(todayStr || todayInputValue()).split('-');
+  const currentMonthLabel = currentYear && currentMonth
+    ? `${Number(currentMonth)}/${currentYear}`
+    : new Date().toLocaleDateString('vi-VN', { month: 'numeric', year: 'numeric' });
   const next = upcomingSessions[0];
   const nextGoing = sessionMemberIds(next);
 
@@ -558,11 +563,10 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
       })()}
 
       <SessionProgressBlock
-        done={doneSessions.length}
+        completedCount={completedCount}
         total={sessionTotal}
-        pct={sessionPct}
-        upcoming={upcomingSessions}
-        accent={accent}
+        upcomingSessions={upcomingSessions}
+        currentMonthLabel={currentMonthLabel}
       />
 
       {/* My monthly settlement */}
