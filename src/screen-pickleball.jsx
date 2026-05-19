@@ -264,6 +264,12 @@ function ScreenPickleball({ tweaks = {}, push }) {
     .filter(m => sameId(rowGroupId(m), pickleballGroup?.id) && m.isActive !== false && m.is_active !== false),
   [pickleballGroup?.id, state.members]);
   const [pickSessions, setPickSessions] = useState([]);
+  const [monthlyConfig, setMonthlyConfig] = useState(null);
+  const [sessionItemsMap, setSessionItemsMap] = useState({});
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [expandedSession, setExpandedSession] = useState(null);
   const [sessionAttendanceMap, setSessionAttendanceMap] = useState({});
@@ -280,22 +286,47 @@ function ScreenPickleball({ tweaks = {}, push }) {
     try {
       const { token } = getStoredAuth();
       const sb = createSupabase(token);
-      const now = new Date();
-      const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-      const end = (() => {
-        const d = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        d.setHours(d.getHours() + 7) // offset VN
-        return d.toISOString().slice(0, 10)
-      })()
-      const { data, error } = await sb
-        .from('pickleball_sessions')
-        .select('id, date, notes, group_id')
-        .eq('group_id', groupId)
-        .gte('date', start)
-        .lte('date', end)
-        .order('date', { ascending: true });
-      if (error) throw error;
-      setPickSessions(data || []);
+      const [yearStr, monthStr] = viewMonth.split('-');
+      const year = Number(yearStr);
+      const month = Number(monthStr);
+      const start = `${year}-${String(month).padStart(2, '0')}-01`;
+      const end = `${year}-${String(month).padStart(2, '0')}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`;
+
+      const [sessionsRes, configRes] = await Promise.all([
+        sb.from('pickleball_sessions')
+          .select('id, date, notes, group_id, water_amount')
+          .eq('group_id', groupId)
+          .gte('date', start)
+          .lte('date', end)
+          .order('date', { ascending: true }),
+        sb.from('pickleball_monthly_config')
+          .select('*')
+          .eq('group_id', groupId)
+          .eq('year_month', viewMonth)
+          .maybeSingle(),
+      ]);
+
+      if (sessionsRes.error) throw sessionsRes.error;
+      const sessions = sessionsRes.data || [];
+      setPickSessions(sessions);
+      setMonthlyConfig(configRes.data || null);
+
+      if (sessions.length > 0) {
+        const sessionIds = sessions.map(s => s.id);
+        const { data: items, error: itemsError } = await sb
+          .from('pickleball_session_items')
+          .select('*')
+          .in('session_id', sessionIds);
+        if (itemsError) throw itemsError;
+        const bySession = {};
+        (items || []).forEach(item => {
+          if (!bySession[item.session_id]) bySession[item.session_id] = [];
+          bySession[item.session_id].push(item);
+        });
+        setSessionItemsMap(bySession);
+      } else {
+        setSessionItemsMap({});
+      }
     } catch (e) {
       console.error('loadSessions error', e);
     } finally {
@@ -305,7 +336,7 @@ function ScreenPickleball({ tweaks = {}, push }) {
 
   useEffect(() => {
     loadSessions(pickleballGroup?.id);
-  }, [pickleballGroup?.id]);
+  }, [pickleballGroup?.id, viewMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toggleSessionExpand(sessionId) {
     if (expandedSession === sessionId) {
