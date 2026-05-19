@@ -613,6 +613,249 @@ function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyC
   );
 }
 
+function BatchEntryForm({ pickSessions, sessionAttendanceMap, groupMembers, sessionItemsMap, setSessionItemsMap, todayStr, onClose, onSessionsUpdated }) {
+  const [drafts, setDrafts] = useState(() => {
+    const d = {};
+    pickSessions.forEach(s => {
+      const existing = sessionItemsMap[s.id] || [];
+      d[s.id] = {
+        water: s.water_amount > 0 ? String(s.water_amount) : '',
+        items: existing.map(item => ({
+          id: item.id,
+          name: item.name,
+          amount: String(item.amount),
+          memberIds: item.member_ids || groupMembers.map(m => m.id),
+        })),
+      };
+    });
+    return d;
+  });
+  const [saving, setSaving] = useState(false);
+
+  function setWater(sessionId, value) {
+    setDrafts(prev => ({ ...prev, [sessionId]: { ...prev[sessionId], water: value } }));
+  }
+  function addItem(sessionId) {
+    setDrafts(prev => ({
+      ...prev,
+      [sessionId]: {
+        ...prev[sessionId],
+        items: [...(prev[sessionId]?.items || []), { name: '', amount: '', memberIds: groupMembers.map(m => m.id) }],
+      },
+    }));
+  }
+  function updateItem(sessionId, idx, field, value) {
+    setDrafts(prev => {
+      const items = [...(prev[sessionId]?.items || [])];
+      items[idx] = { ...items[idx], [field]: value };
+      return { ...prev, [sessionId]: { ...prev[sessionId], items } };
+    });
+  }
+  function toggleItemMember(sessionId, idx, memberId) {
+    setDrafts(prev => {
+      const items = [...(prev[sessionId]?.items || [])];
+      const current = items[idx].memberIds || [];
+      items[idx] = { ...items[idx], memberIds: current.includes(memberId) ? current.filter(id => id !== memberId) : [...current, memberId] };
+      return { ...prev, [sessionId]: { ...prev[sessionId], items } };
+    });
+  }
+
+  async function saveAll() {
+    setSaving(true);
+    try {
+      const client = getAuthedSupabaseClient();
+      for (const session of pickSessions) {
+        if (session.date >= todayStr) continue;
+        const draft = drafts[session.id];
+        if (!draft) continue;
+        const waterAmt = Number(String(draft.water || '').replace(/[^0-9]/g, '')) || 0;
+        await client.from('pickleball_sessions').update({ water_amount: waterAmt }).eq('id', session.id);
+        await client.from('pickleball_session_items').delete().eq('session_id', session.id);
+        const validItems = (draft.items || []).filter(it => it.name && Number(String(it.amount).replace(/[^0-9]/g, '')) > 0);
+        if (validItems.length > 0) {
+          await client.from('pickleball_session_items').insert(
+            validItems.map(it => ({
+              session_id: session.id,
+              name: it.name,
+              amount: Number(String(it.amount).replace(/[^0-9]/g, '')),
+              member_ids: it.memberIds,
+            }))
+          );
+        }
+      }
+      onSessionsUpdated();
+      onClose();
+    } catch (e) {
+      alert('Lỗi lưu: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const pastSessions = pickSessions.filter(s => s.date < todayStr);
+  const futureSessions = pickSessions.filter(s => s.date >= todayStr);
+  let totalWater = 0, totalItems = 0;
+  pastSessions.forEach(s => {
+    const d = drafts[s.id];
+    totalWater += Number(String(d?.water || '').replace(/[^0-9]/g, '')) || 0;
+    (d?.items || []).forEach(it => { totalItems += Number(String(it.amount).replace(/[^0-9]/g, '')) || 0; });
+  });
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 210, background: 'var(--bg, #0f1117)', overflowY: 'auto', paddingBottom: 40 }}>
+      <div style={{ padding: '20px 16px 0', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, position: 'sticky', top: 0, background: 'var(--bg, #0f1117)', zIndex: 1 }}>
+        <button onClick={onClose} style={{ ...iconBtnStyle(), width: 34, height: 34 }}>
+          <Icon name="chevron-left" size={20}/>
+        </button>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>📋 Chi phí sân tháng</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Nước, bóng, phụ kiện theo buổi</div>
+        </div>
+      </div>
+
+      <div style={{ padding: '0 16px' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+          Buổi đã đánh · {pastSessions.length}/{pickSessions.length}
+        </div>
+
+        {pastSessions.map(session => {
+          const draft = drafts[session.id] || { water: '', items: [] };
+          const attendance = sessionAttendanceMap[session.id] || {};
+          const presentCount = groupMembers.filter(m => attendance[m.id] === 'present').length || groupMembers.length;
+          const waterAmt = Number(String(draft.water).replace(/[^0-9]/g, '')) || 0;
+          const waterPerPerson = waterAmt > 0 && presentCount > 0 ? Math.round(waterAmt / presentCount) : 0;
+          const dow = formatDow(session.date);
+          const dd = session.date.slice(8, 10);
+          const mm = session.date.slice(5, 7);
+          const sessionIdx = pickSessions.findIndex(s => s.id === session.id);
+          const extraTotal = draft.items.reduce((s, it) => s + (Number(String(it.amount).replace(/[^0-9]/g, '')) || 0), 0);
+          const hasData = waterAmt > 0 || extraTotal > 0;
+
+          return (
+            <div key={session.id} style={{ background: 'var(--surface-2, #1e2235)', borderRadius: 12, padding: 12, marginBottom: 8, border: hasData ? '1px solid rgba(52,211,153,0.2)' : '1px solid transparent' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: hasData ? '#1a2e1a' : 'var(--surface-1, #13161f)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, color: hasData ? '#34d399' : 'var(--text-1)', lineHeight: 1 }}>{dd}</span>
+                  <span style={{ fontSize: 7, color: hasData ? '#34d399' : 'var(--text-3)' }}>{dow}</span>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600 }}>Buổi #{sessionIdx + 1} · {dd}/{mm}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-3)' }}>{presentCount} có mặt</div>
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: hasData ? '#34d399' : 'var(--text-3)', fontStyle: hasData ? 'normal' : 'italic' }}>
+                  {hasData ? `${fmtVND(waterAmt + extraTotal)} đ` : 'Chưa nhập'}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 14, flexShrink: 0 }}>💧</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-2)' }}>Tiền nước</div>
+                  {waterPerPerson > 0 && (
+                    <div style={{ fontSize: 8, color: 'var(--text-3)' }}>Chia đều {presentCount} người → {fmtVND(waterPerPerson)} đ/người</div>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  value={draft.water}
+                  onChange={e => setWater(session.id, e.target.value)}
+                  placeholder="vd: 88000"
+                  style={{ background: 'var(--surface-1)', border: `1px solid ${draft.water ? 'rgba(52,211,153,0.4)' : 'var(--border-1)'}`, borderRadius: 7, padding: '6px 9px', fontSize: 11, color: draft.water ? '#34d399' : 'var(--text-1)', width: 110, textAlign: 'right' }}
+                />
+              </div>
+
+              {draft.items.map((item, idx) => (
+                <div key={idx} style={{ background: 'var(--surface-1)', borderRadius: 8, padding: '8px 10px', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                    <input
+                      value={item.name}
+                      onChange={e => updateItem(session.id, idx, 'name', e.target.value)}
+                      placeholder="Tên khoản (vd: Bóng BX)"
+                      style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border-1)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: 'var(--text-1)' }}
+                    />
+                    <input
+                      type="number"
+                      value={item.amount}
+                      onChange={e => updateItem(session.id, idx, 'amount', e.target.value)}
+                      placeholder="Tiền"
+                      style={{ background: 'var(--surface-2)', border: '1px solid rgba(251,191,36,0.3)', borderRadius: 6, padding: '5px 8px', fontSize: 10, color: '#fbbf24', width: 90, textAlign: 'right' }}
+                    />
+                  </div>
+                  <div style={{ fontSize: 8, color: 'var(--text-3)', marginBottom: 4 }}>Áp dụng cho:</div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {groupMembers.map(m => {
+                      const sel = item.memberIds.includes(m.id);
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => toggleItemMember(session.id, idx, m.id)}
+                          style={{
+                            padding: '3px 8px', borderRadius: 10, fontSize: 8, fontWeight: 700,
+                            background: sel ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.1)',
+                            color: sel ? '#a5b4fc' : '#6c6f80',
+                            border: `1px solid ${sel ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.15)'}`,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {m.name?.split(' ').at(-1) || m.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() => addItem(session.id)}
+                style={{ width: '100%', padding: '6px 0', background: 'transparent', border: '1px dashed var(--border-1)', borderRadius: 7, color: 'var(--text-3)', fontSize: 10, cursor: 'pointer', marginTop: 4 }}
+              >+ Thêm bóng / phụ kiện</button>
+            </div>
+          );
+        })}
+
+        {futureSessions.length > 0 && (
+          <>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '12px 0 8px' }}>
+              Buổi sắp tới · {futureSessions.length}/{pickSessions.length}
+            </div>
+            {futureSessions.map(session => (
+              <div key={session.id} style={{ opacity: 0.4, background: 'var(--surface-2)', borderRadius: 12, padding: 12, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--surface-1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontSize: 14, fontWeight: 800, lineHeight: 1 }}>{session.date.slice(8, 10)}</span>
+                  <span style={{ fontSize: 7, color: 'var(--text-3)' }}>{formatDow(session.date)}</span>
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', fontStyle: 'italic' }}>Chưa đến</span>
+              </div>
+            ))}
+          </>
+        )}
+
+        <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px', margin: '16px 0 12px' }}>
+          <div style={{ fontSize: 9, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Tổng kết đã nhập</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-2)', paddingBottom: 4 }}>
+            <span>💧 Tiền nước</span><span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtVND(totalWater)} đ</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-2)', paddingBottom: 4 }}>
+            <span>📦 Phụ kiện</span><span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{fmtVND(totalItems)} đ</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 8, borderTop: '1px solid var(--border-1)', marginTop: 4 }}>
+            <span style={{ fontWeight: 700, fontSize: 13 }}>Tổng tháng</span>
+            <span style={{ fontWeight: 800, fontSize: 15, color: '#fbbf24' }}>{fmtVND(totalWater + totalItems)} đ</span>
+          </div>
+        </div>
+
+        <button
+          onClick={saveAll}
+          disabled={saving}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: 'none', background: saving ? '#3a3d55' : 'linear-gradient(135deg,#fbbf24,#f59e0b)', color: '#000', fontWeight: 800, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer' }}
+        >
+          {saving ? 'Đang lưu...' : '💾 Lưu tất cả'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ScreenPickleball({ tweaks = {}, push }) {
   const { state } = useApp();
   const [tab, setTab] = useState('overview'); // overview | sessions | members | external
@@ -881,6 +1124,18 @@ function ScreenPickleball({ tweaks = {}, push }) {
         onSaved={(newConfig) => setMonthlyConfig(prev => ({ ...(prev || {}), ...newConfig }))}
         onOpenBatchEntry={() => setShowBatchEntry(true)}
       />
+      {showBatchEntry && (
+        <BatchEntryForm
+          pickSessions={pickSessions}
+          sessionAttendanceMap={sessionAttendanceMap}
+          groupMembers={groupMembers}
+          sessionItemsMap={sessionItemsMap}
+          setSessionItemsMap={setSessionItemsMap}
+          todayStr={todayStr}
+          onClose={() => setShowBatchEntry(false)}
+          onSessionsUpdated={() => loadSessions(pickleballGroup?.id)}
+        />
+      )}
     </div>
   );
 }
