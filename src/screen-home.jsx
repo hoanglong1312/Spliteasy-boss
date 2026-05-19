@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useApp, fetchPickleballSessions, fetchMonthlyExpenses } from './store.jsx'
-import { ME } from './data.jsx'
+import { ME, fmtVND } from './data.jsx'
 import { Icon, iconBtnStyle, displayMemberName } from './components.jsx'
 import { getStoredAuth } from './lib/auth.js'
 
@@ -97,9 +97,9 @@ function ScreenHome({ push, switchTab }) {
         {hasPickleballGroup && homeMonthSessions.length > 0 && (
           <PickleballMonthCard
             sessions={homeMonthSessions}
-            memberId={meId}
-            net={pickleNet}
-            onClick={() => switchTab('pickle')}
+            pickleNet={pickleNet}
+            monthNumber={monthNumber}
+            switchTab={switchTab}
           />
         )}
 
@@ -194,107 +194,53 @@ function MonthSummaryCard({ monthNumber, net, onAddExpense, onSettle }) {
   )
 }
 
-function PickleballMonthCard({ sessions, memberId, net, onClick }) {
-  const today = toDateKey(new Date())
-  const sessionItems = useMemo(() => {
-    return (sessions || [])
-      .slice()
-      .sort((a, b) => getSessionDate(a).localeCompare(getSessionDate(b)))
-      .map(session => {
-        const date = getSessionDate(session)
-        return {
-          id: session.id || date,
-          date,
-          weekday: formatWeekday(date),
-          day: Number(date.split('-')[2]) || '',
-          status: getSessionStatus(session, memberId, today),
-        }
-      })
-      .filter(item => item.date)
-  }, [memberId, sessions, today])
-
-  const presentCount = sessionItems.filter(item => item.status === 'present').length
-  const absentCount = sessionItems.filter(item => item.status === 'absent').length
-  const upcomingCount = sessionItems.filter(item => item.status === 'upcoming').length
-  const debt = Math.max(-net, 0)
-  const statusText = net > 0
-    ? `Nhận ${formatVNDPlain(net)}`
-    : debt > 0
-      ? `Nợ ${formatVNDPlain(debt)}`
-      : 'Cân bằng'
+function PickleballMonthCard({ sessions, pickleNet, monthNumber, switchTab }) {
+  const todayStr = (() => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); })();
+  const totalSessions = sessions.length;
+  const pastSessions = sessions.filter(s => (s.date || s.session_date) < todayStr);
+  const attended = pastSessions.length;
+  const progress = totalSessions > 0 ? Math.round((pastSessions.length / totalSessions) * 100) : 0;
+  const netAmt = typeof pickleNet === 'number' ? pickleNet : 0;
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        appearance: 'none',
-        width: '100%',
-        padding: 0,
-        border: 0,
-        textAlign: 'left',
-        fontFamily: 'var(--vb-font-body)',
-        background: 'linear-gradient(160deg,#1e1b4b 0%,#312e81 55%,#3730a3 100%)',
-        borderRadius: 20,
-        overflow: 'hidden',
-        boxShadow: '0 6px 24px rgba(30,27,75,.5)',
-        cursor: 'pointer',
-      }}
-      aria-label="Mở tab Pickleball"
-    >
-      <CardHeader
-        icon="🏓"
-        title="Pickleball CLB"
-        subtitle={statusText}
-        subtitleColor="#fca5a5"
-        action="Xem CLB ›"
-      />
-
-      <div style={{ padding: '2px 16px 8px' }}>
-        <div style={{ fontSize: 10, color: 'rgba(255,255,255,.35)', letterSpacing: 0.5, textTransform: 'uppercase' }}>
-          Điểm danh cá nhân · {formatSessionPattern(sessionItems)}
-        </div>
+    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 16, padding: '14px 16px', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ fontWeight: 700, fontSize: 14 }}>🏓 CLB Pickleball</div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)' }}>Tháng {monthNumber}</div>
       </div>
 
-      <div style={{ padding: '0 16px 10px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 5 }}>
-          {sessionItems.map(item => (
-            <AttendanceCell key={item.id} item={item}/>
-          ))}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', marginBottom: 10 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 20, lineHeight: 1 }}>{attended}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Đã đánh</div>
         </div>
-
-        <div style={{ display: 'flex', gap: 14, marginTop: 9, flexWrap: 'wrap' }}>
-          <LegendItem
-            label={`Có mặt (${presentCount})`}
-            color="rgba(167,243,208,.75)"
-            swatchBg="rgba(110,231,183,.4)"
-            swatchBorder="1px solid rgba(110,231,183,.6)"
-          />
-          <LegendItem
-            label={`Vắng (${absentCount})`}
-            color="rgba(253,164,175,.75)"
-            swatchBg="rgba(251,113,133,.3)"
-            swatchBorder="1px solid rgba(251,113,133,.5)"
-          />
-          <LegendItem
-            label={`Sắp tới (${upcomingCount})`}
-            color="rgba(255,255,255,.3)"
-            swatchBg="rgba(255,255,255,.05)"
-            swatchBorder="1px dashed rgba(255,255,255,.2)"
-          />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontWeight: 800, fontSize: 20, lineHeight: 1 }}>{totalSessions}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>Tổng buổi</div>
         </div>
+        <div style={{ flex: 1 }}/>
+        {netAmt !== 0 && (
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontWeight: 800, fontSize: 18, lineHeight: 1, color: netAmt < 0 ? '#f87171' : '#34d399' }}>
+              {netAmt < 0 ? '-' : '+'}{fmtVND(Math.abs(netAmt))} đ
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 2 }}>{netAmt < 0 ? 'Còn nợ' : 'Số dư'}</div>
+          </div>
+        )}
       </div>
 
-      <StatsFooter
-        items={[
-          { value: presentCount, label: 'Có mặt', color: '#a7f3d0' },
-          { value: absentCount, label: 'Vắng', color: '#fecdd3' },
-          { value: sessionItems.length, label: 'Tổng buổi', color: 'rgba(255,255,255,.8)' },
-          { value: compactMoney(debt), label: 'Bạn nợ', color: '#fca5a5' },
-        ]}
-      />
-    </button>
-  )
+      <div style={{ height: 4, borderRadius: 4, background: 'var(--border-1)', marginBottom: 12, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${progress}%`, background: '#7AC74F', borderRadius: 4, transition: 'width 0.4s ease' }}/>
+      </div>
+
+      <button
+        onClick={() => switchTab && switchTab('pickle')}
+        style={{ width: '100%', padding: '9px 0', borderRadius: 10, border: '1px solid var(--border-1)', background: 'transparent', color: 'var(--text-2)', fontWeight: 600, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+      >
+        Xem lịch & chi tiết <Icon name="arrow-right" size={14}/>
+      </button>
+    </div>
+  );
 }
 
 function GroupExpensesCard({ summaries, net, totalSpent, onClick }) {
