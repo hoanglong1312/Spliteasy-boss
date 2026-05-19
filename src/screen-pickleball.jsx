@@ -259,6 +259,7 @@ function ScreenPickleball({ tweaks = {}, push }) {
   ]);
   const activeMemberId = currentMember?.id || state.currentUserId;
   const isTreasurer = currentMember?.role === 'treasurer';
+  console.log('isTreasurer debug:', { pickleballGroup, currentMember, isTreasurer, stateKeys: Object.keys(state) });
   const groupMembers = useMemo(() => safeArray(state.members)
     .filter(m => sameId(rowGroupId(m), pickleballGroup?.id) && m.isActive !== false && m.is_active !== false),
   [pickleballGroup?.id, state.members]);
@@ -529,7 +530,7 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {isTreasurer && todaySession && (() => {
+      {todaySession && (() => {
         const att = sessionAttendanceMap[todaySession.id] || {};
         const members = groupMembers || [];
         const presentCount = members.filter(m => (att[m.id] || 'present') === 'present').length;
@@ -563,7 +564,7 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
                 fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}
             >
-              ✓ Điểm danh buổi này
+              {isTreasurer ? '✓ Điểm danh buổi này' : 'Xem danh sách buổi này'}
             </button>
           </div>
         );
@@ -861,11 +862,11 @@ function PickleSessions({ accent, style, pickle, pickleballGroup, isTreasurer, g
               border: isToday ? '1px solid rgba(99,102,241,0.5)' : '1px solid transparent',
             }}>
               <div
-                onClick={() => !isFuture && isTreasurer && toggleSessionExpand(session.id)}
+                onClick={() => !isFuture && toggleSessionExpand(session.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '12px 14px',
-                  cursor: !isFuture && isTreasurer ? 'pointer' : 'default',
+                  cursor: !isFuture ? 'pointer' : 'default',
                 }}
               >
                 <div style={{
@@ -894,20 +895,20 @@ function PickleSessions({ accent, style, pickle, pickleballGroup, isTreasurer, g
                       : `${presentCount} có mặt · ${absentCount} vắng`}
                   </div>
                 </div>
-                {!isFuture && isTreasurer && (
+                {!isFuture && (
                   <span style={{ color: isExpanded ? '#6366f1' : '#444', fontSize: 16 }}>
                     {isExpanded ? '⌄' : '›'}
                   </span>
                 )}
               </div>
 
-              {isExpanded && isTreasurer && (
+              {isExpanded && (
                 <div style={{ borderTop: '1px solid #2a2d3a', padding: '8px 12px 12px' }}>
                   <div style={{
                     fontSize: 9, color: '#6c6f80', textTransform: 'uppercase',
                     letterSpacing: '0.8px', paddingBottom: 8,
                   }}>
-                    Tap để đánh dấu vắng
+                    {isTreasurer ? 'Tap để đánh dấu vắng' : 'Danh sách điểm danh'}
                   </div>
                   {members.map(member => {
                     const status = attendance[member.id] || 'present';
@@ -916,10 +917,12 @@ function PickleSessions({ accent, style, pickle, pickleballGroup, isTreasurer, g
                     return (
                       <div
                         key={member.id}
-                        onClick={() => markAttendance(session.id, member.id, isPresent ? 'absent' : 'present')}
+                        onClick={() => isTreasurer && markAttendance(session.id, member.id, isPresent ? 'absent' : 'present')}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 10,
-                          padding: '8px 10px', borderRadius: 10, marginBottom: 6, cursor: 'pointer',
+                          padding: '8px 10px', borderRadius: 10, marginBottom: 6,
+                          cursor: isTreasurer ? 'pointer' : 'default',
+                          opacity: isTreasurer ? 1 : 0.72,
                           background: isPresent ? 'rgba(52,211,153,0.1)' : 'rgba(251,113,133,0.1)',
                           border: `1px solid ${isPresent ? 'rgba(52,211,153,0.25)' : 'rgba(251,113,133,0.3)'}`,
                         }}
