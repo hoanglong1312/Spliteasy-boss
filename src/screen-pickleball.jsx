@@ -448,6 +448,19 @@ function PickleHeroStat({ label, value, positive = false, accent }) {
 }
 
 // ── Overview tab ────────────────────────────────────────────────────────────
+const PICKLE_OVERVIEW_DARK = {
+  body: '#0f1117',
+  card: '#1a1d27',
+  surface: '#1e2235',
+  text: '#fff',
+  subtle: '#9ca3af',
+  muted: '#6c6f80',
+  border: 'rgba(255,255,255,0.08)',
+  indigo: '#6366f1',
+  mint: '#34d399',
+  danger: '#fb7185',
+};
+
 function DonutProgress({ done, total }) {
   const r = 36;
   const circ = 2 * Math.PI * r;
@@ -457,39 +470,44 @@ function DonutProgress({ done, total }) {
 
   return (
     <svg width={88} height={88} viewBox="0 0 88 88">
-      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={10}/>
+      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth={10}/>
       <circle
         cx={44} cy={44} r={r} fill="none"
-        stroke="#6366f1" strokeWidth={10}
+        stroke={PICKLE_OVERVIEW_DARK.indigo} strokeWidth={10}
         strokeDasharray={`${dash} ${gap}`}
         strokeLinecap="round"
         transform="rotate(-90 44 44)"
       />
-      <text x={44} y={40} textAnchor="middle" fill="#fff" fontSize={16} fontWeight={800}>{done}</text>
-      <text x={44} y={54} textAnchor="middle" fill="#6c6f80" fontSize={9}>/{total} buổi</text>
+      <text x={44} y={40} textAnchor="middle" fill={PICKLE_OVERVIEW_DARK.text} fontSize={18} fontWeight={800}>{done}</text>
+      <text x={44} y={55} textAnchor="middle" fill={PICKLE_OVERVIEW_DARK.subtle} fontSize={10} fontWeight={700}>/{total} buổi</text>
     </svg>
   );
 }
 
 function SessionProgressBlock({ completedCount, total, upcomingSessions, currentMonthLabel }) {
   return (
-    <div style={{ padding: '0 16px 8px' }}>
-      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 12 }}>
+    <div style={{
+      padding: '14px 16px',
+      background: PICKLE_OVERVIEW_DARK.card,
+      border: `1px solid ${PICKLE_OVERVIEW_DARK.border}`,
+      borderRadius: 16,
+    }}>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
         <DonutProgress done={completedCount} total={total} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>
+          <div style={{ fontSize: 12, color: PICKLE_OVERVIEW_DARK.subtle, marginBottom: 4 }}>
             Buổi tháng {currentMonthLabel}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: PICKLE_OVERVIEW_DARK.text, marginBottom: 8 }}>
             {completedCount} đã đánh · {total - completedCount} còn lại
           </div>
           {upcomingSessions.slice(0, 2).map(s => (
-            <div key={s.id} style={{ fontSize: 11, color: '#6c6f80', marginBottom: 2 }}>
+            <div key={s.id} style={{ fontSize: 11, color: PICKLE_OVERVIEW_DARK.subtle, marginBottom: 2 }}>
               · {formatDow(s.date)}, {formatShortDate(s.date)}
             </div>
           ))}
           {upcomingSessions.length > 2 && (
-            <div style={{ fontSize: 10, color: '#4b5563' }}>
+            <div style={{ fontSize: 10, color: PICKLE_OVERVIEW_DARK.muted }}>
               +{upcomingSessions.length - 2} buổi nữa
             </div>
           )}
@@ -519,9 +537,13 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
     : new Date().toLocaleDateString('vi-VN', { month: 'numeric', year: 'numeric' });
   const next = upcomingSessions[0];
   const nextGoing = sessionMemberIds(next);
+  const overviewCardStyle = {
+    background: PICKLE_OVERVIEW_DARK.card,
+    border: `1px solid ${PICKLE_OVERVIEW_DARK.border}`,
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, background: PICKLE_OVERVIEW_DARK.body }}>
       {isTreasurer && todaySession && (() => {
         const att = sessionAttendanceMap[todaySession.id] || {};
         const members = groupMembers || [];
@@ -551,8 +573,8 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
                 setTimeout(() => toggleSessionExpand(todaySession.id), 50);
               }}
               style={{
-                width: '100%', padding: '8px 0', background: '#fff',
-                color: '#4f46e5', border: 'none', borderRadius: 8,
+                width: '100%', padding: '8px 0', background: PICKLE_OVERVIEW_DARK.surface,
+                color: PICKLE_OVERVIEW_DARK.text, border: `1px solid ${PICKLE_OVERVIEW_DARK.border}`, borderRadius: 8,
                 fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}
             >
@@ -570,27 +592,27 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
       />
 
       {/* My monthly settlement */}
-      <Card>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-1)', background: 'var(--vb-gray-75)' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Số dư của bạn tháng này</div>
+      <Card style={overviewCardStyle}>
+        <div style={{ padding: '14px 16px', borderBottom: `1px solid ${PICKLE_OVERVIEW_DARK.border}`, background: PICKLE_OVERVIEW_DARK.surface }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: PICKLE_OVERVIEW_DARK.subtle, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Số dư của bạn tháng này</div>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 4 }}>
-            <Money value={myNet} size={26} color={myNet >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
-            <Pill bg={myNet >= 0 ? 'var(--vb-success-100)' : 'var(--vb-danger-50)'} color={myNet >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'} icon={myNet >= 0 ? 'arrow-down' : 'arrow-up'}>
+            <Money value={myNet} size={26} color={myNet >= 0 ? PICKLE_OVERVIEW_DARK.mint : PICKLE_OVERVIEW_DARK.danger}/>
+            <Pill bg={myNet >= 0 ? 'rgba(52,211,153,0.14)' : 'rgba(251,113,133,0.14)'} color={myNet >= 0 ? PICKLE_OVERVIEW_DARK.mint : PICKLE_OVERVIEW_DARK.danger} icon={myNet >= 0 ? 'arrow-down' : 'arrow-up'}>
               {myNet >= 0 ? 'Bạn nhận lại' : 'Bạn còn nợ'}
             </Pill>
           </div>
         </div>
         <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <BreakdownRow label="Tiền thuê sân tháng 5" sub={`${pickle.fixedMembers.length} người chia đều`} value={-summary.courtPerMember} icon="card"/>
-          <BreakdownRow label={`Phí vé vãng lai (${guestCount} lượt)`} sub="Chia đều cho thành viên cố định" value={+summary.guestCreditPer} icon="users" positive accent={accent}/>
-          <BreakdownRow label="Chi phí bóng / nước / ăn" sub="Đã trả - phần phải đóng" value={myNet + summary.courtPerMember - summary.guestCreditPer} icon="ball" positive={myNet + summary.courtPerMember - summary.guestCreditPer >= 0} accent={accent}/>
+          <BreakdownRow label={`Phí vé vãng lai (${guestCount} lượt)`} sub="Chia đều cho thành viên cố định" value={+summary.guestCreditPer} icon="users" positive/>
+          <BreakdownRow label="Chi phí bóng / nước / ăn" sub="Đã trả - phần phải đóng" value={myNet + summary.courtPerMember - summary.guestCreditPer} icon="ball" positive={myNet + summary.courtPerMember - summary.guestCreditPer >= 0}/>
         </div>
       </Card>
 
       {/* Upcoming */}
       <div>
         <SectionHeader title="Buổi đánh sắp tới" action="Xem lịch →" onAction={onShowSessions}/>
-        <Card>
+        <Card style={overviewCardStyle}>
           {next ? (
             <div style={{
               padding: 16, display: 'flex', alignItems: 'center', gap: 14,
@@ -628,40 +650,50 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
       {/* Guest fee explainer */}
       <div style={{
         padding: 14, borderRadius: 14,
-        background: accentBg, border: '1px dashed ' + accent,
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.16), rgba(52,211,153,0.10))',
+        border: `1px dashed ${style === 'sporty' ? PICKLE_OVERVIEW_DARK.mint : PICKLE_OVERVIEW_DARK.indigo}`,
         display: 'flex', alignItems: 'flex-start', gap: 12,
       }}>
-        <Icon name="sparkle" size={22} color={accent}/>
+        <Icon name="sparkle" size={22} color={style === 'sporty' ? PICKLE_OVERVIEW_DARK.mint : PICKLE_OVERVIEW_DARK.indigo}/>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>Quy định vé vãng lai</div>
-          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4, lineHeight: 1.5 }}>
-            Người ngoài đánh cùng đóng <b style={{ color: 'var(--text-1)' }}>{fmtVNDFull(pickle.guestFeePerSession)}</b>/buổi.
-            Tổng phí thu được chia đều cho <b style={{ color: 'var(--text-1)' }}>{pickle.fixedMembers.length}</b> thành viên cố định để trừ vào tiền sân.
+          <div style={{ fontSize: 13, fontWeight: 700, color: PICKLE_OVERVIEW_DARK.text }}>Quy định vé vãng lai</div>
+          <div style={{ fontSize: 12, color: PICKLE_OVERVIEW_DARK.subtle, marginTop: 4, lineHeight: 1.5 }}>
+            Người ngoài đánh cùng đóng <b style={{ color: PICKLE_OVERVIEW_DARK.text }}>{fmtVNDFull(pickle.guestFeePerSession)}</b>/buổi.
+            Tổng phí thu được chia đều cho <b style={{ color: PICKLE_OVERVIEW_DARK.text }}>{pickle.fixedMembers.length}</b> thành viên cố định để trừ vào tiền sân.
           </div>
         </div>
       </div>
 
       {/* Add expense FAB-like row */}
-      <Button variant="secondary" full size="lg" icon="plus" onClick={() => push('add-session-expense')}>Thêm chi phí buổi đánh</Button>
+      <Button
+        variant="secondary"
+        full
+        size="lg"
+        icon="plus"
+        style={{ background: PICKLE_OVERVIEW_DARK.surface, border: `1px solid ${PICKLE_OVERVIEW_DARK.border}`, color: PICKLE_OVERVIEW_DARK.text }}
+        onClick={() => push('add-session-expense')}
+      >
+        Thêm chi phí buổi đánh
+      </Button>
     </div>
   );
 }
 
-function BreakdownRow({ label, sub, value, icon, positive = false, accent }) {
+function BreakdownRow({ label, sub, value, icon, positive = false }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <div style={{
         width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: positive ? 'var(--vb-success-100)' : 'var(--vb-danger-50)',
+        background: positive ? 'rgba(52,211,153,0.14)' : 'rgba(251,113,133,0.14)',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon name={icon} size={16} color={positive ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
+        <Icon name={icon} size={16} color={positive ? PICKLE_OVERVIEW_DARK.mint : PICKLE_OVERVIEW_DARK.danger}/>
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{label}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-2)', marginTop: 1, fontWeight: 500 }}>{sub}</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: PICKLE_OVERVIEW_DARK.text }}>{label}</div>
+        <div style={{ fontSize: 11, color: PICKLE_OVERVIEW_DARK.subtle, marginTop: 1, fontWeight: 500 }}>{sub}</div>
       </div>
-      <Money value={value} size={14} color={value >= 0 ? 'var(--vb-success-700)' : 'var(--vb-danger-700)'}/>
+      <Money value={value} size={14} color={value >= 0 ? PICKLE_OVERVIEW_DARK.mint : PICKLE_OVERVIEW_DARK.danger}/>
     </div>
   );
 }
