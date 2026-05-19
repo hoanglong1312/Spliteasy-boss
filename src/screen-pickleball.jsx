@@ -477,6 +477,142 @@ function PickleCalendar({
   );
 }
 
+function ClubSettingsModal({ show, onClose, pickleballGroup, viewMonth, monthlyConfig, pickSessions, onSaved, onOpenBatchEntry }) {
+  const sessionCount = pickSessions.length;
+  const [courtFee, setCourtFee] = useState('');
+  const [scheduleWeekdays, setScheduleWeekdays] = useState([1, 3, 5]);
+  const [scheduleStartDay, setScheduleStartDay] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (show) {
+      setCourtFee(String(monthlyConfig?.court_fee || ''));
+      setScheduleWeekdays(monthlyConfig?.schedule_weekdays || [1, 3, 5]);
+      setScheduleStartDay(monthlyConfig?.schedule_start_day || '');
+    }
+  }, [show, monthlyConfig]);
+
+  if (!show) return null;
+
+  async function saveConfig() {
+    setSaving(true);
+    try {
+      const client = getAuthedSupabaseClient();
+      const payload = {
+        group_id: pickleballGroup.id,
+        year_month: viewMonth,
+        court_fee: Number(String(courtFee).replace(/[^0-9]/g, '')) || 0,
+        schedule_weekdays: scheduleWeekdays,
+        schedule_start_day: scheduleStartDay || null,
+      };
+      const { error } = await client
+        .from('pickleball_monthly_config')
+        .upsert(payload, { onConflict: 'group_id,year_month' });
+      if (error) throw error;
+      onSaved(payload);
+      onClose();
+    } catch (e) {
+      alert('Lỗi lưu cài đặt: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const courtFeeNum = Number(String(courtFee).replace(/[^0-9]/g, '')) || 0;
+  const perSession = sessionCount > 0 && courtFeeNum > 0 ? Math.round(courtFeeNum / sessionCount) : 0;
+  const [ymYear, ymMonth] = viewMonth.split('-').map(Number);
+  const nextYm = ymMonth === 12 ? `${ymYear + 1}-01` : `${ymYear}-${String(ymMonth + 1).padStart(2, '0')}`;
+  const previewDates = scheduleStartDay ? generateSessionDates(scheduleStartDay, scheduleWeekdays, nextYm) : [];
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}/>
+      <div style={{ position: 'relative', background: 'var(--surface-1, #1a1d27)', borderRadius: '20px 20px 0 0', padding: '20px 20px 40px', maxHeight: '85vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <span style={{ fontWeight: 800, fontSize: 16 }}>⚙️ Cài đặt CLB</span>
+          <button onClick={onClose} style={{ ...iconBtnStyle(), width: 30, height: 30 }}>
+            <Icon name="x" size={16}/>
+          </button>
+        </div>
+
+        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Lịch tháng tự động</div>
+        <div style={{ background: 'var(--surface-2, #1e2235)', borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>Các thứ trong tuần</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {SCHEDULE_WEEKDAYS.map(wd => {
+              const active = scheduleWeekdays.includes(wd.value);
+              return (
+                <button
+                  key={wd.value}
+                  onClick={() => setScheduleWeekdays(prev =>
+                    active ? prev.filter(d => d !== wd.value) : [...prev, wd.value].sort()
+                  )}
+                  style={{
+                    padding: '5px 10px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                    background: active ? '#6366f1' : 'var(--surface-1)',
+                    color: active ? '#fff' : 'var(--text-2)',
+                    border: '1px solid ' + (active ? '#6366f1' : 'var(--border-1)'),
+                    cursor: 'pointer',
+                  }}
+                >{wd.label}</button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>Ngày bắt đầu tháng tới</div>
+            <input
+              type="date"
+              value={scheduleStartDay}
+              onChange={e => setScheduleStartDay(e.target.value)}
+              style={{ background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, width: '100%' }}
+            />
+          </div>
+          {previewDates.length > 0 && (
+            <div style={{ marginTop: 8, fontSize: 11, color: '#a5b4fc' }}>
+              Tháng {ymMonth === 12 ? 1 : ymMonth + 1} sẽ có {previewDates.length} buổi, từ {previewDates[0]?.slice(8)}/{String(ymMonth === 12 ? 1 : ymMonth + 1).padStart(2, '0')}
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Chi phí tháng</div>
+        <div style={{ background: 'var(--surface-2, #1e2235)', borderRadius: 12, padding: 14, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>Tiền sân tháng {ymMonth}</div>
+          <input
+            type="number"
+            value={courtFee}
+            onChange={e => setCourtFee(e.target.value)}
+            placeholder="vd: 4550000"
+            style={{ background: 'var(--surface-1)', border: '1px solid var(--border-1)', borderRadius: 8, padding: '7px 10px', color: 'var(--text-1)', fontSize: 13, width: '100%' }}
+          />
+          {perSession > 0 && (
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 6 }}>
+              {sessionCount} buổi → {fmtVND(perSession)} đ / buổi
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => { onClose(); onOpenBatchEntry(); }}
+          style={{
+            width: '100%', padding: '11px 0', borderRadius: 12,
+            background: 'rgba(251,191,36,0.10)', color: '#fbbf24',
+            fontWeight: 700, fontSize: 13, cursor: 'pointer',
+            border: '1px solid rgba(251,191,36,0.3)', marginBottom: 12,
+          }}
+        >📋 Nhập chi phí sân</button>
+
+        <button
+          onClick={saveConfig}
+          disabled={saving}
+          style={{ width: '100%', padding: '12px 0', borderRadius: 12, border: 'none', background: saving ? '#3a3d55' : '#6366f1', color: '#fff', fontWeight: 800, fontSize: 14, cursor: saving ? 'not-allowed' : 'pointer' }}
+        >
+          {saving ? 'Đang lưu...' : '💾 Lưu cài đặt'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ScreenPickleball({ tweaks = {}, push }) {
   const { state } = useApp();
   const [tab, setTab] = useState('overview'); // overview | sessions | members | external
@@ -516,6 +652,8 @@ function ScreenPickleball({ tweaks = {}, push }) {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [showSettings, setShowSettings] = useState(false);
+  const [showBatchEntry, setShowBatchEntry] = useState(false);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [expandedSession, setExpandedSession] = useState(null);
   const [sessionAttendanceMap, setSessionAttendanceMap] = useState({});
@@ -675,6 +813,20 @@ function ScreenPickleball({ tweaks = {}, push }) {
               <PickleHeroStat label="Tiền sân/người" value={summary.courtPerMember}/>
               <PickleHeroStat label="Vé vãng lai" value={summary.guestRevenue} positive accent={style === 'sporty' ? '#B6F092' : null}/>
             </div>
+            {isTreasurer && (
+              <button
+                onClick={() => setShowSettings(true)}
+                style={{
+                  position: 'absolute', top: 0, right: 0,
+                  background: 'rgba(255,255,255,0.12)', border: 'none',
+                  borderRadius: 10, width: 34, height: 34,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#fff', zIndex: 2,
+                }}
+              >
+                <Icon name="settings" size={18} color="#fff"/>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -719,6 +871,16 @@ function ScreenPickleball({ tweaks = {}, push }) {
         {tab === 'external' && <PickleExternal push={push} tweaks={tweaks} accent={accent} accentBg={accentBg} style={style} pickle={pickle} meId={meId}/>}
         {tab === 'members' && <PickleMembers tweaks={tweaks} summary={summary} accent={accent} accentBg={accentBg} style={style} pickle={pickle}/>}
       </div>
+      <ClubSettingsModal
+        show={showSettings}
+        onClose={() => setShowSettings(false)}
+        pickleballGroup={pickleballGroup}
+        viewMonth={viewMonth}
+        monthlyConfig={monthlyConfig}
+        pickSessions={pickSessions}
+        onSaved={(newConfig) => setMonthlyConfig(prev => ({ ...(prev || {}), ...newConfig }))}
+        onOpenBatchEntry={() => setShowBatchEntry(true)}
+      />
     </div>
   );
 }
