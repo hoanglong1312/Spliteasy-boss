@@ -799,6 +799,7 @@ export function AppProvider({ children, onToast }) {
             group_id: groupId,
             title: expense.title,
             amount: expense.amount,
+            category: expense.category || expense.cat || null,
             paid_by_member_id: expense.paidBy,
             submitted_by_member_id: state.currentUserId,
             expense_date: expense.date || new Date().toISOString().slice(0, 10),

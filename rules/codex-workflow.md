@@ -2,14 +2,26 @@
 
 ## Nguyên tắc cốt lõi
 
-**Codex làm tất cả code. Claude = Project Manager (spec + review + debate).**
+**Superpowers = Planning phase. Codex = Execution phase. Claude main = Orchestrator + Quality Gate.**
+
+Ba công cụ, ba vai trò rõ ràng — không overlap.
 
 ---
 
 ## Phân công vai trò
 
-| Việc | Ai làm |
-|------|--------|
+| Phase | Công cụ | Việc làm |
+|-------|---------|----------|
+| **Planning** | Superpowers (Claude plugin) | brainstorming → spec → writing-plans |
+| **Execution** | Codex MCP | Viết/sửa code, commit, chạy lệnh |
+| **Orchestration** | Claude main | Gọi đúng tool, review output, quality gate |
+
+**Chi tiết:**
+
+| Việc cụ thể | Ai làm |
+|-------------|--------|
+| Brainstorm feature, thiết kế approach | Superpowers `brainstorming` skill |
+| Viết implementation plan | Superpowers `writing-plans` skill |
 | Viết / sửa code (.jsx, .js, .sql, config) | **Codex MCP trực tiếp** |
 | Đọc file source để hiểu context | **Codex** (trong workspace của nó) |
 | Chạy git add / commit | **Codex** |
@@ -17,19 +29,30 @@
 | Quyết định kiến trúc / approach | Claude main (trước khi giao Codex) |
 | Review output + chỉ ra lỗi | Claude main (adversarial review) |
 | Fix sau review | **Codex** (nhận feedback từ Claude) |
+| Static audit + Playwright | Claude main (quality gate) |
 
-> Claude subagent **không còn cần thiết** — Codex tự đọc file và reason trong workspace của nó.
+> **Superpowers `subagent-driven-development` KHÔNG dùng** trong dự án này — Codex thay thế hoàn toàn vai trò implementer subagent. Các skill superpowers khác (brainstorming, writing-plans) vẫn dùng bình thường.
+
+> **Superpowers chỉ chạy trên Claude Code** — không cài được trên Codex. Mọi guidance cho Codex được nhúng vào prompt hoặc qua `~/.codex/AGENTS.md`.
 
 ---
 
-## Luồng làm việc
+## Luồng làm việc đầy đủ
 
 ```
-1. Claude main viết goal + context hints (file paths, constraints)
-2. Gọi Codex → Codex tự đọc file, implement, commit
-3. Claude main review output (adversarial — chỉ ra vấn đề)
-4. Nếu có vấn đề: gọi Codex lại với feedback cụ thể
-5. Lặp đến khi Claude main approve
+[Feature mới]
+1. Superpowers brainstorming → spec doc
+2. Superpowers writing-plans → plan doc
+3. Gọi Codex từng task → Codex tự đọc file, implement, commit
+4. Claude main review (adversarial)
+5. Nếu có vấn đề: gọi Codex lại với feedback cụ thể
+6. Quality Gate: static audit + npx playwright test
+7. Chỉ khi pass hết → bàn giao user test
+
+[Bug fix / small change]
+1. Claude main phân tích nguyên nhân (git log, git diff)
+2. Gọi Codex fix trực tiếp
+3. Quality Gate rút gọn: npm run build + playwright test
 ```
 
 ---
@@ -94,6 +117,32 @@ Supabase MCP (`mcp__supabase__*`) đã được cấu hình. Claude **tự làm*
 - Không bao giờ bảo user "vào dashboard chạy SQL này" — tự làm luôn
 - Apply migration xong → báo kết quả ngắn gọn
 - Dùng MCP để simulate/test trước khi đưa cho user
+
+---
+
+## Quality Gate — Bắt buộc trước khi bàn giao user test
+
+**Mỗi lần Codex xong feature / fix, Claude main phải chạy đủ 2 bước này trước khi báo user:**
+
+### Bước 1: Static Audit (Codex tự làm)
+
+Gọi Codex với goal: rà soát toàn bộ screens — kiểm tra:
+- Mọi prop screen nhận có match với data hook trả về không
+- Mọi `onAction(type)` call có handler tương ứng trong `app-v2.jsx` không
+- Mọi import có tồn tại không
+- Form inputs có controlled (useState + onChange) không
+
+Codex báo cáo: danh sách issue (nếu có) → Claude main đánh giá → Codex fix → lặp
+
+### Bước 2: E2E Tests (Playwright)
+
+Chạy: `npx playwright test --reporter=line`
+
+Nếu test fail → Codex fix → chạy lại → lặp đến khi pass
+
+**Chỉ khi:** `vite build` ✅ + static audit ✅ + Playwright ✅ → mới bàn giao user test
+
+> User chỉ cần test những gì **không thể tự động**: visual/UX judgment, Supabase auth thật, edge case cảm tính
 
 ---
 

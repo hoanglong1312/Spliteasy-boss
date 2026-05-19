@@ -2,29 +2,20 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { AppProvider } from './store.jsx'
 import { ToastProvider, useToast } from './lib/toast.jsx'
-import { IOSDevice } from './ios-frame.jsx'
-import App from './app.jsx'
-import './vb-tokens.css'
+import AppV2 from './app-v2'
 
-function Mount() {
-  return (
-    <IOSDevice width={402} height={874} dark={false}>
-      <App />
-    </IOSDevice>
-  )
-}
-
-function AppWithToast() {
+function AppWithProviders() {
   const { addToast } = useToast()
+
   return (
     <AppProvider onToast={addToast}>
-      <Mount />
+      <AppV2 />
     </AppProvider>
   )
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <ToastProvider>
-    <AppWithToast />
+    <AppWithProviders />
   </ToastProvider>
 )

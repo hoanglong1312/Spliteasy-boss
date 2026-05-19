@@ -255,6 +255,8 @@ FAB (nút +): gradient #6366f1→#8b5cf6, border-radius 50%, glow shadow
 
 ### Deliverable 1: HTML Mockups
 Tạo file HTML riêng cho từng màn hình (self-contained, mở được trên browser):
+
+**Đã có (batch 1):**
 - `home.html` — Trang chủ
 - `groups-list.html` — Danh sách nhóm
 - `group-detail.html` — Chi tiết nhóm (tab Hoạt động)
@@ -268,6 +270,17 @@ Tạo file HTML riêng cho từng màn hình (self-contained, mở được trê
 - `profile.html` — Trang cá nhân
 - `payment-flow.html` — Luồng thanh toán + QR
 
+**Cần thiết kế thêm (batch 2):**
+- `join-group.html` — Tham gia nhóm
+- `expense-detail.html` — Chi tiết khoản chi
+- `session-detail.html` — Chi tiết buổi đánh (full screen)
+- `new-group.html` — Tạo nhóm mới
+- `settle-all.html` — Tất toán / chốt nợ
+- `notifications.html` — Thông báo
+- `approval-queue.html` — Duyệt yêu cầu tham gia
+- `settings.html` — Cài đặt tài khoản
+- `settlement-period.html` — Chốt sổ tháng
+
 **Yêu cầu HTML mockup:**
 - Width cố định 375px, nền tối `#07080f`
 - Dùng dữ liệu thật, tên tiếng Việt (Long, Minh, Hoa, Tuấn, Nam, Linh)
@@ -280,6 +293,166 @@ Sau khi HTML được duyệt, convert sang React JSX:
 - Props: `{ data, isTreasurer, onAction }` pattern
 - Không gọi API — component nhận data qua props
 - File tổ chức theo screen (không split quá nhỏ)
+
+---
+
+---
+
+## 3F. BATCH 2 — CÁC MÀN HÌNH CÒN THIẾU
+
+> Giữ nguyên Style B "Sport Finance", palette + typography + spacing đã định nghĩa ở Mục 2.
+
+---
+
+### 3F-1. THAM GIA NHÓM (`join-group.html`)
+
+Luồng 2 bước. Màn hình full-screen (không có TabBar).
+
+**Bước 1 — Nhập mã:**
+- Header: mũi tên back ‹ + tiêu đề "Tham gia nhóm"
+- Hero nhỏ: icon 🔗 + text "Nhập mã mời từ thủ quỹ"
+- Input lớn: placeholder `VD: CLB-2026`, font monospace, border brand khi focus
+- Nút "Xem trước nhóm →" (brand gradient, disabled khi input rỗng)
+
+**Bước 2 — Xác nhận danh tính** (sau khi preview load):
+- Card nhóm: emoji nhóm + tên + số thành viên + badge "X đang hoạt động"
+- Avatar stack thành viên (6 avatar + "+N")
+- Section "Bạn là ai?":
+  - Nếu tên đã tồn tại trong nhóm → row chip chọn tên (màu brand khi selected)
+  - Input thêm tên mới nếu chưa có
+- Nút "Tham gia" (xanh) + trạng thái "Chờ duyệt" (vàng, sau khi gửi)
+- Error state: card đỏ "Mã không đúng hoặc đã hết hạn"
+
+---
+
+### 3F-2. CHI TIẾT KHOẢN CHI (`expense-detail.html`)
+
+Push screen từ Group Detail. Có back button.
+
+- Header: ‹ back + tiêu đề khoản chi + menu (…) cho thủ quỹ
+- Hero card (gradient indigo): icon danh mục lớn + tên khoản chi + số tiền lớn + ngày + badge trạng thái (Đang chờ / Đã duyệt / Đã thanh toán)
+- Section "Người trả trước": avatar + tên + số tiền đã trả
+- Section "Chia cho":
+  - List các thành viên tham gia: avatar + tên + số tiền mỗi người + badge "Đã trả" (xanh) / "Còn nợ" (đỏ)
+  - Tổng cộng ở dưới
+- Section "Ghi chú" (nếu có): text nhỏ màu secondary
+- Action buttons (thủ quỹ): "✏️ Sửa" (ghost) + "🗑 Xóa" (danger ghost)
+- Nút "⚡ Thanh toán ngay" nếu user đang nợ khoản này
+
+---
+
+### 3F-3. CHI TIẾT BUỔI ĐÁNH — FULL SCREEN (`session-detail.html`)
+
+Push screen từ Calendar (khi tap "Xem chi tiết" hoặc từ Home card điểm danh).
+
+- Header: ‹ back + "Buổi #N · T[X] DD/MM/YYYY" + badge trạng thái (Hôm nay / Đã đánh / Sắp tới / Đã dời)
+- Hero emerald (nếu hôm nay) hoặc card thường (nếu đã qua):
+  - Sân + thời gian + tổng số người có mặt / tổng
+- Section "Điểm danh":
+  - Grid chip 2 hàng: thành viên cố định (chip xanh = có mặt, chip đỏ = vắng)
+  - Thủ quỹ: tap chip để toggle
+  - Chip khách vãng lai: màu vàng/cam, có "×" để xóa
+  - Nút "+ Thêm khách" → inline input nhập tên → thêm chip vàng
+- Section "Chi phí buổi":
+  - Row 🏸 Tiền sân/người: X đ — "(tổng sân ÷ buổi ÷ N thành viên)"
+  - Row 💧 Tiền nước/người: X đ — input nhập tổng tiền nước → tự tính /người
+  - Nếu có khoản phụ: row 📦 Tên item: X đ/người (chips thành viên áp dụng nhỏ bên dưới)
+  - Nút "+ Thêm khoản phụ" (thủ quỹ): mở inline form tên + số tiền + chip chọn thành viên
+- Action (thủ quỹ): nút "📅 Dời buổi" → bottom picker chọn ngày mới + input lý do (optional)
+
+---
+
+### 3F-4. TẠO NHÓM MỚI (`new-group.html`)
+
+Push screen. Back button + "Tạo" button ở header phải.
+
+- Input tên nhóm (required, maxlength 40)
+- Chọn emoji đại diện: grid 4×3 emoji phổ biến (🏓 ⚽ 🏀 🎾 🍜 ☕ 🎮 🏖 🌿 🎵 💼 🏠), tap để chọn
+- Input mô tả ngắn (optional, placeholder "VD: Nhóm pickleball thứ 2-4-6")
+- Toggle "Yêu cầu duyệt khi tham gia" (default: bật)
+- Preview card: hiển thị trước nhóm trông như thế nào (emoji + tên + mô tả)
+- Nút "Tạo nhóm" (brand gradient, full width)
+
+---
+
+### 3F-5. TẤT TOÁN / CHỐT NỢ (`settle-all.html`)
+
+Push screen từ Group Detail. Tổng kết ai nợ ai trong nhóm.
+
+- Header: ‹ back + "Tất toán · [Tên nhóm]"
+- Hero card: tổng nợ của user với nhóm này (số lớn, đỏ/xanh)
+- Section "Bạn nợ" (nếu có): list người + số tiền + nút "⚡ Thanh toán" mỗi row
+- Section "Người nợ bạn" (nếu có): list người + số tiền + nút "✓ Xác nhận đã nhận"
+- Section "Tất toán toàn nhóm" (thủ quỹ): bảng nợ tối giản — cột Từ / Đến / Số tiền
+- Nút "📋 Chốt sổ tháng này" (thủ quỹ, outline amber) → dẫn tới settlement-period
+
+---
+
+### 3F-6. THÔNG BÁO (`notifications.html`)
+
+Push screen từ icon 🔔 trên Home.
+
+- Header: ‹ back + "Thông báo" + nút "Đánh dấu đã đọc tất cả"
+- Filter pills: Tất cả / Chưa đọc / Chi tiêu / Thanh toán
+- List thông báo, mỗi item:
+  - Dot xanh (chưa đọc) hoặc không có dot (đã đọc)
+  - Icon emoji theo loại + tên sự kiện + mô tả ngắn + thời gian relative
+  - Nền item chưa đọc: `rgba(99,102,241,0.06)`, border-left 3px brand
+- Các loại thông báo cần hiển thị (dữ liệu mẫu):
+  - 💸 "Minh thêm khoản chi 150.000 đ" · Nhóm CLB · 10 phút trước *(chưa đọc)*
+  - ✅ "Hoa xác nhận đã thanh toán 240.000 đ" · 1 giờ trước *(chưa đọc)*
+  - 👤 "Tuấn yêu cầu tham gia Nhóm CLB" · 2 giờ trước *(chưa đọc)* → có 2 nút "Duyệt" / "Từ chối" inline
+  - 🏓 "Buổi #9 hôm nay lúc 19:00" · 5 giờ trước *(đã đọc)*
+  - 💰 "Nam còn nợ bạn 93.333 đ" · Hôm qua *(đã đọc)*
+
+---
+
+### 3F-7. DUYỆT YÊU CẦU THAM GIA (`approval-queue.html`)
+
+Push screen — chỉ thủ quỹ thấy. Từ notification hoặc Group Detail tab Thành viên.
+
+- Header: ‹ back + "Yêu cầu tham gia" + badge số lượng pending
+- Nếu không có yêu cầu: empty state — icon 🎉 + "Không có yêu cầu nào"
+- Mỗi request:
+  - Avatar chữ cái + tên người xin vào + thời gian gửi
+  - Tên nhóm (nếu hiển thị từ nhiều nhóm)
+  - 2 nút: "✓ Duyệt" (emerald, rounded) + "✕ Từ chối" (danger ghost, rounded)
+  - Sau khi duyệt: row collapse với animation, badge giảm 1
+- Nút "Duyệt tất cả" ở bottom nếu có ≥ 2 request
+
+---
+
+### 3F-8. CÀI ĐẶT TÀI KHOẢN (`settings.html`)
+
+Push screen từ Profile tab. Không có TabBar.
+
+- Header: ‹ back + "Cài đặt"
+- Section "Thông tin ngân hàng":
+  - Card: logo ngân hàng (text) + tên NH + số TK (masked: **** 4321) + chủ TK
+  - Nút "✏️ Sửa" → inline edit form: chọn ngân hàng (dropdown) + input STK + input tên chủ TK
+- Section "Bảo mật":
+  - Row "PIN ứng dụng": toggle on/off + nút "Đổi PIN" (nếu đang bật)
+  - PIN flow: 6 ô tròn nhập số, màu brand khi điền
+- Section "Ứng dụng":
+  - Row "Ngôn ngữ": Tiếng Việt (hiện tại, không cần thay đổi — show only)
+  - Row "Phiên bản": v1.0.0
+- Section danger:
+  - Nút "🚪 Đăng xuất" (danger outline, full width)
+  - Nút "🗑 Xóa tài khoản" (danger ghost, smaller, text muted)
+
+---
+
+### 3F-9. CHỐT SỔ THÁNG (`settlement-period.html`)
+
+Push screen — chỉ thủ quỹ. Từ Settle All hoặc Group Detail "Chốt sổ".
+
+- Header: ‹ back + "Chốt sổ · Tháng 5/2026" + badge "Chưa chốt" (amber)
+- Hero amber: tổng thu/chi tháng — 2 cột: Tổng chi (đỏ) / Tổng đã thanh toán (xanh)
+- Section "Số dư từng người":
+  - List thành viên: avatar + tên + số tiền còn nợ (đỏ) hoặc được nhận (xanh) + badge "Đã trả" / "Chưa trả"
+- Section "Khoản chi tháng": tổng hợp theo danh mục (tiền sân, tiền nước, vé lẻ, chi tiêu nhóm)
+- Nút "📊 Xuất CSV" (ghost, icon download)
+- Nút "✅ Xác nhận chốt sổ" (brand gradient, full width) → confirm dialog "Sau khi chốt không sửa được. Tiếp tục?"
 
 ---
 
