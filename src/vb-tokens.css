@@ -189,3 +189,86 @@ code, pre { font-family: var(--vb-font-mono); font-size: 12px; color: var(--fg-1
 .vb-label   { font: 700 14px/21px var(--vb-font-vn); color: var(--vb-ink-600); letter-spacing: 0; }
 .vb-hint    { font: 500 14px/21px var(--vb-font-vn); color: var(--vb-gray-400); }
 .vb-stat-num{ font: 700 32px/40px var(--vb-font-num); color: var(--fg-1); letter-spacing: -0.01em; }
+
+/* ========================================================================
+   Dark Theme — SpliteasyBoss override palette
+   All semantic aliases remapped to dark values.
+   Missing shorthand aliases (--surface-1, --text-*, --brand-*) defined here.
+   ======================================================================== */
+
+:root {
+  /* ── Dark page & surface palette ─────────────────────────────────── */
+  --dk-bg-page:    #0f1117;
+  --dk-bg-shell:   #13161f;
+  --dk-surface-1:  #1e2235;
+  --dk-surface-2:  #252840;
+  --dk-surface-3:  #2a2d45;
+  --dk-input-bg:   #13161f;
+
+  /* ── Dark text palette ────────────────────────────────────────────── */
+  --dk-text-1:   #f1f5f9;
+  --dk-text-2:   #9ca3af;
+  --dk-text-3:   #6c7280;
+  --dk-text-4:   #4b5563;
+
+  /* ── Dark brand (indigo) ──────────────────────────────────────────── */
+  --dk-brand-1:   #6366f1;
+  --dk-brand-2:   #818cf8;
+  --dk-brand-soft: rgba(99,102,241,0.12);
+  --dk-brand-softer: rgba(99,102,241,0.08);
+
+  /* ── Dark borders ─────────────────────────────────────────────────── */
+  --dk-border-1:      rgba(255,255,255,0.08);
+  --dk-border-2:      rgba(255,255,255,0.12);
+  --dk-border-strong: rgba(255,255,255,0.2);
+
+  /* ── Dark status ──────────────────────────────────────────────────── */
+  --dk-success:       #34d399;
+  --dk-success-soft:  rgba(52,211,153,0.12);
+  --dk-danger:        #f87171;
+  --dk-danger-soft:   rgba(248,113,113,0.12);
+  --dk-warn:          #fbbf24;
+  --dk-warn-soft:     rgba(251,191,36,0.12);
+  --dk-info:          #a5b4fc;
+
+  /* ── Override existing semantic aliases to dark values ───────────── */
+  --fg-1:  var(--dk-text-1);
+  --fg-2:  var(--dk-text-2);
+  --fg-3:  var(--dk-text-3);
+  --fg-brand: var(--dk-brand-2);
+  --fg-on-brand: #fff;
+
+  --bg-1: var(--dk-surface-1);
+  --bg-2: var(--dk-bg-page);
+  --bg-3: var(--dk-bg-shell);
+  --bg-brand: var(--dk-brand-1);
+  --bg-brand-soft: var(--dk-brand-softer);
+
+  --border-1: var(--dk-border-1);
+  --border-2: var(--dk-border-2);
+  --border-strong: var(--dk-border-strong);
+  --border-brand: var(--dk-brand-1);
+
+  --focus-ring: 0 0 0 3px rgba(99,102,241,0.35);
+
+  /* ── Dark shadows ─────────────────────────────────────────────────── */
+  --vb-shadow-card:  0px 2px 8px 0 rgba(0,0,0,0.4);
+  --vb-shadow-pop:   0px 4px 20px 0 rgba(0,0,0,0.5);
+  --vb-shadow-modal: 0px 16px 40px -8px rgba(0,0,0,0.6);
+  --vb-shadow-row:   0px 1px 0 0 rgba(0,0,0,0.3);
+
+  /* ── Shorthand aliases used by components.jsx and screen files ────── */
+  --surface-1: var(--dk-surface-1);
+  --surface-2: var(--dk-surface-2);
+  --text-1:    var(--dk-text-1);
+  --text-2:    var(--dk-text-2);
+  --text-3:    var(--dk-text-3);
+  --brand-1:   var(--dk-brand-1);
+  --brand-2:   var(--dk-brand-2);
+  --brand-soft: var(--dk-brand-soft);
+}
+
+html, body {
+  background: var(--dk-bg-page);
+  color: var(--dk-text-1);
+}

@@ -1272,8 +1272,8 @@ function PickleOverview({ push, tweaks = {}, summary, accent, accentBg, style, p
                 }
               }}
               style={{
-                width: '100%', padding: '8px 0', background: '#fff',
-                color: '#4f46e5', border: 'none', borderRadius: 8,
+                width: '100%', padding: '8px 0', background: '#1e2235',
+                color: '#818cf8', border: 'none', borderRadius: 8,
                 fontWeight: 700, fontSize: 12, cursor: 'pointer',
               }}
             >

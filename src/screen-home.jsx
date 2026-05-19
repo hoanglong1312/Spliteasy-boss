@@ -72,15 +72,15 @@ function ScreenHome({ push, switchTab }) {
 
   return (
     <div style={{ paddingBottom: 96 }}>
-      <div style={{ background: '#fff', padding: '16px 18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ background: '#1e2235', padding: '16px 18px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: 11, color: '#999', fontWeight: 500 }}>Xin chào,</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#1a1a2e' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#f1f5f9' }}>
             {displayMemberName(meMember, 'Bạn')} 👋
           </div>
         </div>
-        <button type="button" style={{ ...iconBtnStyle(), borderRadius: '50%', background: '#f4f4f8', border: 0 }} onClick={() => push('notifications')} aria-label="Thông báo">
-          <Icon name="bell" size={18} color="#1a1a2e"/>
+        <button type="button" style={{ ...iconBtnStyle(), borderRadius: '50%', background: '#2a2d45', border: 0 }} onClick={() => push('notifications')} aria-label="Thông báo">
+          <Icon name="bell" size={18} color="#f1f5f9"/>
         </button>
       </div>
 
@@ -124,8 +124,8 @@ function MonthNav({ selectedMonth, setSelectedMonth }) {
   const current = isCurrentMonth(selectedMonth)
 
   return (
-    <div style={{ background: '#fff', padding: '10px 18px 14px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ display: 'inline-flex', alignItems: 'center', background: '#f0f0f7', borderRadius: 20, padding: 4 }}>
+    <div style={{ background: '#1e2235', padding: '10px 18px 14px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', background: '#2a2d45', borderRadius: 20, padding: 4 }}>
         <button
           type="button"
           onClick={() => setSelectedMonth(prevMonth(selectedMonth))}
@@ -135,7 +135,7 @@ function MonthNav({ selectedMonth, setSelectedMonth }) {
           ‹
         </button>
         <div style={{ padding: '0 16px' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', whiteSpace: 'nowrap' }}>
             {formatMonthLabel(selectedMonth)}
           </div>
         </div>

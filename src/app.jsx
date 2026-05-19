@@ -655,9 +655,9 @@ function App() {
       {state._error && (
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 200,
-          padding: '10px 16px', background: '#FEF2F2',
-          color: '#C8322B', fontSize: 13, fontWeight: 600,
-          borderBottom: '1px solid #FECACA', textAlign: 'center',
+          padding: '10px 16px', background: 'rgba(248,113,113,0.12)',
+          color: '#f87171', fontSize: 13, fontWeight: 600,
+          borderBottom: '1px solid rgba(248,113,113,0.2)', textAlign: 'center',
         }}>
           ⚠️ {state._error}
         </div>
