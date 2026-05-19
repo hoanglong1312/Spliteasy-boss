@@ -456,10 +456,10 @@ function DonutProgress({ done, total }) {
 
   return (
     <svg width={88} height={88} viewBox="0 0 88 88" style={{ flexShrink: 0 }}>
-      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={10}/>
+      <circle cx={44} cy={44} r={r} fill="none" stroke="rgba(52,211,153,0.15)" strokeWidth={10}/>
       <circle
         cx={44} cy={44} r={r} fill="none"
-        stroke="#6366f1" strokeWidth={10}
+        stroke="#34d399" strokeWidth={10}
         strokeDasharray={`${dash} ${circ - dash}`}
         strokeLinecap="round"
         transform="rotate(-90 44 44)"
@@ -474,7 +474,7 @@ function SessionProgressBlock({ completedCount, total, upcomingSessions, current
   return (
     <div style={{ padding: '0 16px 8px' }}>
       <div style={{
-        background: 'linear-gradient(135deg, #1e2235, #252840)',
+        background: 'linear-gradient(135deg, #064e3b, #065f46)',
         borderRadius: 16,
         padding: '16px 18px',
         marginBottom: 12,
