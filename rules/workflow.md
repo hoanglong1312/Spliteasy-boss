@@ -24,9 +24,11 @@
 7. Chỉ khi pass → bàn giao user test
 
 ### Bug fix / small change
-1. Claude main phân tích nguyên nhân (git log, git diff)
-2. Gọi Codex fix trực tiếp
-3. Quality Gate rút gọn: `npm run build` + Playwright
+1. Claude main phân tích sơ bộ (git log, git diff)
+2. Nếu cần trace source code → gọi Codex `read-only` để đọc file và báo cáo root cause (không fix)
+3. Claude main đánh giá root cause → quyết định approach
+4. Gọi Codex `workspace-write` fix trực tiếp
+5. Quality Gate rút gọn: `npm run build` + Claude main chạy Playwright
 
 ## Cách gọi Codex
 
@@ -37,6 +39,8 @@ approval-policy: "never"
 ```
 
 Prompt phải có: Goal + Danh sách file + Constraints + Lệnh git commit
+
+⚠️ **Constraint bắt buộc trong mọi Codex prompt:** Không yêu cầu Codex chạy `npx playwright test` hay khởi động dev server — sandbox bị EPERM. Chỉ yêu cầu `npm run build`.
 
 ## Superpowers Skills — Cái nào còn dùng
 

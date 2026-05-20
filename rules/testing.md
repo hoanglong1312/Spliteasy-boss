@@ -12,9 +12,14 @@ Gọi Codex rà soát toàn bộ screens:
 Codex báo cáo danh sách issue → Claude main **đọc lại adversarial** (không tin báo cáo "không có issue" mà không kiểm tra) → nếu có vấn đề → gọi Codex fix → lặp lại.
 
 ### Bước 2: E2E Tests (Playwright)
+
+⚠️ **Codex không chạy được Playwright** (sandbox bị EPERM khi bind port). Claude main phải chạy lệnh này trực tiếp:
+
 ```bash
 npx playwright test --reporter=line
 ```
+
+Nếu Codex báo "EPERM" hoặc "cannot listen on port" → bình thường, Claude main chạy lại từ terminal.
 
 **Pass condition:** `vite build` ✅ + static audit ✅ + Playwright ✅
 
