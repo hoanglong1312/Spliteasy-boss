@@ -262,19 +262,25 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
 
 function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members) {
   const today = new Date()
+  const currentYearMonth = monthKey(today)
+  const currentMonthConfig = safeArray(pickle?.monthlyConfigs).find(
+    c => c.yearMonth === currentYearMonth
+  )
   const monthSessions = getMonthSessions(pickle, today)
   const attended = monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
   const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0)
-  const courtFee = Number(pickle?.monthlyCourtFee || 0)
+  const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
+  const monthlyActiveMemberIds = safeArray(currentMonthConfig?.activeMemberIds)
+  const activeMemberIds = monthlyActiveMemberIds.length > 0 ? monthlyActiveMemberIds : safeArray(pickle?.fixedMembers)
   const ticketAmount = ticketBalanceForMember(safeArray(pickle?.externalTickets || _allPickle?.externalTickets), currentUserId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount)
 
   return {
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
     monthLabel: formatMonthLabel(today),
-    memberCount: safeArray(pickle?.fixedMembers).length,
+    memberCount: activeMemberIds.length,
     todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members) : null,
     progress: {
       attended,
@@ -283,7 +289,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     },
     monthCosts: {
       court: courtFee,
-      courtSub: `${safeArray(pickle?.fixedMembers).length} thành viên cố định`,
+      courtSub: `${activeMemberIds.length} thành viên cố định`,
       water,
       waterSub: `${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi đã ghi`,
     },
