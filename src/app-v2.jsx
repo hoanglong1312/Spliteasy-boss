@@ -328,6 +328,8 @@ export default function AppV2() {
       'editBank',
       'addBank',
       'changePin',
+      'removePin',
+      'setPin',
       'changeLanguage',
       'deleteAccount',
       'more',

@@ -320,6 +320,7 @@ function buildPickleballCalendarData(state) {
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
+    selectedSessionDay: today.getDate(),
     days: buildCalendarDays(today, sessionsByDay, state),
     selectedSession: null,
   }
@@ -338,6 +339,15 @@ function buildPickleballMembersData(state) {
   const joinRequests = currentJoinRequests(state)
   const guests = buildGuestRows(sessions)
   const totalSessions = sessions.length || 1
+  const joinRequestRows = joinRequests.map(request => {
+    const created = parseDate(request.createdAt || request.created_at)
+    return {
+      id: request.id,
+      initial: initials({ name: request.name }),
+      name: request.name || 'Thành viên mới',
+      sentLabel: relativeTimeLabel(created),
+    }
+  })
 
   const rows = fixedMembers.map(member => ({
     id: member.id,
@@ -360,7 +370,7 @@ function buildPickleballMembersData(state) {
       pendingJoin: joinRequests.length,
       pending: joinRequests.length,
     },
-    joinRequests,
+    joinRequests: joinRequestRows,
     members: rows.map(row => ({
       ...row,
       sessionsTotal: row.sessionsTotal || totalSessions,
@@ -1025,6 +1035,7 @@ function bankData(member, primary = false) {
     name: bankName,
     number: account,
     account,
+    accountRaw: account,
     holder,
     code,
     accountMasked: maskBankAccount(account),

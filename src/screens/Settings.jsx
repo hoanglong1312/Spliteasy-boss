@@ -13,7 +13,7 @@ export default function Settings({ data, onAction }) {
   const primaryBank = d.banks.find((b) => b.primary) || d.banks[0];
   const [editingBank, setEditingBank] = useState(false);
   const [bankName, setBankName] = useState(primaryBank?.name || '');
-  const [bankAccount, setBankAccount] = useState(primaryBank?.accountRaw || primaryBank?.accountMasked || '');
+  const [bankAccount, setBankAccount] = useState(primaryBank?.accountRaw || primaryBank?.account || primaryBank?.accountMasked || '');
   const [bankOwner, setBankOwner] = useState(d.accountHolder || '');
 
   return (
