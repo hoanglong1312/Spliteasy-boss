@@ -388,6 +388,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     notes: e.notes || '',
     declineReason: e.decline_reason,
     submittedBy: e.submitted_by_member_id,
+    submitted_by_member_id: e.submitted_by_member_id,
     pickleSessionId: e.pickle_session_id,
   }))
 

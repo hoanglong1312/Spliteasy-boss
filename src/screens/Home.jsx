@@ -8,14 +8,33 @@ import {
   SectionLabel,
 } from '../primitives';
 
+const STATUS_FILTERS = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'pending', label: 'Chờ duyệt' },
+  { key: 'approved', label: 'Đã duyệt' },
+  { key: 'declined', label: 'Từ chối' },
+];
+
+const CATEGORY_FILTERS = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'court', label: 'Tiền sân' },
+  { key: 'water', label: 'Tiền nước' },
+  { key: 'other', label: 'Khác' },
+];
+
 export default function Home({ data, onAction }) {
   const d = data || DEMO;
   const [filterText, setFilterText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const isNeg = d.totalBalance < 0;
   const normalizedFilter = filterText.trim().toLowerCase();
-  const visibleTransactions = d.transactions.filter(tx => (
-    !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter)
-  ));
+  const visibleTransactions = d.transactions.filter(tx => {
+    const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
+    const statusMatches = statusFilter === 'all' || transactionStatus(tx) === statusFilter;
+    const categoryMatches = categoryFilter === 'all' || transactionCategoryGroup(tx) === categoryFilter;
+    return titleMatches && statusMatches && categoryMatches;
+  });
 
   return (
     <PhoneFrame>
@@ -105,13 +124,68 @@ export default function Home({ data, onAction }) {
             }}
           />
         </div>
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          paddingBottom: 8,
+          marginBottom: 8,
+        }}>
+          {STATUS_FILTERS.map(filter => {
+            const active = statusFilter === filter.key;
+            return (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setStatusFilter(filter.key)}
+                style={{
+                  flex: '0 0 auto',
+                  padding: '7px 11px',
+                  borderRadius: 100,
+                  border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : colors.borderSubtle}`,
+                  background: active ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.03)',
+                  color: active ? colors.brandLight : colors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ marginBottom: 10 }}>
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '11px 12px',
+              background: colors.inputBg,
+              border: `1px solid ${colors.borderSubtle}`,
+              borderRadius: 12,
+              color: colors.textPrimary,
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          >
+            {CATEGORY_FILTERS.map(filter => (
+              <option key={filter.key} value={filter.key}>{filter.label}</option>
+            ))}
+          </select>
+        </div>
         <Card>
           {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (
             <ActivityRow
               key={tx.id}
               tx={tx}
               last={i === visibleTransactions.length - 1}
-              onEdit={() => onAction?.('editExpense', { expenseId: tx.id })}
+              onView={() => onAction?.('viewExpense', { expenseId: tx.id })}
             />
           )) : (
             <div style={{ padding: '14px 0', fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
@@ -126,13 +200,22 @@ export default function Home({ data, onAction }) {
   );
 }
 
-function ActivityRow({ tx, last, onEdit }) {
+function ActivityRow({ tx, last, onView }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 0',
-      borderBottom: last ? 'none' : `1px solid rgba(255,255,255,0.04)`,
-    }}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onView}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') onView?.();
+      }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 0',
+        borderBottom: last ? 'none' : `1px solid rgba(255,255,255,0.04)`,
+        cursor: 'pointer',
+      }}
+    >
       <div style={{
         width: 38, height: 38, borderRadius: 12,
         background: TX_ICON_BG[tx.category] || 'rgba(255,255,255,0.06)',
@@ -150,28 +233,37 @@ function ActivityRow({ tx, last, onEdit }) {
           fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',
           color: tx.amount < 0 ? colors.danger : colors.success, ...type.mono,
         }}>{formatVND(tx.amount)}</div>
-        <button onClick={onEdit} style={{
-          marginTop: 5,
-          background: 'transparent',
-          border: 'none',
-          color: colors.brandLight,
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          fontSize: 11,
-          fontWeight: 700,
-          padding: 0,
-        }}>Sửa</button>
       </div>
+      <div style={{ color: colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
     </div>
   );
 }
 
 const TX_ICON_BG = {
   pickleball: 'rgba(52,211,153,0.12)',
+  court:      'rgba(52,211,153,0.12)',
+  water:      'rgba(99,102,241,0.12)',
   groups:     'rgba(99,102,241,0.12)',
   food:       'rgba(251,191,36,0.12)',
+  cafe:       'rgba(251,191,36,0.12)',
   payment:    'rgba(167,139,250,0.12)',
+  general:    'rgba(255,255,255,0.06)',
 };
+
+function transactionStatus(tx) {
+  const status = String(tx.status || '').toLowerCase();
+  if (status === 'approved' || status === 'settled' || status === 'done' || status === 'closed') return 'approved';
+  if (status === 'declined' || status === 'rejected') return 'declined';
+  return 'pending';
+}
+
+function transactionCategoryGroup(tx) {
+  const category = String(tx.category || '').toLowerCase();
+  const title = String(tx.title || '').toLowerCase();
+  if (category === 'court' || title.includes('sân') || title.includes('court')) return 'court';
+  if (category === 'water' || title.includes('nước') || title.includes('water')) return 'water';
+  return 'other';
+}
 
 const DEMO = {
   user: { firstName: 'Long', dateLabel: 'Thứ Hai · 19/05/2026', hasNotifications: true },
@@ -182,9 +274,9 @@ const DEMO = {
   groups: { count: 3, balance: -93333 },
   todaySession: { id: 9, number: 9, timeLabel: 'Hôm nay · 19:00', dateLabel: '19/05', venue: 'CLB Pickleball Cầu Giấy' },
   transactions: [
-    { id: 1, icon: '🏸', category: 'pickleball', title: 'Tiền nước Buổi #8', subtitle: 'CLB Pickleball', dateLabel: 'Hôm qua', amount: -40000 },
-    { id: 2, icon: '☕', category: 'groups',     title: 'Cafe sau buổi',      subtitle: 'Nhóm CLB',         dateLabel: '17/05',   amount: -55000 },
-    { id: 3, icon: '🍜', category: 'food',       title: 'Bún bò trưa T7',     subtitle: 'Minh trả',         dateLabel: '16/05',   amount: -45000 },
-    { id: 4, icon: '💸', category: 'payment',    title: 'Thanh toán → Hoa',   subtitle: 'VietQR',           dateLabel: '14/05',   amount: 120000 },
+    { id: 1, icon: '🏸', category: 'water',      title: 'Tiền nước Buổi #8', subtitle: 'CLB Pickleball', dateLabel: 'Hôm qua', amount: -40000, status: 'pending' },
+    { id: 2, icon: '☕', category: 'groups',     title: 'Cafe sau buổi',      subtitle: 'Nhóm CLB',         dateLabel: '17/05',   amount: -55000, status: 'approved' },
+    { id: 3, icon: '🍜', category: 'food',       title: 'Bún bò trưa T7',     subtitle: 'Minh trả',         dateLabel: '16/05',   amount: -45000, status: 'declined' },
+    { id: 4, icon: '💸', category: 'payment',    title: 'Thanh toán → Hoa',   subtitle: 'VietQR',           dateLabel: '14/05',   amount: 120000, status: 'approved' },
   ],
 };

@@ -266,6 +266,11 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'viewExpense') {
+      setStack((s) => [...s, { screen: 'expense-detail', params: { expenseId: payload.expenseId } }])
+      return
+    }
+
     if (type === 'delete') {
       const route = stack[stack.length - 1]
       const expenseId = payload?.expenseId ?? payload?.id ?? route?.params?.expenseId ?? route?.params?.id ?? route?.params

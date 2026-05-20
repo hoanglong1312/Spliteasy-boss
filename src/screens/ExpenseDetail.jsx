@@ -161,12 +161,16 @@ export default function ExpenseDetail({ data, onAction }) {
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <Button block variant="ghost" style={{ fontSize: 12 }} onClick={() => onAction?.('edit')}>
-            ✏️ Sửa
-          </Button>
-          <Button block variant="danger" style={{ fontSize: 12 }} onClick={() => onAction?.('delete')}>
-            🗑 Xóa
-          </Button>
+          {d.canEdit === true && (
+            <Button block variant="ghost" style={{ fontSize: 12 }} onClick={() => onAction?.('edit')}>
+              ✏️ Sửa
+            </Button>
+          )}
+          {d.canDelete === true && (
+            <Button block variant="danger" style={{ fontSize: 12 }} onClick={() => onAction?.('delete')}>
+              🗑 Xóa
+            </Button>
+          )}
         </div>
 
         {myOwed && (
@@ -197,4 +201,6 @@ const DEMO = {
     { initial: 'N', name: 'Nam',                 sub: 'Còn nợ Minh',         amount: -54000, tag: 'owe'  },
   ],
   note: 'Mọi người ăn xong rồi qua sân luôn nhé. Tuấn order trước cho 5 người, Minh trả luôn cả bill.',
+  canEdit: true,
+  canDelete: true,
 };

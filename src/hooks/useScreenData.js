@@ -62,7 +62,7 @@ export function useScreenData() {
       getAddExpenseData: (params) => buildAddExpenseData(state, params),
       getSettleAllData: () => buildSettleAllData(state),
       getSettlementPeriodData: (params) => buildSettlementPeriodData(state, params),
-      getExpenseDetailData: (expenseId) => buildExpenseDetailData(state, expenseId),
+      getExpenseDetailData: (params) => buildExpenseDetailData(state, params),
       dispatch,
     }
   }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, me, isTreasurer, dispatch])
@@ -731,15 +731,18 @@ function buildSettlementPeriodData(state, params) {
   }
 }
 
-function buildExpenseDetailData(state, expenseId) {
-  const id = normalizeId(expenseId, 'expenseId')
+function buildExpenseDetailData(state, params) {
+  const id = normalizeId(params, 'expenseId')
   const expense = findExpense(state, id)
   if (!expense) return null
 
   const group = groupForExpense(state, expense) || currentGroup(state)
   const members = currentGroupMembers({ ...state, currentGroup: group })
+  const currentUserId = state?.currentUserId
+  const role = safeArray(state?.members).find(member => String(member.id) === String(currentUserId))?.role
+  const canEdit = role === 'treasurer' || (String(expense.submitted_by_member_id || '') === String(currentUserId) && String(expense.status || '').toLowerCase() === 'pending')
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
-  const splits = expenseSplits(expense, members, payer, state?.currentUserId)
+  const splits = expenseSplits(expense, members, payer, currentUserId)
 
   return {
     id: expense.id,
@@ -760,6 +763,8 @@ function buildExpenseDetailData(state, expenseId) {
     },
     splits,
     note: expense.note || expense.description || expense.declineReason || '',
+    canEdit,
+    canDelete: role === 'treasurer',
     expense,
   }
 }
@@ -785,6 +790,7 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
         subtitle: expense.groupName || memberName(expense.paidBy, members),
         dateLabel: relativeDateLabel(expense.date),
         amount,
+        status: expense.status,
       }
     })
 }
