@@ -31,6 +31,8 @@ const PIN_UNLOCK_KEY = 'spliteasy_pin_unlocked'
 
 export default function AppV2() {
   const { state, dispatch } = useApp()
+  const groups = state.groups || []
+  const members = state.members || []
   const {
     isTreasurer,
     homeData,
@@ -499,7 +501,7 @@ export default function AppV2() {
     )
   }
 
-  if (state._loading && (state.members || []).length === 0 && (state.expenses || []).length === 0) {
+  if (state._loading && members.length === 0 && (state.expenses || []).length === 0) {
     return (
       <div style={{
         display: 'flex',
@@ -511,6 +513,62 @@ export default function AppV2() {
         fontSize: 16,
       }}>
         Đang tải dữ liệu...
+      </div>
+    )
+  }
+
+  if (state._error && !state._loading && state.currentUserId && groups.length === 0 && members.length === 0) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: colors.pageBg,
+        color: colors.textPrimary,
+        fontFamily: type.family,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        textAlign: 'center',
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: 340,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 14,
+        }}>
+          <div style={{
+            fontSize: 20,
+            fontWeight: 800,
+            lineHeight: 1.25,
+          }}>
+            Tài khoản của bạn chưa được kích hoạt trong nhóm
+          </div>
+          <div style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: colors.textSecondary,
+          }}>
+            Liên hệ thủ quỹ để được thêm vào nhóm.
+          </div>
+          <button
+            type="button"
+            onClick={() => handle('logout')}
+            style={{
+              marginTop: 10,
+              border: 'none',
+              borderRadius: 8,
+              background: colors.brand,
+              color: colors.textPrimary,
+              padding: '12px 18px',
+              fontSize: 14,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}
+          >Đăng xuất</button>
+        </div>
       </div>
     )
   }

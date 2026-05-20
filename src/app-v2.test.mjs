@@ -28,6 +28,16 @@ test('AppV2 renders the store toast as a fixed bottom overlay', () => {
   assert.match(appSource, /opacity: visible \? 1 : 0/)
 })
 
+test('AppV2 renders a deactivated-member error state when no groups or members load', () => {
+  assert.match(appSource, /const groups = state\.groups \|\| \[\]/)
+  assert.match(appSource, /const members = state\.members \|\| \[\]/)
+  assert.match(appSource, /state\._error && !state\._loading && state\.currentUserId && groups\.length === 0 && members\.length === 0/)
+  assert.match(appSource, /Tài khoản của bạn chưa được kích hoạt trong nhóm/)
+  assert.match(appSource, /Liên hệ thủ quỹ để được thêm vào nhóm\./)
+  assert.match(appSource, /onClick=\{\(\) => handle\('logout'\)\}/)
+  assert.match(appSource, />Đăng xuất<\/button>/)
+})
+
 test('main renders AppProvider directly without the legacy toast bridge', () => {
   assert.doesNotMatch(mainSource, /ToastProvider/)
   assert.doesNotMatch(mainSource, /useToast/)
