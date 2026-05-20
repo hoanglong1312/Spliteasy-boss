@@ -1,124 +1,95 @@
-# P1 — Tab "Chi phí" Pickleball
+# P1 — Nhập chi phí Pickleball (nước + phụ phát sinh)
 
-**Goal:** Đưa form nhập chi phí thực tế (nước + phụ phát sinh) ra tab riêng trong Pickleball, thay vì nằm trong Settings modal. Tiền sân vẫn lấy từ config, không nhập thủ công.
+**Goal:** Đưa form nhập chi phí thực tế (nước + phụ phát sinh) vào đúng nơi — theo ngày nhập thẳng trong Calendar session detail, batch entry có nút riêng. Không tạo tab mới. Tiền sân vẫn lấy từ config, không nhập thủ công.
 
 ---
 
 ## Scope
 
-- Thêm tab **"Chi phí"** vào navigation bar Pickleball (sau tab "Lịch", trước tab "T.Viên")
-- Xoá nút "Nhập chi phí sân tháng này" khỏi `PickleballSettings.jsx`
-- Không thay đổi config tiền sân / thành viên / lịch trong Settings
+- **KHÔNG tạo tab "Chi phí" mới**
+- Mode 1 (theo ngày): thêm form nhập vào session detail panel của `PickleballCalendar.jsx`
+- Mode 2 (batch): nút "📋 Nhập nhanh" trong `PickleballSettings.jsx` → mở `BatchEntry` screen
+- Xoá nút "Nhập chi phí sân tháng này" cũ khỏi Settings (thay bằng nút mới gọn hơn)
 
 ---
 
-## Tab "Chi phí" — Layout
+## Mode 1 — Nhập theo ngày (Calendar session detail)
 
-### Header (dùng heroEmerald gradient như các tab Pickleball khác)
-- Tiêu đề: "Chi phí tháng M/YYYY"
-- Badge: "X/Y buổi đã nhập"
-
-### Summary Strip (3 card ngang)
-| Card | Nội dung |
-|------|----------|
-| 💧 Nước | Tổng tiền nước tháng này (đã nhập) |
-| ⚡ Phát sinh | Tổng phụ phát sinh tháng này |
-| ⚠ Chưa nhập | Số buổi còn thiếu data |
-
-### Mode Toggle
-Hai nút toggle: **"Theo ngày"** (default) | **"Nhập nhanh"**
-
----
-
-## Mode 1 — Theo ngày (grid view)
-
-Grid 4 cột, mỗi ô = 1 buổi đánh trong tháng:
-
-| State | Style | Nội dung ô |
-|-------|-------|------------|
-| Đã nhập | emerald bg + border | ngày, số tiền nước |
-| Chưa nhập (đã qua) | warning bg + border vàng | ngày, "Nhập" |
-| Chưa tới | mờ opacity 0.4 | ngày, "—" |
-
-**Tap ô "Chưa nhập" → form inline bên dưới grid:**
+Khi tap vào 1 buổi trên Calendar → session detail panel hiện ra (đã có). Thêm section **"Chi phí buổi này"** vào panel đó:
 
 ```
-Buổi N — DD/MM THỨ
-HH:mm–HH:mm · X người
+─────────────────────────────────────
+  Chi phí buổi này          [thủ quỹ]
+─────────────────────────────────────
+  💧 Tiền nước
+  [________________________ đ]
 
-[💧 Tiền nước]   [______ đ]
+  ⚡ Phụ phát sinh ▶  (collapsed)
+    → tap mở:
+    ┌──────────────────────────────┐
+    │ Ghi chú: [________________] │
+    │ Số tiền:         [_____ đ]  │
+    │ Chia cho:                    │
+    │  [An ✓] [Long ✓] [Hoa] ...  │
+    │  [Tất cả]  = Xk/người        │
+    └──────────────────────────────┘
+    [+ Thêm phát sinh]
 
-[⚡ Phụ phát sinh]  ▶ (collapsed)
-  → tap mở:
-  ┌─────────────────────────────┐
-  │ Ghi chú: [_______________]  │
-  │ Số tiền:          [___ đ]  │
-  │ Chia cho:                   │
-  │  [An ✓] [Long ✓] [Hoa] ... │
-  │  [Tất cả]   = Xk/người      │
-  └─────────────────────────────┘
-  [+ Thêm phát sinh]
-
-[Lưu buổi N]
+  [Lưu chi phí]
+─────────────────────────────────────
 ```
 
-**Chi tiết phụ phát sinh:**
-- Ẩn mặc định, tap "⚡ Phụ phát sinh ▶" để mở/đóng
-- Mỗi item: ghi chú (text) + số tiền + chip chọn nhiều thành viên
-- Tap chip = toggle chọn/bỏ; có chip "Tất cả" để select all
-- Hiển thị "= Xk/người" tự tính theo số người được chọn
-- Nút "+ Thêm phát sinh" để add item thứ 2, 3...
+**Rules:**
+- Section chỉ hiển thị khi session đã diễn ra (date <= today) hoặc completed
+- Thành viên thường: xem read-only (số nước, phát sinh đã nhập) — không edit
+- Thủ quỹ: edit được
+- Phụ phát sinh: ẩn mặc định, tap header để expand/collapse
+- Mỗi item phụ phát sinh: ghi chú + số tiền + chip multi-select thành viên + auto-calc "= Xk/người"
+- Nút "+ Thêm phát sinh" để add nhiều item
+- "Tất cả" chip = select all members
 
 ---
 
-## Mode 2 — Nhập nhanh (batch table)
+## Mode 2 — Nhập nhanh (Batch)
 
-Bảng tất cả buổi trong tháng (kể cả đã nhập):
+Trong `PickleballSettings.jsx`, thay nút cũ "Nhập chi phí sân tháng này" bằng:
+
+```
+[📋 Nhập nhanh chi phí tháng này]
+```
+
+Tap → navigate sang `BatchEntry` screen (đã có). BatchEntry hiển thị bảng tất cả buổi tháng:
 
 | Ngày | 💧 Nước (đ) | ⚡ Phát sinh |
 |------|-------------|--------------|
 | 05/05 ✓ | [40.000] | — |
 | 07/05 ✓ | [30.000] | +50k |
 | 10/05 | [_____] | + Thêm |
-| 12/05 | [_____] | + Thêm |
 
-- Footer: "Tổng nước: Xđ"
-- Nút "Phát sinh" trong batch chỉ là shortcut → mở form phát sinh cho buổi đó (overlay/bottom sheet nhỏ)
+- Footer: tổng nước tháng
 - Nút **[Lưu tất cả]** + **[Huỷ]**
+- "Phát sinh" trong batch → bottom sheet nhỏ cho buổi đó (ghi chú + tiền + thành viên)
 
 ---
 
 ## Data Flow
 
-### Đọc dữ liệu
-`buildPickleballCostTabData(state)` trong `useScreenData.js`:
+### Đọc dữ liệu (Calendar session detail)
+`buildPickleballCalendarData()` đã trả về `selectedSession`. Thêm vào:
 ```js
-{
-  monthLabel,          // "Tháng 5/2026"
-  summary: {
-    totalWater,        // tổng nước đã nhập
-    totalExtra,        // tổng phụ phát sinh
-    filledCount,       // số buổi đã nhập
-    totalCount,        // tổng số buổi tháng này
-  },
-  sessions: [{
-    id,
-    date,              // "10/05"
-    dayLabel,          // "T7"
-    sessionNumber,
-    timeRange,
-    attendeeCount,
-    state,             // 'filled' | 'missing' | 'future'
-    waterAmount,       // 0 nếu chưa nhập
-    extras: [{ note, amount, memberIds }]
-  }]
+selectedSession: {
+  ...existing fields...,
+  costs: {
+    waterAmount,           // số tiền nước đã nhập (0 nếu chưa)
+    extras: [{ id, note, amount, memberIds }]
+  }
 }
 ```
 
 ### Ghi dữ liệu
 - `onAction('saveSessionCost', { sessionId, waterAmount, extras: [{ note, amount, memberIds }] })`
 - `onAction('saveBatchCosts', { sessions: [{ sessionId, waterAmount }] })`
-- Handler trong `app-v2.jsx` → upsert vào `pickleball_session_items` (Supabase)
+- Handler trong `app-v2.jsx` → upsert `pickleball_session_items`
 
 ---
 
@@ -127,12 +98,12 @@ Bảng tất cả buổi trong tháng (kể cả đã nhập):
 Dùng bảng `pickleball_session_items` đã có:
 ```sql
 session_id UUID
-name TEXT          -- "Nước" hoặc nội dung ghi chú phụ phát sinh
+name TEXT          -- "Nước" hoặc ghi chú phụ phát sinh
 amount INTEGER
 member_ids UUID[]  -- null = chia đều tất cả; có giá trị = chia cho list này
 ```
 
-Upsert by `(session_id, name)` cho "Nước"; insert mới cho phụ phát sinh.
+Upsert by `(session_id, name)` cho "Nước"; insert/delete cho phụ phát sinh.
 
 ---
 
@@ -140,15 +111,15 @@ Upsert by `(session_id, name)` cho "Nước"; insert mới cho phụ phát sinh.
 
 | File | Thay đổi |
 |------|----------|
-| `src/screens/PickleballCostTab.jsx` | Tạo mới — toàn bộ tab Chi phí |
-| `src/hooks/useScreenData.js` | Thêm `buildPickleballCostTabData()` |
-| `src/app-v2.jsx` | Thêm handler `saveSessionCost`, `saveBatchCosts`; thêm tab route |
-| `src/screens/PickleballOverview.jsx` | Thêm tab "Chi phí" vào tab bar |
-| `src/screens/PickleballSettings.jsx` | Xoá nút "Nhập chi phí sân tháng này" |
+| `src/screens/PickleballCalendar.jsx` | Thêm section "Chi phí buổi này" vào session detail panel |
+| `src/screens/BatchEntry.jsx` | Review + wire đúng actions nếu chưa hoạt động |
+| `src/hooks/useScreenData.js` | Thêm `costs` vào `selectedSession` trong `buildPickleballCalendarData()` |
+| `src/app-v2.jsx` | Thêm handlers `saveSessionCost`, `saveBatchCosts` |
+| `src/screens/PickleballSettings.jsx` | Đổi label nút batch entry |
 
 ---
 
-## Out of scope (P2, P3)
+## Out of scope
 
 - Config tiền sân, lịch, thành viên → Settings (không đổi)
 - Auto-generate sessions → P3
