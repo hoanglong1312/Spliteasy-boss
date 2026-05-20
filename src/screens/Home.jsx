@@ -27,13 +27,15 @@ export default function Home({ data, onAction }) {
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [mineOnly, setMineOnly] = useState(false);
   const isNeg = d.totalBalance < 0;
   const normalizedFilter = filterText.trim().toLowerCase();
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
     const statusMatches = statusFilter === 'all' || transactionStatus(tx) === statusFilter;
     const categoryMatches = categoryFilter === 'all' || transactionCategoryGroup(tx) === categoryFilter;
-    return titleMatches && statusMatches && categoryMatches;
+    const mineMatches = !mineOnly || transactionBelongsToCurrentUser(tx, d.currentUserId);
+    return titleMatches && statusMatches && categoryMatches && mineMatches;
   });
 
   return (
@@ -100,6 +102,12 @@ export default function Home({ data, onAction }) {
           </Card>
         )}
 
+        <PersonalBalance
+          expenses={d.expenses}
+          currentUserId={d.currentUserId}
+          memberName={d.currentUserName || d.user.name || d.user.firstName}
+        />
+
         <SectionLabel action="Xem tất cả →">Giao dịch gần đây</SectionLabel>
         <div style={{ position: 'relative', marginBottom: 8 }}>
           <span style={{
@@ -131,6 +139,23 @@ export default function Home({ data, onAction }) {
           paddingBottom: 8,
           marginBottom: 8,
         }}>
+          <button
+            type="button"
+            onClick={() => setMineOnly(value => !value)}
+            style={{
+              flex: '0 0 auto',
+              padding: '7px 11px',
+              borderRadius: 100,
+              border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
+              background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
+              color: mineOnly ? '#6ee7b7' : colors.textSecondary,
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >Của tôi</button>
           {STATUS_FILTERS.map(filter => {
             const active = statusFilter === filter.key;
             return (
@@ -200,6 +225,109 @@ export default function Home({ data, onAction }) {
   );
 }
 
+function PersonalBalance({ expenses, currentUserId, memberName }) {
+  if (!currentUserId) return null;
+
+  const balance = calculatePersonalBalance(expenses, currentUserId);
+  const netColor = balance.net > 0
+    ? colors.success
+    : balance.net < 0
+      ? colors.danger
+      : colors.textSecondary;
+  const netLabel = balance.net > 0
+    ? `+${formatDong(balance.net)}`
+    : balance.net < 0
+      ? `-${formatDong(Math.abs(balance.net))}`
+      : formatDong(0);
+
+  return (
+    <div style={{
+      background: '#1e293b',
+      borderRadius: 8,
+      padding: '12px 16px',
+      margin: '0 0 8px',
+      border: '1px solid rgba(255,255,255,0.06)',
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textSecondary }}>
+        {memberName || 'Bạn'}
+      </div>
+      <div style={{ ...type.amountSm, ...type.mono, marginTop: 4, color: netColor }}>
+        {netLabel}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginTop: 4 }}>
+        Nợ: {formatDong(balance.owes)} · Được nợ: {formatDong(balance.owed)}
+      </div>
+    </div>
+  );
+}
+
+function calculatePersonalBalance(expenses, currentUserId) {
+  const totals = safeArray(expenses).reduce((totals, expense) => {
+    const memberId = expense.currentMemberId || currentUserId;
+    if (!isBalanceStatus(expense.status)) return totals;
+
+    const amount = Number(expense.amount) || 0;
+    const myShare = shareForMember(expense, memberId);
+    if (String(expense.paidBy || '') === String(memberId)) {
+      return {
+        owed: totals.owed + Math.max(amount - myShare, 0),
+        owes: totals.owes,
+      };
+    }
+
+    if (myShare > 0) {
+      return {
+        owed: totals.owed,
+        owes: totals.owes + myShare,
+      };
+    }
+
+    return totals;
+  }, { owed: 0, owes: 0 });
+
+  return {
+    ...totals,
+    net: totals.owed - totals.owes,
+  };
+}
+
+function shareForMember(expense, memberId) {
+  const split = safeArray(expense.splits).find(item => String(item.memberId) === String(memberId));
+  if (split) return Number(split.amount) || 0;
+
+  const participants = safeArray(expense.participants);
+  const index = participants.findIndex(id => String(id) === String(memberId));
+  if (index === -1 || participants.length === 0) return 0;
+
+  const amount = Number(expense.amount) || 0;
+  const per = Math.round(amount / participants.length);
+  return index === participants.length - 1 ? amount - per * (participants.length - 1) : per;
+}
+
+function isBalanceStatus(status) {
+  const value = String(status || '').toLowerCase();
+  return value === '' || value === 'approved' || value === 'settled' || value === 'done' || value === 'closed';
+}
+
+function formatDong(value) {
+  return `${Math.round(Math.abs(Number(value) || 0)).toLocaleString('vi-VN')}đ`;
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function transactionBelongsToCurrentUser(tx, currentUserId) {
+  if (tx?.isMine === true) return true;
+
+  const memberId = tx.currentMemberId || currentUserId;
+  if (!memberId) return false;
+  if (String(tx?.paidBy || '') === String(memberId)) return true;
+
+  return safeArray(tx?.participants).some(id => String(id) === String(memberId))
+    || safeArray(tx?.splits).some(split => String(split.memberId || split.member_id) === String(memberId));
+}
+
 function ActivityRow({ tx, last, onView }) {
   return (
     <div
@@ -266,17 +394,106 @@ function transactionCategoryGroup(tx) {
 }
 
 const DEMO = {
-  user: { firstName: 'Long', dateLabel: 'Thứ Hai · 19/05/2026', hasNotifications: true },
+  user: { name: 'Long Nguyễn', firstName: 'Long', dateLabel: 'Thứ Hai · 19/05/2026', hasNotifications: true },
+  currentUserId: 'long',
+  currentUserName: 'Long Nguyễn',
   monthLabel: 'Tháng 5 · 2026',
   totalBalance: -333333,
   owedTo: 4,
   pickleball: { sessionsAttended: 8, sessionsTotal: 13, balance: -240000 },
   groups: { count: 3, balance: -93333 },
   todaySession: { id: 9, number: 9, timeLabel: 'Hôm nay · 19:00', dateLabel: '19/05', venue: 'CLB Pickleball Cầu Giấy' },
+  expenses: [
+    {
+      id: 1,
+      title: 'Tiền nước Buổi #8',
+      amount: 120000,
+      paidBy: 'hoa',
+      participants: ['long', 'hoa', 'minh'],
+      splits: [
+        { memberId: 'long', amount: 40000 },
+        { memberId: 'hoa', amount: 40000 },
+        { memberId: 'minh', amount: 40000 },
+      ],
+      status: 'approved',
+      currentMemberId: 'long',
+    },
+    {
+      id: 2,
+      title: 'Cafe sau buổi',
+      amount: 220000,
+      paidBy: 'long',
+      participants: ['long', 'hoa', 'minh', 'an'],
+      splits: [
+        { memberId: 'long', amount: 55000 },
+        { memberId: 'hoa', amount: 55000 },
+        { memberId: 'minh', amount: 55000 },
+        { memberId: 'an', amount: 55000 },
+      ],
+      status: 'approved',
+      currentMemberId: 'long',
+    },
+  ],
   transactions: [
-    { id: 1, icon: '🏸', category: 'water',      title: 'Tiền nước Buổi #8', subtitle: 'CLB Pickleball', dateLabel: 'Hôm qua', amount: -40000, status: 'pending' },
-    { id: 2, icon: '☕', category: 'groups',     title: 'Cafe sau buổi',      subtitle: 'Nhóm CLB',         dateLabel: '17/05',   amount: -55000, status: 'approved' },
-    { id: 3, icon: '🍜', category: 'food',       title: 'Bún bò trưa T7',     subtitle: 'Minh trả',         dateLabel: '16/05',   amount: -45000, status: 'declined' },
-    { id: 4, icon: '💸', category: 'payment',    title: 'Thanh toán → Hoa',   subtitle: 'VietQR',           dateLabel: '14/05',   amount: 120000, status: 'approved' },
+    {
+      id: 1,
+      icon: '🏸',
+      category: 'water',
+      title: 'Tiền nước Buổi #8',
+      subtitle: 'CLB Pickleball',
+      dateLabel: 'Hôm qua',
+      amount: -40000,
+      status: 'pending',
+      paidBy: 'hoa',
+      participants: ['long', 'hoa', 'minh'],
+      splits: [{ memberId: 'long', amount: 40000 }],
+      currentMemberId: 'long',
+      isMine: true,
+    },
+    {
+      id: 2,
+      icon: '☕',
+      category: 'groups',
+      title: 'Cafe sau buổi',
+      subtitle: 'Nhóm CLB',
+      dateLabel: '17/05',
+      amount: 165000,
+      status: 'approved',
+      paidBy: 'long',
+      participants: ['long', 'hoa', 'minh', 'an'],
+      splits: [{ memberId: 'long', amount: 55000 }],
+      currentMemberId: 'long',
+      isMine: true,
+    },
+    {
+      id: 3,
+      icon: '🍜',
+      category: 'food',
+      title: 'Bún bò trưa T7',
+      subtitle: 'Minh trả',
+      dateLabel: '16/05',
+      amount: 0,
+      status: 'declined',
+      paidBy: 'minh',
+      participants: ['hoa', 'minh'],
+      splits: [{ memberId: 'hoa', amount: 45000 }],
+      currentMemberId: 'long',
+      isMine: false,
+    },
+    {
+      id: 4,
+      icon: '💸',
+      category: 'payment',
+      title: 'Thanh toán → Hoa',
+      subtitle: 'VietQR',
+      dateLabel: '14/05',
+      amount: 120000,
+      status: 'approved',
+      paidBy: 'hoa',
+      participants: ['long', 'hoa'],
+      splits: [{ memberId: 'long', amount: 120000 }],
+      currentMemberId: 'long',
+      isMine: true,
+    },
   ],
 };

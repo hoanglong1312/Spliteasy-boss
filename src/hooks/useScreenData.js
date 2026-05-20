@@ -97,8 +97,64 @@ function buildHomeData(state, currentUserId, members, groups, pickle) {
       balance: totalBalance,
     },
     todaySession: session ? toTodaySessionCard(session, pickle, members) : null,
+    currentUserId,
+    currentUserName: state?.currentUserName || 'Bạn',
+    expenses: buildHomeExpenses(safeGroups, currentUserId, members, state?.currentUserName, today),
     transactions: buildTransactions(safeGroups, currentUserId, members, state?.currentUserName),
   }
+}
+
+function buildHomeExpenses(groups, currentUserId, members, currentUserName, monthDate) {
+  return safeArray(groups).flatMap(group => {
+    const meForGroup = memberIdForGroup(group, currentUserId, members, currentUserName)
+    return safeArray(group.expenses)
+      .filter(expense => isSameExpenseMonth(expense, monthDate))
+      .map(expense => {
+        const fields = {
+          paidBy: expense.paidBy || expense.paid_by_member_id,
+          participants: safeArray(expense.participants),
+          splits: safeArray(expense.splits).map(normalizeHomeSplit).filter(split => split.memberId),
+        }
+        const { paidBy, participants, splits } = fields
+        const normalizedExpense = { ...expense, paidBy, participants, splits }
+
+        return {
+          id: expense.id,
+          groupId: expense.groupId || expense.group_id || group.id,
+          groupName: group.name || 'Nhóm',
+          title: expense.title || 'Chi tiêu',
+          amount: Number(expense.amount) || 0,
+          paidBy,
+          participants,
+          splits,
+          date: expense.date || expense.expense_date,
+          status: expense.status,
+          currentMemberId: meForGroup,
+          isMine: isExpenseRelatedToMember(normalizedExpense, meForGroup),
+        }
+      })
+  })
+}
+
+function normalizeHomeSplit(split) {
+  return {
+    memberId: split.memberId || split.member_id,
+    amount: Number(split.amount ?? split.share_amount ?? split.share ?? 0) || 0,
+  }
+}
+
+function isSameExpenseMonth(expense, monthDate) {
+  const expenseMonth = monthKey(expense?.date || expense?.expense_date)
+  const targetMonth = monthKey(monthDate)
+  return Boolean(expenseMonth && targetMonth && expenseMonth === targetMonth)
+}
+
+function isExpenseRelatedToMember(expense, memberId) {
+  if (!memberId) return false
+  const id = String(memberId)
+  if (String(expense?.paidBy || expense?.paid_by_member_id || '') === id) return true
+  return safeArray(expense?.participants).some(member => String(member) === id)
+    || safeArray(expense?.splits).some(split => String(split.memberId || split.member_id) === id)
 }
 
 function buildAddExpenseData(state, params) {
@@ -791,13 +847,19 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
     .slice(0, 4)
     .map(expense => {
+      const group = groups.find(g => g.id === expense.groupId)
       const meForGroup = memberIdForGroup(
-        groups.find(g => g.id === expense.groupId),
+        group,
         currentUserId,
         members,
         currentUserName
       )
       const amount = expenseImpact(expense, meForGroup)
+      const paidBy = expense.paidBy || expense.paid_by_member_id
+      const participants = safeArray(expense.participants)
+      const splits = safeArray(expense.splits).map(normalizeHomeSplit).filter(split => split.memberId)
+      const normalizedExpense = { ...expense, paidBy, participants, splits }
+
       return {
         id: expense.id,
         icon: expenseIcon(expense),
@@ -807,6 +869,11 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
         dateLabel: relativeDateLabel(expense.date),
         amount,
         status: expense.status,
+        paidBy,
+        participants,
+        splits,
+        currentMemberId: meForGroup,
+        isMine: isExpenseRelatedToMember(normalizedExpense, meForGroup),
       }
     })
 }
