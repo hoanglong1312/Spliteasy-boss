@@ -73,6 +73,23 @@ test('Home personal balance helper uses paidBy, splits, participants, and per-ex
   assert.match(homeSource, /return index === participants\.length - 1 \? amount - per \* \(participants\.length - 1\) : per/);
 });
 
+test('Home has a controlled Của tôi filter that composes with existing filters', () => {
+  assert.match(homeSource, /const \[mineOnly, setMineOnly\] = useState\(false\)/);
+  assert.match(homeSource, /const mineMatches = !mineOnly \|\| transactionBelongsToCurrentUser\(tx, d\.currentUserId\)/);
+  assert.match(homeSource, /return titleMatches && statusMatches && categoryMatches && mineMatches/);
+  assert.match(homeSource, /onClick=\{\(\) => setMineOnly\(value => !value\)\}/);
+  assert.match(homeSource, />Của tôi<\/button>/);
+});
+
+test('Home Của tôi helper falls back from isMine to paidBy, participants, and splits', () => {
+  assert.match(homeSource, /function transactionBelongsToCurrentUser\(tx, currentUserId\)/);
+  assert.match(homeSource, /if \(tx\?\.isMine === true\) return true/);
+  assert.match(homeSource, /const memberId = tx\.currentMemberId \|\| currentUserId/);
+  assert.match(homeSource, /if \(String\(tx\?\.paidBy \|\| ''\) === String\(memberId\)\) return true/);
+  assert.match(homeSource, /safeArray\(tx\?\.participants\)\.some\(id => String\(id\) === String\(memberId\)\)/);
+  assert.match(homeSource, /safeArray\(tx\?\.splits\)\.some\(split => String\(split\.memberId \|\| split\.member_id\) === String\(memberId\)\)/);
+});
+
 test('Home expense rows open expense detail instead of edit form', () => {
   assert.match(homeSource, /onAction\?\.\('viewExpense', \{ expenseId: tx\.id \}\)/);
   assert.match(homeSource, /onClick=\{onView\}/);

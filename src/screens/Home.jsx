@@ -27,13 +27,15 @@ export default function Home({ data, onAction }) {
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [mineOnly, setMineOnly] = useState(false);
   const isNeg = d.totalBalance < 0;
   const normalizedFilter = filterText.trim().toLowerCase();
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
     const statusMatches = statusFilter === 'all' || transactionStatus(tx) === statusFilter;
     const categoryMatches = categoryFilter === 'all' || transactionCategoryGroup(tx) === categoryFilter;
-    return titleMatches && statusMatches && categoryMatches;
+    const mineMatches = !mineOnly || transactionBelongsToCurrentUser(tx, d.currentUserId);
+    return titleMatches && statusMatches && categoryMatches && mineMatches;
   });
 
   return (
@@ -137,6 +139,23 @@ export default function Home({ data, onAction }) {
           paddingBottom: 8,
           marginBottom: 8,
         }}>
+          <button
+            type="button"
+            onClick={() => setMineOnly(value => !value)}
+            style={{
+              flex: '0 0 auto',
+              padding: '7px 11px',
+              borderRadius: 100,
+              border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
+              background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
+              color: mineOnly ? '#6ee7b7' : colors.textSecondary,
+              fontSize: 11,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >Của tôi</button>
           {STATUS_FILTERS.map(filter => {
             const active = statusFilter === filter.key;
             return (
@@ -298,6 +317,17 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function transactionBelongsToCurrentUser(tx, currentUserId) {
+  if (tx?.isMine === true) return true;
+
+  const memberId = tx.currentMemberId || currentUserId;
+  if (!memberId) return false;
+  if (String(tx?.paidBy || '') === String(memberId)) return true;
+
+  return safeArray(tx?.participants).some(id => String(id) === String(memberId))
+    || safeArray(tx?.splits).some(split => String(split.memberId || split.member_id) === String(memberId));
+}
+
 function ActivityRow({ tx, last, onView }) {
   return (
     <div
@@ -405,9 +435,65 @@ const DEMO = {
     },
   ],
   transactions: [
-    { id: 1, icon: '🏸', category: 'water',      title: 'Tiền nước Buổi #8', subtitle: 'CLB Pickleball', dateLabel: 'Hôm qua', amount: -40000, status: 'pending' },
-    { id: 2, icon: '☕', category: 'groups',     title: 'Cafe sau buổi',      subtitle: 'Nhóm CLB',         dateLabel: '17/05',   amount: -55000, status: 'approved' },
-    { id: 3, icon: '🍜', category: 'food',       title: 'Bún bò trưa T7',     subtitle: 'Minh trả',         dateLabel: '16/05',   amount: -45000, status: 'declined' },
-    { id: 4, icon: '💸', category: 'payment',    title: 'Thanh toán → Hoa',   subtitle: 'VietQR',           dateLabel: '14/05',   amount: 120000, status: 'approved' },
+    {
+      id: 1,
+      icon: '🏸',
+      category: 'water',
+      title: 'Tiền nước Buổi #8',
+      subtitle: 'CLB Pickleball',
+      dateLabel: 'Hôm qua',
+      amount: -40000,
+      status: 'pending',
+      paidBy: 'hoa',
+      participants: ['long', 'hoa', 'minh'],
+      splits: [{ memberId: 'long', amount: 40000 }],
+      currentMemberId: 'long',
+      isMine: true,
+    },
+    {
+      id: 2,
+      icon: '☕',
+      category: 'groups',
+      title: 'Cafe sau buổi',
+      subtitle: 'Nhóm CLB',
+      dateLabel: '17/05',
+      amount: 165000,
+      status: 'approved',
+      paidBy: 'long',
+      participants: ['long', 'hoa', 'minh', 'an'],
+      splits: [{ memberId: 'long', amount: 55000 }],
+      currentMemberId: 'long',
+      isMine: true,
+    },
+    {
+      id: 3,
+      icon: '🍜',
+      category: 'food',
+      title: 'Bún bò trưa T7',
+      subtitle: 'Minh trả',
+      dateLabel: '16/05',
+      amount: 0,
+      status: 'declined',
+      paidBy: 'minh',
+      participants: ['hoa', 'minh'],
+      splits: [{ memberId: 'hoa', amount: 45000 }],
+      currentMemberId: 'long',
+      isMine: false,
+    },
+    {
+      id: 4,
+      icon: '💸',
+      category: 'payment',
+      title: 'Thanh toán → Hoa',
+      subtitle: 'VietQR',
+      dateLabel: '14/05',
+      amount: 120000,
+      status: 'approved',
+      paidBy: 'hoa',
+      participants: ['long', 'hoa'],
+      splits: [{ memberId: 'long', amount: 120000 }],
+      currentMemberId: 'long',
+      isMine: true,
+    },
   ],
 };
