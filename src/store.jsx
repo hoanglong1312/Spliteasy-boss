@@ -3,6 +3,7 @@ import { createSupabase } from './lib/supabase.js'
 import { getStoredAuth, storeAuth, clearAuth, joinGroup } from './lib/auth.js'
 
 const AppContext = createContext(null)
+const TOAST_HIDE_DELAY_MS = 3000
 
 export function genId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
@@ -133,6 +134,7 @@ function buildEmptyState() {
     homeMonthExpenses: [],
     homeMonthError: null,
     _allPickle: null,
+    toast: { visible: false, message: '' },
     _loading: false,
     _error: null,
   }
@@ -538,6 +540,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     },
     notifications: [],
     disputeCount: disputeCount || 0,
+    toast: { visible: false, message: '' },
     _loading: false,
     _error: null,
   }
@@ -567,9 +570,14 @@ export function AppProvider({ children, onToast }) {
   const tokenRef = useRef(storedToken)
   const channelRef  = useRef(null)
   const debounceRef = useRef(null)
+  const toastTimerRef = useRef(null)
   const stateRef    = useRef(state)
 
   useEffect(() => { stateRef.current = state })
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+  }, [])
 
   const refresh = useCallback(async (tok) => {
     const t = tok ?? tokenRef.current
@@ -580,7 +588,12 @@ export function AppProvider({ children, onToast }) {
       const raw = await fetchGroupData(t)
       const next = normalize(raw, member?.id, member?.groupId || member?.group_id, member?.name)
       if (next) {
-        setState(next)
+        const nextState = {
+          ...next,
+          toast: stateRef.current.toast || buildEmptyState().toast,
+        }
+        stateRef.current = nextState
+        setState(nextState)
       } else {
         // groups empty — RLS / token issue, keep session, show error
         setState(s => ({ ...s, _loading: false, _error: 'Không tải được dữ liệu nhóm. Kiểm tra kết nối.' }))
@@ -673,6 +686,36 @@ export function AppProvider({ children, onToast }) {
 
     switch (action.type) {
 
+      case 'SHOW_TOAST': {
+        const message = String(action.message || '').trim()
+        if (!message) return null
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+        const next = {
+          ...stateRef.current,
+          toast: { visible: true, message },
+        }
+        stateRef.current = next
+        setState(next)
+        toastTimerRef.current = setTimeout(() => {
+          toastTimerRef.current = null
+          dispatch({ type: 'HIDE_TOAST' })
+        }, TOAST_HIDE_DELAY_MS)
+        return next.toast
+      }
+
+      case 'HIDE_TOAST': {
+        const next = {
+          ...stateRef.current,
+          toast: {
+            visible: false,
+            message: stateRef.current.toast?.message || '',
+          },
+        }
+        stateRef.current = next
+        setState(next)
+        return next.toast
+      }
+
       case 'FETCH_HOME_MONTH_SUCCESS': {
         const next = {
           ...stateRef.current,
@@ -751,6 +794,10 @@ export function AppProvider({ children, onToast }) {
       }
 
       case 'LOGOUT': {
+        if (toastTimerRef.current) {
+          clearTimeout(toastTimerRef.current)
+          toastTimerRef.current = null
+        }
         clearAuth()
         tokenRef.current = null
         setState(buildEmptyState())
