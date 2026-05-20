@@ -15,7 +15,7 @@ Nhóm 6–15 người chơi pickleball định kỳ cần chia tiền sân, ti�
 
 ```
 Frontend: React + Vite (đã migrate từ CDN Babel)
-Styles:   vb-tokens.css
+Styles:   src/tokens.js (design tokens — màu, typography)
 State:    Supabase (đã migrate từ localStorage)
 Backend:  Supabase — PostgreSQL + RLS + Realtime
 ```
@@ -53,12 +53,12 @@ Phase 0: Phân tích & Thiết kế    ✅ XONG
 Phase 1: UI/UX Design            ✅ XONG
 Phase 3: Thực thi Database       ✅ XONG
 Phase 4: Frontend Migration      ✅ XONG
-Phase 5: Tính năng mới           ✅ XONG
+Phase 5: Tính năng mới           🔄 UI hoàn chỉnh, đang QA thực tế
   B1 — Realtime sync + Toast
-  A1 — Tab Hồ sơ
-  A2 — Tab Nhóm nâng cao
+  A1 — Tab Hồ sơ (color picker, logout)
+  A2 — Tab Nhóm nâng cao (filter)
   A3 — Vé lẻ Pickleball
   A4 — Personal Dashboard
-  B3 — Export báo cáo
+  B3 — Export báo cáo (CSV)
   B2 — Push notifications
 ```

@@ -9,8 +9,8 @@
 | Orchestration + QA | Claude main | Quyết định kiến trúc, review output, quality gate |
 
 **Lưu ý:**
-- `subagent-driven-development` của Claude main KHÔNG dùng → Codex thay thế hoàn toàn
-- Fallback nếu Codex lỗi: dùng Claude subagent-driven-development, ghi chú lý do
+- `subagent-driven-development` của Claude main **không dùng trong luồng thường** — Codex thay thế vai trò implementer
+- **Emergency fallback** (Codex lỗi/không khả dụng): Claude main được dùng Edit/Write trực tiếp, nhưng phải ghi chú lý do trong commit message
 
 ## Luồng làm việc
 
@@ -37,6 +37,18 @@ approval-policy: "never"
 ```
 
 Prompt phải có: Goal + Danh sách file + Constraints + Lệnh git commit
+
+## Superpowers Skills — Cái nào còn dùng
+
+| Skill | Áp dụng |
+|-------|---------|
+| `brainstorming` | ✅ Claude main dùng trước mọi feature mới |
+| `writing-plans` | ✅ Claude main dùng sau brainstorm |
+| `systematic-debugging` | ✅ Claude main dùng để phân tích bug |
+| `verification-before-completion` | ✅ Claude main dùng trước khi báo xong |
+| `test-driven-development` | ❌ Codex tự handle — không invoke trong main session |
+| `subagent-driven-development` | ❌ Codex thay thế — không invoke trong main session |
+| `requesting-code-review` | ❌ Thay bằng Quality Gate trong `rules/testing.md` |
 
 ## Token Discipline — Claude Main Session
 
