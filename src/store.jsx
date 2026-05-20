@@ -286,6 +286,7 @@ function memberInsertRow(groupId, member, role) {
     initials: member?.initials || parts.initials,
     color: member?.color || '#574EFA',
     role,
+    member_type: member?.memberType || member?.member_type || member?.type || 'fixed',
   }
 }
 
@@ -489,7 +490,12 @@ function pickleForGroup(allPickle, members, groupId) {
     || configs.find(c => !(c.groupId ?? c.group_id))
     || {}
   const fixedMembers = safeArray(members)
-    .filter(m => (m.groupId ?? m.group_id) === groupId && m.isActive !== false && m.is_active !== false)
+    .filter(m => (
+      (m.groupId ?? m.group_id) === groupId &&
+      m.isActive !== false &&
+      m.is_active !== false &&
+      String(m.memberType || m.member_type || 'fixed').toLowerCase() !== 'casual'
+    ))
     .map(m => m.id)
 
   return {
@@ -657,6 +663,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     initials: m.initials || String(m.name || '').trim().slice(0, 2).toUpperCase(),
     color: m.color || '#574EFA',
     role: m.role,
+    memberType: m.member_type || 'fixed',
+    member_type: m.member_type || 'fixed',
     isMe: m.id === currentMemberId,
     isActive: m.is_active !== false,
     is_active: m.is_active !== false,

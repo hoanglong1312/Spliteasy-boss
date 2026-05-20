@@ -26,23 +26,16 @@ test('PickleballSettings saves current-month participation through monthly confi
   assert.match(appSource, /SAVE_PICKLEBALL_MONTHLY_CONFIG/);
 });
 
-test('PickleballSettings add-member action uses an inline controlled form', () => {
-  assert.match(settingsSource, /showAddMemberForm/);
-  assert.match(settingsSource, /newMemberName/);
-  assert.match(settingsSource, /value=\{newMemberName\}/);
-  assert.match(settingsSource, /onChange=\{e => setNewMemberName\(e\.target\.value\)\}/);
-  assert.match(settingsSource, /onAction\?\.\('addMember', \{ name: trimmedName \}\)/);
-  assert.match(appSource, /dispatch\(\{\s*type: 'ADD_MEMBER'/);
-  assert.doesNotMatch(appSource, /coming soon/);
-});
-
-test('PickleballSettings treasurer can deactivate members from the row', () => {
+test('PickleballSettings no longer owns add/delete member management', () => {
   assert.match(dataSource, /currentRole/);
   assert.match(settingsSource, /d\.currentRole === 'treasurer'/);
-  assert.match(settingsSource, /onAction\?\.\('deleteMember'/);
-  assert.match(settingsSource, /window\.confirm\(`Xác nhận xóa thành viên \$\{m\.name\}\? Thao tác này sẽ vô hiệu hóa tài khoản của họ\.`\)/);
+  assert.doesNotMatch(settingsSource, /showAddMemberForm/);
+  assert.doesNotMatch(settingsSource, /newMemberName/);
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('addMember'/);
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('deleteMember'/);
+  assert.doesNotMatch(settingsSource, /Xác nhận xóa thành viên/);
+  assert.match(appSource, /type === 'addMember'/);
   assert.match(appSource, /type === 'deleteMember'/);
   assert.match(appSource, /\.from\('members'\)/);
   assert.match(appSource, /is_active: false/);
-  assert.match(appSource, /left_at: new Date\(\)\.toISOString\(\)/);
 });

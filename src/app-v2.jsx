@@ -12,6 +12,7 @@ import AddExpense from './screens/AddExpense'
 import PickleballOverview from './screens/PickleballOverview'
 import PickleballCalendar from './screens/PickleballCalendar'
 import PickleballMembers from './screens/PickleballMembers'
+import MemberDetail from './screens/MemberDetail'
 import PickleballTickets from './screens/PickleballTickets'
 import PickleballSettings from './screens/PickleballSettings'
 import BatchEntry from './screens/BatchEntry'
@@ -44,6 +45,7 @@ export default function AppV2() {
     getSessionDetailData,
     getPickleballCalendarData,
     getPickleballMembersData,
+    getMemberDetailData,
     getPickleballTicketsData,
     getPickleballSettingsData,
     getBatchEntryData,
@@ -226,8 +228,50 @@ export default function AppV2() {
       if (!name) return null
       return dispatch({
         type: 'ADD_MEMBER',
-        member: { name },
+        member: { name, member_type: payload?.type || payload?.memberType || 'fixed' },
       })
+    }
+
+    if (type === 'editMember') {
+      const memberId = payload?.memberId
+      if (!memberId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('members')
+        .update({ name: payload?.name, bank_account: payload?.bankAccount })
+        .eq('id', memberId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'setMemberRole') {
+      const memberId = payload?.memberId
+      if (!memberId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('members')
+        .update({ role: payload?.role })
+        .eq('id', memberId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'setMemberType') {
+      const memberId = payload?.memberId
+      if (!memberId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('members')
+        .update({ member_type: payload?.type })
+        .eq('id', memberId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
     }
 
     if (type === 'deleteMember') {
@@ -237,7 +281,7 @@ export default function AppV2() {
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ is_active: false, left_at: new Date().toISOString() })
+        .update({ is_active: false })
         .eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
@@ -529,6 +573,7 @@ export default function AppV2() {
       join:             'join-group',
       expenseDetail:    'expense-detail',
       sessionDetail:    'session-detail',
+      memberDetail:     'member-detail',
       accountSettings:  'settings',
     }
 
@@ -653,6 +698,7 @@ export default function AppV2() {
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isTreasurer} onAction={handle} />
+      case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />

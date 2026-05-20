@@ -55,6 +55,7 @@ export function useScreenData() {
       getSessionDetailData: (sessionId) => buildSessionDetailData(state, pickle, sessionId, currentUserId, members),
       getPickleballCalendarData: () => buildPickleballCalendarData(state),
       getPickleballMembersData: () => buildPickleballMembersData(state),
+      getMemberDetailData: (memberId) => buildMemberDetailData(state, memberId),
       getPickleballTicketsData: () => buildPickleballTicketsData(state),
       getPickleballSettingsData: () => buildPickleballSettingsData(state),
       getBatchEntryData: () => buildBatchEntryData(state),
@@ -298,7 +299,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const monthlyActiveMemberIds = safeArray(currentMonthConfig?.activeMemberIds)
   const activeMemberIds = monthlyActiveMemberIds.length > 0 ? monthlyActiveMemberIds : safeArray(pickle?.fixedMembers)
   const ticketAmount = ticketBalanceForMember(safeArray(pickle?.externalTickets || _allPickle?.externalTickets), currentUserId)
-  const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount)
+  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
+  const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
 
   return {
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
@@ -317,7 +319,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       waterSub: `${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi đã ghi`,
     },
     yourBalance: {
-      total: summary?.memberOwes?.[currentUserId] || 0,
+      total: -(memberBalance.totalOwed + Math.abs(ticketAmount)),
       breakdown,
     },
     shouldAutoGenerate,
@@ -456,17 +458,12 @@ function buildPickleballCalendarData(state) {
 
 function buildPickleballMembersData(state) {
   const today = new Date()
-  const members = currentGroupMembers(state)
-  const pickle = state?.pickle || {}
-  const fixedSet = new Set(safeArray(pickle?.fixedMembers).map(String))
-  const fixedMembers = fixedSet.size > 0
-    ? members.filter(member => fixedSet.has(String(member.id)))
-    : members
+  const activeMembers = currentGroupMembers(state).filter(isActiveMember)
   const sessions = getStateMonthSessions(state, today)
-  const summary = pickleSummary(pickle || {})
   const joinRequests = currentJoinRequests(state)
-  const guests = buildGuestRows(sessions)
   const totalSessions = sessions.length || 1
+  const fixedMembers = activeMembers.filter(member => memberType(member) === 'fixed')
+  const casualMembers = activeMembers.filter(member => memberType(member) === 'casual')
   const joinRequestRows = joinRequests.map(request => {
     const created = parseDate(request.createdAt || request.created_at)
     return {
@@ -477,33 +474,67 @@ function buildPickleballMembersData(state) {
     }
   })
 
-  const rows = fixedMembers.map(member => ({
-    id: member.id,
-    initial: initials(member),
-    initials: initials(member),
-    name: member.displayName || member.name || 'Thành viên',
-    sessionsAttended: sessions.filter(session => sessionMemberIds(session).some(id => String(id) === String(member.id))).length,
-    sessionsTotal: sessions.length,
-    joinedLabel: monthYearLabel(member.createdAt || member.created_at),
-    isTreasurer: member.role === 'treasurer',
-    balance: summary?.memberOwes?.[member.id] || 0,
-  }))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions))
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
+    monthLabel: formatMonthLabel(today),
     stats: {
-      active: rows.length,
-      permanent: rows.length,
-      guests: guests.length,
+      active: activeMembers.length,
+      permanent: fixedRows.length,
+      fixed: fixedRows.length,
+      guests: casualRows.length,
+      casual: casualRows.length,
+      total: activeMembers.length,
       pendingJoin: joinRequests.length,
       pending: joinRequests.length,
     },
     joinRequests: joinRequestRows,
-    members: rows.map(row => ({
-      ...row,
-      sessionsTotal: row.sessionsTotal || totalSessions,
-    })),
-    guests,
+    members: fixedRows,
+    guests: casualRows,
+    fixedMembers: fixedRows,
+    casualMembers: casualRows,
+    legacyGuests: buildGuestRows(sessions),
+  }
+}
+
+function buildMemberDetailData(state, memberId) {
+  const pickle = state?.pickle || {}
+  const sessions = getStateMonthSessions(state, new Date())
+  const members = currentGroupMembers(state).filter(isActiveMember)
+  const member = members.find(row => String(row.id) === String(memberId)) || members[0]
+  if (!member) return null
+
+  const attendance = buildMemberAttendance(sessions, member.id)
+  const balance = buildMemberMonthBalance(state, pickle, sessions, member.id)
+
+  return {
+    clubName: currentGroupName(state, 'CLB Pickleball'),
+    monthLabel: formatMonthLabel(new Date()),
+    id: member.id,
+    name: member.displayName || member.name || 'Thành viên',
+    initial: initials(member),
+    initials: initials(member),
+    color: member.color,
+    role: member.role || 'member',
+    type: memberType(member),
+    typeLabel: memberType(member) === 'fixed' ? 'Cố định' : 'Vãng lai',
+    isTreasurer: member.role === 'treasurer',
+    joinDate: fullExpenseDate(member.createdAt || member.created_at),
+    joinedLabel: monthYearLabel(member.createdAt || member.created_at),
+    bankAccount: member?.bankAccount || member?.bank_account || '',
+    attendance,
+    balance,
+    rank: calculateMemberRank(attendance.percentage),
+    member: {
+      id: member.id,
+      name: member.displayName || member.name || 'Thành viên',
+      role: member.role || 'member',
+      type: memberType(member),
+      joinDate: fullExpenseDate(member.createdAt || member.created_at),
+      bankAccount: member?.bankAccount || member?.bank_account || '',
+    },
   }
 }
 
@@ -937,20 +968,157 @@ function toActivity(expense, members) {
   }
 }
 
-function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount) {
-  const fixedMembers = safeArray(pickle?.fixedMembers)
-  const courtNet = Math.max((summary?.courtPerMember || 0) - (summary?.guestCreditPer || 0), 0)
-  const waterShare = monthSessions.reduce((sum, session) => {
-    if (!sessionMemberIds(session).includes(currentUserId)) return sum
-    const splitCount = sessionMemberIds(session).length + sessionGuests(session).length
-    return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
-  }, 0)
+function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, balance) {
+  const monthBalance = balance || {
+    courtFee: Math.max((summary?.courtPerMember || 0) - (summary?.guestCreditPer || 0), 0),
+    waterFee: 0,
+    extras: 0,
+  }
 
   return [
-    { label: '🏸 Tiền sân', amount: fixedMembers.includes(currentUserId) ? courtNet : 0 },
-    { label: `💧 Tiền nước (${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi)`, amount: waterShare },
+    { label: '🏸 Tiền sân', amount: monthBalance.courtFee },
+    { label: `💧 Tiền nước (${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi)`, amount: monthBalance.waterFee },
+    { label: '📦 Phụ phát sinh', amount: monthBalance.extras },
     { label: '🎟️ Vé lẻ chưa trả', amount: Math.abs(ticketAmount) },
   ]
+}
+
+function toPickleballMemberRow(member, sessions, totalSessions) {
+  const sessionsAttended = attendanceByMemberId(sessions, member.id)
+  const sessionsTotal = totalSessions || sessions.length
+  const progressPct = sessionsTotal > 0 ? Math.round((sessionsAttended / sessionsTotal) * 100) : 0
+  const rank = calculateMemberRank(progressPct)
+
+  return {
+    id: member.id,
+    initial: initials(member),
+    initials: initials(member),
+    name: member.displayName || member.name || 'Thành viên',
+    role: member.role || 'member',
+    type: memberType(member),
+    sessionsAttended,
+    sessionsTotal,
+    progressPct,
+    rank: calculateMemberRank(progressPct),
+    rankIcon: rank.icon,
+    rankLabel: rank.label,
+    joinedLabel: monthYearLabel(member.createdAt || member.created_at),
+    isTreasurer: member.role === 'treasurer',
+    bankAccount: member.bankAccount || member.bank_account || '',
+    color: member.color,
+  }
+}
+
+function buildMemberAttendance(sessions, memberId) {
+  const total = sessions.length
+  const attended = attendanceByMemberId(sessions, memberId)
+  const missed = Math.max(total - attended, 0)
+  const percentage = total > 0 ? Math.round((attended / total) * 100) : 0
+
+  return {
+    attended,
+    missed,
+    total,
+    totalSessions: total,
+    sessionsAttended: attended,
+    sessionsMissed: missed,
+    percentage,
+    progressPct: percentage,
+  }
+}
+
+function calculateMemberRank(progressPct) {
+  if (progressPct >= 85) return { icon: '🔥', label: 'Siêu chăm', tone: 'success' }
+  if (progressPct >= 65) return { icon: '⚡', label: 'Chăm chỉ', tone: 'success' }
+  if (progressPct >= 45) return { icon: '😐', label: 'Bình thường', tone: 'warn' }
+  return { icon: '🥶', label: 'Hay vắng', tone: 'danger' }
+}
+
+function buildMemberMonthBalance(state, pickle, sessions, memberId) {
+  const members = currentGroupMembers(state).filter(isActiveMember)
+  const fixedMembers = members.filter(member => memberType(member) === 'fixed')
+  const casualMembers = members.filter(member => memberType(member) === 'casual')
+  const fixedMemberCount = Math.max(fixedMembers.length, 1)
+  const currentYearMonth = monthKey(new Date())
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
+  const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? pickle?.monthlyCourtFee ?? pickle?.monthly_court_fee ?? 0)
+  const configuredSessionCount = Number(monthlyConfig?.sessionsCount ?? monthlyConfig?.sessions_count ?? 0)
+  const sessionsCount = Math.max(sessions.length || configuredSessionCount, 1)
+  const ratePerSession = courtFeeTotal / sessionsCount / fixedMemberCount
+  const casualCharges = casualMembers.map(member => {
+    const vanglaiCharge = ratePerSession * attendanceByMemberId(sessions, member.id)
+    return {
+      memberId: member.id,
+      amount: Math.round(vanglaiCharge),
+    }
+  })
+  const rebatePerFixed = fixedMemberCount > 0 ? casualCharges.reduce((sum, row) => sum + row.amount, 0) / fixedMemberCount : 0
+  const member = members.find(row => String(row.id) === String(memberId))
+  const courtFeeShare = courtFeeTotal / fixedMemberCount
+  const fixedNetCost = Math.max(courtFeeShare - rebatePerFixed, 0)
+  const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
+  const courtFee = memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost)
+  const waterFee = memberWaterShare(sessions, memberId)
+  const extras = memberExtrasShare(sessions, memberId)
+  const totalOwed = Math.max(Math.round(courtFee + waterFee + extras), 0)
+
+  return {
+    courtFee,
+    waterFee,
+    extras,
+    totalOwed,
+    total: totalOwed,
+    ratePerSession: Math.round(ratePerSession),
+    rebatePerFixed: Math.round(rebatePerFixed),
+  }
+}
+
+function memberWaterShare(sessions, memberId) {
+  return safeArray(sessions).reduce((sum, session) => {
+    const presentIds = sessionMemberIds(session)
+    if (!presentIds.some(id => String(id) === String(memberId))) return sum
+    const splitCount = presentIds.length + sessionGuests(session).length
+    return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
+  }, 0)
+}
+
+function memberExtrasShare(sessions, memberId) {
+  return safeArray(sessions).reduce((sum, session) => {
+    const presentIds = sessionMemberIds(session)
+    return sum + safeArray(session?.expenses)
+      .filter(expense => !isWaterExpense(expense) && !isCourtExpense(expense))
+      .reduce((expenseSum, expense) => {
+        const participantIds = safeArray(expense.participants).length > 0
+          ? safeArray(expense.participants)
+          : presentIds
+        const applies = participantIds.some(id => String(id) === String(memberId))
+        if (!applies || participantIds.length === 0) return expenseSum
+        return expenseSum + Math.round((Number(expense.amount) || 0) / participantIds.length)
+      }, 0)
+  }, 0)
+}
+
+function attendanceByMemberId(sessions, memberId) {
+  return safeArray(sessions).filter(session => (
+    sessionMemberIds(session).some(id => String(id) === String(memberId))
+  )).length
+}
+
+function isWaterExpense(expense) {
+  return /nước|water/i.test(`${expense?.title || ''} ${expense?.cat || ''} ${expense?.category || ''}`)
+}
+
+function isCourtExpense(expense) {
+  return /sân|court/i.test(`${expense?.title || ''} ${expense?.cat || ''} ${expense?.category || ''}`)
+}
+
+function memberType(member) {
+  const raw = String(member?.memberType || member?.member_type || '').toLowerCase()
+  return ['casual', 'guest', 'vanglai', 'vãng lai'].includes(raw) ? 'casual' : 'fixed'
+}
+
+function isActiveMember(member) {
+  return member?.isActive !== false && member?.is_active !== false
 }
 
 function currentGroup(state) {

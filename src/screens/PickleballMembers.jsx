@@ -1,28 +1,115 @@
 // Spliteasy Boss — Pickleball · Thành viên
-// Props: data { clubName, stats, joinRequests[], members[], guests[] }, isTreasurer
 
-import React from 'react';
-import { colors, type } from '../tokens';
+import React, { useMemo, useState } from 'react';
+import { colors, type, radius } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, Card, Badge, SubTabs, Avatar, SectionLabel, Stat,
+  PhoneFrame, Screen, TabBar, Card, Badge, SubTabs, Avatar, Stat, Button, Input,
 } from '../primitives';
 
 export default function PickleballMembers({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
+  const [search, setSearch] = useState('');
+  const [expandedFixed, setExpandedFixed] = useState(false);
+  const [expandedCasual, setExpandedCasual] = useState(false);
+  const [quickActionMember, setQuickActionMember] = useState(null);
+  const [editingMember, setEditingMember] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editBankAccount, setEditBankAccount] = useState('');
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberType, setNewMemberType] = useState('fixed');
+
+  const fixedMembers = d.fixedMembers || d.members || [];
+  const casualMembers = d.casualMembers || d.guests || [];
+  const query = search.trim().toLowerCase();
+  const filteredFixed = useMemo(() => filterMembers(fixedMembers, query), [fixedMembers, query]);
+  const filteredCasual = useMemo(() => filterMembers(casualMembers, query), [casualMembers, query]);
+
+  function openEdit(member) {
+    setQuickActionMember(null);
+    setEditingMember(member);
+    setEditName(member.name || '');
+    setEditBankAccount(member.bankAccount || '');
+  }
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    const name = editName.trim();
+    if (!editingMember || !name) return;
+    await onAction?.('editMember', {
+      memberId: editingMember.id,
+      name,
+      bankAccount: editBankAccount.trim(),
+    });
+    setEditingMember(null);
+  }
+
+  async function saveNewMember(e) {
+    e.preventDefault();
+    const name = newMemberName.trim();
+    if (!name) return;
+    await onAction?.('addMember', { name, type: newMemberType });
+    setNewMemberName('');
+    setNewMemberType('fixed');
+    setShowAddMember(false);
+  }
+
+  async function changeType(member) {
+    const type = member.type === 'casual' ? 'fixed' : 'casual';
+    setQuickActionMember(null);
+    await onAction?.('setMemberType', { memberId: member.id, type });
+  }
+
+  async function deleteMember(member) {
+    setQuickActionMember(null);
+    if (!window.confirm(`Xóa ${member.name} khỏi nhóm?`)) return;
+    await onAction?.('deleteMember', { memberId: member.id });
+  }
 
   return (
     <PhoneFrame>
-      <Screen>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0 16px' }}>
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#6ee7b7', textTransform: 'uppercase' }}>
-              CLB PICKLEBALL · {d.clubName}
+      <Screen style={{ background: colors.pageBg }}>
+        <div style={{
+          background: colors.heroEmerald,
+          border: `1px solid rgba(52,211,153,0.35)`,
+          borderRadius: radius.hero,
+          padding: 18,
+          marginTop: 8,
+          position: 'relative',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: -44,
+            right: -48,
+            width: 170,
+            height: 170,
+            background: 'radial-gradient(circle, rgba(52,211,153,0.28) 0%, transparent 70%)',
+            pointerEvents: 'none',
+          }} />
+          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ ...type.label, color: colors.pickleball }}>CLB PICKLEBALL · {d.clubName}</div>
+              <h1 style={{ ...type.title, margin: '4px 0 0' }}>Thành viên</h1>
+              <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>
+                {d.monthLabel}
+              </div>
             </div>
-            <h1 style={{ ...type.title, marginTop: 2 }}>Thành viên</h1>
+            {isTreasurer && (
+              <button type="button" onClick={() => setShowAddMember(true)} style={{
+                border: 'none',
+                borderRadius: 12,
+                background: colors.textPrimary,
+                color: '#064e3b',
+                padding: '10px 12px',
+                fontSize: 12,
+                fontWeight: 800,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                flexShrink: 0,
+              }}>+ Thêm</button>
+            )}
           </div>
-          {isTreasurer && (
-            <IconButton style={{ background: colors.brandGradient, borderColor: 'transparent', color: 'white', fontWeight: 700, fontSize: 20 }} onClick={() => onAction?.('add')}>+</IconButton>
-          )}
         </div>
 
         <SubTabs
@@ -32,154 +119,339 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
             { key: 'members',   label: 'Thành viên' },
             { key: 'tickets',   label: 'Vé lẻ' },
           ]}
-          active="members" onChange={(k) => onAction?.('subTab', k)}
+          active="members"
+          onChange={(key) => onAction?.('subTab', key)}
         />
 
-        {/* Stats strip */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 14 }}>
-          <Stat value={d.stats.permanent} label="Cố định" />
-          <Stat value={d.stats.guests}    label="Khách" color={colors.warning} />
-          <Stat value={d.stats.pending}   label="Chờ duyệt" color={colors.brandLight} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+          <Stat value={d.stats?.permanent || fixedMembers.length} label="Cố định" accent="pickleball" />
+          <Stat value={d.stats?.casual || casualMembers.length} label="Vãng lai" color={colors.warning} />
+          <Stat value={d.stats?.total || fixedMembers.length + casualMembers.length} label="Tổng" color={colors.textPrimary} />
         </div>
 
-        {/* Join requests — treasurer only */}
-        {isTreasurer && d.joinRequests.length > 0 && (
-          <Card accent="finance" style={{ marginBottom: 14, padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: '#c7d2fe', textTransform: 'uppercase' }}>
-                ⏳ Yêu cầu tham gia
-              </div>
-              <Badge tone="brand">{d.joinRequests.length}</Badge>
-            </div>
-            {d.joinRequests.map(r => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                <Avatar initial={r.initial} size={36} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{r.name}</div>
-                  <div style={{ fontSize: 10, color: colors.textSecondary }}>Gửi {r.sentLabel}</div>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button style={requestBtn('success')} onClick={() => onAction?.('approve', r.id)}>✓</button>
-                  <button style={requestBtn('danger')}  onClick={() => onAction?.('decline', r.id)}>✕</button>
-                </div>
-              </div>
-            ))}
-          </Card>
-        )}
+        <Input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Tìm theo tên"
+          style={{ marginBottom: 14 }}
+          inputStyle={{ fontSize: 13, padding: '12px 14px' }}
+        />
 
-        <SectionLabel>Thành viên cố định</SectionLabel>
-        <Card style={{ padding: '6px 12px' }}>
-          {d.members.map((m, i) => (
-            <MemberRow key={m.id} m={m} last={i === d.members.length - 1} />
-          ))}
-        </Card>
+        <MemberSection
+          title={`Cố định · ${filteredFixed.length} người`}
+          members={filteredFixed}
+          expanded={expandedFixed}
+          onExpand={() => setExpandedFixed(true)}
+          isTreasurer={isTreasurer}
+          onMore={setQuickActionMember}
+          onAction={onAction}
+        />
 
-        <SectionLabel action="đã chơi gần đây">Khách vãng lai</SectionLabel>
-        <Card style={{ padding: '6px 12px' }}>
-          {d.guests.map((g, i) => (
-            <GuestRow key={g.id} g={g} last={i === d.guests.length - 1} onPromote={isTreasurer ? () => onAction?.('promote', g.id) : undefined} />
-          ))}
-        </Card>
+        <MemberSection
+          title={`Vãng lai · ${filteredCasual.length} người`}
+          members={filteredCasual}
+          expanded={expandedCasual}
+          onExpand={() => setExpandedCasual(true)}
+          isTreasurer={isTreasurer}
+          onMore={setQuickActionMember}
+          onAction={onAction}
+        />
       </Screen>
 
-      <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
+      {quickActionMember && isTreasurer && (
+        <QuickActionSheet
+          member={quickActionMember}
+          onClose={() => setQuickActionMember(null)}
+          onEdit={() => openEdit(quickActionMember)}
+          onChangeType={() => changeType(quickActionMember)}
+          onDelete={() => deleteMember(quickActionMember)}
+        />
+      )}
+
+      {showAddMember && isTreasurer && (
+        <BottomSheet title="Thêm thành viên" onClose={() => setShowAddMember(false)}>
+          <form onSubmit={saveNewMember}>
+            <Input
+              label="Tên"
+              value={newMemberName}
+              onChange={e => setNewMemberName(e.target.value)}
+              placeholder="Tên thành viên"
+              autoFocus
+            />
+            <TypeSwitch value={newMemberType} onChange={setNewMemberType} />
+            <Button block variant="success" style={{ marginTop: 14 }} type="submit">Lưu thành viên</Button>
+          </form>
+        </BottomSheet>
+      )}
+
+      {editingMember && isTreasurer && (
+        <BottomSheet title="Sửa thông tin" onClose={() => setEditingMember(null)}>
+          <form onSubmit={saveEdit}>
+            <Input
+              label="Tên"
+              value={editName}
+              onChange={e => setEditName(e.target.value)}
+              placeholder="Tên thành viên"
+              autoFocus
+            />
+            <Input
+              label="STK ngân hàng"
+              value={editBankAccount}
+              onChange={e => setEditBankAccount(e.target.value)}
+              placeholder="Chưa cập nhật"
+            />
+            <Button block variant="success" style={{ marginTop: 14 }} type="submit">Lưu thay đổi</Button>
+          </form>
+        </BottomSheet>
+      )}
+
+      <TabBar active="pickleball" onChange={(key) => onAction?.('tab', key)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
   );
 }
 
-function requestBtn(kind) {
-  const palette = {
-    success: { bg: 'rgba(52,211,153,0.15)',  color: '#6ee7b7' },
-    danger:  { bg: 'rgba(248,113,113,0.10)', color: '#fca5a5' },
-  }[kind];
-  return {
-    padding: '6px 10px', borderRadius: 8,
-    background: palette.bg, color: palette.color,
-    fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
-  };
+function filterMembers(members, query) {
+  if (!query) return members;
+  return members.filter(member => String(member.name || '').toLowerCase().includes(query));
 }
 
-function MemberRow({ m, last }) {
-  const pct = Math.round(m.sessionsAttended / m.sessionsTotal * 100);
-  const barColor = pct >= 60 ? colors.success : pct >= 40 ? colors.warning : colors.danger;
-  const textColor = pct >= 60 ? '#6ee7b7' : pct >= 40 ? '#fcd34d' : '#fca5a5';
+function MemberSection({ title, members, expanded, onExpand, isTreasurer, onMore, onAction }) {
+  const visibleMembers = expanded ? members : members.slice(0, 5);
+  const hiddenCount = Math.max(members.length - visibleMembers.length, 0);
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 4px',
-      borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.04)',
-    }}>
-      <Avatar initial={m.initial} size={36} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9', display: 'flex', alignItems: 'center' }}>
-          {m.name}
-          {m.isTreasurer && (
-            <span style={{
-              fontSize: 9, color: '#fcd34d', fontWeight: 700, marginLeft: 4,
-              background: 'rgba(251,191,36,0.12)', padding: '2px 6px', borderRadius: 6,
-              letterSpacing: '0.5px',
-            }}>👑 THỦ QUỸ</span>
-          )}
-        </div>
-        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-          {m.sessionsAttended}/{m.sessionsTotal} buổi · Tham gia {m.joinedLabel}
-        </div>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <div style={{ width: 80, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: barColor }} />
-        </div>
-        <div style={{ fontSize: 10, color: textColor, marginTop: 4, fontWeight: 700 }}>{pct}%</div>
-      </div>
+    <div style={{ marginBottom: 14 }}>
+      <div style={{
+        ...type.label,
+        color: colors.textSecondary,
+        margin: '8px 0 8px',
+      }}>{title}</div>
+      <Card style={{ padding: '4px 12px' }}>
+        {visibleMembers.length === 0 && (
+          <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 0' }}>
+            Không có thành viên
+          </div>
+        )}
+        {visibleMembers.map((member, index) => (
+          <MemberRow
+            key={member.id}
+            member={member}
+            last={index === visibleMembers.length - 1 && hiddenCount === 0}
+            isTreasurer={isTreasurer}
+            onMore={onMore}
+            onAction={onAction}
+          />
+        ))}
+        {hiddenCount > 0 && (
+          <button type="button" onClick={onExpand} style={{
+            width: '100%',
+            padding: '11px 0',
+            border: 'none',
+            borderTop: `1px solid ${colors.borderSubtle}`,
+            background: 'transparent',
+            color: colors.pickleball,
+            fontSize: 12,
+            fontWeight: 800,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}>▼ Xem thêm {hiddenCount} thành viên</button>
+        )}
+      </Card>
     </div>
   );
 }
 
-function GuestRow({ g, last, onPromote }) {
+function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
+  const pct = Number(member.progressPct) || 0;
+  const rank = member.rank || {};
+  const barColor = progressColor(pct);
+
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 4px',
-      borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.04)',
+    <button type="button" onClick={() => onAction?.('memberDetail', { memberId: member.id })} style={{
+      width: '100%',
+      display: 'grid',
+      gridTemplateColumns: '34px minmax(0, 1fr) 30px',
+      gap: 10,
+      alignItems: 'center',
+      padding: '10px 0',
+      border: 'none',
+      borderBottom: last ? 'none' : `1px solid ${colors.borderSubtle}`,
+      background: 'transparent',
+      color: colors.textPrimary,
+      fontFamily: 'inherit',
+      textAlign: 'left',
+      cursor: 'pointer',
     }}>
-      <Avatar initial={g.initial} size={36} color="linear-gradient(135deg, #fbbf24, #d97706)" />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9', display: 'flex', alignItems: 'center' }}>
-          {g.name} <Badge tone="warn" style={{ marginLeft: 4 }}>Khách</Badge>
+      <Avatar initial={member.initial} size={34} color={member.color} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+          <span style={{
+            fontSize: 13,
+            fontWeight: 800,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>{member.name}</span>
+          <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>
+          {member.isTreasurer && <Badge tone="warn" style={{ padding: '2px 6px', fontSize: 9 }}>THỦ QUỸ</Badge>}
         </div>
-        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-          {g.sessions} buổi · {g.lastSeen}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+          <div style={{
+            height: 6,
+            flex: 1,
+            borderRadius: 100,
+            overflow: 'hidden',
+            background: colors.inputBg,
+          }}>
+            <div style={{
+              width: `${Math.max(Math.min(pct, 100), 0)}%`,
+              height: '100%',
+              borderRadius: 100,
+              background: barColor,
+            }} />
+          </div>
+          <span style={{ fontSize: 10, fontWeight: 800, color: barColor, whiteSpace: 'nowrap', ...type.mono }}>
+            {pct}% · {rank.label || member.rankLabel}
+          </span>
         </div>
       </div>
-      {onPromote && (
-        <button onClick={onPromote} style={{
-          fontSize: 10, color: colors.brandLight, fontWeight: 700, letterSpacing: '0.3px',
-          textAlign: 'right', background: 'none', border: 'none', cursor: 'pointer',
-          fontFamily: 'inherit', padding: 0,
-        }}>
-          CHUYỂN<br/>CỐ ĐỊNH →
-        </button>
+      {isTreasurer ? (
+        <button type="button" aria-label={`Mở thao tác ${member.name}`} onClick={(e) => {
+          e.stopPropagation();
+          onMore(member);
+        }} style={{
+          width: 30,
+          height: 30,
+          borderRadius: 10,
+          border: `1px solid ${colors.borderSubtle}`,
+          background: colors.inputBg,
+          color: colors.textSecondary,
+          fontSize: 18,
+          lineHeight: 1,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+        }}>⋯</button>
+      ) : (
+        <span />
       )}
+    </button>
+  );
+}
+
+function QuickActionSheet({ member, onClose, onEdit, onChangeType, onDelete }) {
+  return (
+    <BottomSheet title={member.name} onClose={onClose}>
+      <ActionButton onClick={onEdit}>✏️ Sửa</ActionButton>
+      <ActionButton onClick={onChangeType}>↔️ {member.type === 'casual' ? 'Chuyển thành Cố định' : 'Chuyển sang Vãng lai'}</ActionButton>
+      <ActionButton danger onClick={onDelete}>🗑 Xoá</ActionButton>
+    </BottomSheet>
+  );
+}
+
+function TypeSwitch({ value, onChange }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 6,
+      marginTop: 12,
+      padding: 4,
+      borderRadius: 12,
+      background: colors.cardSurface,
+      border: `1px solid ${colors.borderSubtle}`,
+    }}>
+      {[
+        { key: 'fixed', label: 'Cố định' },
+        { key: 'casual', label: 'Vãng lai' },
+      ].map(item => (
+        <button key={item.key} type="button" onClick={() => onChange(item.key)} style={{
+          border: 'none',
+          borderRadius: 9,
+          padding: '9px 8px',
+          background: value === item.key ? colors.successSoft : 'transparent',
+          color: value === item.key ? colors.pickleball : colors.textSecondary,
+          fontSize: 12,
+          fontWeight: 800,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+        }}>{item.label}</button>
+      ))}
     </div>
   );
+}
+
+function ActionButton({ children, danger, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: '100%',
+      border: `1px solid ${danger ? 'rgba(248,113,113,0.24)' : colors.borderSubtle}`,
+      borderRadius: 12,
+      background: danger ? colors.dangerSoft : colors.inputBg,
+      color: danger ? colors.danger : colors.textPrimary,
+      padding: '12px 14px',
+      marginTop: 8,
+      textAlign: 'left',
+      fontSize: 13,
+      fontWeight: 800,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+    }}>{children}</button>
+  );
+}
+
+function BottomSheet({ title, children, onClose }) {
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 30,
+      background: 'rgba(0,0,0,0.50)',
+      display: 'flex',
+      alignItems: 'flex-end',
+      padding: 12,
+    }}>
+      <div style={{
+        width: '100%',
+        background: colors.shellBg,
+        border: `1px solid ${colors.borderNormal}`,
+        borderRadius: 20,
+        padding: 16,
+        boxShadow: '0 -20px 50px rgba(0,0,0,0.45)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 900 }}>{title}</div>
+          <button type="button" onClick={onClose} style={{
+            border: 'none',
+            background: 'transparent',
+            color: colors.textSecondary,
+            fontSize: 20,
+            cursor: 'pointer',
+          }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function progressColor(pct) {
+  if (pct >= 65) return colors.success;
+  if (pct >= 45) return colors.warning;
+  return colors.danger;
 }
 
 const DEMO = {
   clubName: 'Cầu Giấy',
-  stats: { permanent: 12, guests: 3, pending: 2 },
-  joinRequests: [
-    { id: 1, initial: 'P', name: 'Phương Anh', sentLabel: '2h trước' },
+  monthLabel: 'Tháng 5 · 2026',
+  stats: { permanent: 6, casual: 2, total: 8 },
+  fixedMembers: [
+    { id: 1, initial: 'L', name: 'Long', type: 'fixed', progressPct: 92, rank: { icon: '🔥', label: 'Siêu chăm' }, isTreasurer: true },
+    { id: 2, initial: 'M', name: 'Minh', type: 'fixed', progressPct: 76, rank: { icon: '⚡', label: 'Chăm chỉ' } },
+    { id: 3, initial: 'H', name: 'Hoa', type: 'fixed', progressPct: 54, rank: { icon: '😐', label: 'Bình thường' } },
+    { id: 4, initial: 'T', name: 'Tuấn', type: 'fixed', progressPct: 31, rank: { icon: '🥶', label: 'Hay vắng' } },
   ],
-  members: [
-    { id: 1, initial: 'L',  name: 'Long',  sessionsAttended: 8, sessionsTotal: 13, joinedLabel: '02/2025', isTreasurer: true },
-    { id: 2, initial: 'M',  name: 'Minh',  sessionsAttended: 11,sessionsTotal: 13, joinedLabel: '02/2025' },
-    { id: 3, initial: 'H',  name: 'Hoa',   sessionsAttended: 7, sessionsTotal: 13, joinedLabel: '03/2025' },
-    { id: 4, initial: 'T',  name: 'Tuấn',  sessionsAttended: 4, sessionsTotal: 13, joinedLabel: '04/2025' },
-    { id: 5, initial: 'N',  name: 'Nam',   sessionsAttended: 9, sessionsTotal: 13, joinedLabel: '02/2025' },
-    { id: 6, initial: 'Li', name: 'Linh',  sessionsAttended: 6, sessionsTotal: 13, joinedLabel: '03/2025' },
+  casualMembers: [
+    { id: 7, initial: 'A', name: 'An', type: 'casual', progressPct: 23, rank: { icon: '🥶', label: 'Hay vắng' } },
   ],
-  guests: [
-    { id: 'g1', initial: 'A',  name: 'An',    sessions: 2, lastSeen: 'Lần cuối hôm nay' },
-    { id: 'g2', initial: 'Kh', name: 'Khải',  sessions: 1, lastSeen: 'Lần cuối 11/05' },
-    { id: 'g3', initial: 'D',  name: 'Dũng',  sessions: 3, lastSeen: 'Tháng trước' },
-  ],
+  joinRequests: [],
 };

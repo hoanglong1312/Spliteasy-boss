@@ -38,6 +38,33 @@ test('AppV2 renders a deactivated-member error state when no groups or members l
   assert.match(appSource, />Đăng xuất<\/button>/)
 })
 
+test('AppV2 wires member detail route and member management updates', () => {
+  assert.match(appSource, /import MemberDetail from '\.\/screens\/MemberDetail'/)
+  assert.match(appSource, /getMemberDetailData/)
+  assert.match(appSource, /case 'member-detail':\s*return <MemberDetail data=\{getMemberDetailData\(route\.params\?\.memberId \?\? route\.params\)\} isTreasurer=\{isTreasurer\} onAction=\{handle\} \/>/)
+  assert.match(appSource, /memberDetail:\s*'member-detail'/)
+
+  assert.match(appSource, /if \(type === 'editMember'\)/)
+  assert.match(appSource, /name: payload\?\.name/)
+  assert.match(appSource, /bank_account: payload\?\.bankAccount/)
+  assert.match(appSource, /if \(type === 'setMemberRole'\)/)
+  assert.match(appSource, /role: payload\?\.role/)
+  assert.match(appSource, /if \(type === 'setMemberType'\)/)
+  assert.match(appSource, /member_type: payload\?\.type/)
+  assert.match(appSource, /if \(type === 'deleteMember'\)/)
+  assert.match(appSource, /is_active: false/)
+})
+
+test('Member management screens are registered in the app source', () => {
+  const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
+  assert.match(memberListSource, /const \[search, setSearch\] = useState\(''\)/)
+  assert.match(memberListSource, /Xem thêm/)
+  assert.match(memberListSource, /onAction\?\.\('memberDetail', \{ memberId: member\.id \}\)/)
+  assert.match(memberListSource, /quickAction/)
+  assert.match(memberListSource, /Cố định ·/)
+  assert.match(memberListSource, /Vãng lai ·/)
+})
+
 test('main renders AppProvider directly without the legacy toast bridge', () => {
   assert.doesNotMatch(mainSource, /ToastProvider/)
   assert.doesNotMatch(mainSource, /useToast/)

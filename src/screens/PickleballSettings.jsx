@@ -14,14 +14,11 @@ export default function PickleballSettings({ data, onAction }) {
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
   const [members, setMembers]     = useState(() => memberRowsFromData(d));
   const [activeMemberIds, setActiveMemberIds] = useState(() => monthlyActiveIdsFromData(d));
-  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
-  const [newMemberName, setNewMemberName] = useState('');
-  const [savingMember, setSavingMember] = useState(false);
 
   const perSession = Math.round(courtFee / d.sessionsCount);
   const activeMemberCount = Math.max(activeMemberIds.size || d.memberCount || members.length || 1, 1);
   const perPerson  = Math.round(perSession / activeMemberCount);
-  const canDeleteMembers = d.currentRole === 'treasurer';
+  const canManageSchedule = d.currentRole === 'treasurer';
 
   useEffect(() => {
     setWeekdays(new Set(d.weekdays));
@@ -30,40 +27,6 @@ export default function PickleballSettings({ data, onAction }) {
     setMembers(memberRowsFromData(d));
     setActiveMemberIds(monthlyActiveIdsFromData(d));
   }, [data]);
-
-  async function saveNewMember(e) {
-    e.preventDefault();
-    const trimmedName = newMemberName.trim();
-    if (!trimmedName) return;
-    setSavingMember(true);
-    try {
-      const created = await onAction?.('addMember', { name: trimmedName });
-      if (created?.id) {
-        const nextMember = {
-          id: created.id,
-          name: created.name || trimmedName,
-          initial: created.initials || created.initial || trimmedName[0].toUpperCase(),
-        };
-        setMembers(prev => [...prev, nextMember]);
-        setActiveMemberIds(prev => new Set([...prev, String(created.id)]));
-      }
-      setNewMemberName('');
-      setShowAddMemberForm(false);
-    } finally {
-      setSavingMember(false);
-    }
-  }
-
-  async function deleteMember(m) {
-    if (!window.confirm(`Xác nhận xóa thành viên ${m.name}? Thao tác này sẽ vô hiệu hóa tài khoản của họ.`)) return;
-    setMembers(prev => prev.filter(x => String(x.id) !== String(m.id)));
-    setActiveMemberIds(prev => {
-      const next = new Set(prev);
-      next.delete(String(m.id));
-      return next;
-    });
-    await onAction?.('deleteMember', { memberId: m.id });
-  }
 
   async function regenerateSessions() {
     if (!window.confirm('Tạo lại sẽ xoá các buổi chưa có dữ liệu. Tiếp tục?')) return;
@@ -159,21 +122,6 @@ export default function PickleballSettings({ data, onAction }) {
                       Tháng này · {playing ? 'Đang chơi' : 'Nghỉ'}
                     </div>
                   </div>
-                  {canDeleteMembers && (
-                    <button
-                      type="button"
-                      aria-label={`Xóa ${m.name}`}
-                      onClick={() => deleteMember(m)}
-                      style={{
-                        width: 28, height: 28, borderRadius: 8,
-                        border: `1px solid ${colors.borderSubtle}`,
-                        background: colors.dangerSoft,
-                        color: colors.danger,
-                        fontSize: 13, cursor: 'pointer',
-                        flexShrink: 0,
-                      }}
-                    >🗑</button>
-                  )}
                   <button
                     type="button"
                     onClick={() => setActiveMemberIds(prev => {
@@ -202,59 +150,6 @@ export default function PickleballSettings({ data, onAction }) {
             <div style={{ fontSize: 10, color: colors.textSecondary, padding: '8px 0 4px' }}>
               Tắt = nghỉ tháng này, tự động bật lại tháng sau
             </div>
-            {showAddMemberForm ? (
-              <form onSubmit={saveNewMember} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                <input
-                  value={newMemberName}
-                  onChange={e => setNewMemberName(e.target.value)}
-                  placeholder="Tên thành viên"
-                  autoFocus
-                  style={{
-                    flex: 1, minWidth: 0, padding: '10px 11px',
-                    border: `1px solid ${colors.borderSubtle}`,
-                    background: colors.inputBg, color: colors.textPrimary,
-                    borderRadius: 10, outline: 'none', fontFamily: 'inherit',
-                    fontSize: 12, fontWeight: 600,
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={savingMember}
-                  style={{
-                    padding: '0 11px', border: 'none', borderRadius: 10,
-                    background: colors.success, color: '#052e26',
-                    fontSize: 12, fontWeight: 800, fontFamily: 'inherit',
-                    cursor: savingMember ? 'default' : 'pointer',
-                    opacity: savingMember ? 0.65 : 1,
-                  }}
-                >Lưu</button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddMemberForm(false);
-                    setNewMemberName('');
-                  }}
-                  style={{
-                    padding: '0 10px', border: `1px solid ${colors.borderSubtle}`,
-                    borderRadius: 10, background: 'transparent',
-                    color: colors.textSecondary, fontSize: 12, fontWeight: 700,
-                    fontFamily: 'inherit', cursor: 'pointer',
-                  }}
-                >Hủy</button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowAddMemberForm(true)}
-                style={{
-                  width: '100%', marginTop: 8, padding: '10px 14px',
-                  border: '1px dashed rgba(99,102,241,0.4)',
-                  background: 'transparent', borderRadius: 12,
-                  color: colors.brandLight, fontSize: 12, fontWeight: 700,
-                  fontFamily: 'inherit', cursor: 'pointer',
-                }}
-              >+ Thêm thành viên</button>
-            )}
           </Card>
 
           {/* Weekday picker */}
@@ -344,7 +239,7 @@ export default function PickleballSettings({ data, onAction }) {
             color: '#c7d2fe',
             border: '1px solid rgba(99,102,241,0.35)',
           }} onClick={() => onAction?.('batchEntry')}>📋 Nhập chi phí sân tháng này</Button>
-          {canDeleteMembers && (
+          {canManageSchedule && (
             <Button block variant="muted" style={{
               marginTop: 8,
               background: 'linear-gradient(135deg, rgba(52,211,153,0.18), rgba(52,211,153,0.08))',
