@@ -53,12 +53,41 @@ export default function AppV2() {
   // Keys must match TAB_ITEMS in primitives.jsx: 'home','groups','pickleball','profile'
   const [activeTab, setActiveTab] = useState('home')
   const [stack, setStack] = useState([])
+  const [awaitingPin, setAwaitingPin] = useState(() => (
+    !!(
+      localStorage.getItem('spliteasy_pin') &&
+      localStorage.getItem('spliteasy_token') &&
+      localStorage.getItem('spliteasy_member')
+    )
+  ))
+  const [pinError, setPinError] = useState('')
+  const [pinInput, setPinInput] = useState('')
+
+  function submitPin(value = pinInput) {
+    const stored = localStorage.getItem('spliteasy_pin')
+    if (value === stored) {
+      setAwaitingPin(false)
+      setPinError('')
+      setPinInput('')
+    } else {
+      setPinError('Mã PIN không đúng. Thử lại.')
+      setPinInput('')
+    }
+  }
+
+  function updatePinInput(value) {
+    setPinInput(value)
+    if (pinError) setPinError('')
+  }
 
   async function handle(type, payload) {
     if (type === 'logout') {
       dispatch({ type: 'LOGOUT' })
       setStack([])
       setActiveTab('home')
+      setAwaitingPin(false)
+      setPinError('')
+      setPinInput('')
       return
     }
 
@@ -260,6 +289,11 @@ export default function AppV2() {
         groupId: result.group_id,
         memberName: result.member_name,
       })
+      const storedPin = localStorage.getItem('spliteasy_pin')
+      if (storedPin) {
+        setAwaitingPin(true)
+        return
+      }
       return
     }
 
@@ -403,6 +437,19 @@ export default function AppV2() {
     )
   }
 
+  if (awaitingPin) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+        <PinEntryScreen
+          error={pinError}
+          value={pinInput}
+          onChange={updatePinInput}
+          onSubmit={submitPin}
+        />
+      </div>
+    )
+  }
+
   function renderTabScreen() {
     switch (activeTab) {
       case 'groups':
@@ -504,4 +551,84 @@ function buildAddExpenseData(groupDetailData) {
     groupName: groupDetailData?.name || groupDetailData?.group?.name || 'Nhóm',
     members,
   }
+}
+
+function PinEntryScreen({ error, value, onChange, onSubmit }) {
+  return (
+    <div style={{
+      width: 375,
+      minHeight: 812,
+      margin: '24px auto',
+      background: '#07080f',
+      borderRadius: 38,
+      overflow: 'hidden',
+      border: '1px solid rgba(255,255,255,0.08)',
+      boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 8px #1a1c28',
+      fontFamily: "'Inter', sans-serif",
+      color: '#f1f5f9',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 24,
+    }}>
+      <div style={{ fontSize: 32 }}>🔒</div>
+      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0 }}>Nhập mã PIN</div>
+      <div style={{ display: 'flex', gap: 14 }}>
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <div key={i} style={{
+            width: 14,
+            height: 14,
+            borderRadius: '50%',
+            background: i < value.length ? '#6366f1' : 'transparent',
+            border: i < value.length ? 'none' : '1.5px solid rgba(255,255,255,0.2)',
+            boxShadow: i < value.length ? '0 0 8px rgba(99,102,241,0.5)' : 'none',
+          }} />
+        ))}
+      </div>
+      {error && (
+        <div style={{ fontSize: 12, color: '#fca5a5', fontWeight: 600 }}>{error}</div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: 12 }}>
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map((key, i) => {
+          if (key === '') return <div key={i} />
+          const isBackspace = key === '⌫'
+          return (
+            <button key={i} onClick={() => {
+              if (isBackspace) {
+                onChange(value.slice(0, -1))
+                return
+              }
+              const next = value.length < 6 ? `${value}${key}` : value
+              onChange(next)
+              if (next.length === 6) onSubmit(next)
+            }} style={{
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              fontSize: isBackspace ? 20 : 24,
+              fontWeight: 700,
+              color: '#f1f5f9',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}>{key}</button>
+          )
+        })}
+      </div>
+      <button onClick={() => onSubmit()} style={{
+        padding: '14px 48px',
+        borderRadius: 14,
+        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+        border: 'none',
+        color: 'white',
+        fontSize: 14,
+        fontWeight: 700,
+        fontFamily: 'inherit',
+        cursor: 'pointer',
+        opacity: value.length === 6 ? 1 : 0.4,
+      }}>Xác nhận</button>
+    </div>
+  )
 }

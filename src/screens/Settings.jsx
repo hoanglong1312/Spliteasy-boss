@@ -9,12 +9,55 @@ import {
 
 export default function Settings({ data, onAction }) {
   const d = data || DEMO;
-  const [pinSet, setPinSet] = useState(d.pinEnabled);
+  const [pinSet, setPinSet] = useState(() => !!localStorage.getItem('spliteasy_pin'));
+  const [pinSetupMode, setPinSetupMode] = useState(null);
+  const [pinInputValue, setPinInputValue] = useState('');
+  const [pinSetupError, setPinSetupError] = useState('');
   const primaryBank = d.banks.find((b) => b.primary) || d.banks[0];
   const [editingBank, setEditingBank] = useState(false);
   const [bankName, setBankName] = useState(primaryBank?.name || '');
   const [bankAccount, setBankAccount] = useState(primaryBank?.accountRaw || primaryBank?.account || primaryBank?.accountMasked || '');
   const [bankOwner, setBankOwner] = useState(d.accountHolder || '');
+
+  function startPinSetup(mode) {
+    setPinSetupMode(mode);
+    setPinInputValue('');
+    setPinSetupError('');
+  }
+
+  function cancelPinSetup() {
+    setPinSetupMode(null);
+    setPinInputValue('');
+    setPinSetupError('');
+  }
+
+  function submitPinSetup() {
+    const stored = localStorage.getItem('spliteasy_pin');
+    if (pinSetupMode === 'set') {
+      if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
+      localStorage.setItem('spliteasy_pin', pinInputValue);
+      setPinSet(true);
+      cancelPinSetup();
+      onAction?.('setPin');
+    } else if (pinSetupMode === 'remove') {
+      if (pinInputValue !== stored) { setPinSetupError('PIN không đúng.'); return; }
+      localStorage.removeItem('spliteasy_pin');
+      setPinSet(false);
+      cancelPinSetup();
+      onAction?.('removePin');
+    } else if (pinSetupMode === 'change-old') {
+      if (pinInputValue !== stored) { setPinSetupError('PIN hiện tại không đúng.'); return; }
+      setPinSetupMode('change-new');
+      setPinInputValue('');
+      setPinSetupError('');
+    } else if (pinSetupMode === 'change-new') {
+      if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
+      localStorage.setItem('spliteasy_pin', pinInputValue);
+      setPinSet(true);
+      cancelPinSetup();
+      onAction?.('setPin');
+    }
+  }
 
   return (
     <PhoneFrame>
@@ -101,13 +144,13 @@ export default function Settings({ data, onAction }) {
             </div>
             {pinSet ? (
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => onAction?.('changePin')} style={{
+                <button onClick={() => startPinSetup('change-old')} style={{
                   padding: '5px 10px', borderRadius: 8,
                   background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
                   color: '#c7d2fe', fontSize: 11, fontWeight: 700,
                   fontFamily: 'inherit', cursor: 'pointer',
                 }}>Đổi</button>
-                <button onClick={() => { onAction?.('removePin'); setPinSet(false); }} style={{
+                <button onClick={() => startPinSetup('remove')} style={{
                   padding: '5px 10px', borderRadius: 8,
                   background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
                   color: '#fca5a5', fontSize: 11, fontWeight: 700,
@@ -115,7 +158,7 @@ export default function Settings({ data, onAction }) {
                 }}>Xoá</button>
               </div>
             ) : (
-              <button onClick={() => { onAction?.('setPin'); setPinSet(true); }} style={{
+              <button onClick={() => startPinSetup('set')} style={{
                 padding: '5px 12px', borderRadius: 8,
                 background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)',
                 color: '#6ee7b7', fontSize: 11, fontWeight: 700,
@@ -124,6 +167,54 @@ export default function Settings({ data, onAction }) {
             )}
           </div>
         </Card>
+        {pinSetupMode && (
+          <Card style={{ padding: 16, marginTop: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#c7d2fe', marginBottom: 12 }}>
+              {pinSetupMode === 'set' && 'Nhập mã PIN mới (6 số)'}
+              {pinSetupMode === 'change-old' && 'Nhập PIN hiện tại để xác nhận'}
+              {pinSetupMode === 'change-new' && 'Nhập PIN mới (6 số)'}
+              {pinSetupMode === 'remove' && 'Nhập PIN hiện tại để xoá'}
+            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={6}
+              value={pinInputValue}
+              onChange={e => {
+                setPinInputValue(e.target.value.replace(/\D/g, '').slice(0, 6));
+                setPinSetupError('');
+              }}
+              placeholder="● ● ● ● ● ●"
+              autoFocus
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '12px 14px', borderRadius: 10, fontSize: 18,
+                letterSpacing: '8px', textAlign: 'center',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#f1f5f9', fontFamily: 'inherit', outline: 'none',
+              }}
+            />
+            {pinSetupError && (
+              <div style={{ fontSize: 11, color: '#fca5a5', marginTop: 8 }}>{pinSetupError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }}
+                onClick={cancelPinSetup}>
+                Huỷ
+              </Button>
+              <Button variant="brand" style={{
+                flex: 1,
+                padding: 10,
+                fontSize: 12,
+                opacity: pinInputValue.length === 6 ? 1 : 0.4,
+              }} onClick={submitPinSetup}>
+                {pinSetupMode === 'set' || pinSetupMode === 'change-new' ? 'Lưu PIN'
+                  : pinSetupMode === 'remove' ? 'Xoá PIN' : 'Tiếp theo →'}
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* App */}
         <SectionLabel>Ứng dụng</SectionLabel>
