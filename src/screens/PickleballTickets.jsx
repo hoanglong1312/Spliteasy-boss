@@ -262,11 +262,15 @@ function AddTicketSheet({ data, onClose, onSave }) {
   const [totalAmount, setTotalAmount] = useState('')
   const [paymentMode, setPaymentMode] = useState('team_fund')
   const [advancerId, setAdvancerId] = useState(members[0]?.id || '')
-  const amountPerPerson = memberIds.length > 0 ? Math.round((Number(totalAmount) || 0) / memberIds.length) : 0
-  const canSave = date.trim() && time.trim() && memberIds.length > 0 && Number(totalAmount) > 0 &&
-    (paymentMode === 'team_fund' || advancerId)
+  const [error, setError] = useState('')
+  const defaultAmountPerPerson = Number(data.defaultTicketAmountPerPerson || data.ticketPricePerPerson || 50000) || 50000
+  const enteredTotalAmount = parseMoneyAmount(totalAmount)
+  const totalAmountToSave = enteredTotalAmount > 0 ? enteredTotalAmount : defaultAmountPerPerson * memberIds.length
+  const amountPerPerson = memberIds.length > 0 ? Math.round(totalAmountToSave / memberIds.length) : 0
+  const canSave = !ticketValidationError({ date, time, memberIds, totalAmount: totalAmountToSave, paymentMode, advancerId })
 
   function toggleMember(memberId) {
+    if (error) setError('')
     setMemberIds(current => (
       current.some(id => String(id) === String(memberId))
         ? current.filter(id => String(id) !== String(memberId))
@@ -274,16 +278,25 @@ function AddTicketSheet({ data, onClose, onSave }) {
     ))
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
-    if (!canSave) return
-    onSave({
-      date: dateToIso(date),
-      time,
-      memberIds,
-      totalAmount: Number(totalAmount) || 0,
-      advancerId: paymentMode === 'advancer' ? advancerId : null,
-    })
+    const validationError = ticketValidationError({ date, time, memberIds, totalAmount: totalAmountToSave, paymentMode, advancerId })
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    try {
+      await onSave({
+        session_date: dateToIso(date),
+        session_time: time,
+        member_ids: memberIds,
+        total_amount: totalAmountToSave,
+        advancer_id: paymentMode === 'advancer' ? advancerId : null,
+        paymentMode,
+      })
+    } catch (err) {
+      setError(ticketErrorMessage(err))
+    }
   }
 
   return (
@@ -323,14 +336,20 @@ function AddTicketSheet({ data, onClose, onSave }) {
         <Input
           label="Ngày"
           value={date}
-          onChange={e => setDate(e.target.value)}
+          onChange={e => {
+            setDate(e.target.value)
+            if (error) setError('')
+          }}
           placeholder="DD/MM/YYYY"
           inputMode="numeric"
         />
         <Input
           label="Giờ"
           value={time}
-          onChange={e => setTime(e.target.value)}
+          onChange={e => {
+            setTime(e.target.value)
+            if (error) setError('')
+          }}
           placeholder="HH:mm"
           inputMode="numeric"
         />
@@ -370,8 +389,11 @@ function AddTicketSheet({ data, onClose, onSave }) {
           label="Tổng tiền"
           type="number"
           value={totalAmount}
-          onChange={e => setTotalAmount(e.target.value)}
-          placeholder="0"
+          onChange={e => {
+            setTotalAmount(e.target.value)
+            if (error) setError('')
+          }}
+          placeholder={String(defaultAmountPerPerson * Math.max(memberIds.length, 1))}
           suffix="đ"
         />
         <div style={{ fontSize: 11, color: colors.pickleball, fontWeight: 800, marginTop: 6 }}>
@@ -383,12 +405,18 @@ function AddTicketSheet({ data, onClose, onSave }) {
           <input
             type="radio"
             checked={paymentMode === 'advancer'}
-            onChange={() => setPaymentMode('advancer')}
+            onChange={() => {
+              setPaymentMode('advancer')
+              if (error) setError('')
+            }}
             style={{ accentColor: colors.pickleball }}
           />
           <select
             value={advancerId}
-            onChange={e => setAdvancerId(e.target.value)}
+            onChange={e => {
+              setAdvancerId(e.target.value)
+              if (error) setError('')
+            }}
             disabled={paymentMode !== 'advancer'}
             style={selectStyle()}
           >
@@ -403,19 +431,52 @@ function AddTicketSheet({ data, onClose, onSave }) {
           <input
             type="radio"
             checked={paymentMode === 'team_fund'}
-            onChange={() => setPaymentMode('team_fund')}
+            onChange={() => {
+              setPaymentMode('team_fund')
+              if (error) setError('')
+            }}
             style={{ accentColor: colors.pickleball }}
           />
           <span style={{ fontSize: 13, fontWeight: 800 }}>Quỹ team trả</span>
         </label>
 
+        {error && (
+          <div style={{ marginTop: 12, color: colors.danger, fontSize: 11, fontWeight: 800 }}>
+            {error}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <Button type="button" variant="ghost" block onClick={onClose} style={{ padding: 12 }}>Huỷ</Button>
-          <Button type="submit" variant="success" block disabled={!canSave} style={{ padding: 12, opacity: canSave ? 1 : 0.45 }}>Lưu</Button>
+          <Button type="submit" variant="success" block aria-disabled={canSave ? 'false' : 'true'} style={{ padding: 12, opacity: canSave ? 1 : 0.65 }}>Lưu</Button>
         </div>
       </form>
     </div>
   )
+}
+
+function ticketValidationError({ date, time, memberIds, totalAmount, paymentMode, advancerId }) {
+  if (!String(date || '').trim()) return 'Chọn ngày chơi.'
+  if (!String(time || '').trim()) return 'Nhập giờ chơi.'
+  if (!Array.isArray(memberIds) || memberIds.length === 0) return 'Chọn ít nhất một người tham gia.'
+  if ((Number(totalAmount) || 0) <= 0) return 'Nhập tổng tiền vé.'
+  if (paymentMode === 'advancer' && !advancerId) return 'Chọn người ứng tiền hoặc quỹ team.'
+  return ''
+}
+
+function ticketErrorMessage(err) {
+  const code = String(err?.message || err || '')
+  const map = {
+    ticket_session_date_required: 'Chọn ngày chơi.',
+    ticket_members_required: 'Chọn ít nhất một người tham gia.',
+    ticket_total_amount_required: 'Nhập tổng tiền vé.',
+    ticket_payment_required: 'Chọn người ứng tiền hoặc quỹ team.',
+  }
+  return map[code] || 'Không lưu được vé lẻ. Thử lại.'
+}
+
+function parseMoneyAmount(value) {
+  return Number(String(value ?? '').replace(/\D/g, '')) || 0
 }
 
 function actionButtonStyle(tone) {

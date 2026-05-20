@@ -177,7 +177,17 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-        {session.attendees.map(a => <AttendChip key={a.id} a={a} onToggle={isTreasurer ? () => onAction?.('togglePresence', a.id) : undefined} />)}
+        {session.attendees.map(a => (
+          <AttendChip
+            key={a.id}
+            a={a}
+            onToggle={isTreasurer && a.kind !== 'guest' ? () => onAction?.('markAttendance', {
+              sessionId: session.id,
+              memberId: a.id,
+              status: a.kind === 'present' ? 'absent' : 'present',
+            }) : undefined}
+          />
+        ))}
       </div>
 
       <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0' }} />
@@ -205,12 +215,6 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
         <SessionCostSection session={session} isTreasurer={isTreasurer} onAction={onAction} />
       )}
 
-      {isTreasurer && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          <Button variant="muted" style={{ flex: 1, fontSize: 12, padding: 11 }} onClick={() => onAction?.('reschedule', session.id)}>📅 Dời buổi</Button>
-          <Button variant="brand" style={{ flex: 1, fontSize: 12, padding: 11 }} onClick={() => onAction?.('complete', session.id)}>✓ Hoàn tất</Button>
-        </div>
-      )}
     </Card>
   );
 }
@@ -341,7 +345,7 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
 
       {canEdit && (
         <Button block variant="success" style={{ marginTop: 14, padding: 12, borderRadius: 12 }} onClick={save}>
-          Lưu chi phí
+          Lưu
         </Button>
       )}
     </div>

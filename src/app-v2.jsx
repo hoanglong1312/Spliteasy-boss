@@ -290,23 +290,49 @@ export default function AppV2() {
 
     if (type === 'addTicket') {
       if (!isTreasurer || !state.currentGroupId || !state.currentUserId) return
+      const sessionDate = payload?.session_date || payload?.date
+      const sessionTime = payload?.session_time || payload?.time || null
+      const memberIds = safeArray(payload?.member_ids || payload?.memberIds)
+      const totalAmount = parseMoneyAmount(payload?.total_amount ?? payload?.totalAmount)
+      const advancerId = payload?.advancer_id ?? payload?.advancerId ?? null
+      const isAdvancerMode = payload?.paymentMode === 'advancer'
+      const isTeamFund = payload?.paymentMode === 'team_fund' || payload?.teamFund === true || payload?.status === 'team_fund' || (!isAdvancerMode && !advancerId)
+      if (!sessionDate) throw new Error('ticket_session_date_required')
+      if (memberIds.length === 0) throw new Error('ticket_members_required')
+      if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
+      if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('pickleball_tickets')
         .insert({
           group_id: state.currentGroupId,
-          session_date: payload?.date,
-          session_time: payload?.time || null,
-          total_amount: Number(payload?.totalAmount) || 0,
-          member_ids: payload?.memberIds || [],
-          advancer_id: payload?.advancerId || null,
-          status: payload?.advancerId ? 'unpaid' : 'team_fund',
-          year_month: monthKey(payload?.date || new Date()),
+          session_date: sessionDate,
+          session_time: sessionTime,
+          total_amount: totalAmount,
+          member_ids: memberIds,
+          advancer_id: advancerId,
+          status: advancerId ? 'unpaid' : 'team_fund',
+          year_month: monthKey(sessionDate || new Date()),
           created_by: state.currentUserId,
         })
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'markAttendance') {
+      if (!isTreasurer) return
+      const sessionId = payload?.sessionId ?? payload?.session_id
+      const memberId = payload?.memberId ?? payload?.member_id
+      const status = String(payload?.status || '').toLowerCase() === 'absent' ? 'absent' : 'present'
+      if (!sessionId || !memberId) return
+      await dispatch({
+        type: 'MARK_PICKLEBALL_ATTENDANCE',
+        sessionId,
+        memberId,
+        status,
+      })
       return
     }
 
@@ -874,6 +900,10 @@ function monthKey(value) {
 
 function parseMoneyAmount(value) {
   return Number(String(value ?? '').replace(/\D/g, '')) || 0
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : []
 }
 
 function dateFromLabel(label) {

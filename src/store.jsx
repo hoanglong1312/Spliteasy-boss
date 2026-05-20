@@ -334,7 +334,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, psiR, ptR, dR, jR] = await Promise.all([
+  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('member_tokens').select('member_id,revoked_at'),
@@ -347,6 +347,8 @@ async function fetchGroupData(token) {
     sb.from('pickleball_monthly_config').select('*'),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
+    sb.from('pickleball_sessions').select('*').order('date', { ascending: false }),
+    sb.from('pickleball_attendance').select('*'),
     sb.from('pickleball_session_items').select('*'),
     sb.from('pickleball_tickets').select('*').order('session_date', { ascending: true }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
@@ -359,6 +361,8 @@ async function fetchGroupData(token) {
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (pcR.error) console.warn('[store] pickle_configs query failed:', pcR.error)
   if (pmcR.error) console.warn('[store] pickleball_monthly_config query failed:', pmcR.error)
+  if (pbsR.error) console.warn('[store] pickleball_sessions query failed:', pbsR.error)
+  if (pbaR.error) console.warn('[store] pickleball_attendance query failed:', pbaR.error)
   if (psiR.error) console.warn('[store] pickleball_session_items query failed:', psiR.error)
   if (ptR.error) console.warn('[store] pickleball_tickets query failed:', ptR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
@@ -376,6 +380,8 @@ async function fetchGroupData(token) {
     pickleballMonthlyConfigs: pmcR.data || [],
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
+    pickleballSessions: pbsR.data || [],
+    pickleballAttendance: pbaR.data || [],
     pickleballSessionItems: psiR.data || [],
     pickleballTickets: ptR.data || [],
     disputeCount:    (dR.data || []).length,
@@ -462,6 +468,26 @@ function normalizeMemberTokens(memberTokens = []) {
       return memberId ? { ...token, memberId, member_id: memberId } : null
     })
     .filter(Boolean)
+}
+
+function isPickleAttendeeGuest(row = {}) {
+  return row.is_guest === true || String(row.attendee_type || '').toLowerCase() === 'guest'
+}
+
+function attendanceStatus(row = {}) {
+  const status = String(row.status || row.rsvp_status || '').toLowerCase()
+  if (status === 'absent' || status === 'not_going' || row.attended === false) return 'absent'
+  return 'present'
+}
+
+function findPickleSessionInState(state, sessionId) {
+  const id = String(sessionId || '')
+  if (!id) return null
+  return [
+    ...safeArray(state?._allPickle?.sessions),
+    ...safeArray(state?.pickle?.sessions),
+    ...safeArray(state?.pickle?.upcoming),
+  ].find(session => String(session?.id) === id) || null
 }
 
 function resolveMemberForGroup({ members, memberTokens, groupId, currentMemberId, currentUserName }) {
@@ -561,6 +587,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     pickleConfig,
     pickleSessions,
     pickleAttendees,
+    pickleballSessions = [],
+    pickleballAttendance = [],
     pickleballSessionItems = [],
     pickleballTickets = [],
     disputeCount,
@@ -670,8 +698,78 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     return map
   }, new Map())
 
+  const normalLegacySessions = safeArray(pickleballSessions).map(s => {
+    const sessionItems = sessionItemsBySession.get(String(s.id)) || []
+    const attendanceRecords = safeArray(pickleballAttendance)
+      .filter(a => a.session_id === s.id)
+      .map(a => ({
+        sessionId: a.session_id,
+        session_id: a.session_id,
+        memberId: a.member_id,
+        member_id: a.member_id,
+        status: attendanceStatus(a),
+      }))
+    const itemExpenses = sessionItems.map(item => ({
+      id: item.id,
+      groupId: s.group_id,
+      group_id: s.group_id,
+      title: item.name,
+      name: item.name,
+      cat: /nước|water/i.test(item.name) ? 'water' : 'pickleball_extra',
+      category: /nước|water/i.test(item.name) ? 'water' : 'pickleball_extra',
+      amount: item.amount,
+      paidBy: item.createdBy,
+      participants: item.memberIds == null ? [] : item.memberIds,
+      splits: [],
+      date: s.date,
+      status: 'approved',
+      pickleSessionId: s.id,
+      memberIds: item.memberIds,
+      member_ids: item.memberIds,
+      source: 'pickleball_session_items',
+    }))
+    return {
+      id: s.id,
+      sourceTable: 'pickleball_sessions',
+      source_table: 'pickleball_sessions',
+      groupId: s.group_id,
+      group_id: s.group_id,
+      date: s.date,
+      sessionDate: s.date,
+      session_date: s.date,
+      startTime: s.start_time,
+      start_time: s.start_time,
+      court: s.court,
+      status: s.status || 'completed',
+      waterAmount: Number(s.water_amount) || 0,
+      water_amount: Number(s.water_amount) || 0,
+      notes: s.notes,
+      attendanceRecords,
+      attendance_records: attendanceRecords,
+      attendees: attendanceRecords
+        .filter(record => record.status !== 'absent')
+        .map(record => record.memberId),
+      guests: [],
+      sessionItems,
+      session_items: sessionItems,
+      expenses: [
+        ...itemExpenses,
+      ],
+    }
+  })
+
   const normalSessions = pickleSessions.map(s => {
     const sessionItems = sessionItemsBySession.get(String(s.id)) || []
+    const attendeeRows = safeArray(pickleAttendees).filter(a => a.session_id === s.id)
+    const memberAttendance = attendeeRows
+      .filter(a => !isPickleAttendeeGuest(a))
+      .map(a => ({
+        sessionId: a.session_id,
+        session_id: a.session_id,
+        memberId: a.member_id,
+        member_id: a.member_id,
+        status: attendanceStatus(a),
+      }))
     const itemExpenses = sessionItems.map(item => ({
       id: item.id,
       groupId: s.group_id,
@@ -693,6 +791,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     }))
     return {
       id: s.id,
+      sourceTable: 'pickle_sessions',
+      source_table: 'pickle_sessions',
       groupId: s.group_id,
       group_id: s.group_id,
       date: s.session_date,
@@ -703,11 +803,12 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
       court: s.court,
       status: s.status,
       notes: s.notes,
-      attendees: pickleAttendees
-        .filter(a => a.session_id === s.id && !a.is_guest)
-        .map(a => a.member_id),
-      guests: pickleAttendees
-        .filter(a => a.session_id === s.id && a.is_guest),
+      attendanceRecords: memberAttendance,
+      attendance_records: memberAttendance,
+      attendees: memberAttendance
+        .filter(record => record.status !== 'absent')
+        .map(record => record.memberId),
+      guests: attendeeRows.filter(isPickleAttendeeGuest),
       sessionItems,
       session_items: sessionItems,
       expenses: [
@@ -815,7 +916,10 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     settlementPeriods: normalSettlementPeriods,
     pickle: null,
     _allPickle: {
-      sessions: normalSessions,
+      sessions: [
+        ...normalLegacySessions,
+        ...normalSessions,
+      ],
       upcoming: [],
       sessionItems: normalSessionItems,
       configs: normalPickleConfigs,
@@ -1504,17 +1608,63 @@ export function AppProvider({ children }) {
         return data
       }
 
+      case 'MARK_PICKLEBALL_ATTENDANCE': {
+        if (!sb) return
+        const { sessionId, memberId } = action
+        const status = String(action.status || (action.attending === false ? 'absent' : 'present')).toLowerCase() === 'absent'
+          ? 'absent'
+          : 'present'
+        if (!sessionId || !memberId) return
+        const session = findPickleSessionInState(stateRef.current, sessionId)
+        const sourceTable = session?.sourceTable || session?.source_table
+        if (sourceTable === 'pickleball_sessions') {
+          const { error } = await sb.from('pickleball_attendance').upsert(
+            { session_id: sessionId, member_id: memberId, status },
+            { onConflict: 'session_id,member_id' }
+          )
+          if (error) throw error
+        } else {
+          const { error } = await sb.from('pickle_attendees').upsert(
+            {
+              session_id: sessionId,
+              member_id: memberId,
+              attendee_type: 'member',
+              rsvp_status: status === 'present' ? 'going' : 'not_going',
+              attended: status === 'present',
+            },
+            { onConflict: 'session_id,member_id' }
+          )
+          if (error) throw error
+        }
+        await refresh()
+        break
+      }
+
       case 'CONFIRM_ATTENDANCE': {
         if (!sb) return
         const { sessionId, memberId, attending } = action
-        if (attending) {
-          await sb.from('pickle_attendees').upsert(
-            { session_id: sessionId, member_id: memberId, is_guest: false },
+        if (!sessionId || !memberId) return
+        const session = findPickleSessionInState(stateRef.current, sessionId)
+        const sourceTable = session?.sourceTable || session?.source_table
+        const status = attending === false ? 'absent' : 'present'
+        if (sourceTable === 'pickleball_sessions') {
+          const { error } = await sb.from('pickleball_attendance').upsert(
+            { session_id: sessionId, member_id: memberId, status },
             { onConflict: 'session_id,member_id' }
           )
+          if (error) throw error
         } else {
-          await sb.from('pickle_attendees').delete()
-            .eq('session_id', sessionId).eq('member_id', memberId)
+          const { error } = await sb.from('pickle_attendees').upsert(
+            {
+              session_id: sessionId,
+              member_id: memberId,
+              attendee_type: 'member',
+              rsvp_status: attending === false ? 'not_going' : 'going',
+              attended: attending !== false,
+            },
+            { onConflict: 'session_id,member_id' }
+          )
+          if (error) throw error
         }
         await refresh()
         break

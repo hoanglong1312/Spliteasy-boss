@@ -385,9 +385,9 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
 
   const fixedMembers = safeArray(pickle?.fixedMembers)
   const fixedSet = new Set(fixedMembers.map(String))
-  const presentIds = sessionMemberIds(session)
-  const presentSet = new Set(presentIds.map(String))
   const groupMembers = membersForCurrentPickle(state, members, fixedMembers)
+  const presentIds = effectiveSessionMemberIds(session, groupMembers)
+  const presentSet = new Set(presentIds.map(String))
   const presentMembers = groupMembers
     .filter(member => presentSet.has(String(member.id)))
     .map(member => personChip(member))
@@ -609,6 +609,7 @@ function buildPickleballTicketsData(state) {
     filter: 'all',
     activeFilter: 'all',
     members,
+    defaultTicketAmountPerPerson: Number(state?.pickle?.guestFeePerSession ?? state?.pickle?.guest_fee_per_session ?? 0) || 50000,
     tickets,
   }
 }
@@ -624,9 +625,13 @@ function buildPickleballSettingsData(state) {
   const weekdays = normalizeWeekdays(
     monthlyConfig?.scheduleWeekdays ||
     monthlyConfig?.schedule_weekdays ||
+    config?.scheduleWeekdays ||
+    config?.schedule_weekdays ||
     config?.weekdays ||
     config?.scheduleDays ||
     config?.schedule_days ||
+    group?.scheduleWeekdays ||
+    group?.schedule_weekdays ||
     group?.scheduleDays
   )
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? config?.monthlyCourtFee ?? config?.monthly_court_fee ?? group?.monthlyCourtFee ?? 0)
@@ -1232,7 +1237,7 @@ function calendarCellState(date, session, state) {
   if (['scheduled', 'upcoming'].includes(normalizedStatus)) return 'upcoming'
   if (dateKey(date) > dateKey(new Date())) return 'upcoming'
 
-  const presentIds = sessionMemberIds(session)
+  const presentIds = effectiveSessionMemberIds(session, currentGroupMembers(state).filter(isActiveMember))
   if (!state?.currentUserId) return presentIds.length > 0 ? 'attended' : 'missed'
   return presentIds.some(id => String(id) === String(state.currentUserId)) ? 'attended' : 'missed'
 }
@@ -1242,18 +1247,18 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const groupMembers = currentGroupMembers(state).filter(isActiveMember)
   const fixedMembers = safeArray(pickle?.fixedMembers)
   const fixedSet = new Set(fixedMembers.map(String))
-  const presentIds = sessionMemberIds(session)
+  const presentIds = effectiveSessionMemberIds(session, groupMembers)
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
+  const attendanceMembers = groupMembers
+    .filter(member => fixedSet.size === 0 || fixedSet.has(String(member.id)) || presentSet.has(String(member.id)))
   const attendees = [
-    ...groupMembers
-      .filter(member => fixedSet.size === 0 || fixedSet.has(String(member.id)) || presentSet.has(String(member.id)))
-      .map(member => ({
-        id: member.id,
-        initial: initials(member),
-        name: firstName(member.displayName || member.name),
-        kind: presentSet.has(String(member.id)) ? 'present' : 'absent',
-      })),
+    ...attendanceMembers.map(member => ({
+      id: member.id,
+      initial: initials(member),
+      name: firstName(member.displayName || member.name),
+      kind: presentSet.has(String(member.id)) ? 'present' : 'absent',
+    })),
     ...guests.map((guest, index) => ({
       id: guest.id || guest.guest_id || `guest-${index}`,
       initial: initials({ name: guestName(guest) }),
@@ -1284,7 +1289,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     status: calendarSessionStatus(session, today),
     attendance: {
       present: presentIds.length,
-      total: Math.max(groupMembers.length, presentIds.length),
+      total: Math.max(attendanceMembers.length, presentIds.length),
       guests: guests.length,
     },
     attendees,
@@ -1562,6 +1567,9 @@ function normalizeWeekdays(value) {
 }
 
 function toWeekdayShort(value) {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'][value] || ''
+  }
   const text = String(value || '').trim().toLowerCase()
   const map = {
     monday: 'T2',
@@ -2116,6 +2124,39 @@ function sessionMemberIds(session) {
   return safeArray(session?.attendees || session?.attended)
     .map(item => typeof item === 'object' ? (item.memberId || item.member_id || item.id) : item)
     .filter(Boolean)
+}
+
+function sessionAttendanceRecords(session) {
+  return safeArray(session?.attendanceRecords || session?.attendance_records)
+    .map(record => ({
+      memberId: record?.memberId || record?.member_id || record?.id,
+      status: String(record?.status || record?.rsvp_status || '').toLowerCase() === 'absent' ||
+        String(record?.status || record?.rsvp_status || '').toLowerCase() === 'not_going' ||
+        record?.attended === false
+        ? 'absent'
+        : 'present',
+    }))
+    .filter(record => record.memberId)
+}
+
+function effectiveSessionMemberIds(session, members = []) {
+  const memberIds = safeArray(members).map(member => member?.id || member?.member_id).filter(Boolean)
+  const records = sessionAttendanceRecords(session)
+  if (records.length === 0 && memberIds.length > 0) return memberIds
+
+  const absentIds = new Set(records.filter(record => record.status === 'absent').map(record => String(record.memberId)))
+  const presentIds = new Set([
+    ...sessionMemberIds(session),
+    ...records.filter(record => record.status !== 'absent').map(record => record.memberId),
+  ].map(String))
+
+  if (records.length > 0) {
+    memberIds.forEach(memberId => {
+      if (!absentIds.has(String(memberId))) presentIds.add(String(memberId))
+    })
+  }
+  absentIds.forEach(memberId => presentIds.delete(memberId))
+  return Array.from(presentIds)
 }
 
 function sessionGuests(session) {
