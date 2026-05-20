@@ -441,6 +441,12 @@ function buildPickleballSettingsData(state) {
     courtFeeTotal,
     sessionsCount,
     memberCount: members.length || safeArray(state?.pickle?.fixedMembers).length || 1,
+    members: members.map(m => ({
+      id: m.id || m.member_id,
+      name: m.name || m.member_name,
+      initial: (m.name || m.member_name || '?')[0].toUpperCase(),
+      activeThisMonth: m.active_this_month ?? true,
+    })),
     weekdays,
     timeRange: scheduleTime,
     startDate: config?.startDate || config?.start_date || '01/' + String(today.getMonth() + 1).padStart(2, '0') + '/' + today.getFullYear(),

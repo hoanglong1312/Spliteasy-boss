@@ -112,6 +112,11 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'addMember') {
+      alert('Tính năng thêm thành viên sẽ được cập nhật sớm.')
+      return
+    }
+
     if (type === 'subTab') {
       const SUBTAB_TO_SCREEN = {
         overview: 'pickleball-overview',

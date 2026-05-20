@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { colors, type } from '../tokens';
-import { Button, Input } from '../primitives';
+import { Button, Card, Input, SectionLabel } from '../primitives';
 
 const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
 
@@ -12,6 +12,9 @@ export default function PickleballSettings({ data, onAction }) {
   const [weekdays, setWeekdays]   = useState(new Set(d.weekdays));
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
+  const [members, setMembers]     = useState(
+    (d.members || []).map(m => ({ ...m }))
+  );
 
   const perSession = Math.round(courtFee / d.sessionsCount);
   const perPerson  = Math.round(perSession / d.memberCount);
@@ -70,6 +73,59 @@ export default function PickleballSettings({ data, onAction }) {
               {d.sessionsCount} buổi × {d.memberCount} thành viên
             </div>
           </div>
+
+          {/* Members participation */}
+          <SectionLabel>Thành viên tháng này</SectionLabel>
+          <Card style={{ padding: '6px 16px' }}>
+            {members.length === 0 && (
+              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 0' }}>
+                Chưa có thành viên trong nhóm
+              </div>
+            )}
+            {members.map((m, i) => (
+              <div key={m.id || i} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
+                borderBottom: i < members.length - 1 ? `1px solid ${colors.borderSubtle}` : 'none',
+              }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'rgba(99,102,241,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 700, color: '#c7d2fe',
+                }}>{m.initial}</div>
+                <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</div>
+                <button
+                  onClick={() => setMembers(prev => prev.map((x, j) =>
+                    j === i ? { ...x, activeThisMonth: !x.activeThisMonth } : x
+                  ))}
+                  style={{
+                    width: 42, height: 24, borderRadius: 100,
+                    background: m.activeThisMonth ? colors.brand : 'rgba(255,255,255,0.10)',
+                    position: 'relative', border: 'none',
+                    boxShadow: m.activeThisMonth ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
+                    flexShrink: 0, cursor: 'pointer',
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: '50%', background: 'white',
+                    position: 'absolute', top: 3,
+                    right: m.activeThisMonth ? 3 : 'auto',
+                    left: m.activeThisMonth ? 'auto' : 3,
+                  }} />
+                </button>
+              </div>
+            ))}
+            <button
+              onClick={() => onAction?.('addMember')}
+              style={{
+                width: '100%', marginTop: 8, padding: '10px 14px',
+                border: '1px dashed rgba(99,102,241,0.4)',
+                background: 'transparent', borderRadius: 12,
+                color: colors.brandLight, fontSize: 12, fontWeight: 700,
+                fontFamily: 'inherit', cursor: 'pointer',
+              }}
+            >+ Thêm thành viên</button>
+          </Card>
 
           {/* Weekday picker */}
           <div style={{
@@ -158,7 +214,12 @@ export default function PickleballSettings({ data, onAction }) {
             color: '#c7d2fe',
             border: '1px solid rgba(99,102,241,0.35)',
           }} onClick={() => onAction?.('batchEntry')}>📋 Nhập chi phí sân tháng này</Button>
-          <Button block variant="brand" style={{ marginTop: 8 }} onClick={() => onAction?.('save', { courtFee, weekdays: Array.from(weekdays), autoGen })}>💾 Lưu cài đặt</Button>
+          <Button block variant="brand" style={{ marginTop: 8 }} onClick={() => onAction?.('save', {
+            courtFee,
+            weekdays: Array.from(weekdays),
+            autoGen,
+            memberParticipation: members.map(m => ({ id: m.id, activeThisMonth: m.activeThisMonth })),
+          })}>💾 Lưu cài đặt</Button>
         </div>
       </div>
     </div>
@@ -211,6 +272,7 @@ const DEMO = {
   clubName: 'Cầu Giấy',
   courtFeeTotal: 3120000,
   sessionsCount: 13, memberCount: 12,
+  members: [],
   weekdays: ['T2','T4','T6'],
   timeRange: '19:00 – 21:00',
   startDate: '01/05/2026',
