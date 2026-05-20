@@ -44,10 +44,12 @@
 
 ### Claude Code — nhận task mới
 1. Check Superpowers skill có apply không
-2. Task phức tạp → `brainstorming` trước
-3. `writing-plans` → chia task theo heuristic: 1 task = 1 commit reviewable
-4. Gọi Codex từng task với prompt chuẩn (goal + files + constraints)
-5. Review output qua `git diff` + commit message
+2. Task phức tạp → `brainstorming` trước → spec → lưu `docs/superpowers/specs/`
+3. Gọi Codex: `writing-plans` (Codex đọc codebase + spec → technical checklist)
+4. Review plan → approve hoặc feedback cụ thể
+5. Nếu vấn đề → Codex revise, tối đa **2 lần** → vẫn chưa ổn → Claude sửa thẳng file `.md`
+6. Gọi Codex: `executing-plans` → Codex tự parallelize task độc lập, implement + TDD + commit
+7. Review output thực thi qua `git diff` + commit message
 
 ### Codex — nhận task từ Claude
 1. Đọc file liên quan để lấy context (tự đọc, không cần Claude paste)
@@ -85,6 +87,6 @@
 
 ---
 
-*Cập nhật: 2026-05-20*
+*Cập nhật: 2026-05-20 (sync workflow Claude Code — nhận task mới)*
 
 <!-- template: 2026-05-20 -->
