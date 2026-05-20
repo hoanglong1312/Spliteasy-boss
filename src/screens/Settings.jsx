@@ -1,5 +1,5 @@
 // Spliteasy Boss — Cài đặt tài khoản
-// Props: data { banks[], pinEnabled, faceIdEnabled, language, version, accountHolder }
+// Props: data { banks[], pinEnabled, language, version, accountHolder }
 
 import React, { useState } from 'react';
 import { colors, type } from '../tokens';
@@ -9,9 +9,12 @@ import {
 
 export default function Settings({ data, onAction }) {
   const d = data || DEMO;
-  const [pin, setPin] = useState(d.pinEnabled);
-  const [faceId, setFaceId] = useState(d.faceIdEnabled);
+  const [pinSet, setPinSet] = useState(d.pinEnabled);
   const primaryBank = d.banks.find((b) => b.primary) || d.banks[0];
+  const [editingBank, setEditingBank] = useState(false);
+  const [bankName, setBankName] = useState(primaryBank?.name || '');
+  const [bankAccount, setBankAccount] = useState(primaryBank?.accountRaw || primaryBank?.accountMasked || '');
+  const [bankOwner, setBankOwner] = useState(d.accountHolder || '');
 
   return (
     <PhoneFrame>
@@ -46,10 +49,25 @@ export default function Settings({ data, onAction }) {
             <span style={{ color: colors.textSecondary }}>Chủ tài khoản</span>
             <span style={{ fontWeight: 700 }}>{d.accountHolder}</span>
           </div>
-          <Button block variant="ghost" style={{ padding: 10, fontSize: 12 }}
-            onClick={() => onAction?.('editBank', primaryBank)}>
-            ✏️ Sửa thông tin
-          </Button>
+          {editingBank ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              <BankInput label="Tên ngân hàng" value={bankName} onChange={setBankName} placeholder="Vietcombank" />
+              <BankInput label="Số tài khoản" value={bankAccount} onChange={setBankAccount} placeholder="1027 8438 1234" />
+              <BankInput label="Chủ tài khoản" value={bankOwner} onChange={setBankOwner} placeholder="NGUYEN VAN A" />
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={() => setEditingBank(false)}>Huỷ</Button>
+                <Button variant="brand" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={() => {
+                  onAction?.('saveBank', { bankName, bankAccount, bankAccountName: bankOwner });
+                  setEditingBank(false);
+                }}>Lưu</Button>
+              </div>
+            </div>
+          ) : (
+            <Button block variant="ghost" style={{ padding: 10, fontSize: 12 }}
+              onClick={() => setEditingBank(true)}>
+              ✏️ Sửa thông tin
+            </Button>
+          )}
         </Card>
 
         {/* Add second bank */}
@@ -68,52 +86,44 @@ export default function Settings({ data, onAction }) {
         {/* Security */}
         <SectionLabel>Bảo mật</SectionLabel>
         <Card style={{ padding: '6px 16px' }}>
-          <SettingRow
-            icon="🔒" iconBg="rgba(52,211,153,0.12)"
-            title="PIN ứng dụng" sub="Yêu cầu khi mở app · Đã đặt"
-            right={<Toggle on={pin} onChange={setPin} />}
-          />
-          <SettingRow
-            icon="🔑" iconBg="rgba(167,139,250,0.12)"
-            title="Đổi PIN" sub="Cập nhật mã 6 số"
-            onClick={() => onAction?.('changePin')}
-            right={<Caret />}
-          />
-          <SettingRow
-            icon="👆" iconBg="rgba(99,102,241,0.12)"
-            title="Face ID" sub="Mở khoá bằng khuôn mặt"
-            right={<Toggle on={faceId} onChange={setFaceId} />}
-          />
-        </Card>
-
-        {/* PIN entry preview */}
-        {pin && (
-          <div style={{
-            marginTop: 10, padding: '18px 16px',
-            background: 'rgba(99,102,241,0.06)',
-            border: '1px solid rgba(99,102,241,0.2)',
-            borderRadius: 14, textAlign: 'center',
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0' }}>
             <div style={{
-              fontSize: 10, color: '#c7d2fe', fontWeight: 700,
-              letterSpacing: '0.5px', textTransform: 'uppercase',
-              marginBottom: 14,
-            }}>Nhập PIN hiện tại</div>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              {[0, 1, 2, 3, 4, 5].map((i) => {
-                const filled = i < 4;
-                return (
-                  <div key={i} style={{
-                    width: 16, height: 16, borderRadius: '50%',
-                    background: filled ? colors.brand : 'transparent',
-                    border: filled ? 'none' : '1.5px solid rgba(255,255,255,0.2)',
-                    boxShadow: filled ? '0 0 8px rgba(99,102,241,0.4)' : 'none',
-                  }} />
-                );
-              })}
+              width: 38, height: 38, borderRadius: 12,
+              background: 'rgba(52,211,153,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 17, flexShrink: 0,
+            }}>🔒</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>PIN ứng dụng</div>
+              <div style={{ fontSize: 11, color: pinSet ? '#6ee7b7' : colors.textSecondary, marginTop: 2 }}>
+                {pinSet ? '● ● ● ● ● ●  Đang bật' : 'Chưa đặt · Chạm để thiết lập'}
+              </div>
             </div>
+            {pinSet ? (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => onAction?.('changePin')} style={{
+                  padding: '5px 10px', borderRadius: 8,
+                  background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
+                  color: '#c7d2fe', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}>Đổi</button>
+                <button onClick={() => { onAction?.('removePin'); setPinSet(false); }} style={{
+                  padding: '5px 10px', borderRadius: 8,
+                  background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
+                  color: '#fca5a5', fontSize: 11, fontWeight: 700,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}>Xoá</button>
+              </div>
+            ) : (
+              <button onClick={() => { onAction?.('setPin'); setPinSet(true); }} style={{
+                padding: '5px 12px', borderRadius: 8,
+                background: 'rgba(52,211,153,0.15)', border: '1px solid rgba(52,211,153,0.3)',
+                color: '#6ee7b7', fontSize: 11, fontWeight: 700,
+                fontFamily: 'inherit', cursor: 'pointer',
+              }}>Đặt ngay</button>
+            )}
           </div>
-        )}
+        </Card>
 
         {/* App */}
         <SectionLabel>Ứng dụng</SectionLabel>
@@ -173,6 +183,27 @@ export default function Settings({ data, onAction }) {
   );
 }
 
+function BankInput({ label, value, onChange, placeholder }) {
+  return (
+    <div>
+      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: colors.textSecondary, marginBottom: 4 }}>{label}</div>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 10, padding: '10px 12px',
+          color: '#f1f5f9', fontSize: 13, fontFamily: 'inherit',
+          outline: 'none',
+        }}
+      />
+    </div>
+  );
+}
+
 function SectionLabel({ children }) {
   return (
     <div style={{
@@ -204,24 +235,6 @@ function SettingRow({ icon, iconBg, title, sub, right, onClick }) {
   );
 }
 
-function Toggle({ on, onChange }) {
-  return (
-    <button onClick={() => onChange?.(!on)} style={{
-      width: 42, height: 24, borderRadius: 100,
-      background: on ? colors.brand : 'rgba(255,255,255,0.10)',
-      position: 'relative', border: 'none',
-      boxShadow: on ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
-      flexShrink: 0, cursor: 'pointer',
-    }}>
-      <div style={{
-        width: 18, height: 18, borderRadius: '50%', background: 'white',
-        position: 'absolute', top: 3,
-        right: on ? 3 : 'auto', left: on ? 'auto' : 3,
-        transition: 'all 0.18s ease',
-      }} />
-    </button>
-  );
-}
 
 function Caret() {
   return <span style={{ color: colors.brandLight, fontSize: 18 }}>›</span>;
@@ -234,7 +247,6 @@ const DEMO = {
       brandColor: 'linear-gradient(135deg,#0066b3,#003a70)', primary: true },
   ],
   pinEnabled: true,
-  faceIdEnabled: false,
   language: 'Tiếng Việt',
   version: 'v2.4.1',
 };
