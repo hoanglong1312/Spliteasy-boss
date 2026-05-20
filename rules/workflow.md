@@ -1,48 +1,10 @@
-# Codex Workflow Rules — SpliteasyBoss
+# Workflow Overrides — SpliteasyBoss
 
-## Phân công vai trò
+*Project-specific overrides. Quy trình chung xem `~/.claude/templates/code-project.md`.*
 
-| Phase | Công cụ | Việc làm |
-|-------|---------|----------|
-| Planning | Superpowers (Claude plugin) | brainstorming → spec → writing-plans |
-| Execution | Codex MCP | Viết/sửa code, commit, chạy lệnh |
-| Orchestration + QA | Claude main | Quyết định kiến trúc, review output, quality gate |
+---
 
-**Lưu ý:**
-- `subagent-driven-development` của Claude main **không dùng trong luồng thường** — Codex thay thế vai trò implementer
-- **Emergency fallback** (Codex lỗi/không khả dụng): Claude main được dùng Edit/Write trực tiếp, nhưng phải ghi chú lý do trong commit message
-
-## Luồng làm việc
-
-### Feature mới
-1. Superpowers `brainstorming` → spec
-2. Superpowers `writing-plans` → plan
-3. Gọi Codex từng task → Codex tự đọc file, implement, commit
-4. Claude main review (adversarial)
-5. Nếu có vấn đề: gọi Codex lại với feedback cụ thể
-6. Quality Gate (xem `rules/testing.md`)
-7. Chỉ khi pass → bàn giao user test
-
-### Bug fix / small change
-1. Claude main phân tích sơ bộ (git log, git diff)
-2. Nếu cần trace source code → gọi Codex `read-only` để đọc file và báo cáo root cause (không fix)
-3. Claude main đánh giá root cause → quyết định approach
-4. Gọi Codex `workspace-write` fix trực tiếp
-5. Quality Gate rút gọn: `npm run build` + Claude main chạy Playwright
-
-## Cách gọi Codex
-
-```
-Tool: mcp__codex__codex
-sandbox: "workspace-write"
-approval-policy: "never"
-```
-
-Prompt phải có: Goal + Danh sách file + Constraints + Lệnh git commit
-
-⚠️ **Constraint bắt buộc trong mọi Codex prompt:** Không yêu cầu Codex chạy `npx playwright test` hay khởi động dev server — sandbox bị EPERM. Chỉ yêu cầu `npm run build`.
-
-## Superpowers Skills — Cái nào còn dùng
+## Superpowers Skills — Cái Nào Dùng Trong Project Này
 
 | Skill | Áp dụng |
 |-------|---------|
@@ -54,19 +16,22 @@ Prompt phải có: Goal + Danh sách file + Constraints + Lệnh git commit
 | `subagent-driven-development` | ❌ Codex thay thế — không invoke trong main session |
 | `requesting-code-review` | ❌ Thay bằng Quality Gate trong `rules/testing.md` |
 
-## Token Discipline — Claude Main Session
+---
 
-**KHÔNG làm:**
-- Đọc file source code thay cho Codex
-- Paste nội dung file vào Codex prompt
-- Dùng Edit/Write cho file .jsx/.js/.sql
-- Dispatch Claude subagent làm middleman
-- Bảo user tự chạy SQL khi đã có Supabase MCP
+## Constraints Đặc Thù
 
-**CHỈ làm:**
-- Đọc git log / git diff
-- Viết/sửa file .md (plan, spec, rules)
-- Gọi Codex: goal + file paths + constraints
-- Review output Codex (adversarial)
-- Quyết định kiến trúc trước khi giao Codex
-- Dùng Supabase MCP cho mọi thao tác database
+### Sandbox EPERM
+Codex `workspace-write` sandbox không bind được network port.  
+→ **Không** yêu cầu Codex chạy `npx playwright test` hay khởi động dev server.  
+→ Codex chỉ chạy `npm run build`. Claude main chạy Playwright trực tiếp.
+
+### Git Lock Khi Chạy Codex Song Song
+Hai Codex session đồng thời có thể tranh `.git/index.lock` → một session không commit được.  
+→ Claude main commit thủ công khi Codex báo lỗi lock:
+```bash
+git add [files Codex báo]
+git commit -m "[message Codex đề xuất]"
+```
+
+### Emergency Fallback
+Nếu Codex lỗi/không khả dụng: Claude main dùng Edit/Write trực tiếp, ghi chú lý do trong commit message.

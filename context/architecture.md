@@ -44,7 +44,8 @@ docs/
 │   │   └── 2026-05-17-database-migration-design.md
 │   └── plans/
 │       ├── 2026-05-16-data-layer-analysis.md
-│       └── 2026-05-17-plan1-supabase-setup.md
+│       ├── 2026-05-17-plan1-supabase-setup.md
+│       └── 2026-05-20-qa-review-all-features.md
 ```
 
 ## Lộ trình phát triển
@@ -54,12 +55,14 @@ Phase 0: Phân tích & Thiết kế    ✅ XONG
 Phase 1: UI/UX Design            ✅ XONG
 Phase 3: Thực thi Database       ✅ XONG
 Phase 4: Frontend Migration      ✅ XONG
-Phase 5: Tính năng mới           🔄 UI hoàn chỉnh, đang QA thực tế
-  B1 — Realtime sync + Toast
-  A1 — Tab Hồ sơ (color picker, logout)
-  A2 — Tab Nhóm nâng cao (filter)
-  A3 — Vé lẻ Pickleball
-  A4 — Personal Dashboard
-  B3 — Export báo cáo (CSV)
-  B2 — Push notifications
+Phase 5: Tính năng mới           🔄 đang user test thực tế
+  ✅ PIN gate — đặt/đổi/xóa, text input dialog
+  ✅ AddExpense — default payer, edit mode, filter đa tiêu chí
+  ✅ PickleballSettings — monthly participation save, add/delete member
+  ✅ Home — click-to-detail, permission-based edit/delete
+  ✅ Supabase saves — expense, member, pickleball config
+  🔄 B1 — Realtime sync + Toast
+  🔄 A4 — Personal Dashboard
+  ❌ B2 — Push notifications
+  ❌ B3 — Export CSV (đã bỏ theo yêu cầu)
 ```
