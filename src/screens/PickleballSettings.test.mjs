@@ -40,7 +40,7 @@ test('PickleballSettings treasurer can deactivate members from the row', () => {
   assert.match(dataSource, /currentRole/);
   assert.match(settingsSource, /d\.currentRole === 'treasurer'/);
   assert.match(settingsSource, /onAction\?\.\('deleteMember'/);
-  assert.match(settingsSource, /confirm\(`Xóa \$\{m\.name\} khỏi nhóm\?`\)/);
+  assert.match(settingsSource, /window\.confirm\(`Xác nhận xóa thành viên \$\{m\.name\}\? Thao tác này sẽ vô hiệu hóa tài khoản của họ\.`\)/);
   assert.match(appSource, /type === 'deleteMember'/);
   assert.match(appSource, /\.from\('members'\)/);
   assert.match(appSource, /is_active: false/);

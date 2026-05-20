@@ -55,7 +55,7 @@ export default function PickleballSettings({ data, onAction }) {
   }
 
   async function deleteMember(m) {
-    if (!confirm(`Xóa ${m.name} khỏi nhóm?`)) return;
+    if (!window.confirm(`Xác nhận xóa thành viên ${m.name}? Thao tác này sẽ vô hiệu hóa tài khoản của họ.`)) return;
     setMembers(prev => prev.filter(x => String(x.id) !== String(m.id)));
     setActiveMemberIds(prev => {
       const next = new Set(prev);
