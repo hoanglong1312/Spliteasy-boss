@@ -21,11 +21,12 @@ export default function PickleballSettings({ data, onAction }) {
 
   return (
     <div style={{
-      width: 375, minHeight: 812, margin: '24px auto', position: 'relative',
+      width: 375, height: '100%', minHeight: 812, maxHeight: 812, margin: '24px auto', position: 'relative',
       background: colors.shellBg, borderRadius: 38, overflow: 'hidden',
       border: `1px solid ${colors.borderNormal}`,
       boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 8px #1a1c28',
       fontFamily: type.family, color: colors.textPrimary,
+      display: 'flex', flexDirection: 'column',
     }}>
       <div style={{
         position: 'absolute', inset: 0,
@@ -33,12 +34,13 @@ export default function PickleballSettings({ data, onAction }) {
         opacity: 0.4,
       }} />
 
-      <div style={{ position: 'relative', paddingTop: 60 }}>
+      <div style={{ position: 'relative', paddingTop: 60, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <div style={{
           background: colors.shellBg,
           borderTopLeftRadius: 28, borderTopRightRadius: 28,
           borderTop: `1px solid ${colors.borderNormal}`,
-          padding: '14px 16px 24px', minHeight: 720,
+          padding: '14px 16px 0', minHeight: 0, flex: 1,
+          display: 'flex', flexDirection: 'column',
           boxShadow: '0 -30px 60px rgba(0,0,0,0.6)',
         }}>
           <div style={{ width: 40, height: 4, background: 'rgba(255,255,255,0.15)', borderRadius: 100, margin: '0 auto 18px' }} />
@@ -55,6 +57,7 @@ export default function PickleballSettings({ data, onAction }) {
             }}>✕</button>
           </div>
 
+          <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingBottom: 24 }}>
           {/* Court fee */}
           <Input label="Tiền sân tháng" suffix="đ"
             value={courtFee.toLocaleString('vi-VN')}
@@ -220,6 +223,7 @@ export default function PickleballSettings({ data, onAction }) {
             autoGen,
             memberParticipation: members.map(m => ({ id: m.id, activeThisMonth: m.activeThisMonth })),
           })}>💾 Lưu cài đặt</Button>
+          </div>
         </div>
       </div>
     </div>

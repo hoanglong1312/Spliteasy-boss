@@ -142,7 +142,7 @@ export default function AppV2() {
     }
 
     if (type === 'addMember') {
-      alert('Tính năng thêm thành viên sẽ được cập nhật sớm.')
+      alert('Chức năng thêm thành viên — coming soon')
       return
     }
 
