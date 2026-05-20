@@ -51,29 +51,25 @@ test('Home transactions carry relationship metadata for the Của tôi filter', 
   assert.match(screenDataSource, /safeArray\(expense\?\.splits\)\.some\(split => String\(split\.memberId \|\| split\.member_id\) === id\)/);
 });
 
-test('Home renders personal balance inside the main hero card', () => {
-  assert.match(homeSource, /const memberName = d\.currentUserName \|\| d\.user\.name \|\| d\.user\.firstName/);
-  assert.match(homeSource, /const personalBalance = d\.currentUserId\s*\?\s*calculatePersonalBalance\(d\.expenses, d\.currentUserId\)\s*:\s*null/);
-  assert.match(homeSource, /\{personalBalance && \(/);
-  assert.match(homeSource, /\{memberName \|\| 'Bạn'\}/);
-  assert.match(homeSource, /\{formatPersonalBalanceNet\(personalBalance\.net\)\}/);
-  assert.match(homeSource, /personalBalance\.owes > 0 \|\| personalBalance\.owed > 0/);
-  assert.match(homeSource, /Nợ: \{formatDong\(personalBalance\.owes\)\} · Được nợ: \{formatDong\(personalBalance\.owed\)\}/);
+test('Home does not render personal balance inside the main hero card', () => {
+  assert.doesNotMatch(homeSource, /const memberName = d\.currentUserName \|\| d\.user\.name \|\| d\.user\.firstName/);
+  assert.doesNotMatch(homeSource, /const personalBalance = d\.currentUserId\s*\?\s*calculatePersonalBalance\(d\.expenses, d\.currentUserId\)\s*:\s*null/);
+  assert.doesNotMatch(homeSource, /\{personalBalance && \(/);
+  assert.doesNotMatch(homeSource, /\{memberName \|\| 'Bạn'\}/);
+  assert.doesNotMatch(homeSource, /\{formatPersonalBalanceNet\(personalBalance\.net\)\}/);
+  assert.doesNotMatch(homeSource, /personalBalance\.owes > 0 \|\| personalBalance\.owed > 0/);
+  assert.doesNotMatch(homeSource, /Nợ: \{formatDong\(personalBalance\.owes\)\} · Được nợ: \{formatDong\(personalBalance\.owed\)\}/);
   assert.doesNotMatch(homeSource, /<PersonalBalance/);
   assert.doesNotMatch(homeSource, /function PersonalBalance/);
   assert.doesNotMatch(homeSource, /background: '#1e293b'/);
 });
 
-test('Home personal balance helper uses paidBy, splits, participants, and per-expense member IDs', () => {
-  assert.match(homeSource, /function calculatePersonalBalance\(expenses, currentUserId\)/);
-  assert.match(homeSource, /const memberId = expense\.currentMemberId \|\| currentUserId/);
-  assert.match(homeSource, /if \(!isBalanceStatus\(expense\.status\)\) return totals/);
-  assert.match(homeSource, /if \(String\(expense\.paidBy \|\| ''\) === String\(memberId\)\)/);
-  assert.match(homeSource, /owed: totals\.owed \+ Math\.max\(amount - myShare, 0\)/);
-  assert.match(homeSource, /owes: totals\.owes \+ myShare/);
-  assert.match(homeSource, /function shareForMember\(expense, memberId\)/);
-  assert.match(homeSource, /const split = safeArray\(expense\.splits\)\.find\(item => String\(item\.memberId\) === String\(memberId\)\)/);
-  assert.match(homeSource, /return index === participants\.length - 1 \? amount - per \* \(participants\.length - 1\) : per/);
+test('Home removes unused personal balance helpers', () => {
+  assert.doesNotMatch(homeSource, /function calculatePersonalBalance\(expenses, currentUserId\)/);
+  assert.doesNotMatch(homeSource, /function shareForMember\(expense, memberId\)/);
+  assert.doesNotMatch(homeSource, /function isBalanceStatus\(status\)/);
+  assert.doesNotMatch(homeSource, /function formatDong\(value\)/);
+  assert.doesNotMatch(homeSource, /function formatPersonalBalanceNet\(value\)/);
 });
 
 test('Home has a controlled Của tôi filter that composes with existing filters', () => {

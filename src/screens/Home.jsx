@@ -29,10 +29,6 @@ export default function Home({ data, onAction }) {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(false);
   const isNeg = d.totalBalance < 0;
-  const memberName = d.currentUserName || d.user.name || d.user.firstName;
-  const personalBalance = d.currentUserId
-    ? calculatePersonalBalance(d.expenses, d.currentUserId)
-    : null;
   const normalizedFilter = filterText.trim().toLowerCase();
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
@@ -77,22 +73,6 @@ export default function Home({ data, onAction }) {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isNeg ? colors.danger : colors.success, boxShadow: `0 0 8px ${isNeg ? 'rgba(248,113,113,0.6)' : 'rgba(52,211,153,0.6)'}` }} />
             {isNeg ? `Bạn còn nợ ${d.owedTo} người` : 'Cân bằng'}
           </div>
-          {personalBalance && (
-            <div style={{ marginTop: 12, color: colors.textSecondary }}>
-              <div style={{
-                display: 'flex', alignItems: 'baseline', justifyContent: 'center',
-                gap: 6, fontSize: 13, fontWeight: 700,
-              }}>
-                <span>{memberName || 'Bạn'}</span>
-                <span style={{ ...type.mono }}>{formatPersonalBalanceNet(personalBalance.net)}</span>
-              </div>
-              {(personalBalance.owes > 0 || personalBalance.owed > 0) && (
-                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>
-                  Nợ: {formatDong(personalBalance.owes)} · Được nợ: {formatDong(personalBalance.owed)}
-                </div>
-              )}
-            </div>
-          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('addExpense')}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('payment')}>⚡ Thanh toán</Button>
@@ -237,65 +217,6 @@ export default function Home({ data, onAction }) {
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
   );
-}
-
-function calculatePersonalBalance(expenses, currentUserId) {
-  const totals = safeArray(expenses).reduce((totals, expense) => {
-    const memberId = expense.currentMemberId || currentUserId;
-    if (!isBalanceStatus(expense.status)) return totals;
-
-    const amount = Number(expense.amount) || 0;
-    const myShare = shareForMember(expense, memberId);
-    if (String(expense.paidBy || '') === String(memberId)) {
-      return {
-        owed: totals.owed + Math.max(amount - myShare, 0),
-        owes: totals.owes,
-      };
-    }
-
-    if (myShare > 0) {
-      return {
-        owed: totals.owed,
-        owes: totals.owes + myShare,
-      };
-    }
-
-    return totals;
-  }, { owed: 0, owes: 0 });
-
-  return {
-    ...totals,
-    net: totals.owed - totals.owes,
-  };
-}
-
-function shareForMember(expense, memberId) {
-  const split = safeArray(expense.splits).find(item => String(item.memberId) === String(memberId));
-  if (split) return Number(split.amount) || 0;
-
-  const participants = safeArray(expense.participants);
-  const index = participants.findIndex(id => String(id) === String(memberId));
-  if (index === -1 || participants.length === 0) return 0;
-
-  const amount = Number(expense.amount) || 0;
-  const per = Math.round(amount / participants.length);
-  return index === participants.length - 1 ? amount - per * (participants.length - 1) : per;
-}
-
-function isBalanceStatus(status) {
-  const value = String(status || '').toLowerCase();
-  return value === '' || value === 'approved' || value === 'settled' || value === 'done' || value === 'closed';
-}
-
-function formatDong(value) {
-  return `${Math.round(Math.abs(Number(value) || 0)).toLocaleString('vi-VN')}đ`;
-}
-
-function formatPersonalBalanceNet(value) {
-  const amount = Math.round(Number(value) || 0);
-  if (amount > 0) return `+${formatDong(amount)}`;
-  if (amount < 0) return `-${formatDong(amount)}`;
-  return formatDong(0);
 }
 
 function safeArray(value) {
