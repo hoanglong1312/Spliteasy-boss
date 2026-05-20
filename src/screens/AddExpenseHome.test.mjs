@@ -51,6 +51,28 @@ test('Home transactions carry relationship metadata for the Của tôi filter', 
   assert.match(screenDataSource, /safeArray\(expense\?\.splits\)\.some\(split => String\(split\.memberId \|\| split\.member_id\) === id\)/);
 });
 
+test('Home renders a PersonalBalance banner only when a current user exists', () => {
+  assert.match(homeSource, /<PersonalBalance\s+expenses=\{d\.expenses\}\s+currentUserId=\{d\.currentUserId\}\s+memberName=\{d\.currentUserName \|\| d\.user\.name \|\| d\.user\.firstName\}\s+\/>/);
+  assert.match(homeSource, /function PersonalBalance\(\{ expenses, currentUserId, memberName \}\)/);
+  assert.match(homeSource, /if \(!currentUserId\) return null/);
+  assert.match(homeSource, /const balance = calculatePersonalBalance\(expenses, currentUserId\)/);
+  assert.match(homeSource, /background: '#1e293b'/);
+  assert.match(homeSource, /borderRadius: 8/);
+  assert.match(homeSource, /Nợ: \{formatDong\(balance\.owes\)\} · Được nợ: \{formatDong\(balance\.owed\)\}/);
+});
+
+test('Home personal balance helper uses paidBy, splits, participants, and per-expense member IDs', () => {
+  assert.match(homeSource, /function calculatePersonalBalance\(expenses, currentUserId\)/);
+  assert.match(homeSource, /const memberId = expense\.currentMemberId \|\| currentUserId/);
+  assert.match(homeSource, /if \(!isBalanceStatus\(expense\.status\)\) return totals/);
+  assert.match(homeSource, /if \(String\(expense\.paidBy \|\| ''\) === String\(memberId\)\)/);
+  assert.match(homeSource, /owed: totals\.owed \+ Math\.max\(amount - myShare, 0\)/);
+  assert.match(homeSource, /owes: totals\.owes \+ myShare/);
+  assert.match(homeSource, /function shareForMember\(expense, memberId\)/);
+  assert.match(homeSource, /const split = safeArray\(expense\.splits\)\.find\(item => String\(item\.memberId\) === String\(memberId\)\)/);
+  assert.match(homeSource, /return index === participants\.length - 1 \? amount - per \* \(participants\.length - 1\) : per/);
+});
+
 test('Home expense rows open expense detail instead of edit form', () => {
   assert.match(homeSource, /onAction\?\.\('viewExpense', \{ expenseId: tx\.id \}\)/);
   assert.match(homeSource, /onClick=\{onView\}/);
