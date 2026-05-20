@@ -51,14 +51,17 @@ test('Home transactions carry relationship metadata for the Của tôi filter', 
   assert.match(screenDataSource, /safeArray\(expense\?\.splits\)\.some\(split => String\(split\.memberId \|\| split\.member_id\) === id\)/);
 });
 
-test('Home renders a PersonalBalance banner only when a current user exists', () => {
-  assert.match(homeSource, /<PersonalBalance\s+expenses=\{d\.expenses\}\s+currentUserId=\{d\.currentUserId\}\s+memberName=\{d\.currentUserName \|\| d\.user\.name \|\| d\.user\.firstName\}\s+\/>/);
-  assert.match(homeSource, /function PersonalBalance\(\{ expenses, currentUserId, memberName \}\)/);
-  assert.match(homeSource, /if \(!currentUserId\) return null/);
-  assert.match(homeSource, /const balance = calculatePersonalBalance\(expenses, currentUserId\)/);
-  assert.match(homeSource, /background: '#1e293b'/);
-  assert.match(homeSource, /borderRadius: 8/);
-  assert.match(homeSource, /Nợ: \{formatDong\(balance\.owes\)\} · Được nợ: \{formatDong\(balance\.owed\)\}/);
+test('Home renders personal balance inside the main hero card', () => {
+  assert.match(homeSource, /const memberName = d\.currentUserName \|\| d\.user\.name \|\| d\.user\.firstName/);
+  assert.match(homeSource, /const personalBalance = d\.currentUserId\s*\?\s*calculatePersonalBalance\(d\.expenses, d\.currentUserId\)\s*:\s*null/);
+  assert.match(homeSource, /\{personalBalance && \(/);
+  assert.match(homeSource, /\{memberName \|\| 'Bạn'\}/);
+  assert.match(homeSource, /\{formatPersonalBalanceNet\(personalBalance\.net\)\}/);
+  assert.match(homeSource, /personalBalance\.owes > 0 \|\| personalBalance\.owed > 0/);
+  assert.match(homeSource, /Nợ: \{formatDong\(personalBalance\.owes\)\} · Được nợ: \{formatDong\(personalBalance\.owed\)\}/);
+  assert.doesNotMatch(homeSource, /<PersonalBalance/);
+  assert.doesNotMatch(homeSource, /function PersonalBalance/);
+  assert.doesNotMatch(homeSource, /background: '#1e293b'/);
 });
 
 test('Home personal balance helper uses paidBy, splits, participants, and per-expense member IDs', () => {

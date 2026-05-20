@@ -29,6 +29,10 @@ export default function Home({ data, onAction }) {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(false);
   const isNeg = d.totalBalance < 0;
+  const memberName = d.currentUserName || d.user.name || d.user.firstName;
+  const personalBalance = d.currentUserId
+    ? calculatePersonalBalance(d.expenses, d.currentUserId)
+    : null;
   const normalizedFilter = filterText.trim().toLowerCase();
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
@@ -73,6 +77,22 @@ export default function Home({ data, onAction }) {
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isNeg ? colors.danger : colors.success, boxShadow: `0 0 8px ${isNeg ? 'rgba(248,113,113,0.6)' : 'rgba(52,211,153,0.6)'}` }} />
             {isNeg ? `Bạn còn nợ ${d.owedTo} người` : 'Cân bằng'}
           </div>
+          {personalBalance && (
+            <div style={{ marginTop: 12, color: colors.textSecondary }}>
+              <div style={{
+                display: 'flex', alignItems: 'baseline', justifyContent: 'center',
+                gap: 6, fontSize: 13, fontWeight: 700,
+              }}>
+                <span>{memberName || 'Bạn'}</span>
+                <span style={{ ...type.mono }}>{formatPersonalBalanceNet(personalBalance.net)}</span>
+              </div>
+              {(personalBalance.owes > 0 || personalBalance.owed > 0) && (
+                <div style={{ fontSize: 11, fontWeight: 600, marginTop: 4 }}>
+                  Nợ: {formatDong(personalBalance.owes)} · Được nợ: {formatDong(personalBalance.owed)}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('addExpense')}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('payment')}>⚡ Thanh toán</Button>
@@ -101,12 +121,6 @@ export default function Home({ data, onAction }) {
             <div style={{ color: colors.brandLight, fontSize: 18 }}>›</div>
           </Card>
         )}
-
-        <PersonalBalance
-          expenses={d.expenses}
-          currentUserId={d.currentUserId}
-          memberName={d.currentUserName || d.user.name || d.user.firstName}
-        />
 
         <SectionLabel action="Xem tất cả →">Giao dịch gần đây</SectionLabel>
         <div style={{ position: 'relative', marginBottom: 8 }}>
@@ -225,42 +239,6 @@ export default function Home({ data, onAction }) {
   );
 }
 
-function PersonalBalance({ expenses, currentUserId, memberName }) {
-  if (!currentUserId) return null;
-
-  const balance = calculatePersonalBalance(expenses, currentUserId);
-  const netColor = balance.net > 0
-    ? colors.success
-    : balance.net < 0
-      ? colors.danger
-      : colors.textSecondary;
-  const netLabel = balance.net > 0
-    ? `+${formatDong(balance.net)}`
-    : balance.net < 0
-      ? `-${formatDong(Math.abs(balance.net))}`
-      : formatDong(0);
-
-  return (
-    <div style={{
-      background: '#1e293b',
-      borderRadius: 8,
-      padding: '12px 16px',
-      margin: '0 0 8px',
-      border: '1px solid rgba(255,255,255,0.06)',
-    }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: colors.textSecondary }}>
-        {memberName || 'Bạn'}
-      </div>
-      <div style={{ ...type.amountSm, ...type.mono, marginTop: 4, color: netColor }}>
-        {netLabel}
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 600, color: colors.textSecondary, marginTop: 4 }}>
-        Nợ: {formatDong(balance.owes)} · Được nợ: {formatDong(balance.owed)}
-      </div>
-    </div>
-  );
-}
-
 function calculatePersonalBalance(expenses, currentUserId) {
   const totals = safeArray(expenses).reduce((totals, expense) => {
     const memberId = expense.currentMemberId || currentUserId;
@@ -311,6 +289,13 @@ function isBalanceStatus(status) {
 
 function formatDong(value) {
   return `${Math.round(Math.abs(Number(value) || 0)).toLocaleString('vi-VN')}đ`;
+}
+
+function formatPersonalBalanceNet(value) {
+  const amount = Math.round(Number(value) || 0);
+  if (amount > 0) return `+${formatDong(amount)}`;
+  if (amount < 0) return `-${formatDong(amount)}`;
+  return formatDong(0);
 }
 
 function safeArray(value) {
