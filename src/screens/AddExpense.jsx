@@ -15,14 +15,20 @@ const CATEGORY_OPTIONS = [
 
 export default function AddExpense({ data, onAction }) {
   const d = data || DEMO;
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [paidBy, setPaidBy] = useState(d.members?.[0]?.id || '');
-  const [category, setCategory] = useState('general');
-  const [dateLabel, setDateLabel] = useState(todayLabel());
-  const [participants, setParticipants] = useState(
-    (d.members || []).map(m => ({ ...m, included: true }))
-  );
+  const editExpense = d.editExpense;
+  const [title, setTitle] = useState(() => editExpense?.title ?? '');
+  const [amount, setAmount] = useState(() => editExpense?.amount != null ? String(editExpense.amount) : '');
+  const [paidBy, setPaidBy] = useState(() => editExpense?.paidBy ?? d.currentMemberId ?? '');
+  const [category, setCategory] = useState(() => editExpense?.category ?? 'general');
+  const [dateLabel, setDateLabel] = useState(() => editExpense?.date ? dateLabelFromValue(editExpense.date) : todayLabel());
+  const [notes, setNotes] = useState(() => editExpense?.notes ?? '');
+  const [participants, setParticipants] = useState(() => {
+    const selected = new Set((editExpense?.participants || []).map(id => String(id)));
+    return (d.members || []).map(m => ({
+      ...m,
+      included: editExpense ? selected.has(String(m.id)) : true,
+    }));
+  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -64,12 +70,12 @@ export default function AddExpense({ data, onAction }) {
             <div style={{
               fontSize: 11, fontWeight: 700, color: colors.brandLight,
               letterSpacing: '1px', textTransform: 'uppercase',
-            }}>Chi tiêu mới · {d.groupName}</div>
+            }}>{editExpense ? 'Sửa chi tiêu' : 'Chi tiêu mới'} · {d.groupName}</div>
             <button onClick={() => onAction?.('close')} style={{
               fontSize: 20, color: colors.textMuted, background: 'none', border: 'none', cursor: 'pointer',
             }}>✕</button>
           </div>
-          <h1 style={{ ...type.title, fontSize: 24, marginBottom: 8 }}>Thêm chi tiêu</h1>
+          <h1 style={{ ...type.title, fontSize: 24, marginBottom: 8 }}>{editExpense ? 'Sửa chi tiêu' : 'Thêm chi tiêu'}</h1>
 
           {/* Amount focal */}
           <div style={{
@@ -157,6 +163,13 @@ export default function AddExpense({ data, onAction }) {
             placeholder="dd/mm/yyyy"
           />
 
+          <Input
+            label="Ghi chú"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Ghi chú thêm..."
+          />
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 6px' }}>
             <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary }}>
               Người tham gia · {activeCount}/{participants.length}
@@ -229,10 +242,13 @@ export default function AddExpense({ data, onAction }) {
               setSaving(true);
               try {
                 await onAction?.('save', {
+                  expenseId: editExpense?.id,
+                  groupId: editExpense?.groupId || d.groupId,
                   title: title.trim(),
                   amount: Number(amount),
                   paidBy,
                   category,
+                  notes: notes.trim(),
                   dateLabel,
                   participants: participants.filter(p => p.included).map(p => p.id),
                   splitMode: 'equal',
@@ -243,7 +259,7 @@ export default function AddExpense({ data, onAction }) {
               }
             }}
           >
-            {saving ? '⏳ Đang lưu...' : '💾 Lưu chi tiêu'}
+            {saving ? '⏳ Đang lưu...' : editExpense ? '💾 Cập nhật chi tiêu' : '💾 Lưu chi tiêu'}
           </Button>
         </div>
       </div>
@@ -319,8 +335,17 @@ function todayLabel() {
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
 }
 
+function dateLabelFromValue(value) {
+  const text = String(value || '');
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  return text || todayLabel();
+}
+
 const DEMO = {
   groupName: 'Ăn trưa thứ Bảy',
+  currentMemberId: 2,
+  currentMemberName: 'Minh',
   amount: 270000,
   title: 'Bún bò Huế Phở 24',
   payer:    { initial: 'M', name: 'Minh' },

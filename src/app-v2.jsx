@@ -43,6 +43,7 @@ export default function AppV2() {
     getBatchEntryData,
     getPaymentFlowData,
     getJoinGroupData,
+    getAddExpenseData,
     newGroupData,
     getSettleAllData,
     notificationsData,
@@ -186,26 +187,26 @@ export default function AppV2() {
       return
     }
 
-    if (type === 'save') {
+    if (type === 'save' || type === 'saveExpense') {
       if (payload?.title && payload?.amount != null) {
         if (!state.currentUserId) throw new Error('Chưa đăng nhập. Vui lòng tham gia nhóm trước.')
         const groupId = payload.groupId || state.currentGroupId
         if (!groupId) throw new Error('Không xác định được nhóm. Vui lòng mở nhóm trước khi thêm chi tiêu.')
-        await dispatch({
-          type: 'ADD_EXPENSE',
-          groupId,
-          expense: {
-            title: payload.title,
-            amount: Number(payload.amount) || 0,
-            paidBy: payload.paidBy,
-            category: payload.category,
-            cat: payload.category,
-            date: dateFromLabel(payload.dateLabel),
-            participants: payload.participants || [],
-            splitMode: payload.splitMode,
-          },
-          isTreasurer,
-        })
+        const expense = {
+          id: payload.expenseId,
+          title: payload.title,
+          amount: Number(payload.amount) || 0,
+          paidBy: payload.paidBy,
+          category: payload.category,
+          cat: payload.category,
+          notes: payload.notes,
+          date: dateFromLabel(payload.dateLabel),
+          participants: payload.participants || [],
+          splitMode: payload.splitMode,
+        }
+        await dispatch(payload.expenseId
+          ? { type: 'EDIT_EXPENSE', groupId, expense, isTreasurer }
+          : { type: 'ADD_EXPENSE', groupId, expense, isTreasurer })
         setStack((s) => s.slice(0, -1))
         return
       }
@@ -256,8 +257,12 @@ export default function AppV2() {
     if (type === 'edit') {
       const route = stack[stack.length - 1]
       const expenseId = route?.params?.expenseId ?? route?.params?.id ?? route?.params
-      const expenseData = getExpenseDetailData(expenseId)
-      setStack((s) => [...s, { screen: 'add-expense', params: payload || expenseData?.expense || expenseData }])
+      setStack((s) => [...s, { screen: 'add-expense', params: { expenseId } }])
+      return
+    }
+
+    if (type === 'editExpense') {
+      setStack((s) => [...s, { screen: 'add-expense', params: { expenseId: payload.expenseId } }])
       return
     }
 
@@ -468,7 +473,7 @@ export default function AppV2() {
   function renderStackScreen(route) {
     switch (route.screen) {
       case 'group-detail':        return <GroupDetail data={route.params?.groupId ? getGroupDetailData(route.params.groupId) : groupDetailData} isTreasurer={isTreasurer} onAction={handle} />
-      case 'add-expense':         return <AddExpense data={buildAddExpenseData(groupDetailData)} onAction={handle} />
+      case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isTreasurer} onAction={handle} />
@@ -539,19 +544,6 @@ function exportStateCsv(state) {
   a.download = `spliteasy-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
-}
-
-function buildAddExpenseData(groupDetailData) {
-  const members = (groupDetailData?.members || []).map((member) => ({
-    id: member.id,
-    name: member.name,
-    initial: member.initial || member.initials || String(member.name || '?').slice(0, 2),
-  }))
-
-  return {
-    groupName: groupDetailData?.name || groupDetailData?.group?.name || 'Nhóm',
-    members,
-  }
 }
 
 function PinEntryScreen({ error, value, onChange, onSubmit }) {

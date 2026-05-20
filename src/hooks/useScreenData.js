@@ -59,6 +59,7 @@ export function useScreenData() {
       getBatchEntryData: () => buildBatchEntryData(state),
       getPaymentFlowData: (memberId) => buildPaymentFlowData(state, memberId),
       getJoinGroupData: () => buildJoinGroupData(state),
+      getAddExpenseData: (params) => buildAddExpenseData(state, params),
       getSettleAllData: () => buildSettleAllData(state),
       getSettlementPeriodData: (params) => buildSettlementPeriodData(state, params),
       getExpenseDetailData: (expenseId) => buildExpenseDetailData(state, expenseId),
@@ -97,6 +98,38 @@ function buildHomeData(state, currentUserId, members, groups, pickle) {
     },
     todaySession: session ? toTodaySessionCard(session, pickle, members) : null,
     transactions: buildTransactions(safeGroups, currentUserId, members, state?.currentUserName),
+  }
+}
+
+function buildAddExpenseData(state, params) {
+  const expenseId = normalizeId(params, 'expenseId')
+  const expense = expenseId ? findExpense(state, expenseId) : null
+  const group = expense ? groupForExpense(state, expense) || currentGroup(state) : currentGroup(state)
+  const currentMember = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
+  const members = currentGroupMembers({ ...state, currentGroup: group, currentGroupId: group?.id || state?.currentGroupId })
+    .map(member => ({
+      id: member.id,
+      name: member.displayName || member.name,
+      initial: member.initial || member.initials || initials(member),
+    }))
+
+  return {
+    groupId: group?.id || state?.currentGroupId,
+    groupName: group?.name || 'Nhóm',
+    currentMemberId: state?.currentUserId,
+    currentMemberName: currentMember?.displayName || currentMember?.name || state?.currentUserName,
+    members,
+    editExpense: expense ? {
+      id: expense.id,
+      groupId: expense.groupId || expense.group_id || group?.id,
+      title: expense.title || '',
+      amount: Number(expense.amount) || 0,
+      paidBy: expense.paidBy || expense.paid_by_member_id || '',
+      category: expense.category || expense.cat || 'general',
+      notes: expense.notes || expense.note || expense.description || '',
+      date: expense.date || expense.expense_date || '',
+      participants: safeArray(expense.participants),
+    } : null,
   }
 }
 

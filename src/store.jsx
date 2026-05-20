@@ -375,6 +375,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     group_id: e.group_id,
     title: e.title,
     cat: e.cat || e.category || 'food',
+    category: e.category || e.cat || 'food',
     amount: Number(e.amount),
     paidBy: e.paid_by_member_id,
     participants: participants.filter(p => p.expense_id === e.id).map(p => p.member_id),
@@ -384,6 +385,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     })),
     date: e.expense_date,
     status: e.status,
+    notes: e.notes || '',
     declineReason: e.decline_reason,
     submittedBy: e.submitted_by_member_id,
     pickleSessionId: e.pickle_session_id,
@@ -800,6 +802,7 @@ export function AppProvider({ children, onToast }) {
             title: expense.title,
             amount: expense.amount,
             category: expense.category || expense.cat || null,
+            notes: expense.notes || null,
             paid_by_member_id: expense.paidBy,
             submitted_by_member_id: state.currentUserId,
             expense_date: expense.date || new Date().toISOString().slice(0, 10),
@@ -836,6 +839,8 @@ export function AppProvider({ children, onToast }) {
         await sb.from('expenses').update({
           title: expense.title,
           amount: expense.amount,
+          category: expense.category || expense.cat || null,
+          notes: expense.notes || null,
           paid_by_member_id: expense.paidBy,
           expense_date: expense.date,
         }).eq('id', expense.id)

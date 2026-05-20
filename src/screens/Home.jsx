@@ -1,16 +1,21 @@
 // Spliteasy Boss — Trang chủ
 // Props: data { user, monthLabel, totalBalance, owedTo, pickleball, groups, todaySession, transactions[] }
 
-import React from 'react';
-import { colors, type, formatVND, formatVNDShort } from '../tokens';
+import React, { useState } from 'react';
+import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Hero, Card, Button,
-  SectionLabel, Row,
+  SectionLabel,
 } from '../primitives';
 
 export default function Home({ data, onAction }) {
   const d = data || DEMO;
+  const [filterText, setFilterText] = useState('');
   const isNeg = d.totalBalance < 0;
+  const normalizedFilter = filterText.trim().toLowerCase();
+  const visibleTransactions = d.transactions.filter(tx => (
+    !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter)
+  ));
 
   return (
     <PhoneFrame>
@@ -53,26 +58,6 @@ export default function Home({ data, onAction }) {
           </div>
         </Hero>
 
-        {/* Two mini cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-          <MiniStat
-            accent="pickleball" emoji="🏓" label="PICKLEBALL" labelColor="#6ee7b7"
-            big={d.pickleball.sessionsAttended}
-            denom={`/${d.pickleball.sessionsTotal}`}
-            caption="buổi tham gia"
-            footLabel="Nợ tiền sân"
-            footValue={formatVND(d.pickleball.balance)}
-            footColor={colors.danger}
-          />
-          <MiniStat
-            accent="groups" emoji="👥" label="NHÓM" labelColor="#fcd34d"
-            big={d.groups.count} denom=" nhóm" caption="đang hoạt động"
-            footLabel="Tổng nợ"
-            footValue={formatVND(d.groups.balance)}
-            footColor={colors.danger}
-          />
-        </div>
-
         {/* Today session */}
         {d.todaySession && (
           <Card accent="pickleball" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
@@ -97,16 +82,42 @@ export default function Home({ data, onAction }) {
         )}
 
         <SectionLabel action="Xem tất cả →">Giao dịch gần đây</SectionLabel>
+        <div style={{ position: 'relative', marginBottom: 8 }}>
+          <span style={{
+            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 13, color: colors.textMuted, pointerEvents: 'none',
+          }}>🔍</span>
+          <input
+            value={filterText}
+            onChange={e => setFilterText(e.target.value)}
+            placeholder="Tìm chi tiêu..."
+            style={{
+              width: '100%',
+              padding: '12px 12px 12px 34px',
+              background: colors.inputBg,
+              border: `1px solid ${colors.borderSubtle}`,
+              borderRadius: 12,
+              color: colors.textPrimary,
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          />
+        </div>
         <Card>
-          {d.transactions.map((tx, i) => (
-            <Row key={tx.id}
-              icon={tx.icon} iconBg={TX_ICON_BG[tx.category]}
-              title={tx.title} sub={`${tx.subtitle} · ${tx.dateLabel}`}
-              amount={formatVND(tx.amount)}
-              amountColor={tx.amount < 0 ? colors.danger : colors.success}
-              last={i === d.transactions.length - 1}
+          {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (
+            <ActivityRow
+              key={tx.id}
+              tx={tx}
+              last={i === visibleTransactions.length - 1}
+              onEdit={() => onAction?.('editExpense', { expenseId: tx.id })}
             />
-          ))}
+          )) : (
+            <div style={{ padding: '14px 0', fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
+              Không tìm thấy chi tiêu
+            </div>
+          )}
         </Card>
       </Screen>
 
@@ -115,21 +126,43 @@ export default function Home({ data, onAction }) {
   );
 }
 
-function MiniStat({ accent, emoji, label, labelColor, big, denom, caption, footLabel, footValue, footColor }) {
+function ActivityRow({ tx, last, onEdit }) {
   return (
-    <Card accent={accent}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 18 }}>{emoji}</span>
-        <div style={{ fontSize: 11, fontWeight: 700, color: labelColor, letterSpacing: '0.4px' }}>{label}</div>
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '12px 0',
+      borderBottom: last ? 'none' : `1px solid rgba(255,255,255,0.04)`,
+    }}>
+      <div style={{
+        width: 38, height: 38, borderRadius: 12,
+        background: TX_ICON_BG[tx.category] || 'rgba(255,255,255,0.06)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 18, flexShrink: 0,
+      }}>{tx.icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+          {tx.subtitle} · {tx.dateLabel}
+        </div>
       </div>
-      <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 10, ...type.mono }}>
-        {big}<span style={{ fontSize: 13, color: colors.textMuted, fontWeight: 600 }}>{denom}</span>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{
+          fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',
+          color: tx.amount < 0 ? colors.danger : colors.success, ...type.mono,
+        }}>{formatVND(tx.amount)}</div>
+        <button onClick={onEdit} style={{
+          marginTop: 5,
+          background: 'transparent',
+          border: 'none',
+          color: colors.brandLight,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          fontSize: 11,
+          fontWeight: 700,
+          padding: 0,
+        }}>Sửa</button>
       </div>
-      <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{caption}</div>
-      <div style={{ height: 1, background: colors.borderSubtle, margin: '12px 0' }} />
-      <div style={{ fontSize: 11, color: colors.textSecondary }}>{footLabel}</div>
-      <div style={{ fontSize: 14, fontWeight: 800, color: footColor, marginTop: 2, ...type.mono }}>{footValue}</div>
-    </Card>
+    </div>
   );
 }
 
