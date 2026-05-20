@@ -41,7 +41,7 @@ export default function AddExpense({ data, onAction }) {
 
   return (
     <div style={{
-      width: 375, minHeight: 812, margin: '24px auto', position: 'relative',
+      width: 375, height: 812, margin: '24px auto', position: 'relative',
       background: colors.shellBg, borderRadius: 38, overflow: 'hidden',
       border: `1px solid ${colors.borderNormal}`,
       boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 8px #1a1c28',
@@ -54,7 +54,17 @@ export default function AddExpense({ data, onAction }) {
         opacity: 0.55,
       }} />
 
-      <div style={{ position: 'relative', paddingTop: 80 }}>
+      <div style={{
+        position: 'relative',
+        height: '100%',
+        minHeight: 0,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        paddingTop: 80,
+        paddingBottom: '72px',
+        boxSizing: 'border-box',
+      }}>
         {/* Sheet */}
         <div style={{
           background: colors.shellBg,

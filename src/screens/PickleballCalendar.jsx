@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Avatar, Input,
+  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Input,
 } from '../primitives';
 
 const DAYS_OF_WEEK = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -22,6 +22,7 @@ const CELL_STATE = {
 };
 
 const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8' };
+const ATTENDANCE_CHIP_SIZE = 34;
 
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
@@ -41,7 +42,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen style={{ paddingBottom: '72px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0 16px' }}>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#6ee7b7', textTransform: 'uppercase' }}>
@@ -184,8 +185,8 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
 
       <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
-          Điểm danh · {session.attendance.present}/{session.attendance.total}
-          {session.attendance.guests > 0 && ` + ${session.attendance.guests} khách`}
+          Điểm danh · {session.attendance.present}/{session.attendance.total} tham gia
+          {session.attendance.guests > 0 && ` · ${session.attendance.guests} khách`}
         </div>
         {isTreasurer && (
           <button
@@ -205,7 +206,7 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
         )}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
         {session.attendees.map(a => (
           <AttendChip
             key={a.id}
@@ -548,26 +549,46 @@ function formatAmountInput(value) {
 }
 
 function AttendChip({ a, onToggle }) {
-  const palette = {
-    present: { bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.3)',  color: '#6ee7b7', mark: '✓' },
-    absent:  { bg: 'rgba(248,113,113,0.10)',border: 'rgba(248,113,113,0.3)',  color: '#fca5a5', mark: '✕' },
-    guest:   { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.35)',  color: '#fcd34d' },
-  }[a.kind];
+  const active = a.kind === 'present' || a.kind === 'guest';
 
   return (
-    <button onClick={onToggle} style={{
-      display: 'flex', alignItems: 'center', gap: 5,
-      padding: '5px 9px 5px 5px', borderRadius: 100,
-      background: palette.bg, border: `1px solid ${palette.border}`,
-      fontFamily: 'inherit', cursor: onToggle ? 'pointer' : 'default',
-    }}>
-      <Avatar initial={a.initial} size={18}
-        color={a.kind === 'absent' ? 'rgba(255,255,255,0.08)' : undefined}
-        ring={false} />
-      <span style={{ fontSize: 10, fontWeight: 700, color: palette.color }}>
-        {a.kind === 'guest' ? `Khách · ${a.name}` : `${a.name} ${palette.mark}`}
+    <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={`${a.name} ${active ? 'tham gia' : 'vắng'}`}
+        style={{
+          width: ATTENDANCE_CHIP_SIZE,
+          height: ATTENDANCE_CHIP_SIZE,
+          borderRadius: '50%',
+          background: a.kind === 'present' ? colors.pickleball : 'rgba(255,255,255,0.06)',
+          border: `1px solid ${active ? 'rgba(52,211,153,0.48)' : colors.borderSubtle}`,
+          color: active ? '#052e26' : colors.textSecondary,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 11,
+          fontWeight: 900,
+          fontFamily: 'inherit',
+          cursor: onToggle ? 'pointer' : 'default',
+          boxShadow: active ? '0 0 12px rgba(52,211,153,0.22)' : 'none',
+        }}
+      >
+        {a.initial}
+      </button>
+      <span style={{
+        width: '100%',
+        color: active ? '#6ee7b7' : colors.textMuted,
+        fontSize: 9,
+        fontWeight: 700,
+        textAlign: 'center',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+      }}>
+        {a.name}
       </span>
-    </button>
+    </div>
   );
 }
 

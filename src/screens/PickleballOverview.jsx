@@ -13,7 +13,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen style={{ paddingBottom: '72px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0 16px' }}>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#6ee7b7', textTransform: 'uppercase' }}>
@@ -150,7 +150,6 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               <span style={{ color: '#f1f5f9', fontWeight: 700, ...type.mono }}>{formatVND(b.amount)}</span>
             </div>
           ))}
-          <Button block variant="brand" style={{ marginTop: 14 }} onClick={() => onAction?.('pay')}>⚡ Thanh toán quỹ CLB</Button>
         </Card>
       </Screen>
 

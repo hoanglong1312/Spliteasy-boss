@@ -50,10 +50,12 @@ export function Screen({ children, style }) {
       bottom: 0,
       left: 0,
       right: 0,
+      minHeight: 0,
       overflowY: 'auto',
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
-      padding: '0 16px 100px',
+      boxSizing: 'border-box',
+      padding: '0 16px 72px',
       ...style,
     }}>{children}</div>
   );

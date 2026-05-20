@@ -2,10 +2,10 @@
 // Props: data { user, monthLabel, totalBalance, owedTo, pickleball, groups, todaySession, transactions[] }
 
 import React, { useState } from 'react';
-import { colors, type, formatVND } from '../tokens';
+import { colors, type, formatVND, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Hero, Card, Button,
-  SectionLabel,
+  SectionLabel, Avatar,
 } from '../primitives';
 
 const STATUS_FILTERS = [
@@ -40,7 +40,7 @@ export default function Home({ data, onAction }) {
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen style={{ paddingBottom: '72px' }}>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
           <div>
@@ -78,6 +78,8 @@ export default function Home({ data, onAction }) {
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('payment')}>⚡ Thanh toán</Button>
           </div>
         </Hero>
+
+        <PaymentBalanceSection balances={d.memberBalances || []} onAction={onAction} />
 
         {/* Today session */}
         {d.todaySession && (
@@ -223,6 +225,80 @@ function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function PaymentBalanceSection({ balances, onAction }) {
+  return (
+    <>
+      <SectionLabel>💰 Số dư tháng này</SectionLabel>
+      <Card style={{ padding: '6px 12px' }}>
+        {balances.length > 0 ? balances.map((balance, index) => (
+          <PaymentBalanceRow
+            key={balance.memberId || balance.id}
+            balance={balance}
+            last={index === balances.length - 1}
+            onAction={onAction}
+          />
+        )) : (
+          <div style={{ padding: '14px 0', fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
+            Chưa có thành viên trong tháng này
+          </div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function PaymentBalanceRow({ balance, last, onAction }) {
+  const owes = Number(balance.owed) > 0;
+  const receives = Number(balance.netBalance) > 0;
+  const amountLabel = owes
+    ? `${formatVNDShort(-balance.owed)} còn nợ`
+    : receives ? `+${formatVNDShort(balance.netBalance)} được nhận` : 'Cân bằng';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 0',
+      borderBottom: last ? 'none' : `1px solid ${colors.borderSubtle}`,
+    }}>
+      <Avatar initial={balance.initial || balance.initials || '?'} size={34} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: colors.textPrimary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {balance.name}
+        </div>
+        <div style={{
+          fontSize: 11,
+          fontWeight: 800,
+          marginTop: 2,
+          color: owes ? '#fca5a5' : receives ? '#6ee7b7' : colors.textSecondary,
+          ...type.mono,
+        }}>
+          {amountLabel}
+        </div>
+      </div>
+      {owes && (
+        <button
+          type="button"
+          onClick={() => onAction?.('payment', { memberId: balance.memberId, amount: balance.owed })}
+          style={{
+            border: `1px solid rgba(99,102,241,0.38)`,
+            background: colors.brandSoftBg,
+            color: colors.brandLight,
+            borderRadius: 10,
+            padding: '8px 10px',
+            fontSize: 11,
+            fontWeight: 800,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Thanh toán →
+        </button>
+      )}
+    </div>
+  );
+}
+
 function transactionBelongsToCurrentUser(tx, currentUserId) {
   if (tx?.isMine === true) return true;
 
@@ -309,6 +385,11 @@ const DEMO = {
   pickleball: { sessionsAttended: 8, sessionsTotal: 13, balance: -240000 },
   groups: { count: 3, balance: -93333 },
   todaySession: { id: 9, number: 9, timeLabel: 'Hôm nay · 19:00', dateLabel: '19/05', venue: 'CLB Pickleball Cầu Giấy' },
+  memberBalances: [
+    { memberId: 'long', initial: 'L', name: 'Long', netBalance: -333333, owed: 333333 },
+    { memberId: 'minh', initial: 'M', name: 'Minh', netBalance: -240000, owed: 240000 },
+    { memberId: 'hoa', initial: 'H', name: 'Hoa', netBalance: 120000, owed: 0 },
+  ],
   expenses: [
     {
       id: 1,

@@ -39,9 +39,54 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildPickleballCalendarData, buildPickleballSettingsData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildHomeData, buildPickleballCalendarData, buildPickleballSettingsData }`, context)
   return context.__builders
 }
+
+test('home data exposes active monthly member balances including session items and casual members', () => {
+  const { buildHomeData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentUserName: 'An',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Binh', memberType: 'fixed' },
+      { id: 'm3', groupId: 'g1', name: 'Chi', memberType: 'casual' },
+      { id: 'm4', groupId: 'g1', name: 'Dung', memberType: 'casual', isActive: false },
+    ],
+    pickle: {
+      fixedMembers: ['m1', 'm2'],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 300000 }],
+      sessions: [
+        {
+          id: 's1',
+          groupId: 'g1',
+          date: '2026-05-12',
+          status: 'completed',
+          attendees: ['m1', 'm2', 'm3'],
+          sessionItems: [
+            { id: 'w1', sessionId: 's1', name: 'Nước', amount: 90000 },
+            { id: 'e1', sessionId: 's1', name: 'Bóng', amount: 60000, memberIds: ['m1', 'm3'] },
+          ],
+        },
+      ],
+      externalTickets: [
+        { id: 't1', groupId: 'g1', yearMonth: '2026-05', status: 'team_fund', totalAmount: 30000, memberIds: ['m2', 'm3'] },
+      ],
+    },
+    _allPickle: { sessions: [], sessionItems: [], externalTickets: [] },
+  }
+
+  const data = buildHomeData(state, 'm1', state.members, [], state.pickle)
+
+  assert.deepEqual(JSON.parse(JSON.stringify(data.memberBalances.map(row => [row.memberId, row.type, row.owed]))), [
+    ['m3', 'casual', 225000],
+    ['m1', 'fixed', 135000],
+    ['m2', 'fixed', 120000],
+  ])
+})
 
 test('store loads legacy pickleball_sessions and pickleball_attendance for calendar display', () => {
   assert.match(storeSource, /pbsR/)
@@ -130,6 +175,48 @@ test('calendar marks only explicit absent members absent on legacy attendance ro
   ])
 })
 
+test('calendar attendance list includes absent casual members alongside fixed members', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Binh', memberType: 'fixed' },
+      { id: 'm3', groupId: 'g1', name: 'Chi', memberType: 'casual' },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 'old-3',
+          sourceTable: 'pickleball_sessions',
+          groupId: 'g1',
+          date: '2026-05-20',
+          status: 'completed',
+          attendees: [],
+          attendanceRecords: [
+            { sessionId: 'old-3', memberId: 'm2', status: 'absent' },
+            { sessionId: 'old-3', memberId: 'm3', status: 'absent' },
+          ],
+        },
+      ],
+      fixedMembers: ['m1', 'm2'],
+      monthlyConfigs: [],
+    },
+    _allPickle: { sessions: [], sessionItems: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.attendees.map(row => [row.id, row.kind, row.memberType]))), [
+    ['m1', 'present', 'fixed'],
+    ['m2', 'absent', 'fixed'],
+    ['m3', 'absent', 'casual'],
+  ])
+  assert.equal(data.selectedSession.attendance.total, 3)
+})
+
 test('settings maps ISO schedule weekdays from config to Vietnamese weekday labels', () => {
   const { buildPickleballSettingsData } = loadScreenDataBuilders()
   const state = {
@@ -157,6 +244,15 @@ test('calendar attendance chips call markAttendance and detail has one save path
   assert.doesNotMatch(calendarSource, /onAction\?\.\('reschedule'/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('complete'/)
   assert.doesNotMatch(calendarSource, />\s*Lưu chi phí\s*<\/Button>/)
+})
+
+test('calendar attendance chips use compact 34px avatar-style green and grey states', () => {
+  assert.match(calendarSource, /const ATTENDANCE_CHIP_SIZE = 34/)
+  assert.match(calendarSource, /Điểm danh · \{session\.attendance\.present\}\/\{session\.attendance\.total\} tham gia/)
+  assert.match(calendarSource, /background: a\.kind === 'present' \? colors\.pickleball : 'rgba\(255,255,255,0\.06\)'/)
+  assert.match(calendarSource, /width: ATTENDANCE_CHIP_SIZE/)
+  assert.match(calendarSource, /height: ATTENDANCE_CHIP_SIZE/)
+  assert.doesNotMatch(calendarSource, /memberType: a\.memberType/)
 })
 
 test('ticket form validates visible errors and saves normalized addTicket fields', () => {

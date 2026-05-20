@@ -7,6 +7,7 @@ const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8');
 const expenseDetailSource = readFileSync(new URL('./ExpenseDetail.jsx', import.meta.url), 'utf8');
 const screenDataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
+const primitivesSource = readFileSync(new URL('../primitives.jsx', import.meta.url), 'utf8');
 
 test('AddExpense defaults to the logged-in member and submits edit expense ids', () => {
   assert.match(addExpenseSource, /const editExpense = d\.editExpense/);
@@ -29,6 +30,26 @@ test('Home activity list filters by title, status, and category', () => {
   assert.match(homeSource, /<select[\s\S]*value=\{categoryFilter\}[\s\S]*onChange=\{e => setCategoryFilter\(e\.target\.value\)\}/);
   assert.doesNotMatch(homeSource, /<MiniStat/);
   assert.doesNotMatch(homeSource, /function MiniStat/);
+});
+
+test('Home renders monthly member balances and routes row payments to PaymentFlow', () => {
+  assert.match(homeSource, /<Screen style=\{\{ paddingBottom: '72px' \}\}>/);
+  assert.match(homeSource, /<PaymentBalanceSection balances=\{d\.memberBalances \|\| \[\]\} onAction=\{onAction\} \/>/);
+  assert.match(homeSource, /💰 Số dư tháng này/);
+  assert.match(homeSource, /onAction\?\.\('payment', \{ memberId: balance\.memberId, amount: balance\.owed \}\)/);
+  assert.match(homeSource, /Thanh toán →/);
+  assert.match(screenDataSource, /memberBalances: buildHomeMemberBalances\(state, pickle, today\)/);
+  assert.match(screenDataSource, /function buildHomeMemberBalances\(state, pickle, monthDate\)/);
+  assert.match(screenDataSource, /buildMemberMonthBalance\(state, pickle, monthSessions, member\.id\)/);
+});
+
+test('shared screens and AddExpense sheet define scrollable containers with bottom padding', () => {
+  assert.match(primitivesSource, /minHeight: 0/);
+  assert.match(primitivesSource, /overflowY: 'auto'/);
+  assert.match(primitivesSource, /padding: '0 16px 72px'/);
+  assert.match(addExpenseSource, /height: 812/);
+  assert.match(addExpenseSource, /overflowY: 'auto'/);
+  assert.match(addExpenseSource, /paddingBottom: '72px'/);
 });
 
 test('Home data exposes member identity and current-month normalized expense rows', () => {

@@ -6,16 +6,18 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, IconButton, Card, Avatar, SectionLabel, Button,
+  PhoneFrame, Screen, IconButton, Card, SectionLabel, Button,
 } from '../primitives';
 
-export default function SessionDetail({ data, onAction }) {
+const ATTENDANCE_CHIP_SIZE = 34;
+
+export default function SessionDetail({ data, isTreasurer = false, onAction }) {
   const d = data || DEMO;
   const [waterInput, setWaterInput] = useState(String(d.waterFee?.total || ''));
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen style={{ paddingBottom: '72px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0 14px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
@@ -78,14 +80,26 @@ export default function SessionDetail({ data, onAction }) {
 
         {/* Attendance */}
         <SectionLabel action="+ Thêm khách">
-          Điểm danh · {d.presentMembers.length}/{d.presentMembers.length + d.absentMembers.length}
-          {d.guests.length > 0 && ` + ${d.guests.length} khách`}
+          Điểm danh · {d.presentMembers.length}/{d.presentMembers.length + d.absentMembers.length} tham gia
+          {d.guests.length > 0 && ` · ${d.guests.length} khách`}
         </SectionLabel>
 
         <Card style={{ padding: 14 }}>
-          <PeopleGroup label="✓ Có mặt" labelColor="#6ee7b7" people={d.presentMembers} variant="present" />
+          <PeopleGroup
+            label="✓ Có mặt"
+            labelColor="#6ee7b7"
+            people={d.presentMembers}
+            variant="present"
+            onToggle={isTreasurer ? (id) => onAction?.('markAttendance', { sessionId: d.id, memberId: id, status: 'absent' }) : undefined}
+          />
           {d.absentMembers.length > 0 && (
-            <PeopleGroup label="✕ Vắng" labelColor="#fca5a5" people={d.absentMembers} variant="absent" />
+            <PeopleGroup
+              label="○ Vắng"
+              labelColor={colors.textSecondary}
+              people={d.absentMembers}
+              variant="absent"
+              onToggle={isTreasurer ? (id) => onAction?.('markAttendance', { sessionId: d.id, memberId: id, status: 'present' }) : undefined}
+            />
           )}
           {d.guests.length > 0 && (
             <PeopleGroup label="★ Khách vãng lai" labelColor="#fcd34d" people={d.guests} variant="guest"
@@ -216,12 +230,8 @@ export default function SessionDetail({ data, onAction }) {
   );
 }
 
-function PeopleGroup({ label, labelColor, people, variant, onRemove, footer }) {
-  const palette = {
-    present: { bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.3)',  text: '#6ee7b7' },
-    absent:  { bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)', text: '#fca5a5' },
-    guest:   { bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.35)',  text: '#fcd34d' },
-  }[variant];
+function PeopleGroup({ label, labelColor, people, variant, onToggle, onRemove, footer }) {
+  const active = variant === 'present' || variant === 'guest';
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -231,17 +241,41 @@ function PeopleGroup({ label, labelColor, people, variant, onRemove, footer }) {
       }}>{label} · {people.length}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {people.map((p) => (
-          <span key={p.id || p.name} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 11px 6px 5px', borderRadius: 100,
-            background: palette.bg, border: `1px solid ${palette.border}`,
-          }}>
-            <Avatar initial={p.initial}
-              size={20}
-              color={variant === 'absent' ? 'rgba(255,255,255,0.08)' : undefined}
-              ring={false}
-            />
-            <span style={{ fontSize: 11, fontWeight: 700, color: palette.text }}>{p.name}</span>
+          <span key={p.id || p.name} style={{ width: 44, display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <button
+              type="button"
+              onClick={() => onToggle?.(p.id)}
+              disabled={!onToggle}
+              aria-label={`${p.name} ${active ? 'tham gia' : 'vắng'}`}
+              style={{
+                width: ATTENDANCE_CHIP_SIZE,
+                height: ATTENDANCE_CHIP_SIZE,
+                borderRadius: '50%',
+                background: active ? colors.pickleball : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${active ? 'rgba(52,211,153,0.48)' : colors.borderSubtle}`,
+                color: active ? '#052e26' : colors.textSecondary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 900,
+                fontFamily: 'inherit',
+                cursor: onToggle ? 'pointer' : 'default',
+                boxShadow: active ? '0 0 12px rgba(52,211,153,0.22)' : 'none',
+              }}
+            >
+              {p.initial}
+            </button>
+            <span style={{
+              width: '100%',
+              color: active ? '#6ee7b7' : colors.textMuted,
+              fontSize: 9,
+              fontWeight: 700,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>{p.name}</span>
             {variant === 'guest' && onRemove && (
               <button onClick={() => onRemove(p.id)} style={{
                 width: 16, height: 16, borderRadius: '50%',

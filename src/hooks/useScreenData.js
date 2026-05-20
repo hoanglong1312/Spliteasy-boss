@@ -122,8 +122,34 @@ function buildHomeData(state, currentUserId, members, groups, pickle) {
     currentUserId,
     currentUserName: state?.currentUserName || 'Bạn',
     expenses: buildHomeExpenses(safeGroups, currentUserId, members, state?.currentUserName, today),
+    memberBalances: buildHomeMemberBalances(state, pickle, today),
     transactions: buildTransactions(safeGroups, currentUserId, members, state?.currentUserName),
   }
+}
+
+function buildHomeMemberBalances(state, pickle, monthDate) {
+  const monthSessions = getStateMonthSessions(state, monthDate)
+  return currentGroupMembers(state)
+    .filter(isActiveMember)
+    .map(member => {
+      const balance = buildMemberMonthBalance(state, pickle, monthSessions, member.id)
+      return {
+        memberId: member.id,
+        id: member.id,
+        name: member.displayName || member.name || 'Thành viên',
+        initial: initials(member),
+        initials: initials(member),
+        type: memberType(member),
+        netBalance: balance.netBalance,
+        owed: balance.totalOwed,
+        courtFee: balance.courtFee,
+        waterFee: balance.waterFee,
+        extras: balance.extras,
+        ticketShare: balance.ticketShare,
+        p2pBalance: balance.p2pBalance,
+      }
+    })
+    .sort((a, b) => b.owed - a.owed || a.name.localeCompare(b.name, 'vi'))
 }
 
 function buildHomeExpenses(groups, currentUserId, members, currentUserName, monthDate) {
@@ -384,7 +410,6 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
   if (!session) return null
 
   const fixedMembers = safeArray(pickle?.fixedMembers)
-  const fixedSet = new Set(fixedMembers.map(String))
   const groupMembers = membersForCurrentPickle(state, members, fixedMembers)
   const presentIds = effectiveSessionMemberIds(session, groupMembers)
   const presentSet = new Set(presentIds.map(String))
@@ -392,7 +417,7 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
     .filter(member => presentSet.has(String(member.id)))
     .map(member => personChip(member))
   const absentMembers = groupMembers
-    .filter(member => (fixedSet.size === 0 || fixedSet.has(String(member.id))) && !presentSet.has(String(member.id)))
+    .filter(member => !presentSet.has(String(member.id)))
     .map(member => personChip(member))
   const guests = sessionGuests(session).map((guest, index) => ({
     id: guest.id || guest.guest_id || `guest-${index}`,
@@ -1117,7 +1142,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId) {
   const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
   const courtFee = memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost)
   const waterFee = memberWaterShare(sessions, memberId)
-  const extras = memberExtrasShare(sessions, memberId)
+  const extras = memberExtrasShare(sessions, memberId, state)
   const ticketShare = memberTeamFundTicketShare(state, memberId)
   const p2pBalance = memberTicketBalance(state, memberId)
   const netBalance = Math.round(p2pBalance - courtFee - waterFee - extras - ticketShare)
@@ -1146,10 +1171,20 @@ function memberWaterShare(sessions, memberId) {
   }, 0)
 }
 
-function memberExtrasShare(sessions, memberId) {
+function memberExtrasShare(sessions, memberId, state) {
   return safeArray(sessions).reduce((sum, session) => {
     const presentIds = sessionMemberIds(session)
-    return sum + safeArray(session?.expenses)
+    const itemShare = (state ? sessionItemsForSession(state, session) : safeArray(session?.sessionItems || session?.session_items))
+      .filter(item => !isWaterSessionItem(item))
+      .reduce((itemSum, item) => {
+        const participantIds = item.memberIds == null && item.member_ids == null
+          ? presentIds
+          : safeArray(item.memberIds ?? item.member_ids)
+        const applies = participantIds.some(id => String(id) === String(memberId))
+        if (!applies || participantIds.length === 0) return itemSum
+        return itemSum + Math.round((Number(item.amount) || 0) / participantIds.length)
+      }, 0)
+    const expenseShare = safeArray(session?.expenses)
       .filter(expense => !isWaterExpense(expense) && !isCourtExpense(expense))
       .reduce((expenseSum, expense) => {
         const participantIds = safeArray(expense.participants).length > 0
@@ -1159,6 +1194,7 @@ function memberExtrasShare(sessions, memberId) {
         if (!applies || participantIds.length === 0) return expenseSum
         return expenseSum + Math.round((Number(expense.amount) || 0) / participantIds.length)
       }, 0)
+    return sum + itemShare + expenseShare
   }, 0)
 }
 
@@ -1257,13 +1293,10 @@ function calendarCellState(date, session, state) {
 function toCalendarSessionDetail(state, session, allSessions, today) {
   const pickle = state?.pickle || {}
   const groupMembers = currentGroupMembers(state).filter(isActiveMember)
-  const fixedMembers = safeArray(pickle?.fixedMembers)
-  const fixedSet = new Set(fixedMembers.map(String))
   const presentIds = effectiveSessionMemberIds(session, groupMembers)
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
   const attendanceMembers = groupMembers
-    .filter(member => fixedSet.size === 0 || fixedSet.has(String(member.id)) || presentSet.has(String(member.id)))
   const attendees = [
     ...attendanceMembers.map(member => ({
       id: member.id,
