@@ -1,10 +1,10 @@
 // Spliteasy Boss — Pickleball · Buổi đánh (calendar + detail panel)
 // Props: data { clubName, monthLabel, days[], selectedSession }, isTreasurer
 
-import React, { useState } from 'react';
-import { colors, type } from '../tokens';
+import React, { useEffect, useState } from 'react';
+import { colors, type, formatVNDShort } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Avatar,
+  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Avatar, Input,
 } from '../primitives';
 
 const DAYS_OF_WEEK = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -25,7 +25,19 @@ const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', t
 
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
-  const [selected, setSelected] = useState(d.selectedSessionDay || 19);
+  const initialSession = d.selectedSession || (d.sessions || [])[0] || null;
+  const [selected, setSelected] = useState(d.selectedSessionDay || selectedDayFromSession(initialSession) || 19);
+  const [selectedSessionId, setSelectedSessionId] = useState(initialSession?.id || null);
+  const selectedSession = selectedSessionId
+    ? ((d.sessions || []).find(session => String(session.id) === String(selectedSessionId)) ||
+      (String(d.selectedSession?.id) === String(selectedSessionId) ? d.selectedSession : null))
+    : null;
+
+  useEffect(() => {
+    const nextSession = d.selectedSession || (d.sessions || [])[0] || null;
+    setSelected(d.selectedSessionDay || selectedDayFromSession(nextSession) || 19);
+    setSelectedSessionId(nextSession?.id || null);
+  }, [d.selectedSession?.id, d.selectedSessionDay]);
 
   return (
     <PhoneFrame>
@@ -71,19 +83,33 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             }}>{dow}</div>
           ))}
           {d.days.map((day, i) => (
-            <CalendarCell key={i} day={day} selected={day.n === selected} onClick={() => day.state !== 'faded' && setSelected(day.n)} />
+            <CalendarCell
+              key={i}
+              day={day}
+              selected={day.n === selected}
+              onClick={() => {
+                if (day.state === 'faded') return;
+                setSelected(day.n);
+                setSelectedSessionId(day.sessionId || null);
+              }}
+            />
           ))}
         </div>
 
         {/* Detail panel */}
-        {d.selectedSession && (
-          <SessionDetailPanel session={d.selectedSession} isTreasurer={isTreasurer} onAction={onAction} />
+        {selectedSession && (
+          <SessionDetailPanel session={selectedSession} isTreasurer={isTreasurer} onAction={onAction} />
         )}
       </Screen>
 
       <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
   );
+}
+
+function selectedDayFromSession(session) {
+  const match = String(session?.date || '').match(/-(\d{2})$/);
+  return match ? Number(match[1]) : null;
 }
 
 function LegendChip({ color, label, dashed }) {
@@ -124,6 +150,10 @@ function CalendarCell({ day, selected, onClick }) {
 }
 
 function SessionDetailPanel({ session, isTreasurer, onAction }) {
+  const costRows = Array.isArray(session.costRows)
+    ? session.costRows
+    : Array.isArray(session.costs) ? session.costs : [];
+
   return (
     <Card accent="pickleball" style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -154,7 +184,7 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>
         Chi phí buổi
       </div>
-      {session.costs.map((c, i) => (
+      {costRows.map((c, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '6px 0' }}>
           <span style={{ color: '#cbd5e1' }}>{c.label}</span>
           <span style={{ fontWeight: 700, ...type.mono }}>{c.amount.toLocaleString('vi-VN')} đ</span>
@@ -171,6 +201,10 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
         </span>
       </div>
 
+      {session.canShowCosts !== false && (
+        <SessionCostSection session={session} isTreasurer={isTreasurer} onAction={onAction} />
+      )}
+
       {isTreasurer && (
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           <Button variant="muted" style={{ flex: 1, fontSize: 12, padding: 11 }} onClick={() => onAction?.('reschedule', session.id)}>📅 Dời buổi</Button>
@@ -179,6 +213,284 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
       )}
     </Card>
   );
+}
+
+function SessionCostSection({ session, isTreasurer, onAction }) {
+  const members = (session.members || [])
+    .filter(member => member.id)
+    .map(member => ({
+      id: member.id,
+      name: member.name || member.short || 'TV',
+      initial: member.initial || (member.name || '?').slice(0, 1).toUpperCase(),
+    }));
+  const allMemberIds = members.map(member => member.id);
+  const [waterInput, setWaterInput] = useState('');
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [extras, setExtras] = useState([]);
+  const canEdit = Boolean(isTreasurer);
+  const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
+    .map(extra => `${extra.id || ''}:${extra.note || ''}:${extra.amount || 0}:${(extra.memberIds || []).join(',')}`)
+    .join('|')}`;
+
+  useEffect(() => {
+    setWaterInput(formatAmountInput(session.costs?.waterAmount || 0));
+    setExtras(initialExtraDrafts(session.costs?.extras || [], allMemberIds));
+    setExtrasOpen(false);
+  }, [costDraftKey]);
+
+  const updateExtra = (id, patch) => {
+    setExtras(prev => prev.map(extra => (
+      extra.id === id ? { ...extra, ...patch } : extra
+    )));
+  };
+  const addExtra = () => {
+    setExtras(prev => [
+      ...prev,
+      {
+        id: `new-${Date.now()}-${prev.length}`,
+        note: '',
+        amountInput: '',
+        memberIds: allMemberIds,
+      },
+    ]);
+    setExtrasOpen(true);
+  };
+  const save = () => {
+    const cleanedExtras = extras
+      .map(extra => {
+        const memberIds = allMemberIds.length > 0 && extra.memberIds.length === allMemberIds.length
+          ? null
+          : extra.memberIds;
+        return {
+          note: extra.note,
+          amount: parseAmount(extra.amountInput),
+          memberIds,
+        };
+      })
+      .filter(extra => extra.amount > 0);
+    onAction?.('saveSessionCost', {
+      sessionId: session.id,
+      waterAmount: parseAmount(waterInput),
+      extras: cleanedExtras,
+    });
+  };
+
+  return (
+    <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${colors.borderSubtle}` }}>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        fontSize: 10, fontWeight: 700, letterSpacing: '1px',
+        color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8,
+      }}>
+        <span>Chi phí buổi này</span>
+        <span style={{ color: isTreasurer ? colors.pickleball : colors.textMuted }}>
+          {isTreasurer ? 'thủ quỹ' : 'chỉ xem'}
+        </span>
+      </div>
+
+      <Input
+        label="💧 Tiền nước"
+        suffix="đ"
+        value={waterInput}
+        disabled={!canEdit}
+        inputMode="numeric"
+        onChange={(event) => setWaterInput(formatAmountInput(event.target.value))}
+        placeholder="0"
+        inputStyle={{ fontWeight: 800, ...type.mono, opacity: canEdit ? 1 : 0.7 }}
+        style={{ marginTop: 0 }}
+      />
+
+      <button
+        type="button"
+        onClick={() => setExtrasOpen(open => !open)}
+        style={{
+          marginTop: 14, width: '100%', padding: '10px 0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: 'transparent', border: 'none',
+          color: '#cbd5e1', fontFamily: 'inherit', cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 800 }}>⚡ Phụ phát sinh</span>
+        <span style={{ fontSize: 11, color: colors.textSecondary }}>{extrasOpen ? '▼' : '▶'}</span>
+      </button>
+
+      {extrasOpen && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {extras.map((extra, index) => (
+            <ExtraCostEditor
+              key={extra.id}
+              index={index}
+              extra={extra}
+              members={members}
+              disabled={!canEdit}
+              onChange={(patch) => updateExtra(extra.id, patch)}
+            />
+          ))}
+          {canEdit && (
+            <Button variant="muted" style={{ padding: 10, fontSize: 12 }} onClick={addExtra}>
+              + Thêm phát sinh
+            </Button>
+          )}
+          {!canEdit && extras.length === 0 && (
+            <div style={{ fontSize: 11, color: colors.textSecondary, padding: '6px 0' }}>
+              Chưa có phụ phát sinh.
+            </div>
+          )}
+        </div>
+      )}
+
+      {canEdit && (
+        <Button block variant="success" style={{ marginTop: 14, padding: 12, borderRadius: 12 }} onClick={save}>
+          Lưu chi phí
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function ExtraCostEditor({ index, extra, members, disabled, onChange }) {
+  const allMemberIds = members.map(member => member.id);
+  const selectedIds = new Set(extra.memberIds);
+  const allSelected = allMemberIds.length > 0 && extra.memberIds.length === allMemberIds.length;
+  const amount = parseAmount(extra.amountInput);
+  const splitCount = Math.max(extra.memberIds.length, 1);
+  const perPerson = amount > 0 ? Math.round(amount / splitCount) : 0;
+  const toggleMember = (memberId) => {
+    if (disabled) return;
+    const next = selectedIds.has(memberId)
+      ? extra.memberIds.filter(id => id !== memberId)
+      : [...extra.memberIds, memberId];
+    onChange({ memberIds: next });
+  };
+
+  return (
+    <div style={{
+      padding: 12,
+      background: 'rgba(255,255,255,0.035)',
+      border: `1px solid ${colors.borderSubtle}`,
+      borderRadius: 12,
+    }}>
+      <div style={{ fontSize: 10, fontWeight: 800, color: colors.pickleball, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+        Phát sinh #{index + 1}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 8, marginTop: 8 }}>
+        <CostInput
+          value={extra.note}
+          disabled={disabled}
+          placeholder="Ghi chú"
+          onChange={(value) => onChange({ note: value })}
+        />
+        <CostInput
+          value={extra.amountInput}
+          disabled={disabled}
+          placeholder="Số tiền"
+          suffix="đ"
+          inputMode="numeric"
+          onChange={(value) => onChange({ amountInput: formatAmountInput(value) })}
+          mono
+        />
+      </div>
+      <div style={{ marginTop: 10, fontSize: 10, color: colors.textSecondary, fontWeight: 700 }}>
+        Chia cho:
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 7 }}>
+        {members.map(member => (
+          <MemberCostChip
+            key={member.id}
+            label={member.name}
+            selected={selectedIds.has(member.id)}
+            disabled={disabled}
+            onClick={() => toggleMember(member.id)}
+          />
+        ))}
+        <MemberCostChip
+          label="Tất cả"
+          selected={allSelected}
+          disabled={disabled}
+          onClick={() => !disabled && onChange({ memberIds: allMemberIds })}
+        />
+      </div>
+      <div style={{ marginTop: 8, fontSize: 10, color: perPerson ? '#6ee7b7' : colors.textMuted, fontWeight: 700 }}>
+        = {perPerson ? `${formatVNDShort(perPerson)}/người` : '0/người'}
+      </div>
+    </div>
+  );
+}
+
+function MemberCostChip({ label, selected, disabled, onClick }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        padding: '5px 9px',
+        borderRadius: 100,
+        background: selected ? 'rgba(52,211,153,0.14)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${selected ? 'rgba(52,211,153,0.35)' : colors.borderSubtle}`,
+        color: selected ? '#6ee7b7' : colors.textSecondary,
+        fontSize: 10,
+        fontWeight: selected ? 800 : 700,
+        fontFamily: 'inherit',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.75 : 1,
+      }}
+    >
+      {label}{selected ? ' ✓' : ''}
+    </button>
+  );
+}
+
+function CostInput({ value, disabled, placeholder, suffix, inputMode, onChange, mono }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        onChange={(event) => onChange?.(event.target.value)}
+        style={{
+          width: '100%',
+          padding: suffix ? '10px 30px 10px 11px' : '10px 11px',
+          background: colors.inputBg,
+          border: `1px solid ${colors.borderSubtle}`,
+          borderRadius: 10,
+          color: colors.textPrimary,
+          fontSize: 12,
+          fontWeight: mono ? 800 : 600,
+          fontFamily: 'inherit',
+          outline: 'none',
+          opacity: disabled ? 0.7 : 1,
+          ...(mono ? type.mono : {}),
+        }}
+      />
+      {suffix && (
+        <span style={{
+          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+          color: colors.textMuted, fontSize: 11, fontWeight: 700,
+        }}>{suffix}</span>
+      )}
+    </div>
+  );
+}
+
+function initialExtraDrafts(extras, allMemberIds) {
+  return (extras || []).map((extra, index) => ({
+    id: extra.id || `extra-${index}`,
+    note: extra.note || '',
+    amountInput: formatAmountInput(extra.amount || 0),
+    memberIds: Array.isArray(extra.memberIds) && extra.memberIds.length > 0 ? extra.memberIds : allMemberIds,
+  }));
+}
+
+function parseAmount(value) {
+  return Number(String(value || '').replace(/\D/g, '')) || 0;
+}
+
+function formatAmountInput(value) {
+  const amount = parseAmount(value);
+  return amount > 0 ? amount.toLocaleString('vi-VN') : '';
 }
 
 function AttendChip({ a, onToggle }) {
@@ -227,10 +539,18 @@ const DEMO = {
     { n: 29, state: 'upcoming' }, { n: 30, state: 'normal' }, { n: 31, state: 'normal' },
   ],
   selectedSession: {
-    id: 9, number: 9, dateLabel: 'T3 19/05',
+    id: 9, number: 9, date: '2026-05-19', dateLabel: 'T3 19/05',
     timeRange: '19:00 – 21:00', court: 'Sân 3',
     status: { tone: 'brand', label: 'Hôm nay' },
     attendance: { present: 10, total: 12, guests: 1 },
+    members: [
+      { id: 1, initial: 'L', name: 'Long' },
+      { id: 2, initial: 'M', name: 'Minh' },
+      { id: 3, initial: 'H', name: 'Hoa' },
+      { id: 4, initial: 'N', name: 'Nam' },
+      { id: 5, initial: 'T', name: 'Tuấn' },
+      { id: 6, initial: 'Li', name: 'Linh' },
+    ],
     attendees: [
       { id: 1, initial: 'L', name: 'Long', kind: 'present' },
       { id: 2, initial: 'M', name: 'Minh', kind: 'present' },
@@ -240,11 +560,18 @@ const DEMO = {
       { id: 6, initial: 'Li',name: 'Linh', kind: 'absent' },
       { id: 7, initial: 'K', name: 'An',   kind: 'guest' },
     ],
-    costs: [
+    costs: {
+      waterAmount: 120000,
+      extras: [
+        { id: 'demo-extra-1', note: 'Băng dán vợt', amount: 80000, memberIds: [1, 2, 3, 4] },
+      ],
+    },
+    costRows: [
       { label: '🏸 Tiền sân/người',     amount: 20000 },
       { label: '💧 Tiền nước/người',    amount: 12000 },
       { label: '📦 Băng dán vợt',       amount: 8000 },
     ],
     totalPerPerson: 40000,
+    canShowCosts: true,
   },
 };

@@ -238,7 +238,7 @@ export default function PickleballSettings({ data, onAction }) {
             background: colors.brandSoftBg,
             color: '#c7d2fe',
             border: '1px solid rgba(99,102,241,0.35)',
-          }} onClick={() => onAction?.('batchEntry')}>📋 Nhập chi phí sân tháng này</Button>
+          }} onClick={() => onAction?.('batchEntry')}>📋 Nhập nhanh chi phí tháng này</Button>
           {canManageSchedule && (
             <Button block variant="muted" style={{
               marginTop: 8,

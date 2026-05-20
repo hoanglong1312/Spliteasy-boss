@@ -1,34 +1,70 @@
-// Spliteasy Boss — Pickleball · Nhập chi phí sân (batch entry)
-// Props: data { monthLabel, completedCount, pendingCount, sessions[], summary }
+// Spliteasy Boss — Pickleball · Nhập nhanh chi phí tháng
+// Props: data { monthLabel, sessions[], summary, members[] }
 
-import React, { useState } from 'react';
-import { colors, type, formatVND } from '../tokens';
-import { PhoneFrame, Screen, IconButton, Card, Button, Badge, Input } from '../primitives';
+import React, { useEffect, useState } from 'react';
+import { colors, type, formatVND, formatVNDShort } from '../tokens';
+import { PhoneFrame, Screen, IconButton, Card, Button } from '../primitives';
 
 export default function BatchEntry({ data, onAction }) {
   const d = data || DEMO;
-  const [sessions, setSessions] = useState(() => (d.sessions || []).map((s) => ({
-    ...s,
-    waterInput: s.water != null ? String(s.water) : '',
-    accessories: (s.accessories || []).map((a) => ({
-      ...a,
-      amountInput: a.amount != null ? String(a.amount) : '',
-    })),
-  })));
-  const total = d.completedCount + d.pendingCount;
-  const pct = (d.completedCount / total) * 100;
-  const summary = sessions.reduce((acc, session) => {
-    acc.water += Number(session.waterInput) || Number(session.water) || 0;
-    acc.accessories += (session.accessories || []).reduce((sum, accessory) => (
-      sum + (Number(accessory.amountInput) || Number(accessory.amount) || 0)
-    ), 0);
-    return acc;
-  }, { water: 0, accessories: 0 });
-  const updateSession = (sessionId, updater) => {
-    setSessions((items) => items.map((item) => (
-      item.id === sessionId ? updater(item) : item
+  const [sessions, setSessions] = useState(() => sessionDrafts(d));
+  const [activeSessionId, setActiveSessionId] = useState(null);
+  const [extraDraft, setExtraDraft] = useState(() => emptyExtraDraft(d.members || []));
+
+  useEffect(() => {
+    setSessions(sessionDrafts(d));
+    setActiveSessionId(null);
+    setExtraDraft(emptyExtraDraft(d.members || []));
+  }, [data]);
+
+  const members = d.members || collectMembers(sessions);
+  const activeSession = sessions.find(session => String(session.id) === String(activeSessionId));
+  const totalWater = sessions.reduce((sum, session) => sum + parseAmount(session.waterInput), 0);
+
+  function updateWater(sessionId, value) {
+    setSessions(items => items.map(session => (
+      String(session.id) === String(sessionId)
+        ? { ...session, waterInput: formatAmountInput(value) }
+        : session
     )));
-  };
+  }
+
+  function openExtraSheet(session) {
+    const sessionMembers = session.members?.length ? session.members : members;
+    setActiveSessionId(session.id);
+    setExtraDraft(emptyExtraDraft(sessionMembers));
+  }
+
+  function saveExtra() {
+    if (!activeSession) return;
+    const amount = parseAmount(extraDraft.amountInput);
+    if (amount <= 0) {
+      setActiveSessionId(null);
+      return;
+    }
+    const nextExtra = {
+      id: `batch-${Date.now()}`,
+      note: extraDraft.note.trim() || 'Phụ phát sinh',
+      amount,
+      memberIds: extraDraft.memberIds,
+    };
+    const nextExtras = [...(activeSession.extras || []), nextExtra];
+    setSessions(items => items.map(session => (
+      String(session.id) === String(activeSession.id)
+        ? { ...session, extras: nextExtras }
+        : session
+    )));
+    onAction?.('saveSessionCost', {
+      sessionId: activeSession.id,
+      waterAmount: parseAmount(activeSession.waterInput),
+      extras: nextExtras.map(extra => ({
+        note: extra.note,
+        amount: extra.amount,
+        memberIds: isAllMembers(extra.memberIds, activeSession.members || members) ? null : extra.memberIds,
+      })),
+    });
+    setActiveSessionId(null);
+  }
 
   return (
     <PhoneFrame>
@@ -39,249 +75,325 @@ export default function BatchEntry({ data, onAction }) {
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: colors.textMuted, textTransform: 'uppercase' }}>
               Pickleball · {d.monthLabel}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>Nhập chi phí sân</div>
+            <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>Nhập nhanh chi phí tháng này</div>
           </div>
           <IconButton onClick={() => onAction?.('help')}>?</IconButton>
         </div>
 
-        {/* Progress strip */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 600 }}>
-            Đã nhập <span style={{ color: colors.success, fontWeight: 800 }}>{d.completedCount}</span> / {total} buổi đã qua
-          </div>
-          {d.pendingCount > 0 && <Badge tone="warn">⏳ Còn {d.pendingCount} buổi</Badge>}
-        </div>
-        <div style={{ height: 6, background: colors.borderSubtle, borderRadius: 100, overflow: 'hidden', marginBottom: 18 }}>
+        <Card accent="pickleball" style={{ padding: 0 }}>
           <div style={{
-            width: `${pct}%`, height: '100%',
-            background: 'linear-gradient(90deg, #34d399, #6366f1)',
-          }} />
-        </div>
+            display: 'grid', gridTemplateColumns: '82px 1fr 92px', gap: 8,
+            padding: '10px 12px',
+            borderBottom: `1px solid ${colors.borderSubtle}`,
+            fontSize: 9, fontWeight: 800, letterSpacing: '0.8px',
+            color: colors.textMuted, textTransform: 'uppercase',
+          }}>
+            <span>Ngày</span>
+            <span>💧 Nước (đ)</span>
+            <span style={{ textAlign: 'right' }}>⚡ Phát sinh</span>
+          </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {sessions.map(s => s.status === 'pending'
-            ? (
-              <PendingCard
-                key={s.id}
-                s={s}
-                onAction={onAction}
-                onWaterChange={(value) => updateSession(s.id, (item) => ({ ...item, waterInput: value }))}
-                onAccessoryChange={(index, patch) => updateSession(s.id, (item) => ({
-                  ...item,
-                  accessories: item.accessories.map((accessory, i) => (
-                    i === index ? { ...accessory, ...patch } : accessory
-                  )),
-                }))}
-                onRemoveAccessory={(index) => updateSession(s.id, (item) => ({
-                  ...item,
-                  accessories: item.accessories.filter((_, i) => i !== index),
-                }))}
-              />
-            )
-            : <CompletedCard key={s.id} s={s} />)}
-        </div>
+          {sessions.map((session, index) => {
+            const extraTotal = (session.extras || []).reduce((sum, extra) => sum + (Number(extra.amount) || 0), 0);
+            return (
+              <div key={session.id} style={{
+                display: 'grid', gridTemplateColumns: '82px 1fr 92px', gap: 8,
+                alignItems: 'center', padding: '10px 12px',
+                borderBottom: index < sessions.length - 1 ? `1px solid ${colors.borderSubtle}` : 'none',
+              }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 800 }}>{session.dateLabel}</div>
+                  <div style={{ fontSize: 9, color: colors.textMuted, marginTop: 2 }}>#{session.number}</div>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={session.waterInput}
+                    inputMode="numeric"
+                    onChange={(event) => updateWater(session.id, event.target.value)}
+                    placeholder="0"
+                    style={{
+                      width: '100%', padding: '10px 28px 10px 10px',
+                      background: colors.inputBg,
+                      border: `1px solid ${colors.borderSubtle}`,
+                      borderRadius: 10,
+                      color: colors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      fontFamily: 'inherit',
+                      outline: 'none',
+                      ...type.mono,
+                    }}
+                  />
+                  <span style={{
+                    position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                    color: colors.textMuted, fontSize: 10, fontWeight: 700,
+                  }}>đ</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openExtraSheet(session)}
+                  style={{
+                    justifySelf: 'end',
+                    padding: '8px 9px',
+                    borderRadius: 10,
+                    background: extraTotal > 0 ? 'rgba(52,211,153,0.12)' : colors.inputBg,
+                    border: `1px solid ${extraTotal > 0 ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
+                    color: extraTotal > 0 ? '#6ee7b7' : colors.brandLight,
+                    fontSize: 10,
+                    fontWeight: 800,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    ...type.mono,
+                  }}
+                >
+                  {extraTotal > 0 ? `+${formatVNDShort(extraTotal)}` : '+ Thêm'}
+                </button>
+              </div>
+            );
+          })}
+        </Card>
 
         <div style={{
-          marginTop: 18, padding: 14,
-          background: 'linear-gradient(145deg, rgba(99,102,241,0.10), rgba(99,102,241,0.04))',
-          border: '1px solid rgba(99,102,241,0.25)', borderRadius: 14,
+          marginTop: 14, padding: '12px 14px',
+          background: 'rgba(52,211,153,0.08)',
+          border: '1px solid rgba(52,211,153,0.24)',
+          borderRadius: 12,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <SummaryRow label="Đã nhập (6 buổi)" value={summary.water || d.summary.water} />
-          <SummaryRow label="Phụ kiện" value={summary.accessories || d.summary.accessories} />
-          <div style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.borderSubtle}`,
-          }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#c7d2fe', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tổng phụ + nước</span>
-            <span style={{ fontSize: 18, fontWeight: 900, color: colors.brandLight, letterSpacing: '-0.5px', ...type.mono }}>
-              {formatVND((summary.water || d.summary.water) + (summary.accessories || d.summary.accessories))}
-            </span>
-          </div>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Tổng nước tháng
+          </span>
+          <span style={{ fontSize: 18, fontWeight: 900, color: colors.pickleball, ...type.mono }}>
+            {formatVND(totalWater)}
+          </span>
         </div>
 
-        <Button
-          block
-          variant="brand"
-          style={{ marginTop: 14 }}
-          onClick={() => onAction?.('saveAll', {
-            sessions: sessions.map((session) => ({
-              id: session.id,
-              water: Number(session.waterInput) || 0,
-              accessories: (session.accessories || []).map((accessory) => ({
-                ...accessory,
-                amount: Number(accessory.amountInput) || 0,
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 14 }}>
+          <Button variant="muted" onClick={() => onAction?.('back')}>Huỷ</Button>
+          <Button
+            variant="brand"
+            onClick={() => onAction?.('saveBatchCosts', {
+              sessions: sessions.map(session => ({
+                sessionId: session.id,
+                waterAmount: parseAmount(session.waterInput),
               })),
-            })),
-          })}
-        >
-          💾 Lưu tất cả
-        </Button>
+            })}
+          >
+            Lưu tất cả
+          </Button>
+        </div>
+
+        {activeSession && (
+          <ExtraBottomSheet
+            session={activeSession}
+            members={activeSession.members?.length ? activeSession.members : members}
+            draft={extraDraft}
+            onChange={setExtraDraft}
+            onClose={() => setActiveSessionId(null)}
+            onSave={saveExtra}
+          />
+        )}
       </Screen>
     </PhoneFrame>
   );
 }
 
-function PendingCard({ s, onAction, onWaterChange, onAccessoryChange, onRemoveAccessory }) {
-  const water = Number(s.waterInput) || 0;
-  return (
-    <Card accent="pickleball" style={{ padding: 14 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#fcd34d', textTransform: 'uppercase' }}>
-            Buổi #{s.number} · Cần nhập
-          </div>
-          <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3, letterSpacing: '-0.3px' }}>
-            {s.dateLabel} · {s.timeLabel}
-          </div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-            {s.attendees} thành viên{s.guests ? ` + ${s.guests} khách` : ''}
-          </div>
-        </div>
-        <div style={{ fontSize: 16, color: colors.warning }}>⚠️</div>
-      </div>
+function ExtraBottomSheet({ session, members, draft, onChange, onClose, onSave }) {
+  const allSelected = isAllMembers(draft.memberIds, members);
+  const amount = parseAmount(draft.amountInput);
+  const splitCount = Math.max(draft.memberIds.length, 1);
+  const perPerson = amount > 0 ? Math.round(amount / splitCount) : 0;
 
-      <Input label="💧 Tiền nước" suffix="đ"
-        value={s.waterInput}
-        onChange={(e) => onWaterChange?.(e.target.value)}
-        placeholder="0"
-        inputStyle={{ fontWeight: 700, ...type.mono }}
-      />
-      {water > 0 && (
-        <div style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 600, marginTop: 6 }}>
-          → {Math.round(water / s.attendees).toLocaleString('vi-VN')} đ / người ({s.attendees} người)
-        </div>
-      )}
+  function toggleMember(memberId) {
+    const selected = new Set(draft.memberIds);
+    selected.has(memberId) ? selected.delete(memberId) : selected.add(memberId);
+    onChange({ ...draft, memberIds: Array.from(selected) });
+  }
 
-      {/* Accessory */}
-      {s.accessories?.length > 0
-        ? s.accessories.map((a, i) => (
-          <AccessoryEditor
-            key={i}
-            accessory={a}
-            onChange={(patch) => onAccessoryChange?.(i, patch)}
-            onRemove={() => onRemoveAccessory?.(i)}
-          />
-        ))
-        : (
-          <div style={{
-            marginTop: 10, display: 'flex', alignItems: 'center', gap: 8,
-            padding: '10px 14px', border: '1px dashed rgba(99,102,241,0.4)',
-            borderRadius: 10, color: colors.brandLight,
-            fontSize: 11, fontWeight: 700, letterSpacing: '0.3px', cursor: 'pointer',
-          }} onClick={() => onAction?.('addAccessory', s.id)}>
-            <span style={{ fontSize: 14 }}>+</span> Thêm phụ kiện (cầu, băng dán…)
-          </div>
-        )}
-    </Card>
-  );
-}
-
-function AccessoryEditor({ accessory, onChange, onRemove }) {
   return (
     <div style={{
-      marginTop: 12, padding: 12,
-      background: 'rgba(167,139,250,0.06)',
-      border: '1px solid rgba(167,139,250,0.18)',
-      borderRadius: 10,
+      position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
+      padding: '18px 16px 24px',
+      background: '#0c0e18',
+      borderTop: `1px solid ${colors.borderNormal}`,
+      boxShadow: '0 -24px 60px rgba(0,0,0,0.55)',
+      borderTopLeftRadius: 22,
+      borderTopRightRadius: 22,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>📦</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Phụ kiện · 1
-          </span>
+      <div style={{ width: 40, height: 4, borderRadius: 100, background: 'rgba(255,255,255,0.16)', margin: '0 auto 14px' }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 800, color: colors.pickleball, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Phát sinh · {session.dateLabel}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>Thêm khoản phụ</div>
         </div>
-        <button onClick={onRemove} style={{
-          color: colors.textMuted, fontSize: 14, cursor: 'pointer',
-          background: 'none', border: 'none', fontFamily: 'inherit',
+        <button onClick={onClose} style={{
+          background: 'transparent', border: 'none', color: colors.textMuted,
+          fontSize: 18, fontFamily: 'inherit', cursor: 'pointer',
         }}>✕</button>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={accessory.name || ''} onChange={(e) => onChange?.({ name: e.target.value })} style={{
-          flex: 1.4, padding: '9px 12px', fontSize: 12,
-          background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`,
-          borderRadius: 12, color: colors.textPrimary, fontFamily: 'inherit', outline: 'none',
-        }} />
-        <div style={{ position: 'relative', flex: 1 }}>
-          <input value={accessory.amountInput || ''} onChange={(e) => onChange?.({ amountInput: e.target.value })} style={{
-            width: '100%', padding: '9px 30px 9px 12px', fontSize: 12, fontWeight: 700,
-            background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`,
-            borderRadius: 12, color: colors.textPrimary, fontFamily: 'inherit', outline: 'none',
-            ...type.mono,
-          }} />
-          <span style={{
-            position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-            color: colors.textMuted, fontSize: 11, fontWeight: 600,
-          }}>đ</span>
-        </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 8, marginTop: 14 }}>
+        <SheetInput value={draft.note} placeholder="Ghi chú" onChange={(value) => onChange({ ...draft, note: value })} />
+        <SheetInput
+          value={draft.amountInput}
+          placeholder="Số tiền"
+          suffix="đ"
+          inputMode="numeric"
+          mono
+          onChange={(value) => onChange({ ...draft, amountInput: formatAmountInput(value) })}
+        />
       </div>
-      <div style={{ marginTop: 10, fontSize: 10, color: colors.textSecondary, fontWeight: 600 }}>Áp dụng cho:</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-        {accessory.applies.map((p, i) => (
-          <span key={i} style={{
-            padding: '4px 8px', borderRadius: 100,
-            background: p.included ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.05)',
-            border: `1px solid ${p.included ? 'rgba(167,139,250,0.4)' : 'rgba(255,255,255,0.08)'}`,
-            fontSize: 10, fontWeight: p.included ? 700 : 600,
-            color: p.included ? '#c4b5fd' : colors.textSecondary,
-          }}>
-            {p.name}{p.included ? ' ✓' : ''}
-          </span>
+
+      <div style={{ marginTop: 12, fontSize: 10, color: colors.textSecondary, fontWeight: 800 }}>Chia cho:</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        {members.map(member => (
+          <Chip
+            key={member.id}
+            label={member.name}
+            selected={draft.memberIds.some(id => String(id) === String(member.id))}
+            onClick={() => toggleMember(member.id)}
+          />
         ))}
+        <Chip label="Tất cả" selected={allSelected} onClick={() => onChange({ ...draft, memberIds: members.map(member => member.id) })} />
       </div>
+
+      <div style={{ marginTop: 10, fontSize: 11, color: perPerson ? '#6ee7b7' : colors.textMuted, fontWeight: 800 }}>
+        = {perPerson ? `${formatVNDShort(perPerson)}/người` : '0/người'}
+      </div>
+
+      <Button block variant="success" style={{ marginTop: 14, padding: 12, borderRadius: 12 }} onClick={onSave}>
+        Lưu phát sinh
+      </Button>
     </div>
   );
 }
 
-function CompletedCard({ s }) {
+function SheetInput({ value, placeholder, suffix, inputMode, mono, onChange }) {
   return (
-    <Card style={{ padding: 14, opacity: 0.7 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#6ee7b7', textTransform: 'uppercase' }}>
-            Buổi #{s.number} ✓ Đã nhập
-          </div>
-          <div style={{ fontSize: 13, fontWeight: 700, marginTop: 2 }}>{s.dateLabel} · {s.attendees} người</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 13, fontWeight: 800, ...type.mono }}>{formatVND(s.water)}</div>
-          <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 600 }}>
-            {Math.round(s.water / s.attendees / 1000)}k/người
-          </div>
-        </div>
-      </div>
-    </Card>
+    <div style={{ position: 'relative' }}>
+      <input
+        value={value}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        onChange={(event) => onChange?.(event.target.value)}
+        style={{
+          width: '100%',
+          padding: suffix ? '11px 30px 11px 11px' : '11px',
+          background: colors.inputBg,
+          border: `1px solid ${colors.borderSubtle}`,
+          borderRadius: 10,
+          color: colors.textPrimary,
+          fontSize: 12,
+          fontWeight: mono ? 800 : 600,
+          fontFamily: 'inherit',
+          outline: 'none',
+          ...(mono ? type.mono : {}),
+        }}
+      />
+      {suffix && (
+        <span style={{
+          position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+          color: colors.textMuted, fontSize: 11, fontWeight: 700,
+        }}>{suffix}</span>
+      )}
+    </div>
   );
 }
 
-function SummaryRow({ label, value }) {
+function Chip({ label, selected, onClick }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '3px 0' }}>
-      <span style={{ color: colors.textSecondary }}>{label}</span>
-      <span style={{ fontWeight: 700, ...type.mono }}>{formatVND(value)}</span>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: '5px 9px',
+        borderRadius: 100,
+        background: selected ? 'rgba(52,211,153,0.14)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${selected ? 'rgba(52,211,153,0.35)' : colors.borderSubtle}`,
+        color: selected ? '#6ee7b7' : colors.textSecondary,
+        fontSize: 10,
+        fontWeight: selected ? 800 : 700,
+        fontFamily: 'inherit',
+        cursor: 'pointer',
+      }}
+    >
+      {label}{selected ? ' ✓' : ''}
+    </button>
   );
+}
+
+function sessionDrafts(data) {
+  const members = data.members || [];
+  return (data.sessions || []).map(session => {
+    const sessionMembers = session.members?.length ? session.members : members;
+    return {
+      ...session,
+      id: session.sessionId || session.id,
+      waterInput: formatAmountInput(session.water || session.waterAmount || 0),
+      members: sessionMembers,
+      extras: normalizeExtras(session.extras || session.accessories || [], sessionMembers),
+    };
+  });
+}
+
+function normalizeExtras(extras, members) {
+  const allMemberIds = members.map(member => member.id);
+  return (extras || []).map((extra, index) => ({
+    id: extra.id || `extra-${index}`,
+    note: extra.note || extra.name || 'Phụ phát sinh',
+    amount: Number(extra.amount) || 0,
+    memberIds: Array.isArray(extra.memberIds) && extra.memberIds.length > 0 ? extra.memberIds : allMemberIds,
+  }));
+}
+
+function collectMembers(sessions) {
+  const byId = new Map();
+  sessions.forEach(session => {
+    (session.members || []).forEach(member => {
+      if (member.id && !byId.has(String(member.id))) byId.set(String(member.id), member);
+    });
+  });
+  return Array.from(byId.values());
+}
+
+function emptyExtraDraft(members) {
+  return {
+    note: '',
+    amountInput: '',
+    memberIds: (members || []).map(member => member.id).filter(Boolean),
+  };
+}
+
+function isAllMembers(memberIds, members) {
+  const ids = (members || []).map(member => String(member.id));
+  return ids.length > 0 && ids.every(id => (memberIds || []).some(memberId => String(memberId) === id));
+}
+
+function parseAmount(value) {
+  return Number(String(value || '').replace(/\D/g, '')) || 0;
+}
+
+function formatAmountInput(value) {
+  const amount = parseAmount(value);
+  return amount > 0 ? amount.toLocaleString('vi-VN') : '';
 }
 
 const DEMO = {
-  monthLabel: 'Tháng 5',
-  completedCount: 6, pendingCount: 2,
-  sessions: [
-    { id: 8, number: 8, dateLabel: 'CN 17/05', timeLabel: '19:00', status: 'pending', attendees: 11, guests: 1 },
-    { id: 7, number: 7, dateLabel: 'T6 15/05', timeLabel: '19:00', status: 'pending', attendees: 9, water: 108000,
-      accessories: [{
-        name: 'Hộp cầu Yonex', amount: 180000,
-        applies: [
-          { name: 'Long', included: true },
-          { name: 'Minh', included: true },
-          { name: 'Hoa',  included: true },
-          { name: 'Tuấn', included: false },
-          { name: '+5',   included: false },
-        ],
-      }],
-    },
-    { id: 6, number: 6, dateLabel: 'T4 13/05', status: 'done', attendees: 10, water: 120000 },
-    { id: 5, number: 5, dateLabel: 'T2 11/05', status: 'done', attendees: 12, water: 132000 },
+  monthLabel: 'Tháng 5 · 2026',
+  completedCount: 2,
+  pendingCount: 1,
+  members: [
+    { id: 1, name: 'Long' },
+    { id: 2, name: 'Minh' },
+    { id: 3, name: 'Hoa' },
   ],
-  summary: { water: 720000, accessories: 180000 },
+  sessions: [
+    { id: 8, number: 8, dateLabel: '17/05', timeLabel: '19:00', attendees: 3, water: 108000, extras: [] },
+    { id: 9, number: 9, dateLabel: '19/05', timeLabel: '19:00', attendees: 3, water: 90000,
+      extras: [{ id: 'x1', note: 'Bóng thi đấu', amount: 60000, memberIds: [1, 2, 3] }] },
+    { id: 10, number: 10, dateLabel: '21/05', timeLabel: '19:00', attendees: 3, water: 0, extras: [] },
+  ],
+  summary: { water: 198000, accessories: 60000 },
 };

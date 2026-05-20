@@ -447,13 +447,16 @@ function buildPickleballCalendarData(state) {
     const date = parseDate(sessionDate(session))
     if (date) sessionsByDay.set(date.getDate(), session)
   })
+  const calendarSessions = sessions.map(session => toCalendarSessionDetail(state, session, sessions, today))
+  const selectedSession = calendarSessions.find(session => session.date === dateKey(today)) || calendarSessions[0] || null
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
-    selectedSessionDay: today.getDate(),
+    selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : today.getDate(),
     days: buildCalendarDays(today, sessionsByDay, state),
-    selectedSession: null,
+    sessions: calendarSessions,
+    selectedSession,
     shouldAutoGenerate,
   }
 }
@@ -665,23 +668,28 @@ function buildPickleballSettingsData(state) {
 function buildBatchEntryData(state) {
   const today = new Date()
   const members = currentGroupMembers(state)
-  const sessions = getAllSessions(state)
+  const sessions = getStateMonthSessions(state, today)
     .slice()
-    .sort((a, b) => parseDateValue(sessionDate(b)) - parseDateValue(sessionDate(a)))
+    .sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
     .map((session, index, all) => {
       const presentIds = sessionMemberIds(session)
       const guests = sessionGuests(session)
       const hasAttendance = presentIds.length > 0 || guests.length > 0
-      const water = sessionWaterAmount(session)
+      const costs = sessionCostsForSession(state, session, members)
+      const water = costs.waterAmount
       return {
         id: session.id || `session-${index}`,
+        sessionId: session.id || `session-${index}`,
         number: sessionNumber(session, all),
+        date: sessionDate(session),
         dateLabel: formatSessionDetailDate(sessionDate(session)),
         timeLabel: sessionTime(session),
         status: hasAttendance ? 'done' : 'pending',
         attendees: Math.max(presentIds.length, 1),
         guests: guests.length,
         water,
+        extras: costs.extras,
+        members: members.map(personChip),
         accessories: batchAccessories(session, members, presentIds),
       }
     })
@@ -696,9 +704,10 @@ function buildBatchEntryData(state) {
     summary: {
       water: sessions.reduce((sum, session) => sum + (Number(session.water) || 0), 0),
       accessories: sessions.reduce((sum, session) => (
-        sum + safeArray(session.accessories).reduce((itemSum, item) => itemSum + (Number(item.amount) || 0), 0)
+        sum + safeArray(session.extras || session.accessories).reduce((itemSum, item) => itemSum + (Number(item.amount) || 0), 0)
       ), 0),
     },
+    members: members.map(personChip),
   }
 }
 
@@ -1228,6 +1237,132 @@ function calendarCellState(date, session, state) {
   return presentIds.some(id => String(id) === String(state.currentUserId)) ? 'attended' : 'missed'
 }
 
+function toCalendarSessionDetail(state, session, allSessions, today) {
+  const pickle = state?.pickle || {}
+  const groupMembers = currentGroupMembers(state).filter(isActiveMember)
+  const fixedMembers = safeArray(pickle?.fixedMembers)
+  const fixedSet = new Set(fixedMembers.map(String))
+  const presentIds = sessionMemberIds(session)
+  const presentSet = new Set(presentIds.map(String))
+  const guests = sessionGuests(session)
+  const attendees = [
+    ...groupMembers
+      .filter(member => fixedSet.size === 0 || fixedSet.has(String(member.id)) || presentSet.has(String(member.id)))
+      .map(member => ({
+        id: member.id,
+        initial: initials(member),
+        name: firstName(member.displayName || member.name),
+        kind: presentSet.has(String(member.id)) ? 'present' : 'absent',
+      })),
+    ...guests.map((guest, index) => ({
+      id: guest.id || guest.guest_id || `guest-${index}`,
+      initial: initials({ name: guestName(guest) }),
+      name: guestName(guest),
+      kind: 'guest',
+    })),
+  ]
+  const members = groupMembers.map(personChip)
+  const costs = sessionCostsForSession(state, session, members)
+  const monthSessions = getStateMonthSessions(state, parseDate(sessionDate(session)) || today)
+  const courtPerPerson = perPersonCourtFee(pickle, monthSessions)
+  const splitCount = presentIds.length + guests.length
+  const waterPerPerson = splitCount > 0 ? Math.round(costs.waterAmount / splitCount) : 0
+  const extrasPerPerson = costs.extras.reduce((sum, item) => {
+    const count = safeArray(item.memberIds).length || members.length || splitCount
+    return sum + (count > 0 ? Math.round((Number(item.amount) || 0) / count) : 0)
+  }, 0)
+  const sessionKey = dateKey(sessionDate(session))
+  const todayKey = dateKey(today)
+
+  return {
+    id: session.id,
+    number: sessionNumber(session, allSessions),
+    date: sessionKey,
+    dateLabel: formatSessionDetailDate(sessionDate(session)),
+    timeRange: sessionTimeRange(session),
+    court: sessionCourt(session),
+    status: calendarSessionStatus(session, today),
+    attendance: {
+      present: presentIds.length,
+      total: Math.max(groupMembers.length, presentIds.length),
+      guests: guests.length,
+    },
+    attendees,
+    members,
+    costs,
+    costRows: [
+      { label: '🏸 Tiền sân/người', amount: courtPerPerson },
+      { label: '💧 Tiền nước/người', amount: waterPerPerson },
+      ...costs.extras.map(item => {
+        const count = safeArray(item.memberIds).length || members.length || 1
+        return {
+          label: `⚡ ${item.note || 'Phụ phát sinh'}`,
+          amount: count > 0 ? Math.round((Number(item.amount) || 0) / count) : 0,
+        }
+      }),
+    ],
+    totalPerPerson: courtPerPerson + waterPerPerson + extrasPerPerson,
+    canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
+  }
+}
+
+function calendarSessionStatus(session, today) {
+  const normalizedStatus = String(session?.status || '').toLowerCase()
+  if (isToday(sessionDate(session))) return { tone: 'brand', label: 'Hôm nay' }
+  if (['moved', 'cancelled', 'canceled'].includes(normalizedStatus)) return { tone: 'warn', label: 'Đã dời' }
+  if (isDoneStatus(normalizedStatus)) return { tone: 'success', label: 'Đã đánh' }
+  return dateKey(sessionDate(session)) > dateKey(today) ? { tone: 'muted', label: 'Sắp tới' } : { tone: 'warn', label: 'Chưa chốt' }
+}
+
+function sessionCostsForSession(state, session, members = []) {
+  const items = sessionItemsForSession(state, session)
+  const waterItem = items.find(isWaterSessionItem)
+  const extras = items
+    .filter(item => !isWaterSessionItem(item))
+    .map(item => normalizeSessionCostItem(item, members))
+
+  return {
+    waterAmount: waterItem ? Number(waterItem.amount) || 0 : sessionWaterAmount(session),
+    extras,
+  }
+}
+
+function sessionItemsForSession(state, session) {
+  const sessionId = String(session?.id || '')
+  const rows = [
+    ...safeArray(session?.sessionItems || session?.session_items),
+    ...safeArray(state?.sessionItems || state?.session_items),
+    ...safeArray(state?.pickle?.sessionItems || state?.pickle?.session_items),
+    ...safeArray(state?._allPickle?.sessionItems || state?._allPickle?.session_items),
+  ]
+  const seen = new Set()
+  return rows
+    .filter(item => String(item?.sessionId || item?.session_id || '') === sessionId)
+    .filter(item => {
+      const key = String(item?.id || `${item?.sessionId || item?.session_id}:${item?.name}:${item?.amount}`)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
+
+function normalizeSessionCostItem(item, members) {
+  const rawMemberIds = item?.memberIds ?? item?.member_ids
+  const memberIds = rawMemberIds == null
+    ? members.map(member => member.id).filter(Boolean)
+    : safeArray(rawMemberIds)
+  return {
+    id: item.id,
+    note: item.note || item.name || 'Phụ phát sinh',
+    amount: Number(item.amount) || 0,
+    memberIds,
+  }
+}
+
+function isWaterSessionItem(item) {
+  return String(item?.name || item?.note || '').trim().toLowerCase() === 'nước'
+}
+
 function normalizeId(value, preferredKey = 'id') {
   if (value && typeof value === 'object') {
     return value[preferredKey] ?? value.id ?? value.expenseId ?? value.memberId ?? value.toId ?? value.fromId ?? null
@@ -1481,6 +1616,25 @@ function buildNextMonthPreview(today, weekdays) {
 }
 
 function batchAccessories(session, members, presentIds) {
+  const sessionItems = safeArray(session?.sessionItems || session?.session_items)
+  if (sessionItems.length > 0) {
+    return sessionItems
+      .filter(item => !isWaterSessionItem(item))
+      .map(item => {
+        const appliesToIds = item.memberIds == null && item.member_ids == null
+          ? presentIds
+          : safeArray(item.memberIds ?? item.member_ids)
+        return {
+          name: item.name || 'Phụ phát sinh',
+          amount: Number(item.amount) || 0,
+          memberIds: appliesToIds,
+          applies: appliesToIds.map(id => ({
+            name: firstName(memberName(id, members)),
+            included: true,
+          })),
+        }
+      })
+  }
   return safeArray(session?.expenses)
     .filter(expense => !/nước|water|sân|court/i.test(`${expense?.title || ''} ${expense?.cat || ''} ${expense?.category || ''}`))
     .map(expense => {
@@ -1989,12 +2143,30 @@ function personChip(member) {
 function sessionWaterAmount(session) {
   const direct = Number(session?.water_amount ?? session?.waterAmount ?? session?.water)
   if (Number.isFinite(direct) && direct > 0) return direct
+  const waterItem = safeArray(session?.sessionItems || session?.session_items).find(isWaterSessionItem)
+  if (waterItem) return Number(waterItem.amount) || 0
   return safeArray(session?.expenses)
     .filter(expense => /nước|water/i.test(`${expense?.title || ''} ${expense?.cat || ''} ${expense?.category || ''}`))
     .reduce((sum, expense) => sum + (Number(expense?.amount) || 0), 0)
 }
 
 function sessionAccessories(session, members, presentIds) {
+  const sessionItems = safeArray(session?.sessionItems || session?.session_items)
+  if (sessionItems.length > 0) {
+    return sessionItems
+      .filter(item => !isWaterSessionItem(item))
+      .map(item => {
+        const appliesToIds = item.memberIds == null && item.member_ids == null
+          ? presentIds
+          : safeArray(item.memberIds ?? item.member_ids)
+        return {
+          icon: '⚡',
+          name: item.name || 'Khoản phụ',
+          total: Number(item.amount) || 0,
+          appliesTo: appliesToIds.map(id => firstName(memberName(id, members))),
+        }
+      })
+  }
   return safeArray(session?.expenses)
     .filter(expense => !/nước|water|sân|court/i.test(`${expense?.title || ''} ${expense?.cat || ''} ${expense?.category || ''}`))
     .map(expense => {

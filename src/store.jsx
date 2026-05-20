@@ -334,7 +334,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, ptR, dR, jR] = await Promise.all([
+  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, psiR, ptR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('member_tokens').select('member_id,revoked_at'),
@@ -347,6 +347,7 @@ async function fetchGroupData(token) {
     sb.from('pickleball_monthly_config').select('*'),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
+    sb.from('pickleball_session_items').select('*'),
     sb.from('pickleball_tickets').select('*').order('session_date', { ascending: true }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
@@ -358,6 +359,7 @@ async function fetchGroupData(token) {
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (pcR.error) console.warn('[store] pickle_configs query failed:', pcR.error)
   if (pmcR.error) console.warn('[store] pickleball_monthly_config query failed:', pmcR.error)
+  if (psiR.error) console.warn('[store] pickleball_session_items query failed:', psiR.error)
   if (ptR.error) console.warn('[store] pickleball_tickets query failed:', ptR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
@@ -374,6 +376,7 @@ async function fetchGroupData(token) {
     pickleballMonthlyConfigs: pmcR.data || [],
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
+    pickleballSessionItems: psiR.data || [],
     pickleballTickets: ptR.data || [],
     disputeCount:    (dR.data || []).length,
     joinRequests:    jR.data || [],
@@ -486,6 +489,9 @@ function pickleForGroup(allPickle, members, groupId) {
   const source = allPickle || {}
   const sessions = safeArray(source.sessions).filter(s => (s.groupId ?? s.group_id) === groupId)
   const upcoming = safeArray(source.upcoming).filter(s => (s.groupId ?? s.group_id) === groupId)
+  const sessionIds = new Set(sessions.map(session => String(session.id)).filter(Boolean))
+  const sessionItems = safeArray(source.sessionItems || source.session_items)
+    .filter(item => sessionIds.has(String(item.sessionId || item.session_id || '')))
   const monthlyConfigs = safeArray(source.monthlyConfigs || source.monthly_configs)
     .filter(c => (c.groupId ?? c.group_id) === groupId)
   const configs = safeArray(source.configs)
@@ -504,6 +510,7 @@ function pickleForGroup(allPickle, members, groupId) {
   return {
     sessions,
     upcoming,
+    sessionItems,
     fixedMembers,
     externalTickets: safeArray(source.externalTickets).filter(t => (t.groupId ?? t.group_id) === groupId),
     monthlyConfigs,
@@ -554,6 +561,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     pickleConfig,
     pickleSessions,
     pickleAttendees,
+    pickleballSessionItems = [],
     pickleballTickets = [],
     disputeCount,
     joinRequests = [],
@@ -638,25 +646,76 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     payments: normalPeriodPayments.filter(pay => pay.periodId === p.id),
   }))
 
-  const normalSessions = pickleSessions.map(s => ({
-    id: s.id,
-    groupId: s.group_id,
-    group_id: s.group_id,
-    date: s.session_date,
-    sessionDate: s.session_date,
-    session_date: s.session_date,
-    startTime: s.start_time,
-    start_time: s.start_time,
-    court: s.court,
-    status: s.status,
-    notes: s.notes,
-    attendees: pickleAttendees
-      .filter(a => a.session_id === s.id && !a.is_guest)
-      .map(a => a.member_id),
-    guests: pickleAttendees
-      .filter(a => a.session_id === s.id && a.is_guest),
-    expenses: normalExpenses.filter(e => e.pickleSessionId === s.id),
-  }))
+  const normalSessionItems = safeArray(pickleballSessionItems).map(item => {
+    const memberIds = item.member_ids == null ? null : safeArray(item.member_ids)
+    return {
+      id: item.id,
+      sessionId: item.session_id,
+      session_id: item.session_id,
+      name: item.name || '',
+      amount: Number(item.amount) || 0,
+      memberIds,
+      member_ids: memberIds,
+      createdBy: item.created_by,
+      created_by: item.created_by,
+      createdAt: item.created_at,
+      created_at: item.created_at,
+    }
+  })
+  const sessionItemsBySession = normalSessionItems.reduce((map, item) => {
+    const sessionId = String(item.sessionId || item.session_id || '')
+    if (!sessionId) return map
+    if (!map.has(sessionId)) map.set(sessionId, [])
+    map.get(sessionId).push(item)
+    return map
+  }, new Map())
+
+  const normalSessions = pickleSessions.map(s => {
+    const sessionItems = sessionItemsBySession.get(String(s.id)) || []
+    const itemExpenses = sessionItems.map(item => ({
+      id: item.id,
+      groupId: s.group_id,
+      group_id: s.group_id,
+      title: item.name,
+      name: item.name,
+      cat: /nước|water/i.test(item.name) ? 'water' : 'pickleball_extra',
+      category: /nước|water/i.test(item.name) ? 'water' : 'pickleball_extra',
+      amount: item.amount,
+      paidBy: item.createdBy,
+      participants: item.memberIds == null ? [] : item.memberIds,
+      splits: [],
+      date: s.session_date,
+      status: 'approved',
+      pickleSessionId: s.id,
+      memberIds: item.memberIds,
+      member_ids: item.memberIds,
+      source: 'pickleball_session_items',
+    }))
+    return {
+      id: s.id,
+      groupId: s.group_id,
+      group_id: s.group_id,
+      date: s.session_date,
+      sessionDate: s.session_date,
+      session_date: s.session_date,
+      startTime: s.start_time,
+      start_time: s.start_time,
+      court: s.court,
+      status: s.status,
+      notes: s.notes,
+      attendees: pickleAttendees
+        .filter(a => a.session_id === s.id && !a.is_guest)
+        .map(a => a.member_id),
+      guests: pickleAttendees
+        .filter(a => a.session_id === s.id && a.is_guest),
+      sessionItems,
+      session_items: sessionItems,
+      expenses: [
+        ...normalExpenses.filter(e => e.pickleSessionId === s.id),
+        ...itemExpenses,
+      ],
+    }
+  })
 
   const normalMembers = members.map(m => ({
     id: m.id,
@@ -758,6 +817,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     _allPickle: {
       sessions: normalSessions,
       upcoming: [],
+      sessionItems: normalSessionItems,
       configs: normalPickleConfigs,
       monthlyConfigs: normalPickleballMonthlyConfigs,
       externalTickets: normalTickets,

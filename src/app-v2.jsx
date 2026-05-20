@@ -429,6 +429,76 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'saveSessionCost') {
+      if (!isTreasurer) return
+      const sessionId = payload?.sessionId
+      if (!sessionId) return
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const waterAmount = parseMoneyAmount(payload?.waterAmount)
+      const { error: waterError } = await sb
+        .from('pickleball_session_items')
+        .upsert({
+          session_id: sessionId,
+          name: 'Nước',
+          amount: waterAmount,
+          member_ids: null,
+          created_by: state.currentUserId || null,
+        }, { onConflict: 'session_id,name' })
+      if (waterError) throw waterError
+
+      const { error: deleteExtrasError } = await sb
+        .from('pickleball_session_items')
+        .delete()
+        .eq('session_id', sessionId)
+        .neq('name', 'Nước')
+      if (deleteExtrasError) throw deleteExtrasError
+
+      const extras = (payload?.extras || [])
+        .map(extra => ({
+          session_id: sessionId,
+          name: String(extra?.note || extra?.name || 'Phụ phát sinh').trim() || 'Phụ phát sinh',
+          amount: parseMoneyAmount(extra?.amount),
+          member_ids: Array.isArray(extra?.memberIds) ? extra.memberIds : null,
+          created_by: state.currentUserId || null,
+        }))
+        .filter(extra => extra.amount > 0)
+      if (extras.length > 0) {
+        const { error: insertExtrasError } = await sb
+          .from('pickleball_session_items')
+          .insert(extras)
+        if (insertExtrasError) throw insertExtrasError
+      }
+
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'saveBatchCosts') {
+      if (!isTreasurer) return
+      const rows = (payload?.sessions || [])
+        .filter(session => session?.sessionId || session?.id)
+        .map(session => ({
+          session_id: session.sessionId || session.id,
+          name: 'Nước',
+          amount: parseMoneyAmount(session.waterAmount ?? session.water),
+          member_ids: null,
+          created_by: state.currentUserId || null,
+        }))
+      if (rows.length === 0) return
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickleball_session_items')
+        .upsert(rows, { onConflict: 'session_id,name' })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      setStack((s) => s[s.length - 1]?.screen === 'batch-entry' ? s.slice(0, -1) : s)
+      return
+    }
+
     if (type === 'togglePresence') {
       const route = stack[stack.length - 1]
       const sessionId = payload?.sessionId ?? route?.params?.sessionId ?? route?.params
@@ -800,6 +870,10 @@ function monthRange(yearMonth) {
 function monthKey(value) {
   const date = value instanceof Date ? value : new Date(value)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function parseMoneyAmount(value) {
+  return Number(String(value ?? '').replace(/\D/g, '')) || 0
 }
 
 function dateFromLabel(label) {
