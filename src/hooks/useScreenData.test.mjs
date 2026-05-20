@@ -46,3 +46,31 @@ test('Member detail data includes attendance rank and casual court-fee logic', (
   assert.match(dataSource, /const vanglaiCharge = ratePerSession \* attendanceByMemberId\(sessions, member\.id\)/)
   assert.match(dataSource, /const rebatePerFixed = fixedMemberCount > 0 \? casualCharges\.reduce/)
 })
+
+test('Pickleball tickets data exposes individual-ticket table rows and team-fund filter', () => {
+  const ticketsMatch = dataSource.match(/function buildPickleballTicketsData[\s\S]*?\n}\n\nfunction buildPickleballSettingsData/)
+  assert.ok(ticketsMatch)
+  const ticketsSource = ticketsMatch[0]
+
+  assert.match(ticketsSource, /state\?\._allPickle\?\.externalTickets/)
+  assert.match(ticketsSource, /state\?\.pickle\?\.externalTickets/)
+  assert.match(ticketsSource, /monthLabel: formatMonthLabel\(today\)/)
+  assert.match(ticketsSource, /totalAttendances: tickets\.reduce\([\s\S]*?safeArray\(ticket\.memberIds\)\.length/)
+  assert.match(dataSource, /amountPerPerson/)
+  assert.match(dataSource, /memberLabels/)
+  assert.match(dataSource, /advancerName/)
+  assert.match(ticketsSource, /status: 'team_fund'/)
+  assert.match(ticketsSource, /\{ key: 'team', label: `🏦 Quỹ team · \$\{teamFund\.length\}` \}/)
+})
+
+test('Pickleball overview and member detail include individual-ticket balances', () => {
+  assert.match(dataSource, /function memberTicketBalance\(state, memberId\) \{/)
+  assert.match(dataSource, /function memberTeamFundTicketShare\(state, memberId\) \{/)
+  assert.match(dataSource, /const p2pTicketBalance = memberTicketBalance\(state, currentUserId\)/)
+  assert.match(dataSource, /const teamFundTicketShare = memberTeamFundTicketShare\(state, currentUserId\)/)
+  assert.match(dataSource, /const ticketAmount = p2pTicketBalance - teamFundTicketShare/)
+  assert.match(dataSource, /const ticketShare = memberTeamFundTicketShare\(state, memberId\)/)
+  assert.match(dataSource, /const p2pBalance = memberTicketBalance\(state, memberId\)/)
+  assert.match(dataSource, /ticketShare/)
+  assert.match(dataSource, /p2pBalance/)
+})

@@ -55,6 +55,25 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /is_active: false/)
 })
 
+test('AppV2 handles individual-ticket Supabase writes', () => {
+  assert.match(appSource, /if \(type === 'addTicket'\)/)
+  assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.insert\(\{/)
+  assert.match(appSource, /session_date: payload\?\.date/)
+  assert.match(appSource, /session_time: payload\?\.time \|\| null/)
+  assert.match(appSource, /member_ids: payload\?\.memberIds \|\| \[\]/)
+  assert.match(appSource, /advancer_id: payload\?\.advancerId \|\| null/)
+  assert.match(appSource, /status: payload\?\.advancerId \? 'unpaid' : 'team_fund'/)
+  assert.match(appSource, /year_month: monthKey\(payload\?\.date \|\| new Date\(\)\)/)
+  assert.match(appSource, /created_by: state\.currentUserId/)
+
+  assert.match(appSource, /if \(type === 'markTicketPaid'\)/)
+  assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.update\(\{ status: 'paid' \}\)/)
+  assert.match(appSource, /\.eq\('id', ticketId\)/)
+
+  assert.match(appSource, /if \(type === 'deleteTicket'\)/)
+  assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
+})
+
 test('Member management screens are registered in the app source', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   assert.match(memberListSource, /const \[search, setSearch\] = useState\(''\)/)

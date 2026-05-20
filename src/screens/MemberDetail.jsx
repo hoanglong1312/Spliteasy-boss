@@ -127,6 +127,9 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
           <MoneyRow label="Tiền sân" amount={d.balance.courtFee} />
           <MoneyRow label="Tiền nước" amount={d.balance.waterFee} />
           <MoneyRow label="Phụ phát sinh" amount={d.balance.extras} />
+          {(d.balance.ticketShare || d.balance.p2pBalance) && (
+            <MoneyRow label="Vé lẻ" amount={(d.balance.ticketShare || 0) - (d.balance.p2pBalance || 0)} />
+          )}
           <div style={{ height: 1, background: colors.borderSubtle, margin: '10px 0' }} />
           <MoneyRow label="Tổng còn nợ" amount={d.balance.totalOwed} strong />
         </Card>

@@ -334,7 +334,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, dR, jR] = await Promise.all([
+  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, ptR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('member_tokens').select('member_id,revoked_at'),
@@ -347,6 +347,7 @@ async function fetchGroupData(token) {
     sb.from('pickleball_monthly_config').select('*'),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
+    sb.from('pickleball_tickets').select('*').order('session_date', { ascending: true }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
   ])
@@ -357,6 +358,7 @@ async function fetchGroupData(token) {
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (pcR.error) console.warn('[store] pickle_configs query failed:', pcR.error)
   if (pmcR.error) console.warn('[store] pickleball_monthly_config query failed:', pmcR.error)
+  if (ptR.error) console.warn('[store] pickleball_tickets query failed:', ptR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
@@ -372,6 +374,7 @@ async function fetchGroupData(token) {
     pickleballMonthlyConfigs: pmcR.data || [],
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
+    pickleballTickets: ptR.data || [],
     disputeCount:    (dR.data || []).length,
     joinRequests:    jR.data || [],
   }
@@ -551,6 +554,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     pickleConfig,
     pickleSessions,
     pickleAttendees,
+    pickleballTickets = [],
     disputeCount,
     joinRequests = [],
   } = raw
@@ -715,6 +719,30 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     scheduleStartDay: config.schedule_start_day ?? config.scheduleStartDay ?? null,
     schedule_start_day: config.schedule_start_day ?? config.scheduleStartDay ?? null,
   }))
+  const normalTickets = safeArray(pickleballTickets).map(ticket => ({
+    id: ticket.id,
+    groupId: ticket.group_id,
+    group_id: ticket.group_id,
+    sessionDate: ticket.session_date,
+    session_date: ticket.session_date,
+    sessionTime: ticket.session_time,
+    session_time: ticket.session_time,
+    time: ticket.session_time,
+    totalAmount: Number(ticket.total_amount) || 0,
+    total_amount: Number(ticket.total_amount) || 0,
+    amount: Number(ticket.total_amount) || 0,
+    memberIds: safeArray(ticket.member_ids),
+    member_ids: safeArray(ticket.member_ids),
+    advancerId: ticket.advancer_id,
+    advancer_id: ticket.advancer_id,
+    status: ticket.status || (ticket.advancer_id ? 'unpaid' : 'team_fund'),
+    yearMonth: ticket.year_month,
+    year_month: ticket.year_month,
+    createdBy: ticket.created_by,
+    created_by: ticket.created_by,
+    createdAt: ticket.created_at,
+    created_at: ticket.created_at,
+  }))
   const baseState = {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
@@ -732,7 +760,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
       upcoming: [],
       configs: normalPickleConfigs,
       monthlyConfigs: normalPickleballMonthlyConfigs,
-      externalTickets: [],
+      externalTickets: normalTickets,
     },
     notifications: [],
     disputeCount: disputeCount || 0,

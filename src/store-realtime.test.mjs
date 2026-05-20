@@ -30,3 +30,18 @@ test('store subscribes to expenses postgres changes and ignores current user eve
   assert.match(storeSource, /dispatch\(\{ type: 'SHOW_TOAST', message \}\)/)
   assert.doesNotMatch(storeSource, /\.on\('broadcast', \{ event: 'data_changed' \}/)
 })
+
+test('store fetches and normalizes pickleball individual tickets', () => {
+  assert.match(storeSource, /ptR/)
+  assert.match(storeSource, /sb\.from\('pickleball_tickets'\)\.select\('\*'\)\.order\('session_date', \{ ascending: true \}\)/)
+  assert.match(storeSource, /if \(ptR\.error\) console\.warn\('\[store\] pickleball_tickets query failed:', ptR\.error\)/)
+  assert.match(storeSource, /pickleballTickets:\s*ptR\.data \|\| \[\]/)
+  assert.match(storeSource, /pickleballTickets = \[\]/)
+  assert.match(storeSource, /const normalTickets = safeArray\(pickleballTickets\)\.map\(ticket => \(\{/)
+  assert.match(storeSource, /sessionDate: ticket\.session_date/)
+  assert.match(storeSource, /memberIds: safeArray\(ticket\.member_ids\)/)
+  assert.match(storeSource, /advancerId: ticket\.advancer_id/)
+  assert.match(storeSource, /status: ticket\.status \|\| \(ticket\.advancer_id \? 'unpaid' : 'team_fund'\)/)
+  assert.match(storeSource, /externalTickets: normalTickets/)
+  assert.match(storeSource, /externalTickets: safeArray\(source\.externalTickets\)\.filter/)
+})

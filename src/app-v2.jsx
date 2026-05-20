@@ -288,6 +288,58 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'addTicket') {
+      if (!isTreasurer || !state.currentGroupId || !state.currentUserId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickleball_tickets')
+        .insert({
+          group_id: state.currentGroupId,
+          session_date: payload?.date,
+          session_time: payload?.time || null,
+          total_amount: Number(payload?.totalAmount) || 0,
+          member_ids: payload?.memberIds || [],
+          advancer_id: payload?.advancerId || null,
+          status: payload?.advancerId ? 'unpaid' : 'team_fund',
+          year_month: monthKey(payload?.date || new Date()),
+          created_by: state.currentUserId,
+        })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'markTicketPaid') {
+      if (!isTreasurer) return
+      const ticketId = payload?.ticketId ?? payload?.id ?? payload
+      if (!ticketId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickleball_tickets')
+        .update({ status: 'paid' })
+        .eq('id', ticketId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'deleteTicket') {
+      if (!isTreasurer) return
+      const ticketId = payload?.ticketId ?? payload?.id ?? payload
+      if (!ticketId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickleball_tickets')
+        .delete()
+        .eq('id', ticketId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'subTab') {
       const SUBTAB_TO_SCREEN = {
         overview: 'pickleball-overview',
