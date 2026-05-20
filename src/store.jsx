@@ -76,6 +76,33 @@ export function disambiguateMembers(members = []) {
   })
 }
 
+export function getExpenseRealtimeAuthorId(row = {}) {
+  return row.created_by ?? row.submitted_by_member_id ?? null
+}
+
+export function isExpenseRealtimeFromCurrentUser(payload, currentUserId) {
+  if (!currentUserId) return false
+  return [payload?.new, payload?.old].some(row => String(getExpenseRealtimeAuthorId(row)) === String(currentUserId))
+}
+
+export function expenseRealtimeToastMessage(payload, members = []) {
+  const eventType = payload?.eventType || payload?.event_type
+  switch (eventType) {
+    case 'INSERT': {
+      const authorId = getExpenseRealtimeAuthorId(payload?.new || {})
+      const member = safeArray(members).find(m => String(m.id) === String(authorId))
+      const name = member?.displayName || member?.name || 'Ai đó'
+      return `${name} vừa thêm chi tiêu mới`
+    }
+    case 'UPDATE':
+      return 'Chi tiêu vừa được cập nhật'
+    case 'DELETE':
+      return 'Một chi tiêu đã bị xóa'
+    default:
+      return ''
+  }
+}
+
 function randomInviteCode(name) {
   const prefix = String(name || 'GROUP')
     .normalize('NFD')
@@ -551,7 +578,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
   })
 }
 
-export function AppProvider({ children, onToast }) {
+export function AppProvider({ children }) {
   const { token: storedToken, member: storedMember } = getStoredAuth()
 
   const [state, setState] = useState(() => {
@@ -620,65 +647,6 @@ export function AppProvider({ children, onToast }) {
   useEffect(() => {
     if (storedToken) refresh(storedToken)
   }, [])
-
-  useEffect(() => {
-    const groupId = stateRef.current.currentGroupId
-    const token   = tokenRef.current
-    if (!groupId || !token) return
-
-    const sb      = createSupabase(null)
-    const channel = sb.channel(`group-${groupId}`)
-
-    const getMemberName = (id) => {
-      const member = stateRef.current.members.find(m => m.id === id)
-      return member?.displayName || member?.name || 'Ai đó'
-    }
-    const getMyRole = () =>
-      stateRef.current.members.find(m => m.isMe)?.role
-
-    channel.on('broadcast', { event: 'data_changed' }, (payload) => {
-      const { table, event: evType, new: row } = payload.payload ?? {}
-      scheduleRefresh()
-
-      if (!onToast || !row) return
-      const submittedBy = row.submitted_by_member_id
-      const fromMe = submittedBy === stateRef.current.currentUserId
-      const toMe   = row.to_member_id === stateRef.current.currentUserId
-
-      if (table === 'expenses' && evType === 'INSERT' && !fromMe) {
-        if (getMyRole() === 'treasurer') {
-          onToast('Có khoản mới chờ duyệt ⏳', 'warning')
-        } else {
-          onToast(`${getMemberName(submittedBy)} vừa thêm chi tiêu ${row.title}`, 'info')
-        }
-      } else if (table === 'expenses' && evType === 'UPDATE' && fromMe) {
-        if (row.status === 'approved') {
-          onToast(`Chi tiêu "${row.title}" đã được duyệt ✅`, 'success')
-        } else if (row.status === 'declined') {
-          onToast(`Chi tiêu "${row.title}" bị từ chối ❌`, 'warning')
-        }
-      } else if (table === 'settlements' && evType === 'INSERT' && toMe) {
-        onToast(`${getMemberName(row.from_member_id)} đã thanh toán cho bạn 💸`, 'success')
-      } else if (table === 'expense_disputes' && evType === 'INSERT' && getMyRole() === 'treasurer') {
-        onToast('Có sai sót cần xem ⚠️', 'warning')
-      }
-    }).subscribe((status, err) => {
-      if (err) {
-        console.error('[realtime]', status, err)
-      }
-    })
-
-    channelRef.current = channel
-
-    return () => {
-      channel.unsubscribe()
-      channelRef.current = null
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current)
-        debounceRef.current = null
-      }
-    }
-  }, [state.currentGroupId, scheduleRefresh, onToast])
 
   const dispatch = useCallback(async (action) => {
     const token = tokenRef.current
@@ -1365,6 +1333,42 @@ export function AppProvider({ children, onToast }) {
         console.warn('[store] Unknown action:', action.type)
     }
   }, [state.currentUserId, state.currentGroupId, refresh, scheduleRefresh, broadcastChange])
+
+  useEffect(() => {
+    const token = tokenRef.current
+    if (!state.currentUserId || !token) return
+
+    const sb = createSupabase(token)
+    const channel = sb
+      .channel('expenses-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'expenses',
+      }, (payload) => {
+        if (isExpenseRealtimeFromCurrentUser(payload, stateRef.current.currentUserId)) return
+
+        scheduleRefresh()
+        const message = expenseRealtimeToastMessage(payload, stateRef.current.members)
+        if (message) dispatch({ type: 'SHOW_TOAST', message })
+      })
+      .subscribe((status, err) => {
+        if (err) {
+          console.error('[expenses-realtime]', status, err)
+        }
+      })
+
+    channelRef.current = channel
+
+    return () => {
+      channel.unsubscribe()
+      channelRef.current = null
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+        debounceRef.current = null
+      }
+    }
+  }, [state.currentUserId, scheduleRefresh, dispatch])
 
   return (
     <AppContext.Provider value={{ state, dispatch, genId }}>
