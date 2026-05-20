@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 
+import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
@@ -556,79 +557,58 @@ function buildAddExpenseData(groupDetailData) {
 function PinEntryScreen({ error, value, onChange, onSubmit }) {
   return (
     <div style={{
-      width: 375,
-      minHeight: 812,
-      margin: '24px auto',
-      background: '#07080f',
-      borderRadius: 38,
-      overflow: 'hidden',
-      border: '1px solid rgba(255,255,255,0.08)',
-      boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 8px #1a1c28',
-      fontFamily: "'Inter', sans-serif",
-      color: '#f1f5f9',
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.7)',
       display: 'flex',
-      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 24,
+      zIndex: 1000,
     }}>
-      <div style={{ fontSize: 32 }}>🔒</div>
-      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0 }}>Nhập mã PIN</div>
-      <div style={{ display: 'flex', gap: 14 }}>
-        {[0, 1, 2, 3, 4, 5].map(i => (
-          <div key={i} style={{
-            width: 14,
-            height: 14,
-            borderRadius: '50%',
-            background: i < value.length ? '#6366f1' : 'transparent',
-            border: i < value.length ? 'none' : '1.5px solid rgba(255,255,255,0.2)',
-            boxShadow: i < value.length ? '0 0 8px rgba(99,102,241,0.5)' : 'none',
-          }} />
-        ))}
+      <div style={{
+        background: colors.shellBg,
+        borderRadius: 16,
+        padding: 32,
+        width: 300,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 16,
+        fontFamily: type.family,
+      }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: colors.textPrimary, textAlign: 'center' }}>Nhập mã PIN</div>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          autoFocus
+          value={value}
+          onChange={e => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onKeyDown={e => e.key === 'Enter' && onSubmit()}
+          style={{
+            textAlign: 'center',
+            fontSize: 24,
+            letterSpacing: 0,
+            padding: '12px 16px',
+            borderRadius: 8,
+            border: `1px solid ${colors.borderNormal}`,
+            background: colors.inputBg,
+            color: colors.textPrimary,
+            outline: 'none',
+          }}
+          placeholder="••••••"
+        />
+        {error && <div style={{ color: colors.danger, textAlign: 'center', fontSize: 14 }}>{error}</div>}
+        <button onClick={() => onSubmit()} style={{
+          background: colors.brand,
+          border: 'none',
+          borderRadius: 8,
+          color: 'white',
+          padding: '12px',
+          fontSize: 16,
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}>Xác nhận</button>
       </div>
-      {error && (
-        <div style={{ fontSize: 12, color: '#fca5a5', fontWeight: 600 }}>{error}</div>
-      )}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 72px)', gap: 12 }}>
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'].map((key, i) => {
-          if (key === '') return <div key={i} />
-          const isBackspace = key === '⌫'
-          return (
-            <button key={i} onClick={() => {
-              if (isBackspace) {
-                onChange(value.slice(0, -1))
-                return
-              }
-              const next = value.length < 6 ? `${value}${key}` : value
-              onChange(next)
-              if (next.length === 6) onSubmit(next)
-            }} style={{
-              width: 72,
-              height: 72,
-              borderRadius: '50%',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              fontSize: isBackspace ? 20 : 24,
-              fontWeight: 700,
-              color: '#f1f5f9',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-            }}>{key}</button>
-          )
-        })}
-      </div>
-      <button onClick={() => onSubmit()} style={{
-        padding: '14px 48px',
-        borderRadius: 14,
-        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-        border: 'none',
-        color: 'white',
-        fontSize: 14,
-        fontWeight: 700,
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-        opacity: value.length === 6 ? 1 : 0.4,
-      }}>Xác nhận</button>
     </div>
   )
 }
