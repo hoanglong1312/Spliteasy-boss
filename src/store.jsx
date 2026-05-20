@@ -114,6 +114,7 @@ function buildEmptyState() {
     members: [],
     memberTokens: [],
     groups: [],
+    expenses: [],
     joinRequests: [],
     settlementPeriods: [],
     pickle: {
@@ -524,6 +525,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     members: normalMembers,
     memberTokens: normalizeMemberTokens(memberTokens),
     groups: normalGroups,
+    expenses: normalExpenses,
     joinRequests: normalJoinRequests,
     settlementPeriods: normalSettlementPeriods,
     pickle: null,

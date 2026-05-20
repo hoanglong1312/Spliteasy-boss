@@ -27,6 +27,8 @@ import ApprovalQueue from './screens/ApprovalQueue'
 import Settings from './screens/Settings'
 import SettlementPeriod from './screens/SettlementPeriod'
 
+const PIN_UNLOCK_KEY = 'spliteasy_pin_unlocked'
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const {
@@ -57,19 +59,23 @@ export default function AppV2() {
   // Keys must match TAB_ITEMS in primitives.jsx: 'home','groups','pickleball','profile'
   const [activeTab, setActiveTab] = useState('home')
   const [stack, setStack] = useState([])
-  const [awaitingPin, setAwaitingPin] = useState(() => (
-    !!(
+  const [awaitingPin, setAwaitingPin] = useState(() => {
+    const { token, member } = getStoredAuth()
+    const memberId = member?.id
+    return !!(
       localStorage.getItem('spliteasy_pin') &&
-      localStorage.getItem('spliteasy_token') &&
-      localStorage.getItem('spliteasy_member')
+      token &&
+      memberId &&
+      sessionStorage.getItem(PIN_UNLOCK_KEY) !== memberId
     )
-  ))
+  })
   const [pinError, setPinError] = useState('')
   const [pinInput, setPinInput] = useState('')
 
   function submitPin(value = pinInput) {
     const stored = localStorage.getItem('spliteasy_pin')
     if (value === stored) {
+      if (state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
       setAwaitingPin(false)
       setPinError('')
       setPinInput('')
@@ -87,6 +93,7 @@ export default function AppV2() {
   async function handle(type, payload) {
     if (type === 'logout') {
       dispatch({ type: 'LOGOUT' })
+      sessionStorage.removeItem(PIN_UNLOCK_KEY)
       setStack([])
       setActiveTab('home')
       setAwaitingPin(false)
@@ -397,6 +404,12 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'removePin') {
+      sessionStorage.removeItem(PIN_UNLOCK_KEY)
+      console.log(type, payload)
+      return
+    }
+
     if ([
       'receive',
       'markAllRead',
@@ -404,7 +417,6 @@ export default function AppV2() {
       'editBank',
       'addBank',
       'changePin',
-      'removePin',
       'setPin',
       'changeLanguage',
       'deleteAccount',
@@ -487,6 +499,22 @@ export default function AppV2() {
     )
   }
 
+  if (state._loading && (state.members || []).length === 0 && (state.expenses || []).length === 0) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#0f1117',
+        color: '#94a3b8',
+        fontSize: 16,
+      }}>
+        Đang tải dữ liệu...
+      </div>
+    )
+  }
+
   function renderTabScreen() {
     switch (activeTab) {
       case 'groups':
@@ -549,7 +577,7 @@ function dateFromLabel(label) {
 
 function exportStateCsv(state) {
   const members = (state.members || [])
-  const expenses = (state.homeMonthExpenses || [])
+  const expenses = (state.expenses || [])
   const findName = (id) => members.find(m => m.id === id)?.name || id || ''
 
   const rows = [
