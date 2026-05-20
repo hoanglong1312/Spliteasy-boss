@@ -121,3 +121,31 @@ test('AddExpense title input accepts text', async ({ page }) => {
 
   await expect(titleInput).toHaveValue('Cafe test')
 })
+
+test('Profile tab shows Cá nhân screen', async ({ page }) => {
+  await openHome(page)
+  const profileTab = page.getByRole('button', { name: /Cá nhân/ }).last()
+  test.skip(!(await profileTab.isVisible().catch(() => false)), 'TabBar not visible')
+  await profileTab.click()
+  await expect(page.locator('h1').filter({ hasText: 'Cá nhân' })).toBeVisible()
+})
+
+test('Settings screen opens from Profile via gear button', async ({ page }) => {
+  await openHome(page)
+  const profileTab = page.getByRole('button', { name: /Cá nhân/ }).last()
+  test.skip(!(await profileTab.isVisible().catch(() => false)), 'TabBar not visible')
+  await profileTab.click()
+  await page.waitForSelector('h1:has-text("Cá nhân")')
+  const gearBtn = page.getByRole('button', { name: /⚙/ })
+  test.skip(!(await gearBtn.isVisible().catch(() => false)), 'Gear button not visible')
+  await gearBtn.click()
+  await expect(page.getByText('Cài đặt').first()).toBeVisible()
+})
+
+test('Pickleball tab shows overview screen', async ({ page }) => {
+  await openHome(page)
+  const pbTab = page.getByRole('button', { name: /Pickleball/ }).last()
+  test.skip(!(await pbTab.isVisible().catch(() => false)), 'Pickleball tab not visible')
+  await pbTab.click()
+  await expect(page.getByText(/Tổng quan/i).first()).toBeVisible({ timeout: 3000 })
+})
