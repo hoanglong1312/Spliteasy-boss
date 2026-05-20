@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useApp } from '../store.jsx'
 import {
   fmtVNDFull,
@@ -13,6 +13,7 @@ const WEEKDAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 
 export function useScreenData() {
   const { state, dispatch } = useApp()
+  const autoGenerateRef = useRef('')
   const {
     currentUserId,
     currentUserName,
@@ -26,7 +27,7 @@ export function useScreenData() {
   const me = members.find(m => m.id === currentUserId)
   const isTreasurer = me?.role === 'treasurer'
 
-  return useMemo(() => {
+  const screenData = useMemo(() => {
     const homeData = buildHomeData(state, currentUserId, members, groups, pickle)
     const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName)
     const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName)
@@ -66,6 +67,26 @@ export function useScreenData() {
       dispatch,
     }
   }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, me, isTreasurer, dispatch])
+
+  useEffect(() => {
+    const request = screenData.pickleballOverviewData?.autoGenerateRequest
+    if (!request) {
+      autoGenerateRef.current = ''
+      return
+    }
+    const key = screenData.pickleballOverviewData?.autoGenerateKey || `${state.currentGroupId}:${request.yearMonth}`
+    if (autoGenerateRef.current === key) return
+    autoGenerateRef.current = key
+    dispatch({
+      type: 'AUTO_GENERATE_SESSIONS',
+      yearMonth: request.yearMonth,
+      config: request.config,
+    }).catch(err => {
+      console.error('[useScreenData] AUTO_GENERATE_SESSIONS:', err)
+    })
+  }, [dispatch, screenData.pickleballOverviewData?.autoGenerateKey, screenData.pickleballOverviewData?.autoGenerateRequest, state.currentGroupId])
+
+  return screenData
 }
 
 function buildHomeData(state, currentUserId, members, groups, pickle) {
@@ -267,6 +288,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     c => c.yearMonth === currentYearMonth
   )
   const monthSessions = getMonthSessions(pickle, today)
+  const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
+  const shouldAutoGenerate = monthSessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
   const attended = monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
@@ -297,6 +320,12 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       total: summary?.memberOwes?.[currentUserId] || 0,
       breakdown,
     },
+    shouldAutoGenerate,
+    autoGenerateRequest: shouldAutoGenerate ? {
+      yearMonth: currentYearMonth,
+      config: autoGenerateConfig,
+    } : null,
+    autoGenerateKey: shouldAutoGenerate ? `${state?.currentGroupId || state?.currentGroup?.id || 'group'}:${currentYearMonth}` : '',
   }
 }
 
@@ -405,7 +434,10 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
 
 function buildPickleballCalendarData(state) {
   const today = new Date()
+  const currentYearMonth = monthKey(today)
   const sessions = getStateMonthSessions(state, today)
+  const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
+  const shouldAutoGenerate = sessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
   const sessionsByDay = new Map()
   sessions.forEach(session => {
     const date = parseDate(sessionDate(session))
@@ -418,6 +450,7 @@ function buildPickleballCalendarData(state) {
     selectedSessionDay: today.getDate(),
     days: buildCalendarDays(today, sessionsByDay, state),
     selectedSession: null,
+    shouldAutoGenerate,
   }
 }
 
@@ -946,7 +979,12 @@ function getAllSessions(state) {
 
 function getStateMonthSessions(state, date) {
   const month = monthKey(date)
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
   return getAllSessions(state)
+    .filter(session => {
+      const sessionGroupId = session?.groupId || session?.group_id
+      return !groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)
+    })
     .filter(session => monthKey(sessionDate(session)) === month)
     .sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
 }
@@ -976,12 +1014,12 @@ function calendarCellState(date, session, state) {
   if (!session) return isToday(date) ? 'today' : 'normal'
   const normalizedStatus = String(session?.status || '').toLowerCase()
   if (['moved', 'cancelled', 'canceled'].includes(normalizedStatus)) return 'moved'
-  if (isToday(date)) return 'today'
+  if (['scheduled', 'upcoming'].includes(normalizedStatus)) return 'upcoming'
   if (dateKey(date) > dateKey(new Date())) return 'upcoming'
 
   const presentIds = sessionMemberIds(session)
-  if (!state?.currentUserId) return presentIds.length > 0 ? 'attended' : 'absent'
-  return presentIds.some(id => String(id) === String(state.currentUserId)) ? 'attended' : 'absent'
+  if (!state?.currentUserId) return presentIds.length > 0 ? 'attended' : 'missed'
+  return presentIds.some(id => String(id) === String(state.currentUserId)) ? 'attended' : 'missed'
 }
 
 function normalizeId(value, preferredKey = 'id') {
@@ -1076,6 +1114,44 @@ function ticketAttendees(ticket, state) {
       name: name || memberName(id, members),
     }
   })
+}
+
+function buildSessionGenerationConfig(state, yearMonth) {
+  const group = currentGroup(state)
+  const config = currentPickleConfig(state)
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const [year, month] = String(yearMonth || '').split('-')
+  return {
+    scheduleWeekdays: normalizeIsoWeekdays(
+      monthlyConfig?.scheduleWeekdays ||
+      monthlyConfig?.schedule_weekdays ||
+      config?.scheduleWeekdays ||
+      config?.schedule_weekdays ||
+      config?.weekdays ||
+      config?.scheduleDays ||
+      config?.schedule_days ||
+      group?.scheduleWeekdays ||
+      group?.schedule_weekdays ||
+      group?.scheduleDays ||
+      group?.schedule_days
+    ),
+    scheduleTime: monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time ||
+      config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || group?.schedule_time || '19:00-21:00',
+    startDate: monthlyConfig?.scheduleStartDay || monthlyConfig?.schedule_start_day ||
+      config?.startDate || config?.start_date || `01/${month || String(new Date().getMonth() + 1).padStart(2, '0')}/${year || new Date().getFullYear()}`,
+    defaultVenue: config?.defaultVenue || config?.default_venue || group?.defaultVenue || group?.default_venue || group?.name || 'CLB Pickleball',
+  }
+}
+
+function normalizeIsoWeekdays(value) {
+  const list = Array.isArray(value) ? value : String(value || '').split(/[,\s]+/)
+  const map = { T2: 1, T3: 2, T4: 3, T5: 4, T6: 5, T7: 6, CN: 7 }
+  return list
+    .map(item => {
+      if (typeof item === 'number' && Number.isInteger(item)) return item === 0 ? 7 : item
+      return map[toWeekdayShort(item)]
+    })
+    .filter(day => Number.isInteger(day) && day >= 1 && day <= 7)
 }
 
 function currentPickleConfig(state) {

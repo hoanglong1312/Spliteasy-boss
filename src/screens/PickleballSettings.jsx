@@ -65,6 +65,11 @@ export default function PickleballSettings({ data, onAction }) {
     await onAction?.('deleteMember', { memberId: m.id });
   }
 
+  async function regenerateSessions() {
+    if (!window.confirm('Tạo lại sẽ xoá các buổi chưa có dữ liệu. Tiếp tục?')) return;
+    await onAction?.('regenerateSessions', { yearMonth: d.currentYearMonth });
+  }
+
   return (
     <div style={{
       width: 375, height: '100%', minHeight: 812, maxHeight: 812, margin: '24px auto', position: 'relative',
@@ -339,11 +344,20 @@ export default function PickleballSettings({ data, onAction }) {
             color: '#c7d2fe',
             border: '1px solid rgba(99,102,241,0.35)',
           }} onClick={() => onAction?.('batchEntry')}>📋 Nhập chi phí sân tháng này</Button>
+          {canDeleteMembers && (
+            <Button block variant="muted" style={{
+              marginTop: 8,
+              background: 'linear-gradient(135deg, rgba(52,211,153,0.18), rgba(52,211,153,0.08))',
+              color: '#a7f3d0',
+              border: '1px solid rgba(52,211,153,0.35)',
+            }} onClick={regenerateSessions}>🔄 Tạo lại lịch tháng này</Button>
+          )}
           <Button block variant="brand" style={{ marginTop: 8 }} onClick={() => onAction?.('save', {
             courtFee,
             weekdays: Array.from(weekdays),
             autoGen,
             currentYearMonth: d.currentYearMonth,
+            startDate: d.startDate,
             activeMonthlyMemberIds: Array.from(activeMemberIds),
           })}>💾 Lưu cài đặt</Button>
           </div>

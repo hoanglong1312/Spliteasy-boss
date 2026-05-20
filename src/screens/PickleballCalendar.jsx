@@ -16,11 +16,12 @@ const CELL_STATE = {
               boxShadow: '0 0 16px rgba(99,102,241,0.3)' },
   attended: { bg: 'rgba(52,211,153,0.10)',  border: 'rgba(52,211,153,0.30)',      color: '#6ee7b7' },
   absent:   { bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)',     color: '#fca5a5' },
+  missed:   { bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)',     color: '#fca5a5' },
   upcoming: { bg: 'rgba(255,255,255,0.02)', border: 'rgba(99,102,241,0.35)', dashed: true, color: colors.brandLight },
   moved:    { bg: 'rgba(255,255,255,0.02)', border: 'transparent',                color: '#334155', lineThrough: true },
 };
 
-const DOT_COLOR = { attended: '#34d399', absent: '#f87171', today: '#818cf8' };
+const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8' };
 
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;

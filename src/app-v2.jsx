@@ -155,9 +155,69 @@ export default function AppV2() {
         yearMonth: payload?.currentYearMonth,
         courtFee: payload?.courtFee,
         activeMonthlyMemberIds: payload?.activeMonthlyMemberIds || [],
+        scheduleWeekdays: payload?.weekdays,
+        scheduleStartDay: payload?.startDate,
       })
       alert('Đã lưu cài đặt tháng này')
       setStack((s) => s.slice(0, -1))
+      return
+    }
+
+    if (type === 'AUTO_GENERATE_SESSIONS') {
+      await dispatch({
+        type: 'AUTO_GENERATE_SESSIONS',
+        groupId: state.currentGroupId,
+        yearMonth: payload?.yearMonth,
+        config: payload?.config,
+      })
+      return
+    }
+
+    if (type === 'regenerateSessions') {
+      const yearMonth = payload?.yearMonth || monthKey(new Date())
+      const groupId = state.currentGroupId
+      const { token } = getStoredAuth()
+      if (!token || !groupId) return
+      const sb = createSupabase(token)
+      const { start, end } = monthRange(yearMonth)
+      const { data: scheduledSessions, error: sessionsError } = await sb
+        .from('pickle_sessions')
+        .select('id')
+        .eq('group_id', groupId)
+        .eq('status', 'scheduled')
+        .gte('session_date', start)
+        .lte('session_date', end)
+      if (sessionsError) throw sessionsError
+
+      const sessionIds = (scheduledSessions || []).map(session => session.id).filter(Boolean)
+      if (sessionIds.length > 0) {
+        const [attendeesResult, expensesResult] = await Promise.all([
+          sb.from('pickle_attendees').select('session_id').in('session_id', sessionIds),
+          sb.from('expenses').select('pickle_session_id').in('pickle_session_id', sessionIds),
+        ])
+        if (attendeesResult.error) throw attendeesResult.error
+        if (expensesResult.error) throw expensesResult.error
+        const lockedSessionIds = new Set([
+          ...(attendeesResult.data || []).map(row => row.session_id),
+          ...(expensesResult.data || []).map(row => row.pickle_session_id),
+        ].filter(Boolean).map(String))
+        const deletableIds = sessionIds.filter(id => !lockedSessionIds.has(String(id)))
+        if (deletableIds.length > 0) {
+          const { error: deleteError } = await sb
+            .from('pickle_sessions')
+            .delete()
+            .eq('status', 'scheduled')
+            .in('id', deletableIds)
+          if (deleteError) throw deleteError
+        }
+      }
+
+      await dispatch({
+        type: 'AUTO_GENERATE_SESSIONS',
+        groupId,
+        yearMonth,
+      })
+      alert('Đã tạo lại lịch tháng này')
       return
     }
 
@@ -625,6 +685,23 @@ export default function AppV2() {
       <ToastOverlay toast={state.toast} />
     </div>
   )
+}
+
+function monthRange(yearMonth) {
+  const [yearText, monthText] = String(yearMonth || '').split('-')
+  const year = Number(yearText)
+  const month = Number(monthText)
+  const mm = String(month).padStart(2, '0')
+  const endDay = new Date(year, month, 0).getDate()
+  return {
+    start: `${year}-${mm}-01`,
+    end: `${year}-${mm}-${String(endDay).padStart(2, '0')}`,
+  }
+}
+
+function monthKey(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
 function dateFromLabel(label) {

@@ -28,6 +28,162 @@ function getMonthRange(yearMonth) {
   }
 }
 
+export function generateMonthSessions(yearMonth, config = {}) {
+  const [yearText, monthText] = String(yearMonth || '').split('-')
+  const year = Number(yearText)
+  const month = Number(monthText)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return []
+
+  function toIsoWeekday(value) {
+    if (typeof value === 'number' && Number.isInteger(value)) {
+      if (value >= 1 && value <= 7) return value
+      if (value === 0) return 7
+    }
+    const text = String(value || '').trim().toLowerCase()
+    const map = {
+      monday: 1,
+      mon: 1,
+      t2: 1,
+      '2': 1,
+      tuesday: 2,
+      tue: 2,
+      t3: 2,
+      '3': 2,
+      wednesday: 3,
+      wed: 3,
+      t4: 3,
+      '4': 3,
+      thursday: 4,
+      thu: 4,
+      t5: 4,
+      '5': 4,
+      friday: 5,
+      fri: 5,
+      t6: 5,
+      '6': 5,
+      saturday: 6,
+      sat: 6,
+      t7: 6,
+      '7': 6,
+      sunday: 7,
+      sun: 7,
+      cn: 7,
+      '0': 7,
+    }
+    return map[text] || null
+  }
+
+  function startDayFrom(value) {
+    if (typeof value === 'number' && Number.isInteger(value)) return value
+    const text = String(value || '').trim()
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+    if (iso) return Number(iso[3])
+    const slash = text.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/)
+    if (slash) return Number(slash[1])
+    return 1
+  }
+
+  const scheduleWeekdayList = Array.isArray(config.scheduleWeekdays) ? config.scheduleWeekdays : []
+  const weekdays = new Set(scheduleWeekdayList.map(toIsoWeekday).filter(Boolean))
+  if (weekdays.size === 0) return []
+
+  const [startTime = '19:00', endTime = '21:00'] = String(config.scheduleTime || '19:00-21:00')
+    .split(/\s*(?:-|–|—|to)\s*/i)
+    .map(part => part.trim())
+    .filter(Boolean)
+  const court = config.defaultVenue || 'CLB Pickleball'
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const firstDay = Math.max(1, Math.min(startDayFrom(config.startDate), daysInMonth))
+  const mm = String(month).padStart(2, '0')
+  const sessions = []
+
+  for (let day = firstDay; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month - 1, day)
+    const isoWeekday = date.getDay() === 0 ? 7 : date.getDay()
+    if (!weekdays.has(isoWeekday)) continue
+    sessions.push({
+      date: `${year}-${mm}-${String(day).padStart(2, '0')}`,
+      startTime,
+      endTime,
+      court,
+      status: 'scheduled',
+      sessionNumber: sessions.length + 1,
+    })
+  }
+
+  return sessions
+}
+
+function normalizeScheduleWeekdays(value) {
+  const list = Array.isArray(value) ? value : String(value || '').split(/[,\s]+/)
+  const map = {
+    monday: 1,
+    mon: 1,
+    t2: 1,
+    '2': 1,
+    tuesday: 2,
+    tue: 2,
+    t3: 2,
+    '3': 2,
+    wednesday: 3,
+    wed: 3,
+    t4: 3,
+    '4': 3,
+    thursday: 4,
+    thu: 4,
+    t5: 4,
+    '5': 4,
+    friday: 5,
+    fri: 5,
+    t6: 5,
+    '6': 5,
+    saturday: 6,
+    sat: 6,
+    t7: 6,
+    '7': 6,
+    sunday: 7,
+    sun: 7,
+    cn: 7,
+    '0': 7,
+  }
+  return list
+    .map(item => {
+      if (typeof item === 'number' && Number.isInteger(item)) return item === 0 ? 7 : item
+      return map[String(item || '').trim().toLowerCase()]
+    })
+    .filter(day => Number.isInteger(day) && day >= 1 && day <= 7)
+}
+
+function generationConfigFromState(state, yearMonth, override = {}) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  const group = state?.currentGroup || safeArray(state?.groups).find(g => String(g.id) === String(groupId)) || {}
+  const config = safeArray(state?._allPickle?.configs || state?.pickleConfigs)
+    .find(row => String(row?.groupId || row?.group_id || '') === String(groupId || '')) || {}
+  const monthlyConfig = safeArray(state?._allPickle?.monthlyConfigs || state?.pickle?.monthlyConfigs || state?.pickleballMonthlyConfigs)
+    .find(row => (
+      String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
+      String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
+    )) || {}
+  const month = String(yearMonth || '').split('-')[1] || String(new Date().getMonth() + 1).padStart(2, '0')
+  const year = String(yearMonth || '').split('-')[0] || String(new Date().getFullYear())
+
+  return {
+    scheduleWeekdays: override.scheduleWeekdays ?? override.schedule_weekdays ??
+      monthlyConfig.scheduleWeekdays ?? monthlyConfig.schedule_weekdays ??
+      config.scheduleWeekdays ?? config.schedule_weekdays ??
+      config.weekdays ?? config.scheduleDays ?? config.schedule_days ??
+      group.scheduleWeekdays ?? group.schedule_weekdays ?? group.scheduleDays ?? group.schedule_days,
+    scheduleTime: override.scheduleTime ?? override.schedule_time ??
+      monthlyConfig.scheduleTime ?? monthlyConfig.schedule_time ??
+      config.scheduleTime ?? config.schedule_time ?? config.timeRange ?? group.scheduleTime ?? group.schedule_time,
+    startDate: override.startDate ?? override.start_date ??
+      monthlyConfig.scheduleStartDay ?? monthlyConfig.schedule_start_day ??
+      config.startDate ?? config.start_date ?? `01/${month}/${year}`,
+    defaultVenue: override.defaultVenue ?? override.default_venue ??
+      config.defaultVenue ?? config.default_venue ?? group.defaultVenue ?? group.default_venue ?? group.name,
+  }
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))
 }
@@ -477,6 +633,11 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     groupId: s.group_id,
     group_id: s.group_id,
     date: s.session_date,
+    sessionDate: s.session_date,
+    session_date: s.session_date,
+    startTime: s.start_time,
+    start_time: s.start_time,
+    court: s.court,
     status: s.status,
     notes: s.notes,
     attendees: pickleAttendees
@@ -1160,14 +1321,21 @@ export function AppProvider({ children }) {
         const groupId = action.groupId || state.currentGroupId
         const yearMonth = action.yearMonth || action.currentYearMonth
         if (!groupId || !yearMonth) return
+        const row = {
+          group_id: groupId,
+          year_month: yearMonth,
+          court_fee: Number(action.courtFee ?? action.court_fee) || 0,
+          active_member_ids: safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds),
+        }
+        if ('scheduleWeekdays' in action || 'schedule_weekdays' in action || 'weekdays' in action) {
+          row.schedule_weekdays = normalizeScheduleWeekdays(action.scheduleWeekdays ?? action.schedule_weekdays ?? action.weekdays)
+        }
+        if ('scheduleStartDay' in action || 'schedule_start_day' in action || 'startDate' in action) {
+          row.schedule_start_day = action.scheduleStartDay ?? action.schedule_start_day ?? action.startDate ?? null
+        }
         const { data, error } = await sb
           .from('pickleball_monthly_config')
-          .upsert({
-            group_id: groupId,
-            year_month: yearMonth,
-            court_fee: Number(action.courtFee ?? action.court_fee) || 0,
-            active_member_ids: safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds),
-          }, { onConflict: 'group_id,year_month' })
+          .upsert(row, { onConflict: 'group_id,year_month' })
           .select()
           .single()
         if (error) {
@@ -1176,6 +1344,36 @@ export function AppProvider({ children }) {
         }
         await refresh()
         return data
+      }
+
+      case 'AUTO_GENERATE_SESSIONS': {
+        if (!sb) return []
+        const yearMonth = action.yearMonth || action.year_month
+        const groupId = action.groupId || action.group_id || state.currentGroupId
+        if (!yearMonth || !groupId) return []
+        const config = generationConfigFromState(stateRef.current, yearMonth, action.config || {})
+        const sessions = generateMonthSessions(yearMonth, {
+          ...config,
+          scheduleWeekdays: normalizeScheduleWeekdays(config.scheduleWeekdays),
+        })
+        if (sessions.length === 0) return []
+        const rows = sessions.map(session => ({
+          group_id: groupId,
+          session_date: session.date,
+          start_time: session.startTime,
+          court: session.court,
+          status: 'scheduled',
+          created_by_member_id: state.currentUserId || null,
+        }))
+        const { error } = await sb
+          .from('pickle_sessions')
+          .upsert(rows, { onConflict: 'group_id,session_date', ignoreDuplicates: true })
+        if (error) {
+          console.error('[store] AUTO_GENERATE_SESSIONS:', error)
+          throw error
+        }
+        await refresh()
+        return sessions
       }
 
       case 'APPROVE_JOIN_REQUEST': {
