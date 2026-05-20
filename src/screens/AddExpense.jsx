@@ -1,5 +1,5 @@
 // Spliteasy Boss — Thêm chi tiêu (bottom sheet)
-// Props: data { groupName, amount, title, payer, category, dateLabel, participants[], splitMode }
+// Props: data { groupName, amount, title, payer, category, dateLabel, participants[] }
 
 import React, { useState } from 'react';
 import { colors, type } from '../tokens';
@@ -23,7 +23,6 @@ export default function AddExpense({ data, onAction }) {
   const [participants, setParticipants] = useState(
     (d.members || []).map(m => ({ ...m, included: true }))
   );
-  const [splitMode, setSplitMode] = useState('equal');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
@@ -84,10 +83,13 @@ export default function AddExpense({ data, onAction }) {
               gap: 6, marginTop: 4,
             }}>
               <input
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
+                value={amount ? Number(amount).toLocaleString('vi-VN') : ''}
+                onChange={e => {
+                  const raw = e.target.value.replace(/\D/g, '');
+                  setAmount(raw);
+                }}
                 placeholder="0"
-                type="number"
+                type="text"
                 inputMode="numeric"
                 style={{
                   width: 220,
@@ -181,32 +183,8 @@ export default function AddExpense({ data, onAction }) {
             ))}
           </div>
 
-          <FieldLabel>Phương thức chia</FieldLabel>
-          <div style={{
-            display: 'flex', gap: 6, padding: 4,
-            background: colors.cardSurface, border: `1px solid ${colors.borderSubtle}`,
-            borderRadius: 12,
-          }}>
-            {[
-              { key: 'equal',  icon: '⚖️', label: 'Đều nhau' },
-              { key: 'custom', icon: '🎚️', label: 'Tuỳ chỉnh' },
-              { key: 'percent',icon: '📊', label: 'Theo %' },
-            ].map(s => {
-              const isActive = splitMode === s.key;
-              return (
-                <button key={s.key} onClick={() => setSplitMode(s.key)} style={{
-                  flex: 1, textAlign: 'center', padding: '10px 6px', borderRadius: 9,
-                  background: isActive ? 'rgba(99,102,241,0.18)' : 'transparent',
-                  fontSize: 11, fontWeight: isActive ? 700 : 600,
-                  color: isActive ? '#c7d2fe' : colors.textSecondary,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                  border: 'none', fontFamily: 'inherit', cursor: 'pointer',
-                }}>
-                  <span style={{ fontSize: 14 }}>{s.icon}</span>
-                  {s.label}
-                </button>
-              );
-            })}
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 14, marginBottom: 6 }}>
+            Chia đều cho tất cả người tham gia
           </div>
 
           {/* Per person */}
@@ -257,7 +235,7 @@ export default function AddExpense({ data, onAction }) {
                   category,
                   dateLabel,
                   participants: participants.filter(p => p.included).map(p => p.id),
-                  splitMode,
+                  splitMode: 'equal',
                 });
               } catch (err) {
                 setSaveError(err?.message || 'Lưu thất bại. Kiểm tra kết nối và thử lại.');
@@ -348,7 +326,6 @@ const DEMO = {
   payer:    { initial: 'M', name: 'Minh' },
   category: { icon: '🍜', label: 'Ăn uống' },
   dateLabel: 'Thứ Bảy · 16/05/2026 · 12:30',
-  splitMode: 'even',
   participants: [
     { id: 1, initial: 'L',  name: 'Long',  included: true  },
     { id: 2, initial: 'M',  name: 'Minh',  included: true  },

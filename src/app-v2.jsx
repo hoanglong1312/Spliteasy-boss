@@ -351,9 +351,13 @@ export default function AppV2() {
       'uploadPhoto',
       'promote',
       'add',
-      'fab',
     ].includes(type)) {
       console.log(type, payload)
+      return
+    }
+
+    if (type === 'fab') {
+      setStack((s) => [...s, { screen: 'add-expense', params: payload }])
       return
     }
 
