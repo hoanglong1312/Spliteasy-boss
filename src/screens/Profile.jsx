@@ -112,7 +112,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
         </div>
 
         {/* Bank */}
-        <SectionLabel action="Sửa →">Thông tin ngân hàng</SectionLabel>
+        <SectionLabel action="Sửa →" onAction={() => onAction?.('settings')}>Thông tin ngân hàng</SectionLabel>
         <Card style={{ padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{
@@ -135,7 +135,8 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
         </Card>
 
         {/* PIN */}
-        <Card style={{ marginTop: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Card style={{ marginTop: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+          onClick={() => onAction?.('settings')}>
           <div style={{
             width: 38, height: 38, borderRadius: 10,
             background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.25)',

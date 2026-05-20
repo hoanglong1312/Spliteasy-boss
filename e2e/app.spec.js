@@ -88,6 +88,25 @@ test('Add expense button opens AddExpense screen', async ({ page }) => {
   await expect(page.locator('h1').filter({ hasText: 'Thêm chi tiêu' })).toBeVisible()
 })
 
+test('JoinGroup lookup shows member names after entering valid code', async ({ page }) => {
+  await openJoinGroup(page)
+
+  const codeInput = page.locator('input[placeholder="NHẬP-MÃ-MỜI"]').first()
+  await codeInput.fill('PICKLE-TEST')
+
+  await expect(page.getByText('Nguyễn An').first()).toBeVisible({ timeout: 5000 })
+  await expect(page.getByText('Long').first()).toBeVisible({ timeout: 2000 })
+})
+
+test('JoinGroup shows error for invalid code', async ({ page }) => {
+  await openJoinGroup(page)
+
+  const codeInput = page.locator('input[placeholder="NHẬP-MÃ-MỜI"]').first()
+  await codeInput.fill('INVALID-CODE-XYZ')
+
+  await expect(page.getByText(/Mã mời không/)).toBeVisible({ timeout: 5000 })
+})
+
 test('AddExpense title input accepts text', async ({ page }) => {
   await openHome(page)
 

@@ -1,7 +1,8 @@
 // Spliteasy Boss — Tham gia nhóm (bước 2/2)
 // Props: data { code, group, existingNames[], selectedName }
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { lookupGroupByCode } from '../lib/auth.js';
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel } from '../primitives';
 
@@ -10,7 +11,43 @@ export default function JoinGroup({ data, onAction }) {
   const [code, setCode] = useState(d.code || '');
   const [selected, setSelected] = useState(d.selectedName);
   const [newName, setNewName] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
+  const [foundGroup, setFoundGroup] = useState(null);
+  const [lookupError, setLookupError] = useState('');
+  const [looking, setLooking] = useState(false);
+  const lookupTimer = useRef(null);
   const memberName = (newName || selected || '').trim();
+
+  const existingNames = foundGroup?.member_names || d.existingNames || [];
+  const displayGroup = foundGroup
+    ? { emoji: foundGroup.emoji, name: foundGroup.name, treasurer: foundGroup.treasurer,
+        foundedLabel: '', activeCount: existingNames.length, memberCount: existingNames.length,
+        memberAvatars: existingNames.slice(0, 6).map(n => n[0]?.toUpperCase() || '?'),
+        extraMembers: Math.max(existingNames.length - 6, 0) }
+    : d.group;
+
+  useEffect(() => {
+    if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    const trimmed = code.trim();
+    if (trimmed.length < 6) { setFoundGroup(null); setLookupError(''); return; }
+    lookupTimer.current = setTimeout(async () => {
+      setLooking(true);
+      setLookupError('');
+      try {
+        const result = await lookupGroupByCode(trimmed);
+        setFoundGroup(result);
+        setSelected(null);
+        setNewName('');
+      } catch (err) {
+        setFoundGroup(null);
+        setLookupError(err?.message || 'Mã mời không hợp lệ.');
+      } finally {
+        setLooking(false);
+      }
+    }, 600);
+    return () => clearTimeout(lookupTimer.current);
+  }, [code]);
 
   return (
     <PhoneFrame>
@@ -80,6 +117,20 @@ export default function JoinGroup({ data, onAction }) {
           }}>XÓA</button>
         </div>
 
+        {/* Lookup status */}
+        {looking && (
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 10, textAlign: 'center' }}>
+            🔍 Đang tìm nhóm...
+          </div>
+        )}
+        {lookupError && (
+          <div style={{
+            padding: '10px 14px', marginBottom: 10,
+            background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)',
+            borderRadius: 10, fontSize: 11, color: '#fca5a5',
+          }}>{lookupError}</div>
+        )}
+
         {/* Group preview card */}
         <Card accent="pickleball" style={{ padding: '18px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
@@ -88,18 +139,18 @@ export default function JoinGroup({ data, onAction }) {
               background: 'rgba(52,211,153,0.12)',
               border: '1px solid rgba(52,211,153,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
-            }}>{d.group.emoji}</div>
+            }}>{displayGroup.emoji}</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.3px' }}>{d.group.name}</div>
+              <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.3px' }}>{displayGroup.name}</div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                Thủ quỹ: {d.group.treasurer} · Lập {d.group.foundedLabel}
+                {displayGroup.treasurer ? `Thủ quỹ: ${displayGroup.treasurer}` : 'Nhập mã mời để xem thông tin nhóm'}
               </div>
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 marginTop: 8, padding: '3px 9px', borderRadius: 100,
                 background: 'rgba(52,211,153,0.12)',
                 color: '#6ee7b7', fontSize: 10, fontWeight: 700, letterSpacing: '0.3px',
-              }}>● {d.group.activeCount} đang hoạt động</div>
+              }}>● {displayGroup.activeCount} đang hoạt động</div>
             </div>
           </div>
           <div style={{
@@ -107,9 +158,9 @@ export default function JoinGroup({ data, onAction }) {
             marginTop: 14, paddingTop: 14,
             borderTop: `1px solid ${colors.borderSubtle}`,
           }}>
-            <AvatarStack people={d.group.memberAvatars} extra={d.group.extraMembers} />
+            <AvatarStack people={displayGroup.memberAvatars} extra={displayGroup.extraMembers} />
             <span style={{ fontSize: 11, color: colors.textSecondary }}>
-              {d.group.memberCount} thành viên
+              {displayGroup.memberCount} thành viên
             </span>
           </div>
         </Card>
@@ -126,8 +177,13 @@ export default function JoinGroup({ data, onAction }) {
             color: colors.textSecondary, textTransform: 'uppercase',
             marginBottom: 10,
           }}>Tên có sẵn trong nhóm</div>
+          {existingNames.length === 0 && (
+            <div style={{ fontSize: 11, color: colors.textMuted, fontStyle: 'italic' }}>
+              Nhập mã mời ở trên để xem danh sách tên.
+            </div>
+          )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {d.existingNames.map((name) => {
+            {existingNames.map((name) => {
               const active = name === selected;
               return (
                 <button key={name} onClick={() => { setSelected(name); setNewName(''); }} style={{
@@ -171,12 +227,30 @@ export default function JoinGroup({ data, onAction }) {
           />
         </Card>
 
-        <Button block variant="brand" style={{ marginTop: 18 }}
-          onClick={() => {
-            if (!code.trim() || !memberName) return;
-            onAction?.('joinGroup', { code: code.trim(), memberName });
+        {joinError && (
+          <div style={{
+            marginTop: 10, padding: '10px 14px',
+            background: 'rgba(248,113,113,0.1)',
+            border: '1px solid rgba(248,113,113,0.3)',
+            borderRadius: 10, fontSize: 11, color: '#fca5a5',
+          }}>{joinError}</div>
+        )}
+
+        <Button block variant="brand" style={{ marginTop: 10, opacity: joining ? 0.6 : 1 }}
+          onClick={async () => {
+            if (joining) return;
+            setJoinError('');
+            if (!code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
+            if (!memberName) { setJoinError('Vui lòng chọn hoặc nhập tên của bạn.'); return; }
+            setJoining(true);
+            try {
+              await onAction?.('joinGroup', { code: code.trim(), memberName });
+            } catch (err) {
+              setJoinError(err?.message || 'Mã mời không đúng hoặc kết nối có vấn đề. Thử lại.');
+              setJoining(false);
+            }
           }}>
-          Tham gia →
+          {joining ? '⏳ Đang tham gia...' : 'Tham gia →'}
         </Button>
 
         {/* Pending hint */}

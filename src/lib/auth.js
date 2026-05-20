@@ -35,6 +35,15 @@ export function clearAuth() {
   localStorage.removeItem('spliteasy_tokens')
 }
 
+// Tra cứu nhóm theo mã mời — không cần token (SECURITY DEFINER)
+export async function lookupGroupByCode(inviteCode) {
+  const sb = createSupabase()
+  const { data, error } = await sb.rpc('lookup_group_by_code', { p_invite_code: inviteCode })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data // { id, name, emoji, invite_code, treasurer, member_names[] }
+}
+
 // Gọi Supabase RPC join_group() — không cần token
 export async function joinGroup(inviteCode, name, existingToken = null) {
   const sb = createSupabase()

@@ -24,6 +24,8 @@ export default function AddExpense({ data, onAction }) {
     (d.members || []).map(m => ({ ...m, included: true }))
   );
   const [splitMode, setSplitMode] = useState('equal');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const activeCount = participants.filter(p => p.included).length;
   const amountNumber = Number(amount) || 0;
@@ -228,24 +230,42 @@ export default function AddExpense({ data, onAction }) {
             </div>
           </div>
 
+          {saveError && (
+            <div style={{
+              marginTop: 10, padding: '10px 14px',
+              background: 'rgba(248,113,113,0.1)',
+              border: '1px solid rgba(248,113,113,0.3)',
+              borderRadius: 10, fontSize: 11, color: '#fca5a5',
+            }}>{saveError}</div>
+          )}
+
           <Button
             block
             variant="brand"
-            style={{ marginTop: 18 }}
-            onClick={() => {
-              if (!title.trim() || !amount) return;
-              onAction?.('save', {
-                title: title.trim(),
-                amount: Number(amount),
-                paidBy,
-                category,
-                dateLabel,
-                participants: participants.filter(p => p.included).map(p => p.id),
-                splitMode,
-              });
+            style={{ marginTop: 18, opacity: saving ? 0.6 : 1 }}
+            onClick={async () => {
+              if (saving) return;
+              setSaveError('');
+              if (!title.trim()) { setSaveError('Vui lòng nhập tiêu đề chi tiêu.'); return; }
+              if (!amount || Number(amount) <= 0) { setSaveError('Vui lòng nhập số tiền lớn hơn 0.'); return; }
+              setSaving(true);
+              try {
+                await onAction?.('save', {
+                  title: title.trim(),
+                  amount: Number(amount),
+                  paidBy,
+                  category,
+                  dateLabel,
+                  participants: participants.filter(p => p.included).map(p => p.id),
+                  splitMode,
+                });
+              } catch (err) {
+                setSaveError(err?.message || 'Lưu thất bại. Kiểm tra kết nối và thử lại.');
+                setSaving(false);
+              }
             }}
           >
-            💾 Lưu chi tiêu
+            {saving ? '⏳ Đang lưu...' : '💾 Lưu chi tiêu'}
           </Button>
         </div>
       </div>

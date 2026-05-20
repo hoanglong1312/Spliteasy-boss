@@ -406,7 +406,7 @@ export function Row({ icon, iconBg, title, sub, amount, amountColor = colors.tex
 
 /* ───────────────────────── Misc ───────────────────────── */
 
-export function SectionLabel({ children, action }) {
+export function SectionLabel({ children, action, onAction }) {
   return (
     <div style={{
       fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
@@ -415,10 +415,16 @@ export function SectionLabel({ children, action }) {
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     }}>
       <span>{children}</span>
-      {action && <span style={{
-        color: colors.brandLight, fontSize: 11, letterSpacing: 0,
-        textTransform: 'none', fontWeight: 600,
-      }}>{action}</span>}
+      {action && (
+        <span
+          onClick={onAction}
+          style={{
+            color: colors.brandLight, fontSize: 11, letterSpacing: 0,
+            textTransform: 'none', fontWeight: 600,
+            cursor: onAction ? 'pointer' : 'default',
+          }}
+        >{action}</span>
+      )}
     </div>
   );
 }

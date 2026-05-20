@@ -153,9 +153,12 @@ export default function AppV2() {
 
     if (type === 'save') {
       if (payload?.title && payload?.amount != null) {
+        if (!state.currentUserId) throw new Error('Chưa đăng nhập. Vui lòng tham gia nhóm trước.')
+        const groupId = payload.groupId || state.currentGroupId
+        if (!groupId) throw new Error('Không xác định được nhóm. Vui lòng mở nhóm trước khi thêm chi tiêu.')
         await dispatch({
           type: 'ADD_EXPENSE',
-          groupId: payload.groupId || state.currentGroupId,
+          groupId,
           expense: {
             title: payload.title,
             amount: Number(payload.amount) || 0,
@@ -243,16 +246,14 @@ export default function AppV2() {
     }
 
     if (type === 'joinGroup') {
-      import('./lib/auth.js').then(({ joinGroup }) => {
-        joinGroup(payload.code, payload.memberName).then(result => {
-          dispatch({
-            type: 'LOGIN',
-            token: result.token,
-            memberId: result.member_id,
-            groupId: result.group_id,
-            memberName: result.member_name,
-          })
-        }).catch(err => console.error('join failed', err))
+      const { joinGroup } = await import('./lib/auth.js')
+      const result = await joinGroup(payload.code, payload.memberName)
+      await dispatch({
+        type: 'LOGIN',
+        token: result.token,
+        memberId: result.member_id,
+        groupId: result.group_id,
+        memberName: result.member_name,
       })
       return
     }
@@ -295,17 +296,28 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'color') {
+      await dispatch({ type: 'UPDATE_MEMBER_COLOR', color: payload })
+      return
+    }
+
+    if (type === 'exportCsv') {
+      exportStateCsv(state)
+      return
+    }
+
+    if (type === 'saveBank') {
+      await dispatch({ type: 'UPDATE_BANK_INFO', bankInfo: payload })
+      setStack((s) => s.slice(0, -1))
+      return
+    }
+
     if (type === 'addGuest') {
       console.log('addGuest', payload)
       return
     }
 
     if (type === 'filter') {
-      return
-    }
-
-    if (type === 'exportCsv') {
-      console.log('exportCsv - TODO: wire to export function')
       return
     }
 
@@ -335,7 +347,6 @@ export default function AppV2() {
       'complete',
       'saveAll',
       'uploadPhoto',
-      'color',
       'promote',
       'add',
       'fab',
@@ -439,6 +450,36 @@ function dateFromLabel(label) {
   if (!match) return new Date().toISOString().slice(0, 10)
   const [, day, month, year] = match
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function exportStateCsv(state) {
+  const members = (state.members || [])
+  const expenses = (state.homeMonthExpenses || [])
+  const findName = (id) => members.find(m => m.id === id)?.name || id || ''
+
+  const rows = [
+    ['Ngày', 'Tiêu đề', 'Số tiền', 'Người chi', 'Trạng thái', 'Nhóm'],
+  ]
+  expenses.forEach(ep => {
+    const e = ep.expenses || ep
+    rows.push([
+      e.expense_date || e.date || '',
+      e.title || '',
+      e.amount || '',
+      findName(e.paid_by_member_id || e.paidBy),
+      e.status || '',
+      e.groups?.name || '',
+    ])
+  })
+
+  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `spliteasy-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function buildAddExpenseData(groupDetailData) {
