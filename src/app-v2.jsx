@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
+import { getStoredAuth, joinGroup } from './lib/auth.js'
+import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
 import GroupsList from './screens/GroupsList'
@@ -138,13 +140,38 @@ export default function AppV2() {
     }
 
     if (type === 'saveSettings' || (type === 'save' && stack[stack.length - 1]?.screen === 'pickleball-settings')) {
-      console.log('saveSettings', payload)
+      await dispatch({
+        type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
+        groupId: state.currentGroupId,
+        yearMonth: payload?.currentYearMonth,
+        courtFee: payload?.courtFee,
+        activeMonthlyMemberIds: payload?.activeMonthlyMemberIds || [],
+      })
+      alert('Đã lưu cài đặt tháng này')
       setStack((s) => s.slice(0, -1))
       return
     }
 
     if (type === 'addMember') {
-      alert('Chức năng thêm thành viên — coming soon')
+      const name = String(payload?.name || '').trim()
+      if (!name) return null
+      return dispatch({
+        type: 'ADD_MEMBER',
+        member: { name },
+      })
+    }
+
+    if (type === 'deleteMember') {
+      const memberId = payload?.memberId ?? payload
+      if (!memberId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('members')
+        .update({ is_active: false, left_at: new Date().toISOString() })
+        .eq('id', memberId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
       return
     }
 
@@ -291,7 +318,6 @@ export default function AppV2() {
     }
 
     if (type === 'joinGroup') {
-      const { joinGroup } = await import('./lib/auth.js')
       const result = await joinGroup(payload.code, payload.memberName)
       await dispatch({
         type: 'LOGIN',

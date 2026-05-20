@@ -454,17 +454,33 @@ function buildPickleballTicketsData(state) {
 
 function buildPickleballSettingsData(state) {
   const today = new Date()
+  const currentYearMonth = monthKey(today)
   const group = currentGroup(state)
   const config = currentPickleConfig(state)
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const sessions = getStateMonthSessions(state, today)
-  const members = currentGroupMembers(state)
-  const weekdays = normalizeWeekdays(config?.weekdays || config?.scheduleDays || config?.schedule_days || group?.scheduleDays)
-  const courtFeeTotal = Number(config?.monthlyCourtFee ?? config?.monthly_court_fee ?? group?.monthlyCourtFee ?? 0)
+  const members = currentGroupMembers(state).filter(m => m.isActive !== false && m.is_active !== false)
+  const weekdays = normalizeWeekdays(
+    monthlyConfig?.scheduleWeekdays ||
+    monthlyConfig?.schedule_weekdays ||
+    config?.weekdays ||
+    config?.scheduleDays ||
+    config?.schedule_days ||
+    group?.scheduleDays
+  )
+  const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? config?.monthlyCourtFee ?? config?.monthly_court_fee ?? group?.monthlyCourtFee ?? 0)
   const sessionsCount = Number(config?.sessionsCount ?? config?.sessions_count ?? sessions.length) || Math.max(sessions.length, 1)
   const scheduleTime = config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
+  const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
+  const memberIds = members.map(m => m.id || m.member_id).filter(Boolean)
+  const storedActiveMemberIds = safeArray(monthlyConfig?.activeMemberIds ?? monthlyConfig?.active_member_ids).filter(Boolean)
+  const activeMonthlyMemberIds = storedActiveMemberIds.length > 0 ? storedActiveMemberIds : memberIds
 
   return {
     clubName: group.name || 'CLB Pickleball',
+    currentYearMonth,
+    currentRole: currentMember?.role,
+    activeMonthlyMemberIds,
     courtFeePerSession: Math.round(courtFeeTotal / Math.max(sessionsCount, 1)),
     defaultVenue: config?.defaultVenue || config?.default_venue || group?.defaultVenue || 'CLB Pickleball',
     scheduleDay: weekdays.join(', '),
@@ -477,8 +493,8 @@ function buildPickleballSettingsData(state) {
     members: members.map(m => ({
       id: m.id || m.member_id,
       name: m.name || m.member_name,
-      initial: (m.name || m.member_name || '?')[0].toUpperCase(),
-      activeThisMonth: m.active_this_month ?? true,
+      initial: initials(m),
+      activeThisMonth: activeMonthlyMemberIds.some(id => String(id) === String(m.id || m.member_id)),
     })),
     weekdays,
     timeRange: scheduleTime,
@@ -993,6 +1009,15 @@ function currentPickleConfig(state) {
   const groupId = state?.currentGroupId || state?.currentGroup?.id
   return safeArray(state?._allPickle?.configs || state?.pickleConfigs)
     .find(config => String(config?.groupId || config?.group_id || '') === String(groupId || '')) || {}
+}
+
+function currentMonthlyPickleConfig(state, yearMonth) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  return safeArray(state?._allPickle?.monthlyConfigs || state?.pickle?.monthlyConfigs || state?.pickleballMonthlyConfigs)
+    .find(config => (
+      String(config?.groupId || config?.group_id || '') === String(groupId || '') &&
+      String(config?.yearMonth || config?.year_month || '') === String(yearMonth || '')
+    )) || {}
 }
 
 function normalizeWeekdays(value) {

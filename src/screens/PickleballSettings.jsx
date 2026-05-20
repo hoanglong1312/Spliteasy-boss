@@ -1,7 +1,7 @@
 // Spliteasy Boss — Pickleball · Cài đặt CLB (bottom sheet, thủ quỹ)
 // Props: data { clubName, courtFeeTotal, sessionsCount, memberCount, weekdays, startDate, autoGenerate, nextMonthPreview }
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, type } from '../tokens';
 import { Button, Card, Input, SectionLabel } from '../primitives';
 
@@ -12,12 +12,58 @@ export default function PickleballSettings({ data, onAction }) {
   const [weekdays, setWeekdays]   = useState(new Set(d.weekdays));
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
-  const [members, setMembers]     = useState(
-    (d.members || []).map(m => ({ ...m }))
-  );
+  const [members, setMembers]     = useState(() => memberRowsFromData(d));
+  const [activeMemberIds, setActiveMemberIds] = useState(() => monthlyActiveIdsFromData(d));
+  const [showAddMemberForm, setShowAddMemberForm] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [savingMember, setSavingMember] = useState(false);
 
   const perSession = Math.round(courtFee / d.sessionsCount);
-  const perPerson  = Math.round(perSession / d.memberCount);
+  const activeMemberCount = Math.max(activeMemberIds.size || d.memberCount || members.length || 1, 1);
+  const perPerson  = Math.round(perSession / activeMemberCount);
+  const canDeleteMembers = d.currentRole === 'treasurer';
+
+  useEffect(() => {
+    setWeekdays(new Set(d.weekdays));
+    setAutoGen(d.autoGenerate);
+    setCourtFee(d.courtFeeTotal);
+    setMembers(memberRowsFromData(d));
+    setActiveMemberIds(monthlyActiveIdsFromData(d));
+  }, [data]);
+
+  async function saveNewMember(e) {
+    e.preventDefault();
+    const trimmedName = newMemberName.trim();
+    if (!trimmedName) return;
+    setSavingMember(true);
+    try {
+      const created = await onAction?.('addMember', { name: trimmedName });
+      if (created?.id) {
+        const nextMember = {
+          id: created.id,
+          name: created.name || trimmedName,
+          initial: created.initials || created.initial || trimmedName[0].toUpperCase(),
+        };
+        setMembers(prev => [...prev, nextMember]);
+        setActiveMemberIds(prev => new Set([...prev, String(created.id)]));
+      }
+      setNewMemberName('');
+      setShowAddMemberForm(false);
+    } finally {
+      setSavingMember(false);
+    }
+  }
+
+  async function deleteMember(m) {
+    if (!confirm(`Xóa ${m.name} khỏi nhóm?`)) return;
+    setMembers(prev => prev.filter(x => String(x.id) !== String(m.id)));
+    setActiveMemberIds(prev => {
+      const next = new Set(prev);
+      next.delete(String(m.id));
+      return next;
+    });
+    await onAction?.('deleteMember', { memberId: m.id });
+  }
 
   return (
     <div style={{
@@ -85,49 +131,125 @@ export default function PickleballSettings({ data, onAction }) {
                 Chưa có thành viên trong nhóm
               </div>
             )}
-            {members.map((m, i) => (
-              <div key={m.id || i} style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0',
-                borderBottom: i < members.length - 1 ? `1px solid ${colors.borderSubtle}` : 'none',
-              }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: '50%',
-                  background: 'rgba(99,102,241,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 14, fontWeight: 700, color: '#c7d2fe',
-                }}>{m.initial}</div>
-                <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{m.name}</div>
-                <button
-                  onClick={() => setMembers(prev => prev.map((x, j) =>
-                    j === i ? { ...x, activeThisMonth: !x.activeThisMonth } : x
-                  ))}
-                  style={{
-                    width: 42, height: 24, borderRadius: 100,
-                    background: m.activeThisMonth ? colors.brand : 'rgba(255,255,255,0.10)',
-                    position: 'relative', border: 'none',
-                    boxShadow: m.activeThisMonth ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
-                    flexShrink: 0, cursor: 'pointer',
-                  }}
-                >
+            {members.map((m, i) => {
+              const playing = activeMemberIds.has(String(m.id));
+              return (
+                <div key={m.id || i} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0',
+                  borderBottom: i < members.length - 1 ? `1px solid ${colors.borderSubtle}` : 'none',
+                }}>
                   <div style={{
-                    width: 18, height: 18, borderRadius: '50%', background: 'white',
-                    position: 'absolute', top: 3,
-                    right: m.activeThisMonth ? 3 : 'auto',
-                    left: m.activeThisMonth ? 'auto' : 3,
-                  }} />
-                </button>
-              </div>
-            ))}
-            <button
-              onClick={() => onAction?.('addMember')}
-              style={{
-                width: '100%', marginTop: 8, padding: '10px 14px',
-                border: '1px dashed rgba(99,102,241,0.4)',
-                background: 'transparent', borderRadius: 12,
-                color: colors.brandLight, fontSize: 12, fontWeight: 700,
-                fontFamily: 'inherit', cursor: 'pointer',
-              }}
-            >+ Thêm thành viên</button>
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: playing ? colors.successSoft : 'rgba(255,255,255,0.06)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 14, fontWeight: 700,
+                    color: playing ? colors.success : colors.textMuted,
+                    flexShrink: 0,
+                  }}>{m.initial}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {m.name}
+                    </div>
+                    <div style={{ fontSize: 10, color: playing ? colors.success : colors.textMuted, marginTop: 2, fontWeight: 700 }}>
+                      Tháng này · {playing ? 'Đang chơi' : 'Nghỉ'}
+                    </div>
+                  </div>
+                  {canDeleteMembers && (
+                    <button
+                      type="button"
+                      aria-label={`Xóa ${m.name}`}
+                      onClick={() => deleteMember(m)}
+                      style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        border: `1px solid ${colors.borderSubtle}`,
+                        background: colors.dangerSoft,
+                        color: colors.danger,
+                        fontSize: 13, cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >🗑</button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setActiveMemberIds(prev => {
+                      const next = new Set(prev);
+                      playing ? next.delete(String(m.id)) : next.add(String(m.id));
+                      return next;
+                    })}
+                    style={{
+                      width: 42, height: 24, borderRadius: 100,
+                      background: playing ? colors.success : 'rgba(255,255,255,0.10)',
+                      position: 'relative', border: 'none',
+                      boxShadow: playing ? '0 0 12px rgba(52,211,153,0.35)' : 'none',
+                      flexShrink: 0, cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', background: 'white',
+                      position: 'absolute', top: 3,
+                      right: playing ? 3 : 'auto',
+                      left: playing ? 'auto' : 3,
+                    }} />
+                  </button>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 10, color: colors.textSecondary, padding: '8px 0 4px' }}>
+              Tắt = nghỉ tháng này, tự động bật lại tháng sau
+            </div>
+            {showAddMemberForm ? (
+              <form onSubmit={saveNewMember} style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <input
+                  value={newMemberName}
+                  onChange={e => setNewMemberName(e.target.value)}
+                  placeholder="Tên thành viên"
+                  autoFocus
+                  style={{
+                    flex: 1, minWidth: 0, padding: '10px 11px',
+                    border: `1px solid ${colors.borderSubtle}`,
+                    background: colors.inputBg, color: colors.textPrimary,
+                    borderRadius: 10, outline: 'none', fontFamily: 'inherit',
+                    fontSize: 12, fontWeight: 600,
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={savingMember}
+                  style={{
+                    padding: '0 11px', border: 'none', borderRadius: 10,
+                    background: colors.success, color: '#052e26',
+                    fontSize: 12, fontWeight: 800, fontFamily: 'inherit',
+                    cursor: savingMember ? 'default' : 'pointer',
+                    opacity: savingMember ? 0.65 : 1,
+                  }}
+                >Lưu</button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddMemberForm(false);
+                    setNewMemberName('');
+                  }}
+                  style={{
+                    padding: '0 10px', border: `1px solid ${colors.borderSubtle}`,
+                    borderRadius: 10, background: 'transparent',
+                    color: colors.textSecondary, fontSize: 12, fontWeight: 700,
+                    fontFamily: 'inherit', cursor: 'pointer',
+                  }}
+                >Hủy</button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddMemberForm(true)}
+                style={{
+                  width: '100%', marginTop: 8, padding: '10px 14px',
+                  border: '1px dashed rgba(99,102,241,0.4)',
+                  background: 'transparent', borderRadius: 12,
+                  color: colors.brandLight, fontSize: 12, fontWeight: 700,
+                  fontFamily: 'inherit', cursor: 'pointer',
+                }}
+              >+ Thêm thành viên</button>
+            )}
           </Card>
 
           {/* Weekday picker */}
@@ -221,13 +343,31 @@ export default function PickleballSettings({ data, onAction }) {
             courtFee,
             weekdays: Array.from(weekdays),
             autoGen,
-            memberParticipation: members.map(m => ({ id: m.id, activeThisMonth: m.activeThisMonth })),
+            currentYearMonth: d.currentYearMonth,
+            activeMonthlyMemberIds: Array.from(activeMemberIds),
           })}>💾 Lưu cài đặt</Button>
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+function memberRowsFromData(data) {
+  return (data.members || []).map(m => ({
+    ...m,
+    id: m.id,
+    name: m.name,
+    initial: m.initial || m.initials || (m.name || '?')[0].toUpperCase(),
+  }));
+}
+
+function monthlyActiveIdsFromData(data) {
+  const memberIds = (data.members || []).map(m => m.id).filter(Boolean).map(String);
+  const activeIds = Array.isArray(data.activeMonthlyMemberIds)
+    ? data.activeMonthlyMemberIds.filter(Boolean).map(String)
+    : [];
+  return new Set(activeIds.length > 0 ? activeIds : memberIds);
 }
 
 function FieldLabel({ children }) {
@@ -276,6 +416,9 @@ const DEMO = {
   clubName: 'Cầu Giấy',
   courtFeeTotal: 3120000,
   sessionsCount: 13, memberCount: 12,
+  currentYearMonth: '2026-05',
+  currentRole: 'treasurer',
+  activeMonthlyMemberIds: [],
   members: [],
   weekdays: ['T2','T4','T6'],
   timeRange: '19:00 – 21:00',

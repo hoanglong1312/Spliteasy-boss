@@ -121,6 +121,7 @@ function buildEmptyState() {
       upcoming: [],
       fixedMembers: [],
       externalTickets: [],
+      monthlyConfigs: [],
       monthlyCourtFee: 0,
       guestFeePerSession: 0,
     },
@@ -146,7 +147,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, psR, paR, dR, jR] = await Promise.all([
+  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('member_tokens').select('member_id,revoked_at'),
@@ -156,6 +157,7 @@ async function fetchGroupData(token) {
     sb.from('settlement_periods').select('*').order('period_end', { ascending: false }),
     sb.from('period_payments').select('*'),
     sb.from('pickle_configs').select('*'),
+    sb.from('pickleball_monthly_config').select('*'),
     sb.from('pickle_sessions').select('*').order('session_date', { ascending: false }),
     sb.from('pickle_attendees').select('*'),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
@@ -167,6 +169,7 @@ async function fetchGroupData(token) {
   if (spR.error) console.warn('[store] settlement_periods query failed:', spR.error)
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (pcR.error) console.warn('[store] pickle_configs query failed:', pcR.error)
+  if (pmcR.error) console.warn('[store] pickleball_monthly_config query failed:', pmcR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
@@ -179,6 +182,7 @@ async function fetchGroupData(token) {
     settlementPeriods: spR.data || [],
     periodPayments:    ppR.data || [],
     pickleConfigs:   pcR.data || [],
+    pickleballMonthlyConfigs: pmcR.data || [],
     pickleSessions:  psR.data || [],
     pickleAttendees: paR.data || [],
     disputeCount:    (dR.data || []).length,
@@ -292,6 +296,8 @@ function pickleForGroup(allPickle, members, groupId) {
   const source = allPickle || {}
   const sessions = safeArray(source.sessions).filter(s => (s.groupId ?? s.group_id) === groupId)
   const upcoming = safeArray(source.upcoming).filter(s => (s.groupId ?? s.group_id) === groupId)
+  const monthlyConfigs = safeArray(source.monthlyConfigs || source.monthly_configs)
+    .filter(c => (c.groupId ?? c.group_id) === groupId)
   const configs = safeArray(source.configs)
   const config = configs.find(c => (c.groupId ?? c.group_id) === groupId)
     || configs.find(c => !(c.groupId ?? c.group_id))
@@ -305,6 +311,7 @@ function pickleForGroup(allPickle, members, groupId) {
     upcoming,
     fixedMembers,
     externalTickets: safeArray(source.externalTickets).filter(t => (t.groupId ?? t.group_id) === groupId),
+    monthlyConfigs,
     monthlyCourtFee: Number(config.monthlyCourtFee ?? config.monthly_court_fee ?? 0),
     guestFeePerSession: Number(config.guestFeePerSession ?? config.guest_fee_per_session ?? 0),
   }
@@ -348,6 +355,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     settlementPeriods,
     periodPayments,
     pickleConfigs,
+    pickleballMonthlyConfigs = [],
     pickleConfig,
     pickleSessions,
     pickleAttendees,
@@ -493,6 +501,21 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     guestFeePerSession: Number(config.guest_fee_per_session ?? config.guestFeePerSession ?? 0),
     guest_fee_per_session: Number(config.guest_fee_per_session ?? config.guestFeePerSession ?? 0),
   }))
+  const normalPickleballMonthlyConfigs = safeArray(pickleballMonthlyConfigs).map(config => ({
+    ...config,
+    groupId: config.group_id ?? config.groupId,
+    group_id: config.group_id ?? config.groupId,
+    yearMonth: config.year_month ?? config.yearMonth,
+    year_month: config.year_month ?? config.yearMonth,
+    courtFee: Number(config.court_fee ?? config.courtFee ?? 0),
+    court_fee: Number(config.court_fee ?? config.courtFee ?? 0),
+    activeMemberIds: safeArray(config.active_member_ids ?? config.activeMemberIds),
+    active_member_ids: safeArray(config.active_member_ids ?? config.activeMemberIds),
+    scheduleWeekdays: safeArray(config.schedule_weekdays ?? config.scheduleWeekdays),
+    schedule_weekdays: safeArray(config.schedule_weekdays ?? config.scheduleWeekdays),
+    scheduleStartDay: config.schedule_start_day ?? config.scheduleStartDay ?? null,
+    schedule_start_day: config.schedule_start_day ?? config.scheduleStartDay ?? null,
+  }))
   const baseState = {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
@@ -508,6 +531,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
       sessions: normalSessions,
       upcoming: [],
       configs: normalPickleConfigs,
+      monthlyConfigs: normalPickleballMonthlyConfigs,
       externalTickets: [],
     },
     notifications: [],
@@ -1112,6 +1136,29 @@ export function AppProvider({ children, onToast }) {
         }
         await refresh()
         return newMember
+      }
+
+      case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': {
+        if (!sb) return
+        const groupId = action.groupId || state.currentGroupId
+        const yearMonth = action.yearMonth || action.currentYearMonth
+        if (!groupId || !yearMonth) return
+        const { data, error } = await sb
+          .from('pickleball_monthly_config')
+          .upsert({
+            group_id: groupId,
+            year_month: yearMonth,
+            court_fee: Number(action.courtFee ?? action.court_fee) || 0,
+            active_member_ids: safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds),
+          }, { onConflict: 'group_id,year_month' })
+          .select()
+          .single()
+        if (error) {
+          console.error('[store] SAVE_PICKLEBALL_MONTHLY_CONFIG:', error)
+          throw error
+        }
+        await refresh()
+        return data
       }
 
       case 'APPROVE_JOIN_REQUEST': {
