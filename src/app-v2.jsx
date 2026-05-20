@@ -564,6 +564,7 @@ export default function AppV2() {
   return (
     <div style={{ minHeight: '100vh', background: '#07080f' }}>
       {renderCurrent()}
+      <ToastOverlay toast={state.toast} />
     </div>
   )
 }
@@ -603,6 +604,36 @@ function exportStateCsv(state) {
   a.download = `spliteasy-${new Date().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function ToastOverlay({ toast }) {
+  const visible = toast?.visible === true
+  const message = toast?.message || ''
+  if (!visible && !message) return null
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: 80,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 9999,
+      background: '#1e293b',
+      color: '#f8fafc',
+      padding: '12px 20px',
+      borderRadius: 8,
+      opacity: visible ? 1 : 0,
+      transition: 'opacity 200ms ease',
+      pointerEvents: 'none',
+      fontSize: 14,
+      fontWeight: 600,
+      maxWidth: 'calc(100vw - 32px)',
+      textAlign: 'center',
+      boxShadow: '0 12px 30px rgba(0, 0, 0, 0.28)',
+    }}>
+      {message}
+    </div>
+  )
 }
 
 function PinEntryScreen({ error, value, onChange, onSubmit }) {
