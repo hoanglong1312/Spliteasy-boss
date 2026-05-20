@@ -31,6 +31,26 @@ test('Home activity list filters by title, status, and category', () => {
   assert.doesNotMatch(homeSource, /function MiniStat/);
 });
 
+test('Home data exposes member identity and current-month normalized expense rows', () => {
+  assert.match(screenDataSource, /currentUserId,\s*\n\s*currentUserName: state\?\.currentUserName \|\| 'Bạn'/);
+  assert.match(screenDataSource, /expenses: buildHomeExpenses\(safeGroups, currentUserId, members, state\?\.currentUserName, today\)/);
+  assert.match(screenDataSource, /function buildHomeExpenses\(groups, currentUserId, members, currentUserName, monthDate\)/);
+  assert.match(screenDataSource, /const meForGroup = memberIdForGroup\(group, currentUserId, members, currentUserName\)/);
+  assert.match(screenDataSource, /paidBy: expense\.paidBy \|\| expense\.paid_by_member_id/);
+  assert.match(screenDataSource, /participants: safeArray\(expense\.participants\)/);
+  assert.match(screenDataSource, /splits: safeArray\(expense\.splits\)\.map\(normalizeHomeSplit\)\.filter\(split => split\.memberId\)/);
+  assert.match(screenDataSource, /currentMemberId: meForGroup/);
+});
+
+test('Home transactions carry relationship metadata for the Của tôi filter', () => {
+  assert.match(screenDataSource, /const group = groups\.find\(g => g\.id === expense\.groupId\)/);
+  assert.match(screenDataSource, /const normalizedExpense = \{ \.\.\.expense, paidBy, participants, splits \}/);
+  assert.match(screenDataSource, /isMine: isExpenseRelatedToMember\(normalizedExpense, meForGroup\)/);
+  assert.match(screenDataSource, /function isExpenseRelatedToMember\(expense, memberId\)/);
+  assert.match(screenDataSource, /safeArray\(expense\?\.participants\)\.some\(member => String\(member\) === id\)/);
+  assert.match(screenDataSource, /safeArray\(expense\?\.splits\)\.some\(split => String\(split\.memberId \|\| split\.member_id\) === id\)/);
+});
+
 test('Home expense rows open expense detail instead of edit form', () => {
   assert.match(homeSource, /onAction\?\.\('viewExpense', \{ expenseId: tx\.id \}\)/);
   assert.match(homeSource, /onClick=\{onView\}/);
