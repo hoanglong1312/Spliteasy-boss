@@ -156,6 +156,7 @@ export default function AppV2() {
         groupId: state.currentGroupId,
         yearMonth: payload?.currentYearMonth,
         courtFee: payload?.courtFee,
+        ticketPrice: payload?.ticketPrice,
         activeMonthlyMemberIds: payload?.activeMonthlyMemberIds || [],
         scheduleWeekdays: payload?.weekdays,
         scheduleStartDay: payload?.startDate,
@@ -237,9 +238,17 @@ export default function AppV2() {
       if (!memberId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
+      const memberUpdate = {
+        name: payload?.name,
+        bank_account: payload?.bankAccount ?? payload?.bank_account,
+        bank_name: payload?.bankName ?? payload?.bank_name,
+        bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
+      }
+      if (!('bankName' in (payload || {})) && !('bank_name' in (payload || {}))) delete memberUpdate.bank_name
+      if (!('bankAccountName' in (payload || {})) && !('bank_account_name' in (payload || {}))) delete memberUpdate.bank_account_name
       const { error } = await sb
         .from('members')
-        .update({ name: payload?.name, bank_account: payload?.bankAccount })
+        .update(memberUpdate)
         .eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
@@ -650,7 +659,25 @@ export default function AppV2() {
     }
 
     if (type === 'addGuest') {
-      console.log('addGuest', payload)
+      if (!isTreasurer) return
+      const sessionId = payload?.sessionId ?? payload?.session_id ?? (typeof payload === 'string' ? payload : null)
+      const guestName = String(payload?.guestName ?? payload?.guest_name ?? '').trim()
+      if (!sessionId || !guestName) return
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickle_attendees')
+        .insert({
+          session_id: sessionId,
+          guest_name: guestName,
+          attendee_type: 'guest',
+          is_guest: true,
+          rsvp_status: 'going',
+          attended: true,
+        })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
       return
     }
 

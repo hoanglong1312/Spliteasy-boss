@@ -6,12 +6,14 @@ import { colors, type } from '../tokens';
 import { Button, Card, Input, SectionLabel } from '../primitives';
 
 const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
+const DEFAULT_TICKET_PRICE = 50000;
 
 export default function PickleballSettings({ data, onAction }) {
   const d = data || DEMO;
   const [weekdays, setWeekdays]   = useState(new Set(d.weekdays));
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
+  const [ticketPrice, setTicketPrice] = useState(d.ticketPrice || DEFAULT_TICKET_PRICE);
   const [members, setMembers]     = useState(() => memberRowsFromData(d));
   const [activeMemberIds, setActiveMemberIds] = useState(() => monthlyActiveIdsFromData(d));
 
@@ -24,6 +26,7 @@ export default function PickleballSettings({ data, onAction }) {
     setWeekdays(new Set(d.weekdays));
     setAutoGen(d.autoGenerate);
     setCourtFee(d.courtFeeTotal);
+    setTicketPrice(d.ticketPrice || DEFAULT_TICKET_PRICE);
     setMembers(memberRowsFromData(d));
     setActiveMemberIds(monthlyActiveIdsFromData(d));
   }, [data]);
@@ -76,6 +79,12 @@ export default function PickleballSettings({ data, onAction }) {
           <Input label="Tiền sân tháng" suffix="đ"
             value={courtFee.toLocaleString('vi-VN')}
             onChange={(e) => setCourtFee(Number(e.target.value.replace(/\D/g, '')) || 0)}
+            inputStyle={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.3px', ...type.mono }}
+          />
+          <Input label="Giá vé lẻ (đ/người)" suffix="đ"
+            value={ticketPrice.toLocaleString('vi-VN')}
+            onChange={(e) => setTicketPrice(Number(e.target.value.replace(/\D/g, '')) || 0)}
+            inputMode="numeric"
             inputStyle={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.3px', ...type.mono }}
           />
           <div style={{
@@ -188,6 +197,8 @@ export default function PickleballSettings({ data, onAction }) {
               <SelectField icon="📅" label={d.startDate} />
             </div>
           </div>
+          <FieldLabel>Địa điểm</FieldLabel>
+          <SelectField icon="📍" label={d.defaultVenue || 'CLB Pickleball'} />
 
           {/* Preview */}
           <div style={{
@@ -233,15 +244,9 @@ export default function PickleballSettings({ data, onAction }) {
             <Toggle on={autoGen} onChange={setAutoGen} />
           </div>
 
-          <Button block variant="muted" style={{
-            marginTop: 14,
-            background: colors.brandSoftBg,
-            color: '#c7d2fe',
-            border: '1px solid rgba(99,102,241,0.35)',
-          }} onClick={() => onAction?.('batchEntry')}>📋 Nhập nhanh chi phí tháng này</Button>
           {canManageSchedule && (
             <Button block variant="muted" style={{
-              marginTop: 8,
+              marginTop: 14,
               background: 'linear-gradient(135deg, rgba(52,211,153,0.18), rgba(52,211,153,0.08))',
               color: '#a7f3d0',
               border: '1px solid rgba(52,211,153,0.35)',
@@ -254,6 +259,7 @@ export default function PickleballSettings({ data, onAction }) {
             currentYearMonth: d.currentYearMonth,
             startDate: d.startDate,
             activeMonthlyMemberIds: Array.from(activeMemberIds),
+            ticketPrice,
           })}>💾 Lưu cài đặt</Button>
           </div>
         </div>
@@ -324,6 +330,7 @@ function Toggle({ on, onChange }) {
 const DEMO = {
   clubName: 'Cầu Giấy',
   courtFeeTotal: 3120000,
+  ticketPrice: DEFAULT_TICKET_PRICE,
   sessionsCount: 13, memberCount: 12,
   currentYearMonth: '2026-05',
   currentRole: 'treasurer',
@@ -331,6 +338,7 @@ const DEMO = {
   members: [],
   weekdays: ['T2','T4','T6'],
   timeRange: '19:00 – 21:00',
+  defaultVenue: 'Sân 3 · Trung tâm Cầu Giấy',
   startDate: '01/05/2026',
   autoGenerate: true,
   nextMonthPreview: {

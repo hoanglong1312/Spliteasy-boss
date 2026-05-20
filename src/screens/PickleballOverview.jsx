@@ -109,6 +109,25 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </div>
         </div>
 
+        {isTreasurer && (
+          <Button
+            block
+            variant="ghost"
+            onClick={() => onAction?.('batchEntry')}
+            style={{
+              marginTop: 10,
+              padding: '10px 12px',
+              borderRadius: 12,
+              fontSize: 12,
+              color: colors.textSecondary,
+              background: 'rgba(255,255,255,0.035)',
+              border: `1px solid ${colors.borderSubtle}`,
+            }}
+          >
+            📋 Nhập nhanh tiền nước
+          </Button>
+        )}
+
         {/* Your balance */}
         <Card accent="finance" style={{ marginTop: 10, padding: '18px 16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

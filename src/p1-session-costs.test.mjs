@@ -7,6 +7,7 @@ const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.
 const calendarSource = readFileSync(new URL('./screens/PickleballCalendar.jsx', import.meta.url), 'utf8')
 const batchSource = readFileSync(new URL('./screens/BatchEntry.jsx', import.meta.url), 'utf8')
 const settingsSource = readFileSync(new URL('./screens/PickleballSettings.jsx', import.meta.url), 'utf8')
+const overviewSource = readFileSync(new URL('./screens/PickleballOverview.jsx', import.meta.url), 'utf8')
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 
@@ -116,7 +117,9 @@ test('store loads pickleball_session_items into normalized pickle state', () => 
   assert.match(storeSource, /sessionItems/)
 })
 
-test('settings uses the new quick monthly cost-entry label', () => {
-  assert.match(settingsSource, /📋 Nhập nhanh chi phí tháng này/)
-  assert.doesNotMatch(settingsSource, /Nhập chi phí sân tháng này/)
+test('quick monthly water entry moved from settings to overview', () => {
+  assert.doesNotMatch(settingsSource, /📋 Nhập nhanh chi phí tháng này/)
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('batchEntry'\)/)
+  assert.match(overviewSource, /📋 Nhập nhanh tiền nước/)
+  assert.match(overviewSource, /onAction\?\.\('batchEntry'\)/)
 })

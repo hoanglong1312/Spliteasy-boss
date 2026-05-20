@@ -6,10 +6,14 @@ import {
   PhoneFrame, Screen, IconButton, Card, Avatar, Badge, Button, Input,
 } from '../primitives';
 
+const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
+
 export default function MemberDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(d.name || '');
+  const [editBankAccountName, setEditBankAccountName] = useState(d.bankAccountName || '');
+  const [editBankName, setEditBankName] = useState(d.bankName || '');
   const [editBankAccount, setEditBankAccount] = useState(d.bankAccount || '');
 
   if (!d) {
@@ -30,6 +34,8 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
     await onAction?.('editMember', {
       memberId: d.id,
       name,
+      bankAccountName: editBankAccountName.trim(),
+      bankName: editBankName,
       bankAccount: editBankAccount.trim(),
     });
     setEditing(false);
@@ -43,9 +49,13 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
   }
 
   async function toggleRole() {
+    const role = d.role === 'treasurer' ? 'member' : 'treasurer';
+    if (!window.confirm(role === 'treasurer'
+      ? `Cấp quyền Thủ quỹ cho ${d.name}?`
+      : `Thu quyền Thủ quỹ của ${d.name}?`)) return;
     await onAction?.('setMemberRole', {
       memberId: d.id,
-      role: d.role === 'treasurer' ? 'member' : 'treasurer',
+      role,
     });
   }
 
@@ -137,6 +147,8 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
         <Card style={{ marginTop: 12 }}>
           <CardTitle>Thông tin</CardTitle>
           <InfoRow label="Ngày tham gia" value={d.joinDate || 'Chưa rõ'} />
+          <InfoRow label="Ngân hàng" value={d.bankName || 'Chưa cập nhật'} />
+          <InfoRow label="Chủ tài khoản" value={d.bankAccountName || 'Chưa cập nhật'} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 0' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 700 }}>STK ngân hàng</div>
@@ -151,6 +163,8 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
           {isTreasurer && (
             <Button block variant="ghost" style={{ marginTop: 10, fontSize: 13 }} onClick={() => {
               setEditName(d.name || '');
+              setEditBankAccountName(d.bankAccountName || '');
+              setEditBankName(d.bankName || '');
               setEditBankAccount(d.bankAccount || '');
               setEditing(true);
             }}>✏️ Sửa</Button>
@@ -203,14 +217,23 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
             </div>
             <form onSubmit={saveEdit}>
               <Input
-                label="Tên"
+                label="Tên hiển thị"
                 value={editName}
                 onChange={e => setEditName(e.target.value)}
                 placeholder="Tên thành viên"
                 autoFocus
               />
               <Input
-                label="STK ngân hàng"
+                label="Họ và tên đầy đủ"
+                value={editBankAccountName}
+                onChange={e => setEditBankAccountName(e.target.value)}
+                placeholder="Tên trên tài khoản ngân hàng"
+              />
+              <BankSelect value={editBankName} onChange={setEditBankName} />
+              <Input
+                label="Số tài khoản"
+                type="number"
+                inputMode="numeric"
                 value={editBankAccount}
                 onChange={e => setEditBankAccount(e.target.value)}
                 placeholder="Chưa cập nhật"
@@ -279,6 +302,24 @@ function InfoRow({ label, value }) {
   );
 }
 
+function BankSelect({ value, onChange }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '1.2px', color: colors.textSecondary,
+        margin: '14px 0 6px',
+      }}>Ngân hàng</div>
+      <select value={value} onChange={e => onChange(e.target.value)} style={selectFieldStyle()}>
+        <option value="">Chọn ngân hàng</option>
+        {VN_BANKS.map(bank => (
+          <option key={bank} value={bank}>{bank}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function smallButtonStyle() {
   return {
     border: `1px solid ${colors.borderSubtle}`,
@@ -290,6 +331,21 @@ function smallButtonStyle() {
     fontWeight: 800,
     fontFamily: 'inherit',
     cursor: 'pointer',
+  };
+}
+
+function selectFieldStyle() {
+  return {
+    width: '100%',
+    padding: '14px 14px',
+    background: colors.inputBg,
+    border: `1px solid ${colors.borderSubtle}`,
+    borderRadius: 12,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: 500,
+    fontFamily: 'inherit',
+    outline: 'none',
   };
 }
 
@@ -308,6 +364,8 @@ const DEMO = {
   type: 'fixed',
   typeLabel: 'Cố định',
   joinDate: 'Thứ Tư · 01/05/2026',
+  bankName: 'Vietcombank',
+  bankAccountName: 'Nguyen Long',
   bankAccount: '1234567890',
   rank: { icon: '🔥', label: 'Siêu chăm', tone: 'success' },
   attendance: { attended: 11, missed: 2, total: 13, percentage: 85 },

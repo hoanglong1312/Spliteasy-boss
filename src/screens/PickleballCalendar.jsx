@@ -153,6 +153,20 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
   const costRows = Array.isArray(session.costRows)
     ? session.costRows
     : Array.isArray(session.costs) ? session.costs : [];
+  const [guestName, setGuestName] = useState('');
+  const [guestFormOpen, setGuestFormOpen] = useState(false);
+
+  async function addGuest(event) {
+    event.preventDefault();
+    const name = guestName.trim();
+    if (!name) return;
+    await onAction?.('addGuest', {
+      sessionId: session.id,
+      guestName: name,
+    });
+    setGuestName('');
+    setGuestFormOpen(false);
+  }
 
   return (
     <Card accent="pickleball" style={{ marginTop: 16 }}>
@@ -173,7 +187,22 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
           Điểm danh · {session.attendance.present}/{session.attendance.total}
           {session.attendance.guests > 0 && ` + ${session.attendance.guests} khách`}
         </div>
-        {isTreasurer && <span style={{ fontSize: 11, color: colors.brandLight, fontWeight: 600, cursor: 'pointer' }} onClick={() => onAction?.('addGuest', session.id)}>+ Thêm khách</span>}
+        {isTreasurer && (
+          <button
+            type="button"
+            onClick={() => setGuestFormOpen(open => !open)}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              fontSize: 11,
+              color: colors.brandLight,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >+ Thêm khách</button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
@@ -189,6 +218,26 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
           />
         ))}
       </div>
+
+      {guestFormOpen && isTreasurer && (
+        <form onSubmit={addGuest} style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          gap: 8,
+          marginTop: 10,
+        }}>
+          <Input
+            value={guestName}
+            onChange={(event) => setGuestName(event.target.value)}
+            placeholder="Tên khách mới"
+            inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 700 }}
+            style={{ marginTop: 0 }}
+          />
+          <Button type="submit" variant="muted" style={{ padding: '10px 12px', borderRadius: 10, fontSize: 12 }}>
+            Thêm
+          </Button>
+        </form>
+      )}
 
       <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0' }} />
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>
@@ -254,7 +303,7 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
         id: `new-${Date.now()}-${prev.length}`,
         note: '',
         amountInput: '',
-        memberIds: allMemberIds,
+        memberIds: [],
       },
     ]);
     setExtrasOpen(true);
@@ -357,8 +406,9 @@ function ExtraCostEditor({ index, extra, members, disabled, onChange }) {
   const selectedIds = new Set(extra.memberIds);
   const allSelected = allMemberIds.length > 0 && extra.memberIds.length === allMemberIds.length;
   const amount = parseAmount(extra.amountInput);
-  const splitCount = Math.max(extra.memberIds.length, 1);
-  const perPerson = amount > 0 ? Math.round(amount / splitCount) : 0;
+  const splitCount = extra.memberIds.length;
+  const splitLabel = splitCount > 0 ? `${splitCount} người` : '0 người';
+  const perPerson = amount > 0 && splitCount > 0 ? Math.round(amount / splitCount) : 0;
   const toggleMember = (memberId) => {
     if (disabled) return;
     const next = selectedIds.has(memberId)
@@ -395,7 +445,7 @@ function ExtraCostEditor({ index, extra, members, disabled, onChange }) {
         />
       </div>
       <div style={{ marginTop: 10, fontSize: 10, color: colors.textSecondary, fontWeight: 700 }}>
-        Chia cho:
+        Chia cho: {splitLabel}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 7 }}>
         {members.map(member => (
@@ -484,7 +534,7 @@ function initialExtraDrafts(extras, allMemberIds) {
     id: extra.id || `extra-${index}`,
     note: extra.note || '',
     amountInput: formatAmountInput(extra.amount || 0),
-    memberIds: Array.isArray(extra.memberIds) && extra.memberIds.length > 0 ? extra.memberIds : allMemberIds,
+    memberIds: Array.isArray(extra.memberIds) ? extra.memberIds : allMemberIds,
   }));
 }
 

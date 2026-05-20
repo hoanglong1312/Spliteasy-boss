@@ -28,6 +28,7 @@ const EMPTY_DATA = {
   activeFilter: 'all',
   members: [],
   tickets: [],
+  ticketPricePerPerson: 50000,
 }
 
 export default function PickleballTickets({ data, isTreasurer = true, onAction }) {
@@ -258,15 +259,13 @@ function AddTicketSheet({ data, onClose, onSave }) {
   const members = data.members || []
   const [date, setDate] = useState(toDateInput(today))
   const [time, setTime] = useState('19:00')
-  const [memberIds, setMemberIds] = useState(members.map(member => member.id))
-  const [totalAmount, setTotalAmount] = useState('')
+  const [memberIds, setMemberIds] = useState([])
   const [paymentMode, setPaymentMode] = useState('team_fund')
   const [advancerId, setAdvancerId] = useState(members[0]?.id || '')
   const [error, setError] = useState('')
-  const defaultAmountPerPerson = Number(data.defaultTicketAmountPerPerson || data.ticketPricePerPerson || 50000) || 50000
-  const enteredTotalAmount = parseMoneyAmount(totalAmount)
-  const totalAmountToSave = enteredTotalAmount > 0 ? enteredTotalAmount : defaultAmountPerPerson * memberIds.length
-  const amountPerPerson = memberIds.length > 0 ? Math.round(totalAmountToSave / memberIds.length) : 0
+  const ticketPrice = Number(data.ticketPricePerPerson || data.ticketPrice || data.defaultTicketAmountPerPerson || 50000) || 50000
+  const totalAmountToSave = ticketPrice * memberIds.length
+  const amountPerPerson = ticketPrice
   const canSave = !ticketValidationError({ date, time, memberIds, totalAmount: totalAmountToSave, paymentMode, advancerId })
 
   function toggleMember(memberId) {
@@ -354,7 +353,12 @@ function AddTicketSheet({ data, onClose, onSave }) {
           inputMode="numeric"
         />
 
-        <div style={{ ...type.label, color: colors.textSecondary, margin: '14px 0 8px' }}>Người tham gia</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 8px' }}>
+          <div style={{ ...type.label, color: colors.textSecondary }}>Người tham gia</div>
+          <div style={{ fontSize: 10, color: colors.pickleball, fontWeight: 800 }}>
+            {memberIds.length} người đã chọn
+          </div>
+        </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {members.map(member => {
             const active = memberIds.some(id => String(id) === String(member.id))
@@ -385,19 +389,24 @@ function AddTicketSheet({ data, onClose, onSave }) {
           })}
         </div>
 
-        <Input
-          label="Tổng tiền"
-          type="number"
-          value={totalAmount}
-          onChange={e => {
-            setTotalAmount(e.target.value)
-            if (error) setError('')
-          }}
-          placeholder={String(defaultAmountPerPerson * Math.max(memberIds.length, 1))}
-          suffix="đ"
-        />
-        <div style={{ fontSize: 11, color: colors.pickleball, fontWeight: 800, marginTop: 6 }}>
-          = {formatShortAmount(amountPerPerson)}/người
+        <div style={{
+          marginTop: 14,
+          padding: '10px 12px',
+          borderRadius: 12,
+          background: 'rgba(52,211,153,0.08)',
+          border: '1px solid rgba(52,211,153,0.22)',
+        }}>
+          <div style={{ fontSize: 10, color: '#a7f3d0', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+            Price per person
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+            <span style={{ fontSize: 15, color: colors.textPrimary, fontWeight: 900, ...type.mono }}>
+              {formatShortAmount(amountPerPerson)}/người
+            </span>
+            <span style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 800, ...type.mono }}>
+              Tổng {formatShortAmount(totalAmountToSave)}
+            </span>
+          </div>
         </div>
 
         <div style={{ ...type.label, color: colors.textSecondary, margin: '16px 0 8px' }}>Thanh toán</div>

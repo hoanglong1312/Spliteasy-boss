@@ -528,6 +528,8 @@ function buildMemberDetailData(state, memberId) {
     isTreasurer: member.role === 'treasurer',
     joinDate: fullExpenseDate(member.createdAt || member.created_at),
     joinedLabel: monthYearLabel(member.createdAt || member.created_at),
+    bankName: member?.bankName || member?.bank_name || '',
+    bankAccountName: member?.bankAccountName || member?.bank_account_name || '',
     bankAccount: member?.bankAccount || member?.bank_account || '',
     attendance,
     balance,
@@ -538,6 +540,8 @@ function buildMemberDetailData(state, memberId) {
       role: member.role || 'member',
       type: memberType(member),
       joinDate: fullExpenseDate(member.createdAt || member.created_at),
+      bankName: member?.bankName || member?.bank_name || '',
+      bankAccountName: member?.bankAccountName || member?.bank_account_name || '',
       bankAccount: member?.bankAccount || member?.bank_account || '',
     },
   }
@@ -545,13 +549,15 @@ function buildMemberDetailData(state, memberId) {
 
 function buildPickleballTicketsData(state) {
   const today = new Date()
+  const currentMonth = monthKey(today)
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentMonth)
+  const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
   const rawTickets = uniqueTickets([
     ...safeArray(state?.pickle?.externalTickets),
     ...safeArray(state?._allPickle?.externalTickets),
     ...safeArray(state?.tickets),
   ])
   const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
-  const currentMonth = monthKey(today)
   const monthTickets = rawTickets
     .filter(ticket => {
       const groupId = ticket?.groupId || ticket?.group_id
@@ -609,7 +615,9 @@ function buildPickleballTicketsData(state) {
     filter: 'all',
     activeFilter: 'all',
     members,
-    defaultTicketAmountPerPerson: Number(state?.pickle?.guestFeePerSession ?? state?.pickle?.guest_fee_per_session ?? 0) || 50000,
+    ticketPrice,
+    ticketPricePerPerson: ticketPrice,
+    defaultTicketAmountPerPerson: ticketPrice,
     tickets,
   }
 }
@@ -635,6 +643,7 @@ function buildPickleballSettingsData(state) {
     group?.scheduleDays
   )
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? config?.monthlyCourtFee ?? config?.monthly_court_fee ?? group?.monthlyCourtFee ?? 0)
+  const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
   const sessionsCount = Number(config?.sessionsCount ?? config?.sessions_count ?? sessions.length) || Math.max(sessions.length, 1)
   const scheduleTime = config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
   const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
@@ -654,6 +663,7 @@ function buildPickleballSettingsData(state) {
     maxMembers: Number(config?.maxMembers ?? config?.max_members ?? members.length) || members.length || 12,
     requireApproval: config?.requireApproval ?? config?.require_approval ?? group?.requiresApproval ?? true,
     courtFeeTotal,
+    ticketPrice,
     sessionsCount,
     memberCount: members.length || safeArray(state?.pickle?.fixedMembers).length || 1,
     members: members.map(m => ({
@@ -664,7 +674,7 @@ function buildPickleballSettingsData(state) {
     })),
     weekdays,
     timeRange: scheduleTime,
-    startDate: config?.startDate || config?.start_date || '01/' + String(today.getMonth() + 1).padStart(2, '0') + '/' + today.getFullYear(),
+    startDate: monthlyConfig?.scheduleStartDay || monthlyConfig?.schedule_start_day || config?.startDate || config?.start_date || '01/' + String(today.getMonth() + 1).padStart(2, '0') + '/' + today.getFullYear(),
     autoGenerate: config?.autoGenerate ?? config?.auto_generate ?? true,
     nextMonthPreview: buildNextMonthPreview(today, weekdays),
   }
@@ -1050,6 +1060,8 @@ function toPickleballMemberRow(member, sessions, totalSessions) {
     rankLabel: rank.label,
     joinedLabel: monthYearLabel(member.createdAt || member.created_at),
     isTreasurer: member.role === 'treasurer',
+    bankName: member.bankName || member.bank_name || '',
+    bankAccountName: member.bankAccountName || member.bank_account_name || '',
     bankAccount: member.bankAccount || member.bank_account || '',
     color: member.color,
   }
@@ -1257,6 +1269,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
       id: member.id,
       initial: initials(member),
       name: firstName(member.displayName || member.name),
+      memberType: memberType(member),
       kind: presentSet.has(String(member.id)) ? 'present' : 'absent',
     })),
     ...guests.map((guest, index) => ({
@@ -1273,7 +1286,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const splitCount = presentIds.length + guests.length
   const waterPerPerson = splitCount > 0 ? Math.round(costs.waterAmount / splitCount) : 0
   const extrasPerPerson = costs.extras.reduce((sum, item) => {
-    const count = safeArray(item.memberIds).length || members.length || splitCount
+    const count = safeArray(item.memberIds).length
     return sum + (count > 0 ? Math.round((Number(item.amount) || 0) / count) : 0)
   }, 0)
   const sessionKey = dateKey(sessionDate(session))
@@ -1299,7 +1312,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
       { label: '🏸 Tiền sân/người', amount: courtPerPerson },
       { label: '💧 Tiền nước/người', amount: waterPerPerson },
       ...costs.extras.map(item => {
-        const count = safeArray(item.memberIds).length || members.length || 1
+        const count = safeArray(item.memberIds).length
         return {
           label: `⚡ ${item.note || 'Phụ phát sinh'}`,
           amount: count > 0 ? Math.round((Number(item.amount) || 0) / count) : 0,
@@ -2178,6 +2191,7 @@ function personChip(member) {
     id: member.id,
     name: member.short || member.displayName || member.name,
     initial: initials(member),
+    memberType: memberType(member),
   }
 }
 

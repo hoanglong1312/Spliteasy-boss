@@ -6,6 +6,8 @@ import {
   PhoneFrame, Screen, TabBar, Card, Badge, SubTabs, Avatar, Stat, Button, Input,
 } from '../primitives';
 
+const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
+
 export default function PickleballMembers({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const [search, setSearch] = useState('');
@@ -14,6 +16,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const [quickActionMember, setQuickActionMember] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [editName, setEditName] = useState('');
+  const [editBankAccountName, setEditBankAccountName] = useState('');
+  const [editBankName, setEditBankName] = useState('');
   const [editBankAccount, setEditBankAccount] = useState('');
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
@@ -29,6 +33,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     setQuickActionMember(null);
     setEditingMember(member);
     setEditName(member.name || '');
+    setEditBankAccountName(member.bankAccountName || '');
+    setEditBankName(member.bankName || '');
     setEditBankAccount(member.bankAccount || '');
   }
 
@@ -39,6 +45,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     await onAction?.('editMember', {
       memberId: editingMember.id,
       name,
+      bankAccountName: editBankAccountName.trim(),
+      bankName: editBankName,
       bankAccount: editBankAccount.trim(),
     });
     setEditingMember(null);
@@ -58,6 +66,15 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     const type = member.type === 'casual' ? 'fixed' : 'casual';
     setQuickActionMember(null);
     await onAction?.('setMemberType', { memberId: member.id, type });
+  }
+
+  async function changeRole(member) {
+    const role = member.role === 'treasurer' ? 'member' : 'treasurer';
+    setQuickActionMember(null);
+    if (!window.confirm(role === 'treasurer'
+      ? `Cấp quyền Thủ quỹ cho ${member.name}?`
+      : `Thu quyền Thủ quỹ của ${member.name}?`)) return;
+    await onAction?.('setMemberRole', { memberId: member.id, role });
   }
 
   async function deleteMember(member) {
@@ -164,6 +181,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           onClose={() => setQuickActionMember(null)}
           onEdit={() => openEdit(quickActionMember)}
           onChangeType={() => changeType(quickActionMember)}
+          onChangeRole={() => changeRole(quickActionMember)}
           onDelete={() => deleteMember(quickActionMember)}
         />
       )}
@@ -188,14 +206,23 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
         <BottomSheet title="Sửa thông tin" onClose={() => setEditingMember(null)}>
           <form onSubmit={saveEdit}>
             <Input
-              label="Tên"
+              label="Tên hiển thị"
               value={editName}
               onChange={e => setEditName(e.target.value)}
               placeholder="Tên thành viên"
               autoFocus
             />
             <Input
-              label="STK ngân hàng"
+              label="Họ và tên đầy đủ"
+              value={editBankAccountName}
+              onChange={e => setEditBankAccountName(e.target.value)}
+              placeholder="Tên trên tài khoản ngân hàng"
+            />
+            <BankSelect value={editBankName} onChange={setEditBankName} />
+            <Input
+              label="Số tài khoản"
+              type="number"
+              inputMode="numeric"
               value={editBankAccount}
               onChange={e => setEditBankAccount(e.target.value)}
               placeholder="Chưa cập nhật"
@@ -338,13 +365,32 @@ function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
   );
 }
 
-function QuickActionSheet({ member, onClose, onEdit, onChangeType, onDelete }) {
+function QuickActionSheet({ member, onClose, onEdit, onChangeType, onChangeRole, onDelete }) {
   return (
     <BottomSheet title={member.name} onClose={onClose}>
       <ActionButton onClick={onEdit}>✏️ Sửa</ActionButton>
       <ActionButton onClick={onChangeType}>↔️ {member.type === 'casual' ? 'Chuyển thành Cố định' : 'Chuyển sang Vãng lai'}</ActionButton>
+      <ActionButton onClick={onChangeRole}>👑 {member.role === 'treasurer' ? 'Thu quyền Thủ quỹ' : 'Cấp quyền Thủ quỹ'}</ActionButton>
       <ActionButton danger onClick={onDelete}>🗑 Xoá</ActionButton>
     </BottomSheet>
+  );
+}
+
+function BankSelect({ value, onChange }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '1.2px', color: colors.textSecondary,
+        margin: '14px 0 6px',
+      }}>Ngân hàng</div>
+      <select value={value} onChange={e => onChange(e.target.value)} style={selectFieldStyle()}>
+        <option value="">Chọn ngân hàng</option>
+        {VN_BANKS.map(bank => (
+          <option key={bank} value={bank}>{bank}</option>
+        ))}
+      </select>
+    </div>
   );
 }
 
@@ -434,6 +480,21 @@ function BottomSheet({ title, children, onClose }) {
   );
 }
 
+function selectFieldStyle() {
+  return {
+    width: '100%',
+    padding: '14px 14px',
+    background: colors.inputBg,
+    border: `1px solid ${colors.borderSubtle}`,
+    borderRadius: 12,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: 500,
+    fontFamily: 'inherit',
+    outline: 'none',
+  };
+}
+
 function progressColor(pct) {
   if (pct >= 65) return colors.success;
   if (pct >= 45) return colors.warning;
@@ -445,7 +506,7 @@ const DEMO = {
   monthLabel: 'Tháng 5 · 2026',
   stats: { permanent: 6, casual: 2, total: 8 },
   fixedMembers: [
-    { id: 1, initial: 'L', name: 'Long', type: 'fixed', progressPct: 92, rank: { icon: '🔥', label: 'Siêu chăm' }, isTreasurer: true },
+    { id: 1, initial: 'L', name: 'Long', role: 'treasurer', type: 'fixed', progressPct: 92, rank: { icon: '🔥', label: 'Siêu chăm' }, isTreasurer: true, bankName: 'Vietcombank', bankAccountName: 'Nguyen Long', bankAccount: '1234567890' },
     { id: 2, initial: 'M', name: 'Minh', type: 'fixed', progressPct: 76, rank: { icon: '⚡', label: 'Chăm chỉ' } },
     { id: 3, initial: 'H', name: 'Hoa', type: 'fixed', progressPct: 54, rank: { icon: '😐', label: 'Bình thường' } },
     { id: 4, initial: 'T', name: 'Tuấn', type: 'fixed', progressPct: 31, rank: { icon: '🥶', label: 'Hay vắng' } },
