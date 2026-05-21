@@ -181,41 +181,47 @@ export default function AppV2() {
         const { token } = getStoredAuth()
         if (token) {
           const sb = createSupabase(token)
-          const [deleteResult1, deleteResult2] = await Promise.all([
-            sb
-              .from('pickle_sessions')
-              .delete()
-              .eq('group_id', groupId)
-              .eq('status', 'scheduled')
-              .like('session_date', `${yearMonth}%`),
-            sb
-              .from('pickleball_sessions')
-              .delete()
-              .eq('group_id', groupId)
-              .gte('date', `${yearMonth}-01`)
-              .lte('date', `${yearMonth}-31`),
-          ])
-          if (deleteResult1.error) throw deleteResult1.error
-          if (deleteResult2.error) throw deleteResult2.error
+          await dispatch({ type: 'SET_PICKLE_REGEN', value: true })
+          try {
+            const [deleteResult1, deleteResult2] = await Promise.all([
+              sb
+                .from('pickle_sessions')
+                .delete()
+                .eq('group_id', groupId)
+                .eq('status', 'scheduled')
+                .like('session_date', `${yearMonth}%`),
+              sb
+                .from('pickleball_sessions')
+                .delete()
+                .eq('group_id', groupId)
+                .gte('date', `${yearMonth}-01`)
+                .lte('date', `${yearMonth}-31`),
+            ])
+            if (deleteResult1.error) throw deleteResult1.error
+            if (deleteResult2.error) throw deleteResult2.error
 
-          await dispatch({
-            type: 'CLEAR_SCHEDULED_SESSIONS',
-            groupId,
-            yearMonth,
-          })
+            await dispatch({
+              type: 'CLEAR_SCHEDULED_SESSIONS',
+              groupId,
+              yearMonth,
+            })
 
-          const generationConfig = {
-            ...sessionGenerationConfigFromState(state, yearMonth),
-            scheduleWeekdays: newWeekdays,
-            scheduleTime: action.scheduleTime,
-            startDate: action.scheduleStartDay,
+            const generationConfig = {
+              ...sessionGenerationConfigFromState(state, yearMonth),
+              scheduleWeekdays: newWeekdays,
+              scheduleTime: action.scheduleTime,
+              startDate: action.scheduleStartDay,
+            }
+            await dispatch({
+              type: 'AUTO_GENERATE_SESSIONS',
+              groupId,
+              yearMonth,
+              config: generationConfig,
+              force: true,
+            })
+          } finally {
+            await dispatch({ type: 'SET_PICKLE_REGEN', value: false })
           }
-          await dispatch({
-            type: 'AUTO_GENERATE_SESSIONS',
-            groupId,
-            yearMonth,
-            config: generationConfig,
-          })
         }
       }
       alert('Đã lưu cài đặt tháng này')

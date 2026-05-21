@@ -325,7 +325,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   )
   const monthSessions = getMonthSessions(pickle, today)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
-  const shouldAutoGenerate = monthSessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
+  const shouldAutoGenerate = !state?._pickleRegenInProgress && monthSessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
   const attended = monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
@@ -476,7 +476,7 @@ function buildPickleballCalendarData(state) {
   const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
   const sessions = getStateMonthSessions(state, today)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
-  const shouldAutoGenerate = sessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
+  const shouldAutoGenerate = !state?._pickleRegenInProgress && sessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
   const sessionsByDay = new Map()
   sessions.forEach(session => {
     const date = parseDate(sessionDate(session))

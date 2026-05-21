@@ -371,6 +371,7 @@ function buildEmptyState() {
     homeMonthError: null,
     _allPickle: null,
     toast: { visible: false, message: '' },
+    _pickleRegenInProgress: false,
     _loading: false,
     _error: null,
   }
@@ -1033,6 +1034,7 @@ export function AppProvider({ children }) {
         const nextState = {
           ...next,
           toast: stateRef.current.toast || buildEmptyState().toast,
+          _pickleRegenInProgress: stateRef.current._pickleRegenInProgress === true,
         }
         stateRef.current = nextState
         setState(nextState)
@@ -1139,6 +1141,16 @@ export function AppProvider({ children }) {
         const groupId = action.groupId || action.group_id || stateRef.current.currentGroupId
         const yearMonth = action.yearMonth || action.year_month
         const next = removeScheduledSessionsForMonthFromState(stateRef.current, groupId, yearMonth)
+        stateRef.current = next
+        setState(next)
+        return next
+      }
+
+      case 'SET_PICKLE_REGEN': {
+        const next = {
+          ...stateRef.current,
+          _pickleRegenInProgress: action.value === true,
+        }
         stateRef.current = next
         setState(next)
         return next
@@ -1627,6 +1639,23 @@ export function AppProvider({ children }) {
         if (scheduleWeekdays.length === 0) {
           console.warn('[store] AUTO_GENERATE_SESSIONS: missing schedule weekdays', { groupId, yearMonth })
           return []
+        }
+        if (!action.force) {
+          const { data: existingRows, error: existingError } = await sb
+            .from('pickle_sessions')
+            .select('id')
+            .eq('group_id', groupId)
+            .eq('status', 'scheduled')
+            .like('session_date', `${yearMonth}%`)
+            .limit(1)
+          if (existingError) {
+            console.error('[store] AUTO_GENERATE_SESSIONS existing check:', existingError)
+            throw existingError
+          }
+          if (existingRows?.length > 0) {
+            await refresh()
+            return []
+          }
         }
         const sessions = generateMonthSessions(yearMonth, {
           ...config,

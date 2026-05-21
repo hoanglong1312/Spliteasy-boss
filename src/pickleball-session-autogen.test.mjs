@@ -68,7 +68,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildPickleballCalendarData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildPickleballCalendarData, buildPickleballOverviewData }`, context)
   return context.__builders
 }
 
@@ -179,6 +179,36 @@ test('calendar auto-generation request uses loaded monthly config weekdays, not 
   assert.equal(withoutMonthlyWeekdays.autoGenerateRequest, null)
 })
 
+test('calendar and overview suppress auto-generation while manual regeneration is in progress', () => {
+  const { buildPickleballCalendarData, buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [],
+      fixedMembers: ['u1'],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3] }],
+    },
+    _allPickle: {
+      sessions: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3] }],
+    },
+    _pickleRegenInProgress: true,
+  }
+
+  const calendarData = buildPickleballCalendarData(state)
+  const overviewData = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'u1', [])
+
+  assert.equal(calendarData.shouldAutoGenerate, false)
+  assert.equal(calendarData.autoGenerateRequest, null)
+  assert.equal(calendarData.autoGenerateKey, '')
+  assert.equal(overviewData.shouldAutoGenerate, false)
+  assert.equal(overviewData.autoGenerateRequest, null)
+  assert.equal(overviewData.autoGenerateKey, '')
+})
+
 test('pickleball calendar maps current month session rows to day states and exposes auto-generate flag', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const baseState = {
@@ -257,6 +287,31 @@ test('settings save clears in-memory scheduled sessions before regenerating', ()
     saveBlock.indexOf("type: 'CLEAR_SCHEDULED_SESSIONS'") < saveBlock.indexOf("type: 'AUTO_GENERATE_SESSIONS'"),
     'clear action runs before auto-generation',
   )
+})
+
+test('settings save suppresses app auto-generation while manually regenerating', () => {
+  const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+
+  assert.match(saveBlock, /type: 'SET_PICKLE_REGEN'[\s\S]*value: true/)
+  assert.match(saveBlock, /try\s*\{[\s\S]*type: 'CLEAR_SCHEDULED_SESSIONS'[\s\S]*type: 'AUTO_GENERATE_SESSIONS'[\s\S]*force: true[\s\S]*\}\s*finally\s*\{[\s\S]*type: 'SET_PICKLE_REGEN'[\s\S]*value: false/)
+
+  const enableIndex = saveBlock.indexOf("type: 'SET_PICKLE_REGEN'")
+  const clearIndex = saveBlock.indexOf("type: 'CLEAR_SCHEDULED_SESSIONS'")
+  const generateIndex = saveBlock.indexOf("type: 'AUTO_GENERATE_SESSIONS'")
+  const disableIndex = saveBlock.lastIndexOf("type: 'SET_PICKLE_REGEN'")
+
+  assert.ok(enableIndex >= 0 && enableIndex < clearIndex, 'regen flag is enabled before local clear')
+  assert.ok(clearIndex >= 0 && clearIndex < generateIndex, 'local clear runs before manual generation')
+  assert.ok(generateIndex >= 0 && generateIndex < disableIndex, 'regen flag is disabled after manual generation')
+})
+
+test('store auto-generation skips existing scheduled sessions unless forced', () => {
+  assert.match(storeSource, /_pickleRegenInProgress: false/)
+  assert.match(storeSource, /case 'SET_PICKLE_REGEN':\s*\{/)
+
+  const autoGenerateBlock = storeSource.match(/case 'AUTO_GENERATE_SESSIONS':\s*\{[\s\S]*?return validSessions\s*\n\s*\}/)?.[0] || ''
+  assert.match(autoGenerateBlock, /if \(!action\.force\) \{[\s\S]*const \{ data: existingRows[\s\S]*\.from\('pickle_sessions'\)[\s\S]*\.select\('id'\)[\s\S]*\.eq\('group_id', groupId\)[\s\S]*\.eq\('status', 'scheduled'\)[\s\S]*\.like\('session_date', `\$\{yearMonth\}%`\)[\s\S]*\.limit\(1\)[\s\S]*if \(existingRows\?\.length > 0\) \{[\s\S]*await refresh\(\)[\s\S]*return \[\][\s\S]*\}/)
+  assert.match(autoGenerateBlock, /if \(existingRows\?\.length > 0\)/)
 })
 
 test('scheduled session clear removes normalized primary and missing-status legacy rows', () => {
