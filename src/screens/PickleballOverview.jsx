@@ -80,14 +80,6 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                       {d.todaySession.venue}
                     </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 24, fontWeight: 900, color: '#f8fafc', ...type.mono }}>
-                      {d.todaySession.present}<span style={{ fontSize: 11, color: colors.textMuted }}>/{d.todaySession.total}</span>
-                    </div>
-                    <div style={{ fontSize: 8, color: '#a7f3d0', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Có mặt
-                    </div>
-                  </div>
                 </div>
               </div>
             )}

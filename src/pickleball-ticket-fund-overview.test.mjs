@@ -92,6 +92,9 @@ test('overview folds next session into progress card instead of rendering a sepa
   assert.match(overviewSource, /function CompactCostCard/)
   assert.match(overviewSource, /d\.todaySession\.statusLabel/)
   assert.match(overviewSource, /Buổi #\{d\.todaySession\.number\}/)
+  assert.doesNotMatch(overviewSource, /d\.todaySession\.present/)
+  assert.doesNotMatch(overviewSource, /d\.todaySession\.total/)
+  assert.doesNotMatch(overviewSource, /Có mặt/)
 })
 
 test('overview uses calendar month sessions and current fixed members for progress and court summary', () => {
