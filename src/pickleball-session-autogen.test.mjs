@@ -110,12 +110,15 @@ test('generateMonthSessions creates scheduled sessions from the configured start
   assert.equal(sessions.at(-1).sessionNumber, 11)
 })
 
-test('store auto-generates sessions with Supabase upsert do nothing on duplicate dates', () => {
+test('store auto-generates sessions with plain Supabase insert after scheduled rows were deleted', () => {
   assert.match(storeSource, /case 'AUTO_GENERATE_SESSIONS':\s*\{/)
   assert.match(storeSource, /const scheduleWeekdays = normalizeScheduleWeekdays/)
   assert.match(storeSource, /console\.warn\('\[store\] AUTO_GENERATE_SESSIONS: missing schedule weekdays'/)
   assert.match(storeSource, /const validSessions = sessions\.filter\(session => scheduleWeekdaySet\.has\(isoWeekdayFromDate\(session\.date\)\)\)/)
-  assert.match(storeSource, /\.from\('pickle_sessions'\)[\s\S]*?\.upsert\([\s\S]*?onConflict: 'group_id,session_date'[\s\S]*?ignoreDuplicates: true/)
+  const autoGenerateBlock = storeSource.match(/case 'AUTO_GENERATE_SESSIONS':\s*\{[\s\S]*?return validSessions\s*\n\s*\}/)?.[0] || ''
+  assert.match(autoGenerateBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.insert\(rows\)/)
+  assert.doesNotMatch(autoGenerateBlock, /\.upsert\(/)
+  assert.doesNotMatch(autoGenerateBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.insert\(rows\)/)
   assert.match(storeSource, /await refresh\(\)/)
 })
 
@@ -227,9 +230,14 @@ test('settings save deletes scheduled sessions and regenerates when schedule wee
   assert.match(settingsSource, /onAction\?\.\('save', \{/)
   assert.doesNotMatch(appSource, /type === 'regenerateSessions'/)
   assert.match(appSource, /const oldMonthlyConfig = findMonthlyPickleConfig\(state, groupId, yearMonth\)/)
-  assert.match(appSource, /const savedConfig = await dispatch\(action\)/)
-  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, savedWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
-  assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/)
+  assert.match(appSource, /await dispatch\(action\)/)
+  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
+  const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+  assert.match(saveBlock, /Promise\.all\(\[/)
+  assert.match(saveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/)
+  assert.match(saveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.like\('date', `\$\{yearMonth\}%`\)/)
+  assert.match(saveBlock, /if \(deleteResult1\.error\) throw deleteResult1\.error/)
+  assert.match(saveBlock, /if \(deleteResult2\.error\) throw deleteResult2\.error/)
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'/)
   assert.match(appSource, /config: generationConfig/)
 })
@@ -243,4 +251,41 @@ test('settings save clears in-memory scheduled sessions before regenerating', ()
     saveBlock.indexOf("type: 'CLEAR_SCHEDULED_SESSIONS'") < saveBlock.indexOf("type: 'AUTO_GENERATE_SESSIONS'"),
     'clear action runs before auto-generation',
   )
+})
+
+test('scheduled session clear removes normalized primary and legacy scheduled rows', () => {
+  const start = storeSource.indexOf('function safeArray')
+  const end = storeSource.indexOf('\nfunction removeSessionGuestFromState', start)
+  assert.ok(start >= 0 && end > start, 'scheduled clear helpers are available')
+  const source = `${storeSource.slice(start, end).replace(/\bexport\s+/g, '')}\nglobalThis.removeScheduledSessionsForMonthFromState = removeScheduledSessionsForMonthFromState`
+  const context = {}
+  vm.runInNewContext(source, context)
+
+  const next = context.removeScheduledSessionsForMonthFromState({
+    _allPickle: {
+      sessions: [
+        { id: 'primary-scheduled', sourceTable: 'pickle_sessions', groupId: 'g1', sessionDate: '2026-05-06', status: 'scheduled' },
+        { id: 'legacy-scheduled', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-08', status: 'scheduled' },
+        { id: 'legacy-completed', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-10', status: 'completed' },
+        { id: 'other-month', sourceTable: 'pickle_sessions', groupId: 'g1', sessionDate: '2026-06-01', status: 'scheduled' },
+        { id: 'other-group', sourceTable: 'pickle_sessions', groupId: 'g2', sessionDate: '2026-05-01', status: 'scheduled' },
+      ],
+    },
+    pickle: {
+      sessions: [
+        { id: 'primary-scheduled', sourceTable: 'pickle_sessions', groupId: 'g1', sessionDate: '2026-05-06', status: 'scheduled' },
+        { id: 'legacy-scheduled', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-08', status: 'scheduled' },
+        { id: 'legacy-completed', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-10', status: 'completed' },
+      ],
+    },
+  }, 'g1', '2026-05')
+
+  assert.deepEqual(next._allPickle.sessions.map(session => session.id), [
+    'legacy-completed',
+    'other-month',
+    'other-group',
+  ])
+  assert.deepEqual(next.pickle.sessions.map(session => session.id), [
+    'legacy-completed',
+  ])
 })

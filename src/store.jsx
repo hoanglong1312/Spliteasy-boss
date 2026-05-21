@@ -1652,7 +1652,7 @@ export function AppProvider({ children }) {
         }))
         const { error } = await sb
           .from('pickle_sessions')
-          .upsert(rows, { onConflict: 'group_id,session_date', ignoreDuplicates: true })
+          .insert(rows)
         if (error) {
           console.error('[store] AUTO_GENERATE_SESSIONS:', error)
           throw error

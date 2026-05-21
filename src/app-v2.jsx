@@ -181,13 +181,21 @@ export default function AppV2() {
         const { token } = getStoredAuth()
         if (token) {
           const sb = createSupabase(token)
-          const { error: deleteError } = await sb
-            .from('pickle_sessions')
-            .delete()
-            .eq('group_id', groupId)
-            .eq('status', 'scheduled')
-            .like('session_date', `${yearMonth}%`)
-          if (deleteError) throw deleteError
+          const [deleteResult1, deleteResult2] = await Promise.all([
+            sb
+              .from('pickle_sessions')
+              .delete()
+              .eq('group_id', groupId)
+              .eq('status', 'scheduled')
+              .like('session_date', `${yearMonth}%`),
+            sb
+              .from('pickleball_sessions')
+              .delete()
+              .eq('group_id', groupId)
+              .like('date', `${yearMonth}%`),
+          ])
+          if (deleteResult1.error) throw deleteResult1.error
+          if (deleteResult2.error) throw deleteResult2.error
 
           await dispatch({
             type: 'CLEAR_SCHEDULED_SESSIONS',
