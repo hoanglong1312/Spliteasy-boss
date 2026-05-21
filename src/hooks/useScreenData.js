@@ -345,6 +345,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const p2pTicketBalance = memberTicketBalance(state, currentUserId)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentUserId)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
+  const ticketFund = buildTicketFundSummary(state)
   const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
 
@@ -368,6 +369,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       total: memberBalance.netBalance,
       breakdown,
     },
+    ticketFund,
     shouldAutoGenerate,
     autoGenerateRequest: shouldAutoGenerate ? {
       yearMonth: currentYearMonth,
@@ -1121,6 +1123,44 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
     { label: '📦 Phụ phát sinh', amount: monthBalance.extras },
     { label: '🎟️ Vé lẻ chưa trả', amount: Math.abs(ticketAmount) },
   ]
+}
+
+function buildTicketFundSummary(state) {
+  const rows = currentGroupMembers(state)
+    .filter(isActiveMember)
+    .map(member => {
+      const ticketNet = memberTicketBalance(state, member.id) - memberTeamFundTicketShare(state, member.id)
+      const amount = Math.round(-ticketNet)
+      return {
+        memberId: member.id,
+        name: member.displayName || member.name || 'Thành viên',
+        initial: initials(member),
+        color: member.color,
+        amount,
+        label: amount < 0 ? 'Trừ vào quỹ' : 'Nộp thêm quỹ',
+      }
+    })
+    .filter(row => row.amount !== 0)
+    .sort((a, b) => {
+      if ((a.amount < 0) !== (b.amount < 0)) return a.amount < 0 ? -1 : 1
+      if (a.amount > 0 && b.amount > 0) return b.amount - a.amount
+      return a.amount - b.amount
+    })
+
+  const tickets = currentMonthTicketsForState(state)
+  const unpaidCount = tickets.filter(ticket => ticketStatus(ticket) === 'unpaid').length
+  const teamFundCount = tickets.filter(ticket => ticketStatus(ticket) === 'team_fund').length
+  const totalDue = rows.filter(row => row.amount > 0).reduce((sum, row) => sum + row.amount, 0)
+  const totalCredit = rows.filter(row => row.amount < 0).reduce((sum, row) => sum + Math.abs(row.amount), 0)
+
+  return {
+    rows,
+    totalDue,
+    totalCredit,
+    netToFund: totalDue - totalCredit,
+    unpaidCount,
+    teamFundCount,
+  }
 }
 
 function toPickleballMemberRow(member, sessions, totalSessions) {
