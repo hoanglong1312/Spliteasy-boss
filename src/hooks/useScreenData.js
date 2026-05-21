@@ -55,7 +55,7 @@ export function useScreenData() {
         return buildGroupDetailData(group, currentUserId, members, currentUserName)
       },
       getSessionDetailData: (sessionId) => buildSessionDetailData(state, pickle, sessionId, currentUserId, members),
-      getPickleballCalendarData: () => pickleballCalendarData,
+      getPickleballCalendarData: (params) => buildPickleballCalendarData(state, params),
       getPickleballMembersData: () => buildPickleballMembersData(state),
       getMemberDetailData: (memberId) => buildMemberDetailData(state, memberId),
       getPickleballTicketsData: () => buildPickleballTicketsData(state),
@@ -470,11 +470,12 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
   }
 }
 
-function buildPickleballCalendarData(state) {
+function buildPickleballCalendarData(state, params = {}) {
   const today = new Date()
-  const currentYearMonth = monthKey(today)
+  const monthDate = calendarMonthDate(params, today)
+  const currentYearMonth = monthKey(monthDate)
   const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
-  const sessions = getStateMonthSessions(state, today)
+  const sessions = getStateMonthSessions(state, monthDate)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
   const shouldAutoGenerate = !state?._pickleRegenInProgress && sessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
   const sessionsByDay = new Map()
@@ -483,7 +484,10 @@ function buildPickleballCalendarData(state) {
     if (date) sessionsByDay.set(date.getDate(), session)
   })
   const calendarSessions = sessions.map(session => toCalendarSessionDetail(state, session, sessions, today))
-  const selectedSession = calendarSessions.find(session => session.date === dateKey(today)) || calendarSessions[0] || null
+  const isCurrentMonth = currentYearMonth === monthKey(today)
+  const selectedSession = isCurrentMonth
+    ? calendarSessions.find(session => session.date === dateKey(today)) || calendarSessions[0] || null
+    : calendarSessions[0] || null
   const casualMembers = safeArray(state?.members)
     .filter(member => String(member?.groupId || member?.group_id || '') === String(currentGroupId || ''))
     .filter(isActiveMember)
@@ -496,9 +500,9 @@ function buildPickleballCalendarData(state) {
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
-    monthLabel: formatMonthLabel(today),
-    selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : today.getDate(),
-    days: buildCalendarDays(today, sessionsByDay, state),
+    monthLabel: formatMonthLabel(monthDate),
+    selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : (isCurrentMonth ? today.getDate() : 1),
+    days: buildCalendarDays(monthDate, sessionsByDay, state),
     sessions: calendarSessions,
     selectedSession,
     shouldAutoGenerate,
@@ -509,6 +513,17 @@ function buildPickleballCalendarData(state) {
     autoGenerateKey: shouldAutoGenerate ? `${state?.currentGroupId || state?.currentGroup?.id || 'group'}:${currentYearMonth}` : '',
     casualMembers,
   }
+}
+
+function calendarMonthDate(params, fallbackDate) {
+  const source = typeof params === 'string'
+    ? params
+    : (params?.yearMonth || params?.year_month || params?.month)
+  const match = String(source || '').match(/^(\d{4})-(\d{1,2})$/)
+  if (!match) return fallbackDate
+  const [, year, month] = match
+  const date = new Date(Number(year), Number(month) - 1, 1)
+  return Number.isNaN(date.getTime()) ? fallbackDate : date
 }
 
 function buildPickleballMembersData(state) {

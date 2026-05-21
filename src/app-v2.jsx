@@ -285,6 +285,27 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'monthPrev' || type === 'monthNext') {
+      const route = stack[stack.length - 1]
+      if (route?.screen === 'pickleball-calendar') {
+        const currentYearMonth = route.params?.yearMonth || monthKey(new Date())
+        const nextYearMonth = shiftYearMonth(currentYearMonth, type === 'monthNext' ? 1 : -1)
+        const nextRoute = { screen: 'pickleball-calendar', params: { ...route.params, yearMonth: nextYearMonth } }
+        setStack((s) => s.map((item, index) => index === s.length - 1 ? nextRoute : item))
+        const groupId = state.currentGroupId || state.currentGroup?.id
+        const generationConfig = sessionGenerationConfigFromState(state, nextYearMonth)
+        if (normalizeScheduleWeekdays(generationConfig.scheduleWeekdays).length > 0) {
+          await dispatch({
+            type: 'AUTO_GENERATE_SESSIONS',
+            groupId,
+            yearMonth: nextYearMonth,
+            config: generationConfig,
+          })
+        }
+      }
+      return
+    }
+
     if (type === 'addMember') {
       const name = String(payload?.name || '').trim()
       if (!name) return null
@@ -809,8 +830,6 @@ export default function AppV2() {
       'remindAll',
       'confirmClose',
       'expandMembers',
-      'monthPrev',
-      'monthNext',
       'complete',
       'saveAll',
       'uploadPhoto',
@@ -967,7 +986,7 @@ export default function AppV2() {
     switch (route.screen) {
       case 'group-detail':        return <GroupDetail data={route.params?.groupId ? getGroupDetailData(route.params.groupId) : groupDetailData} isTreasurer={isTreasurer} onAction={handle} />
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
-      case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData()} isTreasurer={isTreasurer} onAction={handle} />
+      case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isTreasurer} onAction={handle} />
@@ -1119,6 +1138,12 @@ function isoWeekdayFromDate(value) {
 function monthKey(value) {
   const date = value instanceof Date ? value : new Date(value)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function shiftYearMonth(yearMonth, delta) {
+  const [year, month] = String(yearMonth || monthKey(new Date())).split('-').map(Number)
+  const date = new Date(year || new Date().getFullYear(), (month || 1) - 1 + delta, 1)
+  return monthKey(date)
 }
 
 function parseMoneyAmount(value) {

@@ -255,6 +255,31 @@ test('pickleball calendar maps current month session rows to day states and expo
   assert.equal(emptyData.shouldAutoGenerate, true)
 })
 
+test('pickleball calendar can view and auto-generate a requested future month', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [{ id: 'm1', groupId: 'g1', name: 'An' }],
+    pickle: {
+      sessions: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-06', scheduleWeekdays: [1, 3] }],
+    },
+    _allPickle: {
+      sessions: [],
+      configs: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-06', scheduleWeekdays: [1, 3] }],
+    },
+  }, { yearMonth: '2026-06' })
+
+  assert.equal(data.monthLabel, 'Tháng 6 · 2026')
+  assert.equal(data.days.find(day => day.date === '2026-06-01')?.n, 1)
+  assert.equal(data.shouldAutoGenerate, true)
+  assert.equal(data.autoGenerateRequest.yearMonth, '2026-06')
+  assert.equal(data.autoGenerateKey, 'g1:2026-06')
+})
+
 test('overview data triggers AUTO_GENERATE_SESSIONS when the current configured month is empty', () => {
   assert.match(dataSource, /shouldAutoGenerate/)
   assert.match(dataSource, /type: 'AUTO_GENERATE_SESSIONS'/)

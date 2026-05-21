@@ -108,6 +108,16 @@ test('AppV2 saveSettings pre-generates next-month pickleball schedule', () => {
   assert.match(settingsSaveBlock, /alert\('Đã lưu cài đặt và tạo lịch tháng sau'\)/)
 })
 
+test('AppV2 routes pickleball month navigation through calendar params and auto-generation', () => {
+  assert.match(appSource, /if \(type === 'monthPrev' \|\| type === 'monthNext'\)/)
+  assert.match(appSource, /const nextYearMonth = shiftYearMonth\(currentYearMonth, type === 'monthNext' \? 1 : -1\)/)
+  assert.match(appSource, /screen: 'pickleball-calendar'[\s\S]*params: \{ \.\.\.route\.params, yearMonth: nextYearMonth \}/)
+  assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*yearMonth: nextYearMonth[\s\S]*config: generationConfig/)
+  assert.match(appSource, /case 'pickleball-calendar': return <PickleballCalendar data=\{getPickleballCalendarData\(route\.params\)\}/)
+  assert.match(appSource, /function shiftYearMonth\(yearMonth, delta\)/)
+  assert.doesNotMatch(appSource, /'monthPrev',\s*\n\s*'monthNext',/)
+})
+
 test('Member management screens are registered in the app source', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   assert.match(memberListSource, /const \[search, setSearch\] = useState\(''\)/)
