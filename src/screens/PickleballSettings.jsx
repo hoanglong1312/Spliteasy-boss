@@ -47,13 +47,29 @@ function buildLiveNextMonthPreview(today, weekdaySet) {
   };
 }
 
+function splitTimeRange(value) {
+  const matches = String(value || '').match(/\d{1,2}:\d{2}/g) || [];
+  return [
+    normalizeTime(matches[0], '19:00'),
+    normalizeTime(matches[1], '21:00'),
+  ];
+}
+
+function normalizeTime(value, fallback) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback;
+  const hour = Math.max(0, Math.min(Number(match[1]) || 0, 23));
+  const minute = Math.max(0, Math.min(Number(match[2]) || 0, 59));
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 export default function PickleballSettings({ data, onAction }) {
   const d = data || DEMO;
   const [weekdays, setWeekdays]   = useState(new Set(d.weekdays));
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
   const [ticketPrice, setTicketPrice] = useState(d.ticketPrice || DEFAULT_TICKET_PRICE);
-  const [timeRange, setTimeRange] = useState(d.timeRange || '19:00 – 21:00');
+  const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(d.timeRange));
   const [startDate, setStartDate] = useState(d.startDate || '');
 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
@@ -67,9 +83,15 @@ export default function PickleballSettings({ data, onAction }) {
     setAutoGen(d.autoGenerate);
     setCourtFee(d.courtFeeTotal);
     setTicketPrice(d.ticketPrice || DEFAULT_TICKET_PRICE);
-    setTimeRange(d.timeRange || '19:00 – 21:00');
+    setTimeParts(splitTimeRange(d.timeRange));
     setStartDate(d.startDate || '');
   }, [data]);
+
+  const timeInputStyle = {
+    width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 10, padding: '10px 8px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+    fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
+  };
 
   return (
     <div style={{
@@ -164,15 +186,21 @@ export default function PickleballSettings({ data, onAction }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
             <div>
               <FieldLabel>Giờ chơi</FieldLabel>
-              <input
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                style={{
-                  width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                  borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
-                  fontFamily: 'inherit', boxSizing: 'border-box',
-                }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 5 }}>
+                <input
+                  type="time"
+                  value={timeStart}
+                  onChange={(e) => setTimeParts([e.target.value, timeEnd])}
+                  style={timeInputStyle}
+                />
+                <span style={{ color: colors.textMuted, fontSize: 12, fontWeight: 700 }}>–</span>
+                <input
+                  type="time"
+                  value={timeEnd}
+                  onChange={(e) => setTimeParts([timeStart, e.target.value])}
+                  style={timeInputStyle}
+                />
+              </div>
             </div>
             <div>
               <FieldLabel>Ngày bắt đầu</FieldLabel>
@@ -242,7 +270,7 @@ export default function PickleballSettings({ data, onAction }) {
             autoGen,
             currentYearMonth: d.currentYearMonth,
             startDate,
-            scheduleTime: timeRange,
+            scheduleTime: `${timeStart} – ${timeEnd}`,
             ticketPrice,
           })}>💾 Lưu cài đặt</Button>
           </div>
