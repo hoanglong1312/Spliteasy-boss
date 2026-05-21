@@ -473,6 +473,7 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
 function buildPickleballCalendarData(state) {
   const today = new Date()
   const currentYearMonth = monthKey(today)
+  const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
   const sessions = getStateMonthSessions(state, today)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
   const shouldAutoGenerate = sessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
@@ -483,6 +484,15 @@ function buildPickleballCalendarData(state) {
   })
   const calendarSessions = sessions.map(session => toCalendarSessionDetail(state, session, sessions, today))
   const selectedSession = calendarSessions.find(session => session.date === dateKey(today)) || calendarSessions[0] || null
+  const casualMembers = safeArray(state?.members)
+    .filter(member => String(member?.groupId || member?.group_id || '') === String(currentGroupId || ''))
+    .filter(isActiveMember)
+    .filter(member => memberType(member) === 'casual')
+    .map(member => ({
+      id: member.id,
+      name: member.displayName || member.name || '',
+    }))
+    .filter(member => member.id && member.name)
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
@@ -497,6 +507,7 @@ function buildPickleballCalendarData(state) {
       config: autoGenerateConfig,
     } : null,
     autoGenerateKey: shouldAutoGenerate ? `${state?.currentGroupId || state?.currentGroup?.id || 'group'}:${currentYearMonth}` : '',
+    casualMembers,
   }
 }
 

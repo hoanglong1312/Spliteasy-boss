@@ -217,6 +217,44 @@ test('calendar attendance list includes absent casual members alongside fixed me
   assert.equal(data.selectedSession.attendance.total, 3)
 })
 
+test('calendar data exposes active casual members for guest quick-select', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Binh', memberType: 'casual' },
+      { id: 'm3', groupId: 'g1', name: 'Chi', memberType: 'casual', isActive: false },
+      { id: 'm4', groupId: 'g2', name: 'Dung', memberType: 'casual' },
+    ],
+    pickle: { sessions: [], monthlyConfigs: [] },
+    _allPickle: { sessions: [], sessionItems: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.deepEqual(JSON.parse(JSON.stringify(data.casualMembers)), [
+    { id: 'm2', name: 'Binh' },
+  ])
+})
+
+test('calendar guest form can select existing casual members', () => {
+  assert.match(calendarSource, /casualMembers=\{d\.casualMembers \|\| \[\]\}/)
+  assert.match(calendarSource, /function SessionDetailPanel\(\{ session, casualMembers = \[\], isTreasurer, onAction \}\)/)
+  assert.match(calendarSource, /casualMembers\.map\(member => \(/)
+  assert.match(calendarSource, /setGuestName\(member\.name\)/)
+  assert.match(calendarSource, /Tên khách mới hoặc vãng lai/)
+})
+
+test('addGuest syncs new guest names into casual members', () => {
+  assert.match(appSource, /const existingMember = await findCasualMemberByName\(sb, groupId, guestName\)/)
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.select\('id'\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('member_type', 'casual'\)[\s\S]*?\.ilike\('name', name\)[\s\S]*?\.maybeSingle\(\)/)
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.insert\(\{[\s\S]*?group_id: groupId[\s\S]*?name: guestName[\s\S]*?member_type: 'casual'[\s\S]*?is_active: true/)
+  assert.match(appSource, /await dispatch\(\{ type: 'REFRESH' \}\)/)
+})
+
 test('settings maps ISO schedule weekdays from config to Vietnamese weekday labels', () => {
   const { buildPickleballSettingsData } = loadScreenDataBuilders()
   const state = {

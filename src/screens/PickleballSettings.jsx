@@ -20,7 +20,6 @@ export default function PickleballSettings({ data, onAction }) {
   const perSession = Math.round(courtFee / d.sessionsCount);
   const activeMemberCount = Math.max(d.memberCount || 1, 1);
   const perPerson  = Math.round(perSession / activeMemberCount);
-  const canManageSchedule = d.currentRole === 'treasurer';
 
   useEffect(() => {
     setWeekdays(new Set(d.weekdays));
@@ -30,11 +29,6 @@ export default function PickleballSettings({ data, onAction }) {
     setTimeRange(d.timeRange || '19:00 – 21:00');
     setStartDate(d.startDate || '');
   }, [data]);
-
-  async function regenerateSessions() {
-    if (!window.confirm('Tạo lại sẽ xoá các buổi chưa có dữ liệu. Tiếp tục?')) return;
-    await onAction?.('regenerateSessions', { yearMonth: d.currentYearMonth });
-  }
 
   return (
     <div style={{
@@ -203,14 +197,6 @@ export default function PickleballSettings({ data, onAction }) {
             <Toggle on={autoGen} onChange={setAutoGen} />
           </div>
 
-          {canManageSchedule && (
-            <Button block variant="muted" style={{
-              marginTop: 14,
-              background: 'linear-gradient(135deg, rgba(52,211,153,0.18), rgba(52,211,153,0.08))',
-              color: '#a7f3d0',
-              border: '1px solid rgba(52,211,153,0.35)',
-            }} onClick={regenerateSessions}>🔄 Tạo lại lịch tháng này</Button>
-          )}
           <Button block variant="brand" style={{ marginTop: 8 }} onClick={() => onAction?.('save', {
             courtFee,
             weekdays: Array.from(weekdays),

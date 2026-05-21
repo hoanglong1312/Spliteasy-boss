@@ -21,7 +21,8 @@ test('settings removes batch entry and member toggles, keeps schedule and ticket
   assert.match(settingsSource, /const \[ticketPrice, setTicketPrice\]/)
   assert.match(settingsSource, /ticketPrice,/)
   assert.match(settingsSource, /Lịch tự động/)
-  assert.match(settingsSource, /Tạo lại lịch tháng này/)
+  assert.doesNotMatch(settingsSource, /Tạo lại lịch tháng này/)
+  assert.doesNotMatch(appSource, /type === 'regenerateSessions'/)
 })
 
 test('overview shows treasurer-only compact batch water entry action', () => {

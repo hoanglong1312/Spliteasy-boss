@@ -221,13 +221,15 @@ test('overview data triggers AUTO_GENERATE_SESSIONS when the current configured 
   assert.match(dataSource, /yearMonth: currentYearMonth/)
 })
 
-test('treasurer settings exposes regenerate sessions action and app deletes empty scheduled sessions before regenerating', () => {
-  assert.match(settingsSource, /Tạo lại lịch tháng này/)
-  assert.match(settingsSource, /window\.confirm\('Tạo lại sẽ xoá các buổi chưa có dữ liệu\. Tiếp tục\?'\)/)
-  assert.match(settingsSource, /onAction\?\.\('regenerateSessions', \{ yearMonth: d\.currentYearMonth \}\)/)
-  assert.match(appSource, /type === 'regenerateSessions'/)
+test('settings save deletes scheduled sessions and regenerates when schedule weekdays change', () => {
+  assert.doesNotMatch(settingsSource, /Tạo lại lịch tháng này/)
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('regenerateSessions'/)
+  assert.match(settingsSource, /onAction\?\.\('save', \{/)
+  assert.doesNotMatch(appSource, /type === 'regenerateSessions'/)
+  assert.match(appSource, /const oldMonthlyConfig = findMonthlyPickleConfig\(state, groupId, yearMonth\)/)
+  assert.match(appSource, /const savedConfig = await dispatch\(action\)/)
+  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, savedWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
   assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/)
-  assert.match(appSource, /const config = sessionGenerationConfigFromState\(state, yearMonth\)/)
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'/)
-  assert.match(appSource, /config,/)
+  assert.match(appSource, /config: generationConfig/)
 })

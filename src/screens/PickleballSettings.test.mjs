@@ -28,7 +28,6 @@ test('PickleballSettings no longer renders current-month member participation to
 
 test('PickleballSettings no longer owns add/delete member management', () => {
   assert.match(dataSource, /currentRole/);
-  assert.match(settingsSource, /d\.currentRole === 'treasurer'/);
   assert.doesNotMatch(settingsSource, /showAddMemberForm/);
   assert.doesNotMatch(settingsSource, /newMemberName/);
   assert.doesNotMatch(settingsSource, /onAction\?\.\('addMember'/);
@@ -52,4 +51,17 @@ test('PickleballSettings edits schedule time and start date before saving', () =
   assert.match(settingsSource, /setStartDate\(parts\.length === 3 \? `\$\{parts\[2\]\}\/\$\{parts\[1\]\}\/\$\{parts\[0\]\}` : e\.target\.value\)/);
   assert.match(settingsSource, /startDate,\s*\n\s*scheduleTime: timeRange,/);
   assert.doesNotMatch(settingsSource, /startDate: d\.startDate/);
+});
+
+test('PickleballSettings relies on save to regenerate schedules', () => {
+  assert.doesNotMatch(settingsSource, /function regenerateSessions/);
+  assert.doesNotMatch(settingsSource, /regenerateSessions/);
+  assert.doesNotMatch(settingsSource, /Tạo lại lịch tháng này/);
+  assert.match(settingsSource, /onAction\?\.\('save', \{/);
+
+  assert.doesNotMatch(appSource, /type === 'regenerateSessions'/);
+  assert.match(appSource, /const savedConfig = await dispatch\(action\)/);
+  assert.match(appSource, /shouldRegenerateSchedule/);
+  assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/);
+  assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*?yearMonth[\s\S]*?config: generationConfig/);
 });

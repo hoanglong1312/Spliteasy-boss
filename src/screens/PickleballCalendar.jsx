@@ -99,7 +99,12 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
 
         {/* Detail panel */}
         {selectedSession && (
-          <SessionDetailPanel session={selectedSession} isTreasurer={isTreasurer} onAction={onAction} />
+          <SessionDetailPanel
+            session={selectedSession}
+            casualMembers={d.casualMembers || []}
+            isTreasurer={isTreasurer}
+            onAction={onAction}
+          />
         )}
       </Screen>
 
@@ -150,7 +155,7 @@ function CalendarCell({ day, selected, onClick }) {
   );
 }
 
-function SessionDetailPanel({ session, isTreasurer, onAction }) {
+function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction }) {
   const costRows = Array.isArray(session.costRows)
     ? session.costRows
     : Array.isArray(session.costs) ? session.costs : [];
@@ -233,10 +238,37 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
           gap: 8,
           marginTop: 10,
         }}>
+          {casualMembers.length > 0 && (
+            <div style={{
+              gridColumn: '1 / -1',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 6,
+            }}>
+              {casualMembers.map(member => (
+                <button
+                  key={member.id}
+                  type="button"
+                  onClick={() => setGuestName(member.name)}
+                  style={{
+                    border: `1px solid ${colors.borderSubtle}`,
+                    borderRadius: 8,
+                    background: colors.cardSurface,
+                    color: colors.textSecondary,
+                    padding: '6px 8px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >{member.name}</button>
+              ))}
+            </div>
+          )}
           <Input
             value={guestName}
             onChange={(event) => setGuestName(event.target.value)}
-            placeholder="Tên khách mới"
+            placeholder="Tên khách mới hoặc vãng lai"
             inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 700 }}
             style={{ marginTop: 0 }}
           />

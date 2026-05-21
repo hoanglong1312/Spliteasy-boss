@@ -151,10 +151,21 @@ export default function AppV2() {
     }
 
     if (type === 'saveSettings' || (type === 'save' && stack[stack.length - 1]?.screen === 'pickleball-settings')) {
+      const groupId = state.currentGroupId
+      const yearMonth = payload?.currentYearMonth || monthKey(new Date())
+      const oldMonthlyConfig = findMonthlyPickleConfig(state, groupId, yearMonth)
+      const oldWeekdays = normalizeScheduleWeekdays(oldMonthlyConfig.scheduleWeekdays ?? oldMonthlyConfig.schedule_weekdays)
+      const existingScheduledSessions = scheduledSessionsForMonth(state, groupId, yearMonth)
+      const newWeekdays = normalizeScheduleWeekdays(payload?.weekdays)
+      const newWeekdaySet = new Set(newWeekdays)
+      const hasScheduledSessionsWithOldDays = existingScheduledSessions.some(session => {
+        const weekday = isoWeekdayFromDate(sessionDateValue(session))
+        return weekday && (newWeekdaySet.size === 0 || !newWeekdaySet.has(weekday))
+      })
       const action = {
         type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
-        groupId: state.currentGroupId,
-        yearMonth: payload?.currentYearMonth,
+        groupId,
+        yearMonth,
         courtFee: payload?.courtFee,
         ticketPrice: payload?.ticketPrice,
         scheduleWeekdays: payload?.weekdays,
@@ -164,7 +175,37 @@ export default function AppV2() {
       if ('activeMonthlyMemberIds' in (payload || {}) || 'activeMemberIds' in (payload || {})) {
         action.activeMonthlyMemberIds = payload?.activeMonthlyMemberIds ?? payload?.activeMemberIds ?? []
       }
-      await dispatch(action)
+      const savedConfig = await dispatch(action)
+      const savedWeekdays = normalizeScheduleWeekdays(
+        savedConfig?.scheduleWeekdays ?? savedConfig?.schedule_weekdays ?? action.scheduleWeekdays
+      )
+      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, savedWeekdays) || hasScheduledSessionsWithOldDays
+      if (shouldRegenerateSchedule && groupId) {
+        const { token } = getStoredAuth()
+        if (token) {
+          const sb = createSupabase(token)
+          const { error: deleteError } = await sb
+            .from('pickle_sessions')
+            .delete()
+            .eq('group_id', groupId)
+            .eq('status', 'scheduled')
+            .like('session_date', `${yearMonth}%`)
+          if (deleteError) throw deleteError
+
+          const generationConfig = {
+            ...sessionGenerationConfigFromState(state, yearMonth),
+            scheduleWeekdays: savedWeekdays,
+            scheduleTime: action.scheduleTime,
+            startDate: action.scheduleStartDay,
+          }
+          await dispatch({
+            type: 'AUTO_GENERATE_SESSIONS',
+            groupId,
+            yearMonth,
+            config: generationConfig,
+          })
+        }
+      }
       alert('Đã lưu cài đặt tháng này')
       setStack((s) => s.slice(0, -1))
       return
@@ -177,31 +218,6 @@ export default function AppV2() {
         yearMonth: payload?.yearMonth,
         config: payload?.config,
       })
-      return
-    }
-
-    if (type === 'regenerateSessions') {
-      const yearMonth = payload?.yearMonth || monthKey(new Date())
-      const groupId = state.currentGroupId
-      const { token } = getStoredAuth()
-      if (!token || !groupId) return
-      const sb = createSupabase(token)
-      const config = sessionGenerationConfigFromState(state, yearMonth)
-      const { error: deleteError } = await sb
-        .from('pickle_sessions')
-        .delete()
-        .eq('group_id', groupId)
-        .eq('status', 'scheduled')
-        .like('session_date', `${yearMonth}%`)
-      if (deleteError) throw deleteError
-
-      await dispatch({
-        type: 'AUTO_GENERATE_SESSIONS',
-        groupId,
-        yearMonth,
-        config,
-      })
-      alert('Đã tạo lại lịch tháng này')
       return
     }
 
@@ -646,6 +662,8 @@ export default function AppV2() {
       const sessionId = payload?.sessionId ?? payload?.session_id ?? (typeof payload === 'string' ? payload : null)
       const guestName = String(payload?.guestName ?? payload?.guest_name ?? '').trim()
       if (!sessionId || !guestName) return
+      const groupId = state.currentGroupId
+      if (!groupId) return
       const { token } = getStoredAuth()
       if (!token) return
       const sb = createSupabase(token)
@@ -658,6 +676,23 @@ export default function AppV2() {
           attended: true,
         })
       if (error) throw error
+      const existingMember = await findCasualMemberByName(sb, groupId, guestName)
+      if (!existingMember) {
+        const parts = memberNameParts(guestName)
+        const { error: memberError } = await sb
+          .from('members')
+          .insert({
+            group_id: groupId,
+            name: guestName,
+            short: parts.short,
+            initials: parts.initials,
+            color: '#574EFA',
+            role: 'member',
+            member_type: 'casual',
+            is_active: true,
+          })
+        if (memberError) throw memberError
+      }
       await dispatch({ type: 'REFRESH' })
       return
     }
@@ -911,6 +946,96 @@ function sessionGenerationConfigFromState(state, yearMonth) {
   }
 }
 
+function findMonthlyPickleConfig(state, groupId, yearMonth) {
+  return [
+    ...safeArray(state?._allPickle?.monthlyConfigs),
+    ...safeArray(state?.pickle?.monthlyConfigs),
+    ...safeArray(state?.pickleballMonthlyConfigs),
+  ].find(row => (
+    String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
+    String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
+  )) || {}
+}
+
+function scheduledSessionsForMonth(state, groupId, yearMonth) {
+  const seen = new Set()
+  return [
+    ...safeArray(state?._allPickle?.sessions),
+    ...safeArray(state?.pickle?.sessions),
+    ...safeArray(state?.pickle?.upcoming),
+  ].filter(session => {
+    const id = String(session?.id || `${sessionDateValue(session)}:${session?.court || ''}`)
+    if (seen.has(id)) return false
+    seen.add(id)
+    const sessionGroupId = session?.groupId || session?.group_id
+    return (
+      String(session?.status || '').toLowerCase() === 'scheduled' &&
+      String(sessionGroupId || '') === String(groupId || '') &&
+      String(sessionDateValue(session) || '').startsWith(`${yearMonth}-`)
+    )
+  })
+}
+
+function sessionDateValue(session) {
+  return session?.sessionDate || session?.session_date || session?.date
+}
+
+function normalizeScheduleWeekdays(value) {
+  const list = Array.isArray(value) ? value : String(value || '').split(/[,\s]+/)
+  const map = {
+    monday: 1,
+    mon: 1,
+    t2: 1,
+    '2': 1,
+    tuesday: 2,
+    tue: 2,
+    t3: 2,
+    '3': 2,
+    wednesday: 3,
+    wed: 3,
+    t4: 3,
+    '4': 3,
+    thursday: 4,
+    thu: 4,
+    t5: 4,
+    '5': 4,
+    friday: 5,
+    fri: 5,
+    t6: 5,
+    '6': 5,
+    saturday: 6,
+    sat: 6,
+    t7: 6,
+    '7': 6,
+    sunday: 7,
+    sun: 7,
+    cn: 7,
+    '0': 7,
+  }
+  return [...new Set(list
+    .map(item => {
+      if (typeof item === 'number' && Number.isInteger(item)) return item === 0 ? 7 : item
+      return map[String(item || '').trim().toLowerCase()]
+    })
+    .filter(day => Number.isInteger(day) && day >= 1 && day <= 7))]
+    .sort((a, b) => a - b)
+}
+
+function sameScheduleWeekdays(left, right) {
+  const a = normalizeScheduleWeekdays(left)
+  const b = normalizeScheduleWeekdays(right)
+  return a.length === b.length && a.every((day, index) => day === b[index])
+}
+
+function isoWeekdayFromDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (!match) return null
+  const [, year, month, day] = match
+  const date = new Date(Number(year), Number(month) - 1, Number(day))
+  if (Number.isNaN(date.getTime())) return null
+  return date.getDay() === 0 ? 7 : date.getDay()
+}
+
 function monthKey(value) {
   const date = value instanceof Date ? value : new Date(value)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
@@ -922,6 +1047,27 @@ function parseMoneyAmount(value) {
 
 function safeArray(value) {
   return Array.isArray(value) ? value : []
+}
+
+function memberNameParts(name) {
+  const trimmed = String(name || '').trim()
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  return {
+    short: words.at(-1) || trimmed,
+    initials: words.map(word => word[0]).join('').slice(0, 2).toUpperCase() || '?',
+  }
+}
+
+async function findCasualMemberByName(sb, groupId, name) {
+  const { data, error } = await sb
+    .from('members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('member_type', 'casual')
+    .ilike('name', name)
+    .maybeSingle()
+  if (error) throw error
+  return data
 }
 
 function normalizeTicketDate(value) {
