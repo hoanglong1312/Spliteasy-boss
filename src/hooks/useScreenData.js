@@ -114,7 +114,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle) {
   const totalBalance = safeGroups.reduce((sum, group) => (
     sum + groupNetForMember(group, currentUserId, members, state?.currentUserName)
   ), 0)
-  const monthSessions = getMonthSessions(pickle, today)
+  const monthSessions = getStateMonthSessions(state, today)
   const summary = pickleSummary(pickle || {})
   const session = findNearestOpenSession(pickle, today)
 
@@ -332,16 +332,16 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const currentMonthConfig = safeArray(pickle?.monthlyConfigs).find(
     c => c.yearMonth === currentYearMonth
   )
-  const monthSessions = getMonthSessions(pickle, today)
+  const monthSessions = getStateMonthSessions(state, today)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
   const shouldAutoGenerate = !state?._pickleRegenInProgress && monthSessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
-  const attended = monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length
+  const completedSessions = monthSessions.filter(s => isDoneStatus(s?.status)).length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
   const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0)
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
-  const monthlyActiveMemberIds = safeArray(currentMonthConfig?.activeMemberIds)
-  const activeMemberIds = monthlyActiveMemberIds.length > 0 ? monthlyActiveMemberIds : safeArray(pickle?.fixedMembers)
+  const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
+  const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
   const p2pTicketBalance = memberTicketBalance(state, currentUserId)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentUserId)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
@@ -355,7 +355,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     memberCount: activeMemberIds.length,
     todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members) : null,
     progress: {
-      attended,
+      attended: completedSessions,
       total: monthSessions.length || 1,
       actualTotal: monthSessions.length,
     },
@@ -364,6 +364,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       courtSub: `${activeMemberIds.length} thành viên cố định`,
       water,
       waterSub: `${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi đã ghi`,
+      ticketFund: ticketFund.teamFundTotal,
+      ticketFundSub: `${ticketFund.teamFundCount} lượt quỹ trả hộ`,
     },
     yourBalance: {
       total: memberBalance.netBalance,
@@ -1150,6 +1152,9 @@ function buildTicketFundSummary(state) {
   const tickets = currentMonthTicketsForState(state)
   const unpaidCount = tickets.filter(ticket => ticketStatus(ticket) === 'unpaid').length
   const teamFundCount = tickets.filter(ticket => ticketStatus(ticket) === 'team_fund').length
+  const teamFundTotal = tickets
+    .filter(ticket => ticketStatus(ticket) === 'team_fund')
+    .reduce((sum, ticket) => sum + ticketTotalAmount(ticket), 0)
   const totalDue = rows.filter(row => row.amount > 0).reduce((sum, row) => sum + row.amount, 0)
   const totalCredit = rows.filter(row => row.amount < 0).reduce((sum, row) => sum + Math.abs(row.amount), 0)
 
@@ -1160,6 +1165,7 @@ function buildTicketFundSummary(state) {
     netToFund: totalDue - totalCredit,
     unpaidCount,
     teamFundCount,
+    teamFundTotal,
   }
 }
 

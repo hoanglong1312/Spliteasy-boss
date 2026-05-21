@@ -181,6 +181,17 @@ export default function AppV2() {
       if ('activeMonthlyMemberIds' in (payload || {}) || 'activeMemberIds' in (payload || {})) {
         action.activeMonthlyMemberIds = payload?.activeMonthlyMemberIds ?? payload?.activeMemberIds ?? []
       }
+      const nextClubName = String(payload?.clubName || '').trim()
+      if (nextClubName && nextClubName !== state.currentGroup?.name) {
+        await dispatch({
+          type: 'EDIT_GROUP',
+          group: {
+            ...state.currentGroup,
+            id: groupId,
+            name: nextClubName,
+          },
+        })
+      }
       await dispatch(action)
       const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || hasScheduledSessionsWithOldDays
       if (shouldRegenerateSchedule && groupId && sb) {

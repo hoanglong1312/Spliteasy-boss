@@ -57,10 +57,17 @@ test('calendar treats casual members as attendance chips and adds only brand new
 
 test('calendar guest attendance chip uses a readable horizontal pill', () => {
   assert.match(calendarSource, /if \(a\.kind === 'guest'\) \{/)
-  assert.match(calendarSource, /flex: '1 1 132px'/)
-  assert.match(calendarSource, /maxWidth: 180/)
+  assert.match(calendarSource, /width: ATTENDANCE_CHIP_SIZE/)
+  assert.match(calendarSource, /background: 'rgba\(96,165,250,0\.22\)'/)
   assert.match(calendarSource, /aria-label=\{`Xóa \$\{a\.name\}`\}/)
-  assert.match(calendarSource, /Khách/)
+  assert.match(calendarSource, /position: 'absolute'/)
+})
+
+test('completed pickleball sessions lock attendance and cost editing', () => {
+  assert.match(calendarSource, /const canManageSession = Boolean\(isTreasurer && !session\.isCompleted\)/)
+  assert.match(calendarSource, /onToggle=\{canManageSession && a\.kind !== 'guest'/)
+  assert.match(calendarSource, /isTreasurer=\{canManageSession\}/)
+  assert.match(calendarSource, /canEditCosts = canManageSession/)
 })
 
 test('member management confirms role changes and edits full bank information', () => {
@@ -91,6 +98,13 @@ test('store, app handler, and screen data support ticket price and full bank col
   assert.match(dataSource, /monthlyConfig\?\.ticketPrice/)
   assert.match(dataSource, /bankName: member\?\.bankName/)
   assert.match(dataSource, /bankAccountName: member\?\.bankAccountName/)
+})
+
+test('pickleball settings can rename the club without losing schedule settings', () => {
+  assert.match(settingsSource, /const \[clubName, setClubName\]/)
+  assert.match(settingsSource, /<Input label="Tên CLB"/)
+  assert.match(settingsSource, /clubName,/)
+  assert.match(appSource, /type: 'EDIT_GROUP'/)
 })
 
 test('ticket add form starts empty and calculates total from configured per-person price', () => {

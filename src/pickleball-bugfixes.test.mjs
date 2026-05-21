@@ -434,8 +434,8 @@ test('app-v2 handles markAttendance and validates addTicket payloads before inse
 })
 
 test('calendar guest chips expose treasurer-only delete without changing member toggle behavior', () => {
-  assert.match(calendarSource, /onToggle=\{isTreasurer && a\.kind !== 'guest' \? \(\) => onAction\?\.\('markAttendance'/)
-  assert.match(calendarSource, /isTreasurer=\{isTreasurer\}/)
+  assert.match(calendarSource, /onToggle=\{canManageSession && a\.kind !== 'guest' \? \(\) => onAction\?\.\('markAttendance'/)
+  assert.match(calendarSource, /isTreasurer=\{canManageSession\}/)
   assert.match(calendarSource, /sessionId=\{session\.id\}/)
   assert.match(calendarSource, /function AttendChip\(\{ a, onToggle, isTreasurer, sessionId, onAction \}\)/)
   assert.match(calendarSource, /if \(a\.kind === 'guest'\) \{[\s\S]*?\{isTreasurer && \(/)

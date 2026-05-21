@@ -71,6 +71,7 @@ export default function PickleballSettings({ data, onAction }) {
   const [ticketPrice, setTicketPrice] = useState(d.ticketPrice || DEFAULT_TICKET_PRICE);
   const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(d.timeRange));
   const [startDate, setStartDate] = useState(d.startDate || '');
+  const [clubName, setClubName] = useState(d.clubName || '');
 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
   const liveNextMonthPreview = buildLiveNextMonthPreview(new Date(), weekdays);
@@ -85,6 +86,7 @@ export default function PickleballSettings({ data, onAction }) {
     setTicketPrice(d.ticketPrice || DEFAULT_TICKET_PRICE);
     setTimeParts(splitTimeRange(d.timeRange));
     setStartDate(d.startDate || '');
+    setClubName(d.clubName || '');
   }, [data]);
 
   const timeInputStyle = {
@@ -133,6 +135,11 @@ export default function PickleballSettings({ data, onAction }) {
 
           <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', paddingBottom: 24 }}>
           {/* Court fee */}
+          <Input label="Tên CLB"
+            value={clubName}
+            onChange={(e) => setClubName(e.target.value)}
+            inputStyle={{ fontWeight: 700, fontSize: 15 }}
+          />
           <Input label="Tiền sân tháng" suffix="đ"
             value={courtFee.toLocaleString('vi-VN')}
             onChange={(e) => setCourtFee(Number(e.target.value.replace(/\D/g, '')) || 0)}
@@ -272,6 +279,7 @@ export default function PickleballSettings({ data, onAction }) {
             startDate,
             scheduleTime: `${timeStart} – ${timeEnd}`,
             ticketPrice,
+            clubName,
           })}>💾 Lưu cài đặt</Button>
           </div>
         </div>

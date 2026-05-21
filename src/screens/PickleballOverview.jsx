@@ -104,6 +104,18 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               </div>
               <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{d.monthCosts.waterSub}</div>
             </Card>
+            <Card style={{ padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 18 }}>🎟️</span>
+                <div style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
+                  Vé lẻ quỹ
+                </div>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 8, ...type.mono }}>
+                {formatVND(d.monthCosts.ticketFund || 0)}
+              </div>
+              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{d.monthCosts.ticketFundSub || '0 lượt quỹ trả hộ'}</div>
+            </Card>
           </div>
         </div>
 
