@@ -581,7 +581,7 @@ export default function AppV2() {
           session_id: session.sessionId || session.id,
           name: 'Nước',
           amount: parseMoneyAmount(session.waterAmount ?? session.water),
-          member_ids: null,
+          member_ids: [],
           created_by: state.currentUserId || null,
         }))
       if (rows.length === 0) return
