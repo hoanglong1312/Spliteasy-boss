@@ -342,7 +342,6 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
-  const leaders = buildAttendanceLeaders(monthSessions, currentFixedMembers)
   const p2pTicketBalance = memberTicketBalance(state, currentUserId)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentUserId)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
@@ -359,7 +358,6 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       attended: completedSessions,
       total: monthSessions.length || 1,
       actualTotal: monthSessions.length,
-      leaders,
     },
     monthCosts: {
       court: courtFee,
@@ -1127,23 +1125,6 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
     { label: '📦 Phụ phát sinh', amount: monthBalance.extras },
     { label: '🎟️ Vé lẻ chưa trả', amount: Math.abs(ticketAmount) },
   ]
-}
-
-function buildAttendanceLeaders(sessions, members) {
-  const playedSessions = safeArray(sessions).filter(session => isDoneStatus(session?.status))
-  return safeArray(members)
-    .map(member => ({
-      id: member.id || member.member_id,
-      name: firstName(member.displayName || member.name),
-      initial: initials(member),
-      attended: playedSessions.filter(session => (
-        effectiveSessionMemberIds(session, members).some(id => String(id) === String(member.id || member.member_id))
-      )).length,
-    }))
-    .filter(row => row.id)
-    .sort((a, b) => b.attended - a.attended || a.name.localeCompare(b.name, 'vi'))
-    .slice(0, 3)
-    .map((row, index) => ({ ...row, rank: index + 1 }))
 }
 
 function buildTicketFundSummary(state) {
@@ -2313,6 +2294,7 @@ function toOverviewSessionCard(session, pickle, members) {
   return {
     id: session.id,
     number: sessionNumber(session, uniqueSessions([...safeArray(pickle?.sessions), ...safeArray(pickle?.upcoming)])),
+    statusLabel: isToday(sessionDate(session)) ? 'Hôm nay' : 'Buổi tới',
     timeRange: sessionTimeRange(session),
     dateLabel: formatDayMonth(sessionDate(session)),
     venue: sessionCourt(session),

@@ -161,6 +161,9 @@ export default function AppV2() {
       const sb = token ? createSupabase(token) : null
       const oldMonthlyConfig = findMonthlyPickleConfig(state, groupId, yearMonth)
       const oldWeekdays = normalizeScheduleWeekdays(oldMonthlyConfig.scheduleWeekdays ?? oldMonthlyConfig.schedule_weekdays)
+      const oldScheduleTime = normalizeScheduleTimeForCompare(oldMonthlyConfig.scheduleTime ?? oldMonthlyConfig.schedule_time)
+      const newScheduleTime = normalizeScheduleTimeForCompare(payload?.scheduleTime)
+      const scheduleTimeChanged = oldScheduleTime !== newScheduleTime
       const existingScheduledSessions = scheduledSessionsForMonth(state, groupId, yearMonth)
       const newWeekdays = normalizeScheduleWeekdays(payload?.weekdays)
       const newWeekdaySet = new Set(newWeekdays)
@@ -193,7 +196,7 @@ export default function AppV2() {
         })
       }
       await dispatch(action)
-      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || hasScheduledSessionsWithOldDays
+      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || scheduleTimeChanged || hasScheduledSessionsWithOldDays
       if (shouldRegenerateSchedule && groupId && sb) {
         await dispatch({ type: 'SET_PICKLE_REGEN', value: true })
         try {
@@ -1289,6 +1292,17 @@ function sameScheduleWeekdays(left, right) {
   const a = normalizeScheduleWeekdays(left)
   const b = normalizeScheduleWeekdays(right)
   return a.length === b.length && a.every((day, index) => day === b[index])
+}
+
+function normalizeScheduleTimeForCompare(value) {
+  const parts = String(value || '').match(/\d{1,2}:\d{2}/g) || []
+  return parts
+    .slice(0, 2)
+    .map(part => {
+      const [hour, minute] = part.split(':').map(Number)
+      return `${String(Math.max(0, Math.min(hour || 0, 23))).padStart(2, '0')}:${String(Math.max(0, Math.min(minute || 0, 59))).padStart(2, '0')}`
+    })
+    .join('-')
 }
 
 function isoWeekdayFromDate(value) {

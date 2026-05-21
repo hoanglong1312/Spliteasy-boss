@@ -89,9 +89,18 @@ test('AppV2 regenerates pickleball schedule from payload weekdays instead of dis
   const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?setStack\(\(s\) => s\.slice\(0, -1\)\)/)?.[0] || ''
 
   assert.match(settingsSaveBlock, /const newWeekdays = normalizeScheduleWeekdays\(payload\?\.weekdays\)/)
-  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
+  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| hasScheduledSessionsWithOldDays/)
   assert.match(settingsSaveBlock, /scheduleWeekdays: newWeekdays/)
   assert.doesNotMatch(settingsSaveBlock, /savedWeekdays/)
+})
+
+test('AppV2 regenerates scheduled pickleball sessions when schedule time changes', () => {
+  const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?setStack\(\(s\) => s\.slice\(0, -1\)\)/)?.[0] || ''
+
+  assert.match(settingsSaveBlock, /const oldScheduleTime = normalizeScheduleTimeForCompare/)
+  assert.match(settingsSaveBlock, /const newScheduleTime = normalizeScheduleTimeForCompare\(payload\?\.scheduleTime\)/)
+  assert.match(settingsSaveBlock, /const scheduleTimeChanged = oldScheduleTime !== newScheduleTime/)
+  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| hasScheduledSessionsWithOldDays/)
 })
 
 test('AppV2 saveSettings pre-generates next-month pickleball schedule', () => {

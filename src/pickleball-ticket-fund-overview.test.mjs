@@ -85,6 +85,15 @@ test('overview renders ticket-fund summary card', () => {
   assert.match(overviewSource, /Nộp thêm quỹ/)
 })
 
+test('overview folds next session into progress card instead of rendering a separate hero', () => {
+  assert.doesNotMatch(overviewSource, /<Hero variant="emerald">/)
+  assert.doesNotMatch(overviewSource, /d\.progress\.leaders/)
+  assert.match(overviewSource, /gridTemplateColumns: '1\.35fr 0\.65fr'/)
+  assert.match(overviewSource, /function CompactCostCard/)
+  assert.match(overviewSource, /d\.todaySession\.statusLabel/)
+  assert.match(overviewSource, /Buổi #\{d\.todaySession\.number\}/)
+})
+
 test('overview uses calendar month sessions and current fixed members for progress and court summary', () => {
   const { buildPickleballOverviewData } = loadScreenDataBuilders()
   const state = {
@@ -120,7 +129,7 @@ test('overview uses calendar month sessions and current fixed members for progre
   assert.equal(data.monthCosts.ticketFund, 120000)
 })
 
-test('overview progress exposes top attendance leaders', () => {
+test('overview exposes a dynamic next-session label for the progress card', () => {
   const { buildPickleballOverviewData } = loadScreenDataBuilders()
   const state = {
     currentUserId: 'a',
@@ -135,19 +144,18 @@ test('overview progress exposes top attendance leaders', () => {
     pickle: {
       monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 0 }],
       sessions: [
-        { id: 's1', groupId: 'g1', date: '2026-05-01', status: 'completed', attendanceRecords: [{ memberId: 'd', status: 'absent' }] },
-        { id: 's2', groupId: 'g1', date: '2026-05-08', status: 'completed', attendanceRecords: [{ memberId: 'c', status: 'absent' }, { memberId: 'd', status: 'absent' }] },
-        { id: 's2b', groupId: 'g1', date: '2026-05-12', status: 'completed', attendees: [] },
-        { id: 's3', groupId: 'g1', date: '2026-05-15', status: 'scheduled', attendees: ['a'] },
+        { id: 's1', groupId: 'g1', date: '2026-05-21', status: 'scheduled', timeRange: '19:00 – 22:00', attendees: ['a'] },
+        { id: 's2', groupId: 'g1', date: '2026-05-22', status: 'scheduled', timeRange: '19:00 – 22:00', attendees: [] },
       ],
     },
     _allPickle: { sessions: [], externalTickets: [] },
   }
 
   const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'a', state.members)
-  assert.deepEqual(data.progress.leaders.map(row => [row.rank, row.name, row.attended]), [
-    [1, 'An', 3],
-    [2, 'Bình', 3],
-    [3, 'Chi', 2],
-  ])
+  assert.equal(data.todaySession.statusLabel, 'Hôm nay')
+  assert.equal(data.todaySession.timeRange, '19:00 – 22:00')
+
+  state.pickle.sessions[0].date = '2026-05-22'
+  const nextData = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'a', state.members)
+  assert.equal(nextData.todaySession.statusLabel, 'Buổi tới')
 })

@@ -293,7 +293,7 @@ test('settings save deletes scheduled sessions and regenerates when schedule wee
   assert.doesNotMatch(appSource, /type === 'regenerateSessions'/)
   assert.match(appSource, /const oldMonthlyConfig = findMonthlyPickleConfig\(state, groupId, yearMonth\)/)
   assert.match(appSource, /await dispatch\(action\)/)
-  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
+  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| hasScheduledSessionsWithOldDays/)
   const saveBlock = extractSaveSettingsBlock()
   assert.match(saveBlock, /Promise\.all\(\[/)
   assert.match(saveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.gte\('session_date', `\$\{yearMonth\}-01`\)[\s\S]*?\.lte\('session_date', `\$\{yearMonth\}-31`\)/)

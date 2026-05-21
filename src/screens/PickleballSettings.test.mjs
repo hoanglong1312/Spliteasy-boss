@@ -82,7 +82,7 @@ test('PickleballSettings relies on save to regenerate schedules', () => {
   assert.doesNotMatch(appSource, /type === 'regenerateSessions'/);
   assert.match(appSource, /await dispatch\(action\)/);
   assert.match(appSource, /shouldRegenerateSchedule/);
-  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/);
+  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| hasScheduledSessionsWithOldDays/);
   assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.gte\('session_date', `\$\{yearMonth\}-01`\)[\s\S]*?\.lte\('session_date', `\$\{yearMonth\}-31`\)/);
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*?yearMonth[\s\S]*?config: generationConfig/);
 });

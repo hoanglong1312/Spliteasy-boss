@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
+  PhoneFrame, Screen, TabBar, IconButton, Card, Button, Badge, SubTabs, Avatar,
 } from '../primitives';
 
 export default function PickleballOverview({ data, isTreasurer = true, onAction }) {
@@ -44,32 +44,9 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           }}
         />
 
-        {/* Today session hero */}
-        {d.todaySession && (
-          <Hero variant="emerald">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#6ee7b7' }}>
-                  HÔM NAY · {d.todaySession.timeRange}
-                </div>
-                <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 6 }}>
-                  Buổi #{d.todaySession.number} · {d.todaySession.dateLabel}
-                </div>
-                <div style={{ fontSize: 12, color: '#a7f3d0', marginTop: 4 }}>{d.todaySession.venue}</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: '-0.5px', ...type.mono }}>
-                  {d.todaySession.present}<span style={{ fontSize: 14, color: '#6ee7b7', fontWeight: 600 }}>/{d.todaySession.total}</span>
-                </div>
-                <div style={{ fontSize: 10, color: '#a7f3d0', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Có mặt</div>
-              </div>
-            </div>
-          </Hero>
-        )}
-
         {/* Progress + costs grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 10 }}>
-          <Card accent="pickleball" style={{ padding: '18px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 0.65fr', gap: 10, marginTop: 10 }}>
+          <Card accent="pickleball" style={{ padding: '17px 14px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
               Tiến độ tháng
             </div>
@@ -77,55 +54,49 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             <div style={{ textAlign: 'center', fontSize: 11, color: '#6ee7b7', fontWeight: 600 }}>
               {Math.round(d.progress.attended / d.progress.total * 100)}% hoàn thành
             </div>
-            {d.progress.leaders?.length > 0 && (
-              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {d.progress.leaders.map(row => (
-                  <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10 }}>
-                    <span style={{ color: colors.textSecondary, fontWeight: 800 }}>#{row.rank} {row.name}</span>
-                    <span style={{ color: '#6ee7b7', fontWeight: 900, ...type.mono }}>{row.attended} buổi</span>
+            {d.todaySession && (
+              <div style={{
+                marginTop: 12,
+                padding: '12px 12px',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, rgba(6,95,70,0.92), rgba(16,185,129,0.42))',
+                border: '1px solid rgba(52,211,153,0.38)',
+                boxShadow: '0 10px 24px rgba(16,185,129,0.16)',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 8,
+                }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#6ee7b7' }}>
+                      {d.todaySession.statusLabel} · {d.todaySession.timeRange}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 900, marginTop: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      Buổi #{d.todaySession.number} · {d.todaySession.dateLabel}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {d.todaySession.venue}
+                    </div>
                   </div>
-                ))}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: '#f8fafc', ...type.mono }}>
+                      {d.todaySession.present}<span style={{ fontSize: 11, color: colors.textMuted }}>/{d.todaySession.total}</span>
+                    </div>
+                    <div style={{ fontSize: 8, color: '#a7f3d0', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Có mặt
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </Card>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Card style={{ padding: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 18 }}>🏸</span>
-                <div style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
-                  Tiền sân tháng
-                </div>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 8, ...type.mono }}>
-                {formatVND(d.monthCosts.court)}
-              </div>
-              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{d.monthCosts.courtSub}</div>
-            </Card>
-            <Card style={{ padding: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 18 }}>💧</span>
-                <div style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
-                  Tiền nước
-                </div>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 8, ...type.mono }}>
-                {formatVND(d.monthCosts.water)}
-              </div>
-              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{d.monthCosts.waterSub}</div>
-            </Card>
-            <Card style={{ padding: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 18 }}>🎟️</span>
-                <div style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
-                  Vé lẻ quỹ
-                </div>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 8, ...type.mono }}>
-                {formatVND(d.monthCosts.ticketFund || 0)}
-              </div>
-              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{d.monthCosts.ticketFundSub || '0 lượt quỹ trả hộ'}</div>
-            </Card>
+            <CompactCostCard icon="🏸" label="Tiền sân" value={d.monthCosts.court} sub={d.monthCosts.courtSub} />
+            <CompactCostCard icon="💧" label="Tiền nước" value={d.monthCosts.water} sub={d.monthCosts.waterSub} />
+            <CompactCostCard icon="🎟️" label="Vé lẻ quỹ" value={d.monthCosts.ticketFund || 0} sub={d.monthCosts.ticketFundSub || '0 lượt quỹ trả hộ'} />
           </div>
         </div>
 
@@ -252,6 +223,23 @@ function TicketFundStat({ label, value, tone }) {
       <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>{label}</div>
       <div style={{ fontSize: 14, color: palette.color, fontWeight: 900, marginTop: 3, ...type.mono }}>{formatVND(value)}</div>
     </div>
+  );
+}
+
+function CompactCostCard({ icon, label, value, sub }) {
+  return (
+    <Card style={{ padding: '11px 9px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 14 }}>{icon}</span>
+        <div style={{ fontSize: 8, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 800 }}>
+          {label}
+        </div>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: 0, marginTop: 7, ...type.mono }}>
+        {formatVND(value)}
+      </div>
+      <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, lineHeight: 1.25 }}>{sub}</div>
+    </Card>
   );
 }
 
