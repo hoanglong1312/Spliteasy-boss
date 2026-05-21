@@ -26,9 +26,6 @@ export default function BatchEntry({ data, onAction }) {
       })),
     });
   }
-  function resetAll() {
-    setBulkInput(sessions.map(() => '0').join('\n'));
-  }
 
   return (
     <PhoneFrame>
@@ -54,7 +51,7 @@ export default function BatchEntry({ data, onAction }) {
             placeholder={'60.000\n45.000\n0\n22/05 60.000'}
             style={{
               width: '100%',
-              minHeight: 168,
+              minHeight: 126,
               marginTop: 10,
               padding: 12,
               resize: 'vertical',
@@ -113,7 +110,7 @@ export default function BatchEntry({ data, onAction }) {
                     Buổi #{session.number}
                   </div>
                   <div style={{ fontSize: 10, color: matchedSessionIds.has(String(session.id)) ? '#6ee7b7' : colors.textSecondary, marginTop: 2 }}>
-                    {parsed ? 'Sẽ cập nhật' : 'Không đổi'}
+                    {parsed ? 'Sẽ lưu' : 'Không đổi'}
                   </div>
                 </div>
                 <div style={{
@@ -137,11 +134,9 @@ export default function BatchEntry({ data, onAction }) {
           borderTop: '1px solid rgba(255,255,255,0.06)',
           zIndex: 10,
           display: 'grid',
-          gridTemplateColumns: '1fr 1.4fr',
-          gap: 10,
+          gridTemplateColumns: '1fr',
           margin: '14px -16px 0',
         }}>
-          <Button variant="muted" onClick={resetAll}>Reset 0</Button>
           <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
             Lưu tất cả
           </Button>
@@ -159,10 +154,12 @@ function parseMonthlyWaterInput(input, sessions) {
   let sequentialIndex = 0;
   const rows = [];
   lines.forEach(line => {
-    const dateMatch = line.match(/(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?/);
+    const rawDateMatch = line.match(/(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?/);
+    const dateMatch = rawDateMatch && isValidInputDate(rawDateMatch) ? rawDateMatch : null;
     const amountText = dateMatch ? line.replace(dateMatch[0], '') : line;
     const hasAmountDigits = /\d/.test(amountText);
-    if (!hasAmountDigits) {
+    const hasExplicitZero = /\b0\b/.test(amountText);
+    if (!hasAmountDigits && !hasExplicitZero) {
       if (!dateMatch) sequentialIndex += 1;
       return;
     }
@@ -180,6 +177,12 @@ function parseMonthlyWaterInput(input, sessions) {
     });
   });
   return rows;
+}
+
+function isValidInputDate(dateMatch) {
+  const day = Number(dateMatch?.[1]);
+  const month = Number(dateMatch?.[2]);
+  return day >= 1 && day <= 31 && month >= 1 && month <= 12;
 }
 
 function findSessionByInputDate(sessions, dateMatch) {

@@ -6,6 +6,7 @@ import vm from 'node:vm'
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 const settingsSource = readFileSync(new URL('./screens/PickleballSettings.jsx', import.meta.url), 'utf8')
+const calendarSource = readFileSync(new URL('./screens/PickleballCalendar.jsx', import.meta.url), 'utf8')
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 
 function extractSaveSettingsBlock() {
@@ -253,6 +254,29 @@ test('pickleball calendar maps current month session rows to day states and expo
     },
   })
   assert.equal(emptyData.shouldAutoGenerate, true)
+})
+
+test('calendar exposes treasurer reschedule action only for unfinished sessions', () => {
+  assert.match(calendarSource, /const \[rescheduleOpen, setRescheduleOpen\] = useState\(false\)/)
+  assert.match(calendarSource, /session\.canReschedule/)
+  assert.match(calendarSource, />Dời buổi</)
+  assert.match(calendarSource, /type="date"/)
+  assert.match(calendarSource, /onAction\?\.\('rescheduleSession'/)
+  assert.match(dataSource, /canReschedule: !completed && !isMovedSession\(session\)/)
+})
+
+test('reschedule handler cancels old session and creates a new scheduled session', () => {
+  assert.match(appSource, /type === 'rescheduleSession'/)
+  assert.match(appSource, /type: 'RESCHEDULE_PICKLEBALL_SESSION'/)
+  assert.match(storeSource, /case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{/)
+  const block = storeSource.match(/case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{[\s\S]*?break\s*\n\s*\}/)?.[0] || ''
+  assert.match(block, /\.update\(\{[\s\S]*status: 'cancelled'/)
+  assert.match(block, /\.from\(table\)[\s\S]*\.eq\('id', sessionId\)/)
+  assert.match(block, /\.from\('pickle_sessions'\)[\s\S]*\.insert\(\{[\s\S]*session_date: newDate[\s\S]*status: 'scheduled'/)
+  assert.match(block, /start_time: session\?\.startTime \|\| session\?\.start_time \|\| null/)
+  assert.match(block, /court: session\?\.court \|\| null/)
+  assert.doesNotMatch(block, /attendeeIds/)
+  assert.doesNotMatch(block, /pickleball_session_items/)
 })
 
 test('pickleball calendar can view and auto-generate a requested future month', () => {

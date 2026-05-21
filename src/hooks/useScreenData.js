@@ -1466,6 +1466,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
     canComplete: sessionKey <= todayKey,
     isCompleted: completed,
+    canReschedule: !completed && !isMovedSession(session),
   }
 }
 
@@ -1494,9 +1495,14 @@ function compactMemberName(member) {
 function calendarSessionStatus(session, today) {
   const normalizedStatus = String(session?.status || '').toLowerCase()
   if (isToday(sessionDate(session))) return { tone: 'brand', label: 'Hôm nay' }
-  if (['moved', 'cancelled', 'canceled'].includes(normalizedStatus)) return { tone: 'warn', label: 'Đã dời' }
+  if (isMovedSession(session)) return { tone: 'warn', label: 'Đã dời' }
   if (isDoneStatus(normalizedStatus)) return { tone: 'success', label: 'Đã đánh' }
   return dateKey(sessionDate(session)) > dateKey(today) ? { tone: 'muted', label: 'Sắp tới' } : { tone: 'warn', label: 'Chưa chốt' }
+}
+
+function isMovedSession(session) {
+  const normalizedStatus = String(session?.status || '').toLowerCase()
+  return ['moved', 'cancelled', 'canceled'].includes(normalizedStatus)
 }
 
 function sessionCostsForSession(state, session, members = []) {

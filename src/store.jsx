@@ -13,6 +13,14 @@ function safeArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function isDoneStatus(status) {
+  return ['completed', 'done', 'closed'].includes(String(status || '').toLowerCase())
+}
+
+function isMovedStatus(status) {
+  return ['moved', 'cancelled', 'canceled'].includes(String(status || '').toLowerCase())
+}
+
 function getMonthRange(yearMonth) {
   const [yearText, monthText] = String(yearMonth || '').split('-')
   const year = Number(yearText)
@@ -1785,6 +1793,41 @@ export function AppProvider({ children }) {
           .update({ status: 'scheduled' })
           .eq('id', sessionId)
         if (error) throw error
+        await refresh()
+        break
+      }
+
+      case 'RESCHEDULE_PICKLEBALL_SESSION': {
+        if (!sb) return
+        const { sessionId, newDate } = action
+        if (!sessionId || !newDate) return
+        const session = findPickleSessionInState(stateRef.current, sessionId)
+        if (!session || isDoneStatus(session?.status) || isMovedStatus(session?.status)) return
+        const sourceTable = session?.sourceTable || session?.source_table
+        const table = sourceTable === 'pickleball_sessions' ? 'pickleball_sessions' : 'pickle_sessions'
+        const movedNote = String(action.notes || '').trim()
+        const oldDate = sessionDateValue(session)
+        const { error: cancelError } = await sb
+          .from(table)
+          .update({
+            status: 'cancelled',
+            notes: movedNote || `Dời từ ${oldDate || 'lịch cũ'} sang ${newDate}`,
+          })
+          .eq('id', sessionId)
+        if (cancelError) throw cancelError
+
+        const { error: insertError } = await sb
+          .from('pickle_sessions')
+          .insert({
+            group_id: session?.groupId || session?.group_id || state.currentGroupId,
+            session_date: newDate,
+            start_time: session?.startTime || session?.start_time || null,
+            court: session?.court || null,
+            status: 'scheduled',
+            notes: movedNote || `Dời từ ${oldDate || 'lịch cũ'}`,
+            created_by_member_id: state.currentUserId || null,
+          })
+        if (insertError) throw insertError
         await refresh()
         break
       }

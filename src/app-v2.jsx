@@ -469,6 +469,20 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'rescheduleSession') {
+      if (!isTreasurer) return
+      const sessionId = payload?.sessionId ?? payload?.id
+      const date = normalizeTicketDate(payload?.date)
+      if (!sessionId || !date) return
+      await dispatch({
+        type: 'RESCHEDULE_PICKLEBALL_SESSION',
+        sessionId,
+        newDate: date,
+        notes: payload?.notes,
+      })
+      return
+    }
+
     if (type === 'markTicketPaid') {
       if (!isTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id ?? payload

@@ -238,20 +238,31 @@ test('batch entry sends batch water saves and can cancel back', () => {
   assert.doesNotMatch(batchSource, /ExtraBottomSheet/)
 })
 
-test('batch entry can reset every session water amount to zero', () => {
-  assert.match(batchSource, /function resetAll\(\)/)
-  assert.match(batchSource, /setBulkInput\(sessions\.map\(\(\) => '0'\)\.join\('\\n'\)\)/)
-  assert.match(batchSource, />Reset 0<\/Button>/)
+test('batch entry uses one full-width save action and no reset-zero button', () => {
+  assert.doesNotMatch(batchSource, /function resetAll\(\)/)
+  assert.doesNotMatch(batchSource, />Reset 0<\/Button>/)
+  assert.match(batchSource, /gridTemplateColumns:\s*'1fr'/)
+  assert.match(batchSource, /variant="brand"[^>]*onClick=\{saveAll\}/)
+  assert.match(batchSource, /Lưu tất cả/)
   assert.match(batchSource, /waterAmount: row\.waterAmount/)
 })
 
 test('batch entry supports amount-per-line and date-prefixed monthly water formats', () => {
   assert.match(batchSource, /function parseMonthlyWaterInput\(input, sessions\)/)
-  assert.match(batchSource, /const dateMatch = line\.match/)
+  assert.match(batchSource, /const rawDateMatch = line\.match/)
+  assert.match(batchSource, /const dateMatch = rawDateMatch && isValidInputDate\(rawDateMatch\) \? rawDateMatch : null/)
   assert.match(batchSource, /const hasAmountDigits = \/\\d\/\.test\(amountText\)/)
   assert.match(batchSource, /findSessionByInputDate\(sessions, dateMatch/)
   assert.match(batchSource, /: sessions\[sequentialIndex\]/)
   assert.match(batchSource, /formatAmountInput\(amount\)/)
+  assert.match(batchSource, /function isValidInputDate\(dateMatch\)/)
+})
+
+test('batch entry treats explicit zero as a saveable monthly water value', () => {
+  assert.match(batchSource, /const hasExplicitZero = \/\\b0\\b\/\.test\(amountText\)/)
+  assert.match(batchSource, /if \(!hasAmountDigits && !hasExplicitZero\)/)
+  assert.match(batchSource, /waterAmount: amount/)
+  assert.match(appSource, /\.filter\(row => row\.waterAmount >= 0\)/)
 })
 
 test('app handlers persist session water and extras through pickleball_session_items', () => {

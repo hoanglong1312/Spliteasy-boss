@@ -118,6 +118,13 @@ function selectedDayFromSession(session) {
   return match ? Number(match[1]) : null;
 }
 
+function nextDateInputValue(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 function LegendChip({ color, label, dashed }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -176,6 +183,9 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
   const [extras, setExtras] = useState([]);
   const [savingSessionToggle, setSavingSessionToggle] = useState(false);
   const [costSaveState, setCostSaveState] = useState('');
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleNote, setRescheduleNote] = useState('');
   const canManageSession = Boolean(isTreasurer && !session.isCompleted);
   const canEditCosts = canManageSession;
   const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
@@ -191,6 +201,9 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
 
   useEffect(() => {
     setCostSaveState('');
+    setRescheduleOpen(false);
+    setRescheduleDate(nextDateInputValue(session.date));
+    setRescheduleNote('');
   }, [session.id]);
 
   const updateExtra = (id, patch) => {
@@ -247,6 +260,16 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
     } finally {
       setSavingSessionToggle(false);
     }
+  };
+  const saveReschedule = async (event) => {
+    event.preventDefault();
+    if (!session.canReschedule || !rescheduleDate) return;
+    await onAction?.('rescheduleSession', {
+      sessionId: session.id,
+      date: rescheduleDate,
+      notes: rescheduleNote,
+    });
+    setRescheduleOpen(false);
   };
 
   async function addGuest(event) {
@@ -311,22 +334,73 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
           {session.attendance.guests > 0 && ` · ${session.attendance.guests} khách`}
         </div>
         {canManageSession && (
-          <button
-            type="button"
-            onClick={() => setGuestFormOpen(open => !open)}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              fontSize: 11,
-              color: colors.brandLight,
-              fontWeight: 600,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >+ Thêm khách</button>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {session.canReschedule && (
+              <button
+                type="button"
+                onClick={() => setRescheduleOpen(open => !open)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  fontSize: 11,
+                  color: '#fbbf24',
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >Dời buổi</button>
+            )}
+            <button
+              type="button"
+              onClick={() => setGuestFormOpen(open => !open)}
+              style={{
+                border: 'none',
+                background: 'transparent',
+                fontSize: 11,
+                color: colors.brandLight,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >+ Thêm khách</button>
+          </div>
         )}
       </div>
+
+      {rescheduleOpen && canManageSession && session.canReschedule && (
+        <form onSubmit={saveReschedule} style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: 8,
+          marginTop: 10,
+          padding: 12,
+          borderRadius: 12,
+          border: '1px solid rgba(251,191,36,0.22)',
+          background: 'rgba(251,191,36,0.07)',
+        }}>
+          <Input
+            label="Ngày mới"
+            type="date"
+            value={rescheduleDate}
+            onChange={(event) => setRescheduleDate(event.target.value)}
+            inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 800 }}
+            style={{ marginTop: 0 }}
+          />
+          <Input
+            label="Lý do"
+            value={rescheduleNote}
+            onChange={(event) => setRescheduleNote(event.target.value)}
+            placeholder="Ví dụ: mưa lớn"
+            inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 700 }}
+            style={{ marginTop: 0 }}
+          />
+          <Button type="submit" variant="muted" disabled={!rescheduleDate} style={{ padding: 10, borderRadius: 10, fontSize: 12 }}>
+            Lưu ngày mới
+          </Button>
+        </form>
+      )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
         {session.attendees.map(a => (
