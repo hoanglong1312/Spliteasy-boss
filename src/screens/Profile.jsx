@@ -1,8 +1,8 @@
 // Spliteasy Boss — Profile / Cá nhân
 // Props: data { user, profileColor, monthStats, bank, pin }, isTreasurer
 
-import React from 'react';
-import { colors, type, formatVND, formatVNDShort } from '../tokens';
+import React, { useEffect, useRef, useState } from 'react';
+import { colors, type, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge,
   SectionLabel,
@@ -19,6 +19,27 @@ const PROFILE_COLORS = [
 
 export default function Profile({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
+  const fileInputRef = useRef(null);
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState(d.user.photoUrl || '');
+
+  useEffect(() => {
+    setCurrentPhotoUrl(d.user.photoUrl || '');
+  }, [d.user.id, d.user.photoUrl]);
+
+  function handlePhotoFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const photoUrl = String(reader.result || '');
+      if (!photoUrl) return;
+      setCurrentPhotoUrl(photoUrl);
+      onAction?.('uploadPhoto', { memberId: d.user.id, photoUrl });
+    };
+    reader.readAsDataURL(file);
+  }
 
   return (
     <PhoneFrame>
@@ -33,13 +54,29 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <div style={{
               width: 88, height: 88, borderRadius: '50%',
-              background: PROFILE_COLORS[d.profileColor],
+              background: currentPhotoUrl ? colors.shellBg : PROFILE_COLORS[d.profileColor],
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden',
               fontSize: 36, fontWeight: 900, color: 'white',
               border: '4px solid rgba(255,255,255,0.1)',
               boxShadow: '0 8px 32px rgba(99,102,241,0.4)',
-            }}>{d.user.initial}</div>
-            <button onClick={() => onAction?.('uploadPhoto')} style={{
+            }}>
+              {currentPhotoUrl ? (
+                <img
+                  src={currentPhotoUrl}
+                  alt={d.user.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : d.user.initial}
+            </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoFile}
+              style={{ display: 'none' }}
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()} style={{
               position: 'absolute', bottom: 0, right: 0,
               width: 28, height: 28, borderRadius: '50%',
               background: colors.shellBg, border: '2px solid #1e1b4b',
@@ -151,23 +188,6 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
           <span style={{ fontSize: 10, color: colors.brandLight, fontWeight: 700, letterSpacing: '0.5px' }}>ĐỔI · XOÁ</span>
         </Card>
 
-        {/* CSV export — treasurer */}
-        {isTreasurer && (
-          <Card accent="finance" style={{ marginTop: 10, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-            onClick={() => onAction?.('exportCsv')}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 10,
-              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16,
-            }}>📊</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>Xuất sổ CSV</div>
-              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Chỉ thủ quỹ · Excel/Google Sheets</div>
-            </div>
-            <span style={{ color: colors.brandLight }}>›</span>
-          </Card>
-        )}
-
         <Button block variant="danger" style={{ marginTop: 16 }} onClick={() => onAction?.('logout')}>Đăng xuất</Button>
         <div style={{
           textAlign: 'center', fontSize: 10, color: colors.textHint, marginTop: 14, letterSpacing: '0.3px',
@@ -181,10 +201,12 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
 
 const DEMO = {
   user: {
+    id: 'demo',
     name: 'Long Nguyễn',
     email: 'long.nguyen@gmail.com',
     initial: 'L',
     club: 'Cầu Giấy',
+    photoUrl: '',
   },
   profileColor: 0,
   monthStats: {

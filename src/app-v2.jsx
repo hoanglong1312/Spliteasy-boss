@@ -30,6 +30,10 @@ import SettlementPeriod from './screens/SettlementPeriod'
 
 const PIN_UNLOCK_KEY = 'spliteasy_pin_unlocked'
 
+function profilePhotoStorageKey(memberId) {
+  return `spliteasy_profile_photo_${memberId || 'me'}`
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const groups = state.groups || []
@@ -851,6 +855,15 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'uploadPhoto') {
+      const memberId = payload?.memberId || state.currentUserId
+      const photoUrl = String(payload?.photoUrl || '')
+      if (memberId && photoUrl) {
+        localStorage.setItem(profilePhotoStorageKey(memberId), photoUrl)
+      }
+      return
+    }
+
     if (type === 'exportCsv') {
       exportStateCsv(state)
       return
@@ -952,7 +965,6 @@ export default function AppV2() {
       'expandMembers',
       'complete',
       'saveAll',
-      'uploadPhoto',
       'promote',
       'add',
     ].includes(type)) {

@@ -11,6 +11,15 @@ import {
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 const WEEKDAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
 
+function profilePhotoStorageKey(memberId) {
+  return `spliteasy_profile_photo_${memberId || 'me'}`
+}
+
+function loadStoredProfilePhoto(memberId) {
+  if (!memberId || typeof localStorage === 'undefined') return ''
+  return localStorage.getItem(profilePhotoStorageKey(memberId)) || ''
+}
+
 export function useScreenData() {
   const { state, dispatch } = useApp()
   const autoGenerateRef = useRef('')
@@ -384,10 +393,12 @@ function buildProfileData(me, state, pickle) {
     initials: initials(me || { name: state?.currentUserName }),
     color: me?.color || '#6366f1',
     user: {
+      id: currentUserId,
       name: me?.displayName || me?.name || state?.currentUserName || 'Bạn',
       email: '',
       initial: initials(me || { name: state?.currentUserName }).slice(0, 2),
       club: state?.currentGroup?.name || 'Spliteasy',
+      photoUrl: loadStoredProfilePhoto(currentUserId),
     },
     profileColor: profileColorIndex(me?.color),
     monthStats: {
