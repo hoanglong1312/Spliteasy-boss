@@ -189,7 +189,8 @@ export default function AppV2() {
                 .delete()
                 .eq('group_id', groupId)
                 .eq('status', 'scheduled')
-                .like('session_date', `${yearMonth}%`),
+                .gte('session_date', `${yearMonth}-01`)
+                .lte('session_date', `${yearMonth}-31`),
               sb
                 .from('pickleball_sessions')
                 .delete()
