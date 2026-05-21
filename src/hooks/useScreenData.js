@@ -2299,9 +2299,15 @@ function sessionAccessories(session, members, presentIds) {
 
 function perPersonCourtFee(pickle, monthSessions) {
   const fixedCount = safeArray(pickle?.fixedMembers).length
-  const monthlyCourtFee = Number(pickle?.monthlyCourtFee) || 0
-  if (!fixedCount || !monthSessions.length || !monthlyCourtFee) return 0
-  return Math.round(monthlyCourtFee / monthSessions.length / fixedCount)
+  const ym = String(sessionDate(monthSessions[0]) || '').slice(0, 7)
+  const monthlyConfig = safeArray(pickle?.monthlyConfigs).find(c => (
+    c?.yearMonth === ym || c?.year_month === ym
+  ))
+  const activeCount = safeArray(monthlyConfig?.active_member_ids ?? monthlyConfig?.activeMemberIds).length
+  const memberCount = monthlyConfig ? (activeCount || fixedCount) : fixedCount
+  const courtFee = Number(monthlyConfig ? (monthlyConfig.courtFee ?? monthlyConfig.court_fee) : pickle?.monthlyCourtFee) || 0
+  if (!memberCount || !monthSessions.length || !courtFee) return 0
+  return Math.round(courtFee / monthSessions.length / memberCount)
 }
 
 function memberTicketBalance(state, memberId) {

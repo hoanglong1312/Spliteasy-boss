@@ -86,6 +86,44 @@ test('calendar selected session exposes water and extra costs from pickleball se
   assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.members.map(member => member.id))), ['m1', 'm2'])
 })
 
+test('calendar court cost uses monthly config for the selected session month', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Long', memberType: 'fixed' },
+      { id: 'm3', groupId: 'g1', name: 'Chi', memberType: 'fixed' },
+    ],
+    pickle: {
+      monthlyCourtFee: 2000000,
+      fixedMembers: ['m1', 'm2'],
+      monthlyConfigs: [
+        {
+          groupId: 'g1',
+          year_month: '2026-05',
+          court_fee: 390000,
+          active_member_ids: ['m1', 'm2', 'm3'],
+        },
+      ],
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-06', status: 'completed', attendees: ['m1', 'm2', 'm3'] },
+        { id: 's2', groupId: 'g1', date: '2026-05-13', status: 'completed', attendees: ['m1', 'm2', 'm3'] },
+        { id: 's3', groupId: 'g1', date: '2026-05-20', status: 'completed', attendees: ['m1', 'm2', 'm3'] },
+      ],
+    },
+    _allPickle: { sessions: [], sessionItems: [], monthlyConfigs: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.equal(data.selectedSession.id, 's3')
+  assert.equal(data.selectedSession.costRows[0].amount, 43333)
+  assert.equal(data.selectedSession.totalPerPerson, 43333)
+})
+
 test('calendar detail panel contains the P1 session-cost editor contract', () => {
   assert.match(calendarSource, /Chi phí buổi này/)
   assert.match(calendarSource, /Phụ phát sinh/)
@@ -128,6 +166,15 @@ test('app handlers persist session water and extras through pickleball_session_i
   assert.match(appSource, /\.delete\(\)[\s\S]*?\.eq\('session_id', sessionId\)[\s\S]*?\.neq\('name', 'Nước'\)/)
   assert.match(appSource, /\.insert\([\s\S]*?member_ids/)
   assert.match(appSource, /type === 'saveBatchCosts'/)
+})
+
+test('saveSessionCost writes empty member arrays for all session item upserts', () => {
+  const handlerSource = appSource.match(/if \(type === 'saveSessionCost'\) \{[\s\S]*?\n    if \(type === 'saveBatchCosts'\)/)?.[0] || ''
+
+  assert.match(handlerSource, /member_ids: \[\],[\s\S]*created_by: state\.currentUserId \|\| null/)
+  assert.match(handlerSource, /member_ids: Array\.isArray\(extra\?\.memberIds\) \? extra\.memberIds : \[\]/)
+  assert.doesNotMatch(handlerSource, /member_ids: null/)
+  assert.doesNotMatch(handlerSource, /memberIds\) \? extra\.memberIds : null/)
 })
 
 test('store loads pickleball_session_items into normalized pickle state', () => {

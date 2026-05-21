@@ -496,7 +496,7 @@ export default function AppV2() {
           session_id: sessionId,
           name: 'Nước',
           amount: waterAmount,
-          member_ids: null,
+          member_ids: [],
           created_by: state.currentUserId || null,
         }, { onConflict: 'session_id,name' })
       if (waterError) throw waterError
@@ -513,7 +513,7 @@ export default function AppV2() {
           session_id: sessionId,
           name: String(extra?.note || extra?.name || 'Phụ phát sinh').trim() || 'Phụ phát sinh',
           amount: parseMoneyAmount(extra?.amount),
-          member_ids: Array.isArray(extra?.memberIds) ? extra.memberIds : null,
+          member_ids: Array.isArray(extra?.memberIds) ? extra.memberIds : [],
           created_by: state.currentUserId || null,
         }))
         .filter(extra => extra.amount > 0)
