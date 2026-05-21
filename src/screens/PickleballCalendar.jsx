@@ -609,6 +609,93 @@ function formatAmountInput(value) {
 function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
   const active = a.kind === 'present' || a.kind === 'guest';
 
+  if (a.kind === 'guest') {
+    return (
+      <div style={{
+        flex: '1 1 132px',
+        maxWidth: 180,
+        minWidth: 132,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '5px 6px',
+        borderRadius: 999,
+        background: 'rgba(96,165,250,0.12)',
+        border: '1px solid rgba(96,165,250,0.38)',
+        boxShadow: '0 0 14px rgba(59,130,246,0.16)',
+      }}>
+        <span style={{
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: 'rgba(96,165,250,0.22)',
+          border: '1px solid rgba(147,197,253,0.44)',
+          color: '#bfdbfe',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 10,
+          fontWeight: 900,
+          flexShrink: 0,
+        }}>
+          {a.initial}
+        </span>
+        <div style={{
+          minWidth: 0,
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1,
+        }}>
+          <span style={{
+            color: '#dbeafe',
+            fontSize: 11,
+            fontWeight: 800,
+            lineHeight: 1.15,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {a.name}
+          </span>
+          <span style={{
+            color: '#93c5fd',
+            fontSize: 8,
+            fontWeight: 800,
+            letterSpacing: '0.8px',
+            textTransform: 'uppercase',
+          }}>
+            Khách
+          </span>
+        </div>
+        {isTreasurer && (
+          <button
+            type="button"
+            onClick={() => onAction?.('removeGuest', { sessionId, attendeeId: a.id })}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              border: '1px solid rgba(248,113,113,0.34)',
+              background: 'rgba(248,113,113,0.10)',
+              color: '#fca5a5',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 15,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              flexShrink: 0,
+              padding: 0,
+            }}
+            aria-label={`Xóa ${a.name}`}
+          >×</button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <button
@@ -653,14 +740,6 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
         }}>
           {a.name}
         </span>
-        {a.kind === 'guest' && isTreasurer && (
-          <button
-            type="button"
-            onClick={() => onAction?.('removeGuest', { sessionId, attendeeId: a.id })}
-            style={{ marginLeft: 4, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}
-            aria-label="Xóa khách"
-          >×</button>
-        )}
       </div>
     </div>
   );

@@ -49,6 +49,14 @@ test('calendar treats casual members as attendance chips and adds only brand new
   assert.match(dataSource, /memberType: memberType\(member\)/)
 })
 
+test('calendar guest attendance chip uses a readable horizontal pill', () => {
+  assert.match(calendarSource, /if \(a\.kind === 'guest'\) \{/)
+  assert.match(calendarSource, /flex: '1 1 132px'/)
+  assert.match(calendarSource, /maxWidth: 180/)
+  assert.match(calendarSource, /aria-label=\{`Xóa \$\{a\.name\}`\}/)
+  assert.match(calendarSource, /Khách/)
+})
+
 test('member management confirms role changes and edits full bank information', () => {
   assert.match(memberDetailSource, /window\.confirm\(role === 'treasurer'/)
   assert.match(memberDetailSource, /onAction\?\.\('setMemberRole', \{\s*memberId: d\.id,\s*role/)

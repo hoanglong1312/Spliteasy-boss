@@ -396,9 +396,9 @@ test('calendar guest chips expose treasurer-only delete without changing member 
   assert.match(calendarSource, /isTreasurer=\{isTreasurer\}/)
   assert.match(calendarSource, /sessionId=\{session\.id\}/)
   assert.match(calendarSource, /function AttendChip\(\{ a, onToggle, isTreasurer, sessionId, onAction \}\)/)
-  assert.match(calendarSource, /a\.kind === 'guest' && isTreasurer/)
+  assert.match(calendarSource, /if \(a\.kind === 'guest'\) \{[\s\S]*?\{isTreasurer && \(/)
   assert.match(calendarSource, /onAction\?\.\('removeGuest', \{ sessionId, attendeeId: a\.id \}\)/)
-  assert.match(calendarSource, /aria-label="Xóa khách"/)
+  assert.match(calendarSource, /aria-label=\{`Xóa \$\{a\.name\}`\}/)
 })
 
 test('removeGuest deletes pickle attendee rows and updates session state', () => {
