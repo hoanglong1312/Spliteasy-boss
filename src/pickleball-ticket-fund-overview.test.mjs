@@ -88,9 +88,12 @@ test('overview renders ticket-fund summary card', () => {
 test('overview folds next session into progress card instead of rendering a separate hero', () => {
   assert.doesNotMatch(overviewSource, /<Hero variant="emerald">/)
   assert.doesNotMatch(overviewSource, /d\.progress\.leaders/)
-  assert.match(overviewSource, /gridTemplateColumns: '1\.35fr 0\.65fr'/)
+  assert.match(overviewSource, /gridTemplateColumns: '1\.28fr 0\.72fr'/)
   assert.match(overviewSource, /function CompactCostCard/)
   assert.match(overviewSource, /d\.todaySession\.statusLabel/)
+  assert.doesNotMatch(overviewSource, /d\.todaySession\.statusLabel\} · \{d\.todaySession\.timeRange/)
+  assert.match(overviewSource, /displayTimeRange\(d\.todaySession\.timeRange\)/)
+  assert.match(overviewSource, /whiteSpace: 'nowrap'/)
   assert.match(overviewSource, /Buổi #\{d\.todaySession\.number\}/)
   assert.doesNotMatch(overviewSource, /d\.todaySession\.present/)
   assert.doesNotMatch(overviewSource, /d\.todaySession\.total/)

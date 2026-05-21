@@ -45,7 +45,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
         />
 
         {/* Progress + costs grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.35fr 0.65fr', gap: 10, marginTop: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.28fr 0.72fr', gap: 10, marginTop: 10 }}>
           <Card accent="pickleball" style={{ padding: '17px 14px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
               Tiến độ tháng
@@ -71,7 +71,10 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#6ee7b7' }}>
-                      {d.todaySession.statusLabel} · {d.todaySession.timeRange}
+                      {d.todaySession.statusLabel}
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: '#a7f3d0', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...type.mono }}>
+                      {displayTimeRange(d.todaySession.timeRange)}
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 900, marginTop: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       Buổi #{d.todaySession.number} · {d.todaySession.dateLabel}
@@ -227,7 +230,7 @@ function CompactCostCard({ icon, label, value, sub }) {
           {label}
         </div>
       </div>
-      <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: 0, marginTop: 7, ...type.mono }}>
+      <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: 0, marginTop: 7, whiteSpace: 'nowrap', ...type.mono }}>
         {formatVND(value)}
       </div>
       <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, lineHeight: 1.25 }}>{sub}</div>
@@ -237,6 +240,10 @@ function CompactCostCard({ icon, label, value, sub }) {
 
 function formatSignedFundAmount(amount) {
   return amount > 0 ? `+${formatVND(amount)}` : formatVND(amount);
+}
+
+function displayTimeRange(value) {
+  return String(value || '').replace(/(\d{1,2}:\d{2}):00/g, '$1');
 }
 
 function ProgressDonut({ value, max }) {
