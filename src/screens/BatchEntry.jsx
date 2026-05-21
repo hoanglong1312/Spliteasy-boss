@@ -26,6 +26,9 @@ export default function BatchEntry({ data, onAction }) {
       })),
     });
   }
+  function resetAll() {
+    setBulkInput(sessions.map(() => '0').join('\n'));
+  }
 
   return (
     <PhoneFrame>
@@ -138,7 +141,7 @@ export default function BatchEntry({ data, onAction }) {
           gap: 10,
           margin: '14px -16px 0',
         }}>
-          <Button variant="muted" onClick={() => onAction?.('back')}>Huỷ</Button>
+          <Button variant="muted" onClick={resetAll}>Reset 0</Button>
           <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
             Lưu tất cả
           </Button>

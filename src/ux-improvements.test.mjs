@@ -68,6 +68,7 @@ test('completed pickleball sessions lock attendance and cost editing', () => {
   assert.match(calendarSource, /onToggle=\{canManageSession && a\.kind !== 'guest'/)
   assert.match(calendarSource, /isTreasurer=\{canManageSession\}/)
   assert.match(calendarSource, /canEditCosts = canManageSession/)
+  assert.match(calendarSource, /\{canManageSession && \(/)
 })
 
 test('member management confirms role changes and edits full bank information', () => {

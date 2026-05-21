@@ -231,11 +231,18 @@ test('batch entry sends batch water saves and can cancel back', () => {
   assert.match(batchSource, /sessions:\s*parsedRows\.map/)
   assert.match(batchSource, /textarea/)
   assert.match(batchSource, /Dán tiền nước/)
-  assert.match(batchSource, /onAction\?\.\('back'\)/)
+  assert.doesNotMatch(batchSource, />Huỷ<\/Button>/)
   assert.match(batchSource, /Tổng nước tháng/)
   assert.match(batchSource, /position:\s*'sticky'[\s\S]*bottom:\s*0[\s\S]*background:\s*colors\.pageBg[\s\S]*zIndex:\s*10/)
   assert.doesNotMatch(batchSource, /openExtraSheet/)
   assert.doesNotMatch(batchSource, /ExtraBottomSheet/)
+})
+
+test('batch entry can reset every session water amount to zero', () => {
+  assert.match(batchSource, /function resetAll\(\)/)
+  assert.match(batchSource, /setBulkInput\(sessions\.map\(\(\) => '0'\)\.join\('\\n'\)\)/)
+  assert.match(batchSource, />Reset 0<\/Button>/)
+  assert.match(batchSource, /waterAmount: row\.waterAmount/)
 })
 
 test('batch entry supports amount-per-line and date-prefixed monthly water formats', () => {

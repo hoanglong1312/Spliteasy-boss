@@ -333,7 +333,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
           <AttendChip
             key={a.id}
             a={a}
-            isTreasurer={isTreasurer}
+            isTreasurer={canManageSession}
             sessionId={session.id}
             onAction={onAction}
             onToggle={canManageSession && a.kind !== 'guest' ? () => onAction?.('markAttendance', {

@@ -77,6 +77,16 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             <div style={{ textAlign: 'center', fontSize: 11, color: '#6ee7b7', fontWeight: 600 }}>
               {Math.round(d.progress.attended / d.progress.total * 100)}% hoàn thành
             </div>
+            {d.progress.leaders?.length > 0 && (
+              <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {d.progress.leaders.map(row => (
+                  <div key={row.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 10 }}>
+                    <span style={{ color: colors.textSecondary, fontWeight: 800 }}>#{row.rank} {row.name}</span>
+                    <span style={{ color: '#6ee7b7', fontWeight: 900, ...type.mono }}>{row.attended} buổi</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

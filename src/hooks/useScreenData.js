@@ -342,6 +342,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
+  const leaders = buildAttendanceLeaders(monthSessions, currentFixedMembers)
   const p2pTicketBalance = memberTicketBalance(state, currentUserId)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentUserId)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
@@ -358,6 +359,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       attended: completedSessions,
       total: monthSessions.length || 1,
       actualTotal: monthSessions.length,
+      leaders,
     },
     monthCosts: {
       court: courtFee,
@@ -1127,6 +1129,23 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
   ]
 }
 
+function buildAttendanceLeaders(sessions, members) {
+  const playedSessions = safeArray(sessions).filter(session => isDoneStatus(session?.status))
+  return safeArray(members)
+    .map(member => ({
+      id: member.id || member.member_id,
+      name: firstName(member.displayName || member.name),
+      initial: initials(member),
+      attended: playedSessions.filter(session => (
+        effectiveSessionMemberIds(session, members).some(id => String(id) === String(member.id || member.member_id))
+      )).length,
+    }))
+    .filter(row => row.id)
+    .sort((a, b) => b.attended - a.attended || a.name.localeCompare(b.name, 'vi'))
+    .slice(0, 3)
+    .map((row, index) => ({ ...row, rank: index + 1 }))
+}
+
 function buildTicketFundSummary(state) {
   const rows = currentGroupMembers(state)
     .filter(isActiveMember)
@@ -1246,8 +1265,8 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId) {
   const fixedNetCost = Math.max(courtFeeShare - rebatePerFixed, 0)
   const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
   const courtFee = memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost)
-  const waterFee = memberWaterShare(sessions, memberId)
-  const extras = memberExtrasShare(sessions, memberId, state)
+  const waterFee = memberWaterShare(sessions, memberId, members)
+  const extras = memberExtrasShare(sessions, memberId, state, members)
   const ticketShare = memberTeamFundTicketShare(state, memberId)
   const p2pBalance = memberTicketBalance(state, memberId)
   const netBalance = Math.round(p2pBalance - courtFee - waterFee - extras - ticketShare)
@@ -1267,18 +1286,18 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId) {
   }
 }
 
-function memberWaterShare(sessions, memberId) {
+function memberWaterShare(sessions, memberId, members = []) {
   return safeArray(sessions).reduce((sum, session) => {
-    const presentIds = sessionMemberIds(session)
+    const presentIds = effectiveSessionMemberIds(session, members)
     if (!presentIds.some(id => String(id) === String(memberId))) return sum
     const splitCount = presentIds.length + sessionGuests(session).length
     return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
   }, 0)
 }
 
-function memberExtrasShare(sessions, memberId, state) {
+function memberExtrasShare(sessions, memberId, state, members = []) {
   return safeArray(sessions).reduce((sum, session) => {
-    const presentIds = sessionMemberIds(session)
+    const presentIds = effectiveSessionMemberIds(session, members)
     const itemShare = (state ? sessionItemsForSession(state, session) : safeArray(session?.sessionItems || session?.session_items))
       .filter(item => !isWaterSessionItem(item))
       .reduce((itemSum, item) => {

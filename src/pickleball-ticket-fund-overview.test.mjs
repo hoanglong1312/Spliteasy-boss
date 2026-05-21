@@ -119,3 +119,35 @@ test('overview uses calendar month sessions and current fixed members for progre
   assert.equal(data.monthCosts.courtSub, '2 thành viên cố định')
   assert.equal(data.monthCosts.ticketFund, 120000)
 })
+
+test('overview progress exposes top attendance leaders', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'a',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'a', groupId: 'g1', name: 'An', memberType: 'fixed', isActive: true },
+      { id: 'b', groupId: 'g1', name: 'Bình', memberType: 'fixed', isActive: true },
+      { id: 'c', groupId: 'g1', name: 'Chi', memberType: 'fixed', isActive: true },
+      { id: 'd', groupId: 'g1', name: 'Dung', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 0 }],
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-01', status: 'completed', attendanceRecords: [{ memberId: 'd', status: 'absent' }] },
+        { id: 's2', groupId: 'g1', date: '2026-05-08', status: 'completed', attendanceRecords: [{ memberId: 'c', status: 'absent' }, { memberId: 'd', status: 'absent' }] },
+        { id: 's2b', groupId: 'g1', date: '2026-05-12', status: 'completed', attendees: [] },
+        { id: 's3', groupId: 'g1', date: '2026-05-15', status: 'scheduled', attendees: ['a'] },
+      ],
+    },
+    _allPickle: { sessions: [], externalTickets: [] },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'a', state.members)
+  assert.deepEqual(data.progress.leaders.map(row => [row.rank, row.name, row.attended]), [
+    [1, 'An', 3],
+    [2, 'Bình', 3],
+    [3, 'Chi', 2],
+  ])
+})
