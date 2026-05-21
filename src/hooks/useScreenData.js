@@ -2269,7 +2269,7 @@ function membersForCurrentPickle(state, members, fixedMembers) {
 function personChip(member) {
   return {
     id: member.id,
-    name: member.short || member.displayName || member.name,
+    name: member.displayName || member.name || member.short,
     initial: initials(member),
     memberType: memberType(member),
   }

@@ -86,6 +86,31 @@ test('calendar selected session exposes water and extra costs from pickleball se
   assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.members.map(member => member.id))), ['m1', 'm2'])
 })
 
+test('calendar session-cost member chips prefer real names over numeric short aliases', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'Anh Hoàng', short: '92', initials: 'H9', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Tuấn', short: 'Tuấn', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-20', status: 'completed', attendees: ['m1', 'm2'] },
+      ],
+      monthlyConfigs: [],
+      fixedMembers: ['m1', 'm2'],
+    },
+    _allPickle: { sessions: [], sessionItems: [], monthlyConfigs: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.members.map(member => member.name))), ['Anh Hoàng', 'Tuấn'])
+})
+
 test('calendar court cost uses monthly config for the selected session month', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {
