@@ -21,8 +21,9 @@
 
 ## Files cần đụng đến
 ```
-src/components.jsx        # [lý do]
-src/screen-home.jsx       # [lý do]
+src/app-v2.jsx              # [lý do]
+src/hooks/useScreenData.js  # [lý do]
+src/screens/Home.jsx        # [lý do]
 ```
 
 ## Acceptance Criteria
@@ -33,12 +34,13 @@ src/screen-home.jsx       # [lý do]
 
 ## Không làm
 > Những gì KHÔNG nên thay đổi để tránh side effect.
-- Không sửa `src/vb-tokens.css` trừ khi được yêu cầu
+- Không sửa file ngoài danh sách files allowed
 - Không thay đổi data schema trong `src/data.jsx`
+- Không sửa `docs/superpowers/plans/*` trừ khi task là cập nhật plan
 
 ---
 ## Kết quả (agent điền sau khi done)
 
-**Branch**: `feature/TASK-XXX`
+**Branch**: `codex/TASK-XXX`
 **Commit**: `abc1234`
 **Ghi chú**: [Những điều đáng lưu ý khi review]

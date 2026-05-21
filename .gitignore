@@ -1,5 +1,10 @@
 .env
+.env.local
 node_modules/
 dist/
 package-lock.json
 .worktrees
+.codex/
+.superpowers/brainstorm/
+test-results/
+screenshots/

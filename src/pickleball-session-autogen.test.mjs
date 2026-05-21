@@ -8,6 +8,13 @@ const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.
 const settingsSource = readFileSync(new URL('./screens/PickleballSettings.jsx', import.meta.url), 'utf8')
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 
+function extractSaveSettingsBlock() {
+  const start = appSource.indexOf("if (type === 'saveSettings'")
+  const end = appSource.indexOf("\n    if (type === 'AUTO_GENERATE_SESSIONS')", start)
+  assert.ok(start >= 0 && end > start, 'saveSettings handler block is available')
+  return appSource.slice(start, end)
+}
+
 function extractFunction(source, name) {
   const marker = new RegExp(`(?:export\\s+)?function\\s+${name}\\s*\\(`)
   const match = marker.exec(source)
@@ -262,9 +269,9 @@ test('settings save deletes scheduled sessions and regenerates when schedule wee
   assert.match(appSource, /const oldMonthlyConfig = findMonthlyPickleConfig\(state, groupId, yearMonth\)/)
   assert.match(appSource, /await dispatch\(action\)/)
   assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
-  const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+  const saveBlock = extractSaveSettingsBlock()
   assert.match(saveBlock, /Promise\.all\(\[/)
-  assert.match(saveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/)
+  assert.match(saveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.gte\('session_date', `\$\{yearMonth\}-01`\)[\s\S]*?\.lte\('session_date', `\$\{yearMonth\}-31`\)/)
   assert.match(saveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.gte\('date', `\$\{yearMonth\}-01`\)[\s\S]*?\.lte\('date', `\$\{yearMonth\}-31`\)/)
   const legacyDeleteStart = saveBlock.indexOf(".from('pickleball_sessions')")
   const legacyDeleteEnd = saveBlock.indexOf('])', legacyDeleteStart)
@@ -279,7 +286,7 @@ test('settings save deletes scheduled sessions and regenerates when schedule wee
 })
 
 test('settings save clears in-memory scheduled sessions before regenerating', () => {
-  const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+  const saveBlock = extractSaveSettingsBlock()
   assert.match(saveBlock, /type: 'CLEAR_SCHEDULED_SESSIONS'/)
   assert.match(storeSource, /case 'CLEAR_SCHEDULED_SESSIONS':\s*\{/)
   assert.match(storeSource, /removeScheduledSessionsForMonthFromState\(stateRef\.current, groupId, yearMonth\)/)
@@ -290,7 +297,7 @@ test('settings save clears in-memory scheduled sessions before regenerating', ()
 })
 
 test('settings save suppresses app auto-generation while manually regenerating', () => {
-  const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+  const saveBlock = extractSaveSettingsBlock()
 
   assert.match(saveBlock, /type: 'SET_PICKLE_REGEN'[\s\S]*value: true/)
   assert.match(saveBlock, /try\s*\{[\s\S]*type: 'CLEAR_SCHEDULED_SESSIONS'[\s\S]*type: 'AUTO_GENERATE_SESSIONS'[\s\S]*force: true[\s\S]*\}\s*finally\s*\{[\s\S]*type: 'SET_PICKLE_REGEN'[\s\S]*value: false/)

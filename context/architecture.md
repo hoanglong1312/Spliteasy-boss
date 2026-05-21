@@ -20,19 +20,40 @@ State:    Supabase (server state) + localStorage (PIN, token, member)
 Backend:  Supabase — PostgreSQL + RLS + Realtime
 ```
 
+## Runtime source of truth
+
+App runtime hiện tại đi theo luồng:
+
+```
+src/main.jsx → src/app-v2.jsx → src/screens/*.jsx
+```
+
+App v1 đã bị xóa khỏi `src/`: root app cũ, shared components cũ, tweak panel cũ, stylesheet token cũ, và các root-level screen modules cũ.
+Nếu tài liệu cũ trong `docs/superpowers/` còn nhắc cấu trúc v1 này, xem đó là lịch sử implementation, không phải hướng dẫn cho code hiện tại.
+
 ## File quan trọng
 
 ```
+src/main.jsx                ← Entry point React, mount AppProvider + AppV2
 src/app-v2.jsx              ← Shell chính, điều hướng, handle() router, PIN gate
 src/store.jsx               ← State store (Supabase-backed)
 src/hooks/useScreenData.js  ← Data builders cho tất cả screens (buildXxxData)
 src/primitives.jsx          ← UI components dùng chung
 src/tokens.js               ← Design tokens (màu sắc, typography)
 src/screens/*.jsx           ← 21 màn hình
+src/data.jsx                ← Helper tính toán/format legacy vẫn được useScreenData dùng
 src/lib/supabase.js         ← Supabase client factory
 src/lib/auth.js             ← Token auth helpers
 supabase/migrations/        ← SQL migrations (đã chạy hết)
 ```
+
+## Claude/Codex handoff
+
+- `CLAUDE.md` là entrypoint cho Claude Code.
+- `AGENTS.md` là luật chung cho mọi AI agent.
+- Claude giao task nên ghi rõ: goal, files allowed, files forbidden, acceptance tests, commit message.
+- Codex không sửa file ngoài phạm vi task và chạy `npm run qa:codex` trước khi bàn giao nếu task có code change.
+- Playwright vẫn do Claude main chạy bằng `npm run qa:claude`.
 
 ## Tài liệu dự án
 

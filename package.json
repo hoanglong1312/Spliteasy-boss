@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:node": "node --test $(rg --files src | rg '\\.test\\.mjs$')",
+    "qa:codex": "npm run test:node && npm run build",
+    "qa:claude": "npx playwright test --reporter=line"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
