@@ -162,6 +162,91 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
   const [guestName, setGuestName] = useState('');
   const [guestFormOpen, setGuestFormOpen] = useState(false);
   const [submittingGuest, setSubmittingGuest] = useState(false);
+  const costMembers = (session.members || [])
+    .filter(member => member.id)
+    .map(member => ({
+      id: member.id,
+      name: member.name || member.short || 'TV',
+      initial: member.initial || (member.name || '?').slice(0, 1).toUpperCase(),
+    }));
+  const allCostMemberIds = costMembers.map(member => member.id);
+  const [waterInput, setWaterInput] = useState('');
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [waterOpen, setWaterOpen] = useState(false);
+  const [extras, setExtras] = useState([]);
+  const [savingSessionToggle, setSavingSessionToggle] = useState(false);
+  const [costSaveState, setCostSaveState] = useState('');
+  const canEditCosts = Boolean(isTreasurer);
+  const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
+    .map(extra => `${extra.id || ''}:${extra.note || ''}:${extra.amount || 0}:${(extra.memberIds || []).join(',')}`)
+    .join('|')}`;
+
+  useEffect(() => {
+    setWaterInput(formatAmountInput(session.costs?.waterAmount || 0));
+    setExtras(initialExtraDrafts(session.costs?.extras || [], allCostMemberIds));
+    setExtrasOpen(false);
+    setWaterOpen(false);
+  }, [costDraftKey]);
+
+  useEffect(() => {
+    setCostSaveState('');
+  }, [session.id]);
+
+  const updateExtra = (id, patch) => {
+    setExtras(prev => prev.map(extra => (
+      extra.id === id ? { ...extra, ...patch } : extra
+    )));
+  };
+  const addExtra = () => {
+    setExtras(prev => [
+      ...prev,
+      {
+        id: `new-${Date.now()}-${prev.length}`,
+        note: '',
+        amountInput: '',
+        memberIds: [],
+      },
+    ]);
+    setExtrasOpen(true);
+  };
+  const cleanedExtras = () => extras
+    .map(extra => {
+      const memberIds = allCostMemberIds.length > 0 && extra.memberIds.length === allCostMemberIds.length
+        ? null
+        : extra.memberIds;
+      return {
+        note: extra.note,
+        amount: parseAmount(extra.amountInput),
+        memberIds,
+      };
+    })
+    .filter(extra => extra.amount > 0);
+  const saveSessionCosts = async () => {
+    setCostSaveState('');
+    await onAction?.('saveSessionCost', {
+      sessionId: session.id,
+      waterAmount: parseAmount(waterInput),
+      extras: cleanedExtras(),
+    });
+    setCostSaveState('saved');
+  };
+  const toggleSessionCompletion = async () => {
+    if (savingSessionToggle || !session.canComplete) return;
+    setSavingSessionToggle(true);
+    try {
+      if (session.isCompleted) {
+        await onAction?.('reopenSession', session.id);
+      } else {
+        await saveSessionCosts();
+        await onAction?.('completeSession', session.id);
+      }
+    } catch (err) {
+      console.error('[PickleballCalendar] toggleSessionCompletion:', err);
+      setCostSaveState('error');
+    } finally {
+      setSavingSessionToggle(false);
+    }
+  };
 
   async function addGuest(event) {
     event.preventDefault();
@@ -191,18 +276,32 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
             {session.timeRange} · {session.court}
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        {isTreasurer && session.canComplete ? (
+          <button
+            type="button"
+            aria-pressed={session.isCompleted}
+            disabled={savingSessionToggle}
+            onClick={toggleSessionCompletion}
+            style={{
+              border: 'none',
+              borderRadius: 999,
+              padding: '8px 13px',
+              minWidth: 86,
+              background: session.isCompleted ? 'rgba(52,211,153,0.18)' : 'rgba(250,204,21,0.16)',
+              color: session.isCompleted ? '#6ee7b7' : '#fde68a',
+              fontSize: 11,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              lineHeight: 1.1,
+              cursor: savingSessionToggle ? 'default' : 'pointer',
+              opacity: savingSessionToggle ? 0.7 : 1,
+            }}
+          >
+            ● {savingSessionToggle ? 'Đang lưu' : session.isCompleted ? 'Đã đánh' : 'Chưa chốt'}
+          </button>
+        ) : (
           <Badge tone={session.status.tone}>● {session.status.label}</Badge>
-          {isTreasurer && session.canComplete && (
-            <Button
-              variant="success"
-              style={{ padding: '7px 10px', borderRadius: 10, fontSize: 11, whiteSpace: 'nowrap' }}
-              onClick={() => onAction?.('completeSession', session.id)}
-            >
-              Chốt buổi
-            </Button>
-          )}
-        </div>
+        )}
       </div>
 
       <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -314,92 +413,43 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
       </div>
 
       {session.canShowCosts !== false && (
-        <SessionCostSection session={session} isTreasurer={isTreasurer} onAction={onAction} />
+        <SessionCostSection
+          session={session}
+          isTreasurer={isTreasurer}
+          members={costMembers}
+          waterInput={waterInput}
+          setWaterInput={setWaterInput}
+          waterOpen={waterOpen}
+          setWaterOpen={setWaterOpen}
+          extras={extras}
+          extrasOpen={extrasOpen}
+          setExtrasOpen={setExtrasOpen}
+          updateExtra={updateExtra}
+          addExtra={addExtra}
+          costSaveState={costSaveState}
+          canEdit={canEditCosts}
+        />
       )}
 
     </Card>
   );
 }
 
-function SessionCostSection({ session, isTreasurer, onAction }) {
-  const members = (session.members || [])
-    .filter(member => member.id)
-    .map(member => ({
-      id: member.id,
-      name: member.name || member.short || 'TV',
-      initial: member.initial || (member.name || '?').slice(0, 1).toUpperCase(),
-    }));
-  const allMemberIds = members.map(member => member.id);
-  const [waterInput, setWaterInput] = useState('');
-  const [extrasOpen, setExtrasOpen] = useState(false);
-  const [waterOpen, setWaterOpen] = useState(false);
-  const [extras, setExtras] = useState([]);
-  const [savingCost, setSavingCost] = useState(false);
-  const [costSaveState, setCostSaveState] = useState('');
-  const canEdit = Boolean(isTreasurer);
-  const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
-    .map(extra => `${extra.id || ''}:${extra.note || ''}:${extra.amount || 0}:${(extra.memberIds || []).join(',')}`)
-    .join('|')}`;
-
-  useEffect(() => {
-    setWaterInput(formatAmountInput(session.costs?.waterAmount || 0));
-    setExtras(initialExtraDrafts(session.costs?.extras || [], allMemberIds));
-    setExtrasOpen(false);
-    setWaterOpen(false);
-  }, [costDraftKey]);
-
-  useEffect(() => {
-    setCostSaveState('');
-  }, [session.id]);
-
-  const updateExtra = (id, patch) => {
-    setExtras(prev => prev.map(extra => (
-      extra.id === id ? { ...extra, ...patch } : extra
-    )));
-  };
-  const addExtra = () => {
-    setExtras(prev => [
-      ...prev,
-      {
-        id: `new-${Date.now()}-${prev.length}`,
-        note: '',
-        amountInput: '',
-        memberIds: [],
-      },
-    ]);
-    setExtrasOpen(true);
-  };
-  const save = async () => {
-    if (savingCost) return;
-    const cleanedExtras = extras
-      .map(extra => {
-        const memberIds = allMemberIds.length > 0 && extra.memberIds.length === allMemberIds.length
-          ? null
-          : extra.memberIds;
-        return {
-          note: extra.note,
-          amount: parseAmount(extra.amountInput),
-          memberIds,
-        };
-      })
-      .filter(extra => extra.amount > 0);
-    setSavingCost(true);
-    setCostSaveState('');
-    try {
-      await onAction?.('saveSessionCost', {
-        sessionId: session.id,
-        waterAmount: parseAmount(waterInput),
-        extras: cleanedExtras,
-      });
-      setCostSaveState('saved');
-    } catch (err) {
-      console.error('[PickleballCalendar] saveSessionCost:', err);
-      setCostSaveState('error');
-    } finally {
-      setSavingCost(false);
-    }
-  };
-
+function SessionCostSection({
+  isTreasurer,
+  members,
+  waterInput,
+  setWaterInput,
+  waterOpen,
+  setWaterOpen,
+  extras,
+  extrasOpen,
+  setExtrasOpen,
+  updateExtra,
+  addExtra,
+  costSaveState,
+  canEdit,
+}) {
   return (
     <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${colors.borderSubtle}` }}>
       <div style={{
@@ -479,11 +529,6 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
         </div>
       )}
 
-      {canEdit && (
-        <Button block variant="success" disabled={savingCost} style={{ marginTop: 14, padding: 12, borderRadius: 12, opacity: savingCost ? 0.68 : 1 }} onClick={save}>
-          {savingCost ? 'Đang lưu...' : 'Lưu'}
-        </Button>
-      )}
       {costSaveState && (
         <div style={{
           marginTop: 8,

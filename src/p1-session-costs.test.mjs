@@ -199,12 +199,14 @@ test('calendar detail panel contains the P1 session-cost editor contract', () =>
   assert.match(calendarSource, /memberIds/)
 })
 
-test('calendar session-cost save awaits the action and shows save feedback', () => {
-  assert.match(calendarSource, /const \[savingCost, setSavingCost\] = useState\(false\)/)
+test('calendar session-cost status toggle awaits save action and shows save feedback', () => {
+  assert.match(calendarSource, /const \[savingSessionToggle, setSavingSessionToggle\] = useState\(false\)/)
   assert.match(calendarSource, /await onAction\?\.\('saveSessionCost'/)
+  assert.match(calendarSource, /await onAction\?\.\('completeSession'/)
   assert.match(calendarSource, /setCostSaveState\('saved'\)/)
   assert.match(calendarSource, /setCostSaveState\('error'\)/)
-  assert.match(calendarSource, /disabled=\{savingCost\}/)
+  assert.match(calendarSource, /disabled=\{savingSessionToggle\}/)
+  assert.doesNotMatch(calendarSource, />\s*Lưu\s*<\/Button>/)
 })
 
 test('calendar session-cost editor keeps water input collapsed until opened', () => {

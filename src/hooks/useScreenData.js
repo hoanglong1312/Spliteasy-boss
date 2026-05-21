@@ -1427,6 +1427,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   }, 0)
   const sessionKey = dateKey(sessionDate(session))
   const todayKey = dateKey(today)
+  const completed = isDoneStatus(session?.status)
 
   return {
     id: session.id,
@@ -1457,7 +1458,8 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     ],
     totalPerPerson: courtPerPerson + waterPerPerson + extrasPerPerson,
     canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
-    canComplete: sessionKey <= todayKey && !isDoneStatus(session?.status),
+    canComplete: sessionKey <= todayKey,
+    isCompleted: completed,
   }
 }
 

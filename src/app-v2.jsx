@@ -444,6 +444,17 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'reopenSession') {
+      if (!isTreasurer) return
+      const sessionId = payload?.sessionId ?? payload?.id ?? payload
+      if (!sessionId) return
+      await dispatch({
+        type: 'REOPEN_PICKLEBALL_SESSION',
+        sessionId,
+      })
+      return
+    }
+
     if (type === 'markTicketPaid') {
       if (!isTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id ?? payload

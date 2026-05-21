@@ -346,22 +346,33 @@ test('settings screen no longer renders venue selection', () => {
   assert.doesNotMatch(settingsSource, /defaultVenue:/)
 })
 
-test('calendar attendance chips call markAttendance and detail has one save path', () => {
+test('calendar attendance chips call markAttendance and detail uses the status toggle as save path', () => {
   assert.match(calendarSource, /onAction\?\.\('markAttendance', \{\s*sessionId: session\.id,\s*memberId: a\.id,\s*status: a\.kind === 'present' \? 'absent' : 'present'/)
-  assert.match(calendarSource, /\{savingCost \? 'Đang lưu\.\.\.' : 'Lưu'\}/)
+  assert.match(calendarSource, /onAction\?\.\('saveSessionCost'/)
+  assert.match(calendarSource, /toggleSessionCompletion/)
+  assert.doesNotMatch(calendarSource, /\{savingCost \? 'Đang lưu\.\.\.' : 'Lưu'\}/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('togglePresence'/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('reschedule'/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('complete'/)
+  assert.doesNotMatch(calendarSource, />\s*Lưu\s*<\/Button>/)
   assert.doesNotMatch(calendarSource, />\s*Lưu chi phí\s*<\/Button>/)
 })
 
 test('treasurer can explicitly complete a session before calendar marks it attended', () => {
   assert.match(calendarSource, /session\.canComplete/)
+  assert.match(calendarSource, /session\.isCompleted/)
+  assert.match(calendarSource, /aria-pressed=\{session\.isCompleted\}/)
+  assert.match(calendarSource, /await saveSessionCosts\(\)/)
   assert.match(calendarSource, /onAction\?\.\('completeSession', session\.id\)/)
+  assert.match(calendarSource, /onAction\?\.\('reopenSession', session\.id\)/)
   assert.match(appSource, /if \(type === 'completeSession'\)/)
+  assert.match(appSource, /if \(type === 'reopenSession'\)/)
   assert.match(appSource, /type: 'COMPLETE_PICKLEBALL_SESSION'/)
+  assert.match(appSource, /type: 'REOPEN_PICKLEBALL_SESSION'/)
   assert.match(storeSource, /case 'COMPLETE_PICKLEBALL_SESSION':/)
+  assert.match(storeSource, /case 'REOPEN_PICKLEBALL_SESSION':/)
   assert.match(storeSource, /\.update\(\{ status: 'completed' \}\)/)
+  assert.match(storeSource, /\.update\(\{ status: 'scheduled' \}\)/)
 })
 
 test('calendar attendance chips use compact 34px avatar-style green and grey states', () => {

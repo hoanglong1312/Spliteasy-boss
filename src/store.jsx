@@ -1773,6 +1773,22 @@ export function AppProvider({ children }) {
         break
       }
 
+      case 'REOPEN_PICKLEBALL_SESSION': {
+        if (!sb) return
+        const { sessionId } = action
+        if (!sessionId) return
+        const session = findPickleSessionInState(stateRef.current, sessionId)
+        const sourceTable = session?.sourceTable || session?.source_table
+        const table = sourceTable === 'pickleball_sessions' ? 'pickleball_sessions' : 'pickle_sessions'
+        const { error } = await sb
+          .from(table)
+          .update({ status: 'scheduled' })
+          .eq('id', sessionId)
+        if (error) throw error
+        await refresh()
+        break
+      }
+
       case 'CONFIRM_ATTENDANCE': {
         if (!sb) return
         const { sessionId, memberId, attending } = action
