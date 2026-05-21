@@ -153,6 +153,8 @@ export default function AppV2() {
     if (type === 'saveSettings' || (type === 'save' && stack[stack.length - 1]?.screen === 'pickleball-settings')) {
       const groupId = state.currentGroupId
       const yearMonth = payload?.currentYearMonth || monthKey(new Date())
+      const { token } = getStoredAuth()
+      const sb = token ? createSupabase(token) : null
       const oldMonthlyConfig = findMonthlyPickleConfig(state, groupId, yearMonth)
       const oldWeekdays = normalizeScheduleWeekdays(oldMonthlyConfig.scheduleWeekdays ?? oldMonthlyConfig.schedule_weekdays)
       const existingScheduledSessions = scheduledSessionsForMonth(state, groupId, yearMonth)
@@ -177,55 +179,98 @@ export default function AppV2() {
       }
       await dispatch(action)
       const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || hasScheduledSessionsWithOldDays
-      if (shouldRegenerateSchedule && groupId) {
-        const { token } = getStoredAuth()
-        if (token) {
-          const sb = createSupabase(token)
-          await dispatch({ type: 'SET_PICKLE_REGEN', value: true })
-          try {
-            const [deleteResult1, deleteResult2] = await Promise.all([
-              sb
-                .from('pickle_sessions')
-                .delete()
-                .eq('group_id', groupId)
-                .eq('status', 'scheduled')
-                .gte('session_date', `${yearMonth}-01`)
-                .lte('session_date', `${yearMonth}-31`),
-              sb
-                .from('pickleball_sessions')
-                .delete()
-                .eq('group_id', groupId)
-                .gte('date', `${yearMonth}-01`)
-                .lte('date', `${yearMonth}-31`),
-            ])
-            if (deleteResult1.error) throw deleteResult1.error
-            if (deleteResult2.error) throw deleteResult2.error
+      if (shouldRegenerateSchedule && groupId && sb) {
+        await dispatch({ type: 'SET_PICKLE_REGEN', value: true })
+        try {
+          const [deleteResult1, deleteResult2] = await Promise.all([
+            sb
+              .from('pickle_sessions')
+              .delete()
+              .eq('group_id', groupId)
+              .eq('status', 'scheduled')
+              .gte('session_date', `${yearMonth}-01`)
+              .lte('session_date', `${yearMonth}-31`),
+            sb
+              .from('pickleball_sessions')
+              .delete()
+              .eq('group_id', groupId)
+              .gte('date', `${yearMonth}-01`)
+              .lte('date', `${yearMonth}-31`),
+          ])
+          if (deleteResult1.error) throw deleteResult1.error
+          if (deleteResult2.error) throw deleteResult2.error
 
-            await dispatch({
-              type: 'CLEAR_SCHEDULED_SESSIONS',
-              groupId,
-              yearMonth,
-            })
+          await dispatch({
+            type: 'CLEAR_SCHEDULED_SESSIONS',
+            groupId,
+            yearMonth,
+          })
 
-            const generationConfig = {
-              ...sessionGenerationConfigFromState(state, yearMonth),
-              scheduleWeekdays: newWeekdays,
-              scheduleTime: action.scheduleTime,
-              startDate: action.scheduleStartDay,
-            }
-            await dispatch({
-              type: 'AUTO_GENERATE_SESSIONS',
-              groupId,
-              yearMonth,
-              config: generationConfig,
-              force: true,
-            })
-          } finally {
-            await dispatch({ type: 'SET_PICKLE_REGEN', value: false })
+          const generationConfig = {
+            ...sessionGenerationConfigFromState(state, yearMonth),
+            scheduleWeekdays: newWeekdays,
+            scheduleTime: action.scheduleTime,
+            startDate: action.scheduleStartDay,
           }
+          await dispatch({
+            type: 'AUTO_GENERATE_SESSIONS',
+            groupId,
+            yearMonth,
+            config: generationConfig,
+            force: true,
+          })
+        } finally {
+          await dispatch({ type: 'SET_PICKLE_REGEN', value: false })
         }
       }
-      alert('Đã lưu cài đặt tháng này')
+      if (groupId && sb) {
+        const [y, m] = yearMonth.split('-').map(Number)
+        const nextYearMonth = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`
+
+        await dispatch({
+          type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
+          groupId,
+          yearMonth: nextYearMonth,
+          courtFee: payload?.courtFee,
+          ticketPrice: payload?.ticketPrice,
+          scheduleWeekdays: payload?.weekdays,
+          scheduleStartDay: null,
+          scheduleTime: payload?.scheduleTime,
+          skipIfExists: true,
+        })
+
+        const [d1, d2] = await Promise.all([
+          sb
+            .from('pickle_sessions')
+            .delete()
+            .eq('group_id', groupId)
+            .eq('status', 'scheduled')
+            .gte('session_date', `${nextYearMonth}-01`)
+            .lte('session_date', `${nextYearMonth}-31`),
+          sb
+            .from('pickleball_sessions')
+            .delete()
+            .eq('group_id', groupId)
+            .gte('date', `${nextYearMonth}-01`)
+            .lte('date', `${nextYearMonth}-31`),
+        ])
+        if (d1.error) console.warn('[saveSettings] next month delete p1:', d1.error)
+        if (d2.error) console.warn('[saveSettings] next month delete p2:', d2.error)
+
+        const nextConfig = {
+          ...sessionGenerationConfigFromState(state, nextYearMonth),
+          scheduleWeekdays: newWeekdays,
+          scheduleTime: action.scheduleTime,
+        }
+        await dispatch({
+          type: 'AUTO_GENERATE_SESSIONS',
+          groupId,
+          yearMonth: nextYearMonth,
+          config: nextConfig,
+          force: true,
+        })
+      }
+      alert('Đã lưu cài đặt và tạo lịch tháng sau')
       setStack((s) => s.slice(0, -1))
       return
     }

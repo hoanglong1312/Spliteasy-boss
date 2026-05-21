@@ -191,8 +191,6 @@ export default function PickleballSettings({ data, onAction }) {
               />
             </div>
           </div>
-          <FieldLabel>Địa điểm</FieldLabel>
-          <SelectField icon="📍" label={d.defaultVenue || 'CLB Pickleball'} />
 
           {/* Preview */}
           <div style={{
@@ -264,21 +262,6 @@ function FieldLabel({ children }) {
   );
 }
 
-function SelectField({ icon, label }) {
-  return (
-    <div style={{
-      width: '100%', padding: '11px 12px',
-      background: colors.inputBg,
-      border: `1px solid ${colors.borderSubtle}`,
-      borderRadius: 12,
-      display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
-    }}>
-      <span>{icon}</span>
-      <span style={{ fontSize: 13, fontWeight: 600 }}>{label}</span>
-    </div>
-  );
-}
-
 function Toggle({ on, onChange }) {
   return (
     <button onClick={() => onChange?.(!on)} style={{
@@ -305,7 +288,6 @@ const DEMO = {
   currentRole: 'treasurer',
   weekdays: ['T2','T4','T6'],
   timeRange: '19:00 – 21:00',
-  defaultVenue: 'Sân 3 · Trung tâm Cầu Giấy',
   startDate: '01/05/2026',
   autoGenerate: true,
   nextMonthPreview: {

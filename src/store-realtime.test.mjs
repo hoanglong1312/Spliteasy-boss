@@ -54,3 +54,12 @@ test('monthly pickleball config save persists schedule time aliases', () => {
   assert.match(source, /if \('scheduleTime' in action \|\| 'schedule_time' in action \|\| 'timeRange' in action\) \{/)
   assert.match(source, /row\.schedule_time = action\.scheduleTime \?\? action\.schedule_time \?\? action\.timeRange \?\? null/)
 })
+
+test('monthly pickleball config save can skip existing rows', () => {
+  const match = storeSource.match(/case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': \{[\s\S]*?\n      \}/)
+  assert.ok(match, 'SAVE_PICKLEBALL_MONTHLY_CONFIG case is available')
+  const source = match[0]
+
+  assert.match(source, /ignoreDuplicates: action\.skipIfExists === true/)
+  assert.match(source, /action\.skipIfExists === true \? await query\.maybeSingle\(\) : await query\.single\(\)/)
+})

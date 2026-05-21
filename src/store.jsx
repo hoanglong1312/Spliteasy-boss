@@ -1616,11 +1616,14 @@ export function AppProvider({ children }) {
         if ('scheduleTime' in action || 'schedule_time' in action || 'timeRange' in action) {
           row.schedule_time = action.scheduleTime ?? action.schedule_time ?? action.timeRange ?? null
         }
-        const { data, error } = await sb
+        const query = sb
           .from('pickleball_monthly_config')
-          .upsert(row, { onConflict: 'group_id,year_month' })
+          .upsert(row, {
+            onConflict: 'group_id,year_month',
+            ignoreDuplicates: action.skipIfExists === true,
+          })
           .select()
-          .single()
+        const { data, error } = action.skipIfExists === true ? await query.maybeSingle() : await query.single()
         if (error) {
           console.error('[store] SAVE_PICKLEBALL_MONTHLY_CONFIG:', error)
           throw error

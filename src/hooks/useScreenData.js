@@ -715,7 +715,6 @@ function buildPickleballSettingsData(state) {
     currentRole: currentMember?.role,
     activeMonthlyMemberIds,
     courtFeePerSession: Math.round(courtFeeTotal / Math.max(sessionsCount, 1)),
-    defaultVenue: config?.defaultVenue || config?.default_venue || group?.defaultVenue || 'CLB Pickleball',
     scheduleDay: weekdays.join(', '),
     scheduleTime,
     maxMembers: Number(config?.maxMembers ?? config?.max_members ?? members.length) || members.length || 12,
@@ -723,7 +722,7 @@ function buildPickleballSettingsData(state) {
     courtFeeTotal,
     ticketPrice,
     sessionsCount,
-    memberCount: members.length || safeArray(state?.pickle?.fixedMembers).length || 1,
+    memberCount: activeMonthlyMemberIds.length || members.length || 1,
     members: members.map(m => ({
       id: m.id || m.member_id,
       name: m.name || m.member_name,
@@ -1329,7 +1328,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const presentIds = effectiveSessionMemberIds(session, groupMembers)
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
-  const attendanceMembers = groupMembers
+  const attendanceMembers = groupMembers.filter(member => memberType(member) === 'fixed')
   const attendees = [
     ...attendanceMembers.map(member => ({
       id: member.id,

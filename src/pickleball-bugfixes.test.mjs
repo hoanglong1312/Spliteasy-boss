@@ -5,6 +5,7 @@ import vm from 'node:vm'
 
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 const calendarSource = readFileSync(new URL('./screens/PickleballCalendar.jsx', import.meta.url), 'utf8')
+const settingsSource = readFileSync(new URL('./screens/PickleballSettings.jsx', import.meta.url), 'utf8')
 const ticketsSource = readFileSync(new URL('./screens/PickleballTickets.jsx', import.meta.url), 'utf8')
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
@@ -175,7 +176,7 @@ test('calendar marks only explicit absent members absent on legacy attendance ro
   ])
 })
 
-test('calendar attendance list includes absent casual members alongside fixed members', () => {
+test('calendar attendance list renders only fixed members while present count includes casual attendance', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {
     currentUserId: 'm1',
@@ -197,7 +198,7 @@ test('calendar attendance list includes absent casual members alongside fixed me
           attendees: [],
           attendanceRecords: [
             { sessionId: 'old-3', memberId: 'm2', status: 'absent' },
-            { sessionId: 'old-3', memberId: 'm3', status: 'absent' },
+            { sessionId: 'old-3', memberId: 'm3', status: 'present' },
           ],
         },
       ],
@@ -212,9 +213,9 @@ test('calendar attendance list includes absent casual members alongside fixed me
   assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.attendees.map(row => [row.id, row.kind, row.memberType]))), [
     ['m1', 'present', 'fixed'],
     ['m2', 'absent', 'fixed'],
-    ['m3', 'absent', 'casual'],
   ])
-  assert.equal(data.selectedSession.attendance.total, 3)
+  assert.equal(data.selectedSession.attendance.present, 2)
+  assert.equal(data.selectedSession.attendance.total, 2)
 })
 
 test('calendar data exposes active casual members for guest quick-select', () => {
@@ -293,6 +294,53 @@ test('settings calculates session count from configured weekdays in the current 
   const data = buildPickleballSettingsData(state)
 
   assert.equal(data.sessionsCount, 13)
+})
+
+test('settings member count uses active monthly members and does not expose venue', () => {
+  const { buildPickleballSettingsData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', defaultVenue: 'Sân cũ' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', role: 'treasurer' },
+      { id: 'm2', groupId: 'g1', name: 'Binh' },
+      { id: 'm3', groupId: 'g1', name: 'Chi' },
+    ],
+    pickle: {
+      fixedMembers: ['m1', 'm2', 'm3'],
+      sessions: [],
+      monthlyConfigs: [
+        {
+          groupId: 'g1',
+          yearMonth: '2026-05',
+          active_member_ids: ['m1', 'm3'],
+        },
+      ],
+    },
+    _allPickle: {
+      configs: [{ groupId: 'g1', defaultVenue: 'Sân fallback' }],
+      monthlyConfigs: [
+        {
+          groupId: 'g1',
+          yearMonth: '2026-05',
+          active_member_ids: ['m1', 'm3'],
+        },
+      ],
+      sessions: [],
+    },
+  }
+
+  const data = buildPickleballSettingsData(state)
+
+  assert.equal(data.memberCount, 2)
+  assert.equal(Object.hasOwn(data, 'defaultVenue'), false)
+})
+
+test('settings screen no longer renders venue selection', () => {
+  assert.doesNotMatch(settingsSource, /<FieldLabel>Địa điểm<\/FieldLabel>/)
+  assert.doesNotMatch(settingsSource, /d\.defaultVenue/)
+  assert.doesNotMatch(settingsSource, /defaultVenue:/)
 })
 
 test('calendar attendance chips call markAttendance and detail has one save path', () => {

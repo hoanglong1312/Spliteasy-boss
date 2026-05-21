@@ -86,12 +86,26 @@ test('AppV2 passes pickleball settings time and home treasurer role through prop
 })
 
 test('AppV2 regenerates pickleball schedule from payload weekdays instead of dispatch return', () => {
-  const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+  const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?setStack\(\(s\) => s\.slice\(0, -1\)\)/)?.[0] || ''
 
   assert.match(settingsSaveBlock, /const newWeekdays = normalizeScheduleWeekdays\(payload\?\.weekdays\)/)
   assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
   assert.match(settingsSaveBlock, /scheduleWeekdays: newWeekdays/)
   assert.doesNotMatch(settingsSaveBlock, /savedWeekdays/)
+})
+
+test('AppV2 saveSettings pre-generates next-month pickleball schedule', () => {
+  const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?setStack\(\(s\) => s\.slice\(0, -1\)\)/)?.[0] || ''
+
+  assert.match(settingsSaveBlock, /const \[y, m\] = yearMonth\.split\('-'\)\.map\(Number\)/)
+  assert.match(settingsSaveBlock, /const nextYearMonth = /)
+  assert.match(settingsSaveBlock, /padStart\(2, '0'\)/)
+  assert.match(settingsSaveBlock, /type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG'[\s\S]*?yearMonth: nextYearMonth[\s\S]*?scheduleStartDay: null[\s\S]*?skipIfExists: true/)
+  assert.match(settingsSaveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.gte\('session_date', `\$\{nextYearMonth\}-01`\)[\s\S]*?\.lte\('session_date', `\$\{nextYearMonth\}-31`\)/)
+  assert.match(settingsSaveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.gte\('date', `\$\{nextYearMonth\}-01`\)[\s\S]*?\.lte\('date', `\$\{nextYearMonth\}-31`\)/)
+  assert.match(settingsSaveBlock, /const nextConfig = \{[\s\S]*?\.\.\.sessionGenerationConfigFromState\(state, nextYearMonth\)[\s\S]*?scheduleWeekdays: newWeekdays[\s\S]*?scheduleTime: action\.scheduleTime/)
+  assert.match(settingsSaveBlock, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*?yearMonth: nextYearMonth[\s\S]*?config: nextConfig[\s\S]*?force: true/)
+  assert.match(settingsSaveBlock, /alert\('Đã lưu cài đặt và tạo lịch tháng sau'\)/)
 })
 
 test('Member management screens are registered in the app source', () => {
