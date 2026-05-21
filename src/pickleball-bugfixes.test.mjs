@@ -176,7 +176,7 @@ test('calendar marks only explicit absent members absent on legacy attendance ro
   ])
 })
 
-test('calendar attendance list renders only fixed members while present count includes casual attendance', () => {
+test('calendar attendance count follows fixed members and ignores casual attendance', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {
     currentUserId: 'm1',
@@ -197,7 +197,6 @@ test('calendar attendance list renders only fixed members while present count in
           status: 'completed',
           attendees: [],
           attendanceRecords: [
-            { sessionId: 'old-3', memberId: 'm2', status: 'absent' },
             { sessionId: 'old-3', memberId: 'm3', status: 'present' },
           ],
         },
@@ -212,7 +211,7 @@ test('calendar attendance list renders only fixed members while present count in
 
   assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.attendees.map(row => [row.id, row.kind, row.memberType]))), [
     ['m1', 'present', 'fixed'],
-    ['m2', 'absent', 'fixed'],
+    ['m2', 'present', 'fixed'],
   ])
   assert.equal(data.selectedSession.attendance.present, 2)
   assert.equal(data.selectedSession.attendance.total, 2)

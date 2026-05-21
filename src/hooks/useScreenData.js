@@ -1345,6 +1345,9 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
   const attendanceMembers = groupMembers.filter(member => memberType(member) === 'fixed')
+  const fixedPresentCount = attendanceMembers
+    .filter(member => presentSet.has(String(member.id)))
+    .length
   const attendees = [
     ...attendanceMembers.map(member => ({
       id: member.id,
@@ -1382,8 +1385,8 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     court: sessionCourt(session),
     status: calendarSessionStatus(session, today),
     attendance: {
-      present: presentIds.length,
-      total: Math.max(attendanceMembers.length, presentIds.length),
+      present: fixedPresentCount,
+      total: attendanceMembers.length,
       guests: guests.length,
     },
     attendees,
