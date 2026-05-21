@@ -225,13 +225,24 @@ test('calendar guest form disables duplicate submissions while addGuest is pendi
 
 test('batch entry sends batch water saves and can cancel back', () => {
   assert.match(batchSource, /onAction\?\.\('saveBatchCosts'/)
-  assert.match(batchSource, /sessions:\s*sessions\.map/)
+  assert.match(batchSource, /parseMonthlyWaterInput\(bulkInput, sessions\)/)
+  assert.match(batchSource, /sessions:\s*parsedRows\.map/)
+  assert.match(batchSource, /textarea/)
+  assert.match(batchSource, /Dán tiền nước/)
   assert.match(batchSource, /onAction\?\.\('back'\)/)
   assert.match(batchSource, /Tổng nước tháng/)
-  assert.match(batchSource, /Phát sinh/)
   assert.match(batchSource, /position:\s*'sticky'[\s\S]*bottom:\s*0[\s\S]*background:\s*colors\.pageBg[\s\S]*zIndex:\s*10/)
-  assert.match(batchSource, /memberIds:\s*\[\]/)
-  assert.doesNotMatch(batchSource, /memberIds:\s*\(members \|\| \[\]\)\.map\(member => member\.id\)/)
+  assert.doesNotMatch(batchSource, /openExtraSheet/)
+  assert.doesNotMatch(batchSource, /ExtraBottomSheet/)
+})
+
+test('batch entry supports amount-per-line and date-prefixed monthly water formats', () => {
+  assert.match(batchSource, /function parseMonthlyWaterInput\(input, sessions\)/)
+  assert.match(batchSource, /const dateMatch = line\.match/)
+  assert.match(batchSource, /const hasAmountDigits = \/\\d\/\.test\(amountText\)/)
+  assert.match(batchSource, /findSessionByInputDate\(sessions, dateMatch/)
+  assert.match(batchSource, /: sessions\[sequentialIndex\]/)
+  assert.match(batchSource, /formatAmountInput\(amount\)/)
 })
 
 test('app handlers persist session water and extras through pickleball_session_items', () => {
@@ -251,6 +262,17 @@ test('saveSessionCost saves water for primary pickle_sessions through linked exp
   assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.select\('id'\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
   assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.update\(\{[\s\S]*?amount: waterAmount/)
   assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.insert\(\{[\s\S]*?pickle_session_id: sessionId[\s\S]*?category: 'water'/)
+})
+
+test('saveBatchCosts routes primary pickle_sessions water through expenses', () => {
+  const handlerSource = appSource.match(/if \(type === 'saveBatchCosts'\) \{[\s\S]*?\n    if \(type === 'togglePresence'\)/)?.[0] || ''
+
+  assert.match(handlerSource, /findSessionInPickleState\(state, row\.sessionId\)/)
+  assert.match(handlerSource, /sourceTable === 'pickle_sessions'/)
+  assert.match(handlerSource, /savePickleSessionWaterExpense\(sb, state, session, row\.sessionId, row\.waterAmount\)/)
+  assert.match(appSource, /async function savePickleSessionWaterExpense\(/)
+  assert.match(appSource, /\.from\('expenses'\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
+  assert.match(appSource, /if \(waterAmount <= 0\) \{[\s\S]*?\.from\('expenses'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', existingWater\.id\)/)
 })
 
 test('saveSessionCost saves extras for primary pickle_sessions through expenses and participants', () => {

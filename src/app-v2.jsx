@@ -703,20 +703,36 @@ export default function AppV2() {
       const rows = (payload?.sessions || [])
         .filter(session => session?.sessionId || session?.id)
         .map(session => ({
-          session_id: session.sessionId || session.id,
-          name: 'Nước',
-          amount: parseMoneyAmount(session.waterAmount ?? session.water),
-          member_ids: [],
-          created_by: state.currentUserId || null,
+          sessionId: session.sessionId || session.id,
+          waterAmount: parseMoneyAmount(session.waterAmount ?? session.water),
         }))
+        .filter(row => row.waterAmount >= 0)
       if (rows.length === 0) return
       const { token } = getStoredAuth()
       if (!token) return
       const sb = createSupabase(token)
-      const { error } = await sb
-        .from('pickleball_session_items')
-        .upsert(rows, { onConflict: 'session_id,name' })
-      if (error) throw error
+      const legacyRows = []
+      for (const row of rows) {
+        const session = findSessionInPickleState(state, row.sessionId)
+        const sourceTable = session?.sourceTable || session?.source_table
+        if (sourceTable === 'pickle_sessions') {
+          await savePickleSessionWaterExpense(sb, state, session, row.sessionId, row.waterAmount)
+        } else {
+          legacyRows.push({
+            session_id: row.sessionId,
+            name: 'Nước',
+            amount: row.waterAmount,
+            member_ids: [],
+            created_by: state.currentUserId || null,
+          })
+        }
+      }
+      if (legacyRows.length > 0) {
+        const { error } = await sb
+          .from('pickleball_session_items')
+          .upsert(legacyRows, { onConflict: 'session_id,name' })
+        if (error) throw error
+      }
       await dispatch({ type: 'REFRESH' })
       setStack((s) => s[s.length - 1]?.screen === 'batch-entry' ? s.slice(0, -1) : s)
       return
@@ -1267,6 +1283,63 @@ function currentGroupMemberIds(state, groupId) {
     .filter(member => !groupId || String(member?.groupId || member?.group_id || '') === String(groupId))
     .map(member => member.id)
     .filter(Boolean)
+}
+
+async function savePickleSessionWaterExpense(sb, state, session, sessionId, waterAmount) {
+  const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
+  const { data: existingWater, error: existingWaterError } = await sb
+    .from('expenses')
+    .select('id')
+    .eq('pickle_session_id', sessionId)
+    .eq('category', 'water')
+    .limit(1)
+    .maybeSingle()
+  if (existingWaterError) throw existingWaterError
+
+  if (waterAmount <= 0) {
+    if (existingWater?.id) {
+      const { error: deleteWaterError } = await sb
+        .from('expenses')
+        .delete()
+        .eq('id', existingWater.id)
+      if (deleteWaterError) throw deleteWaterError
+    }
+    return
+  }
+
+  if (existingWater?.id) {
+    const { error: updateWaterError } = await sb
+      .from('expenses')
+      .update({
+        title: 'Tiền nước',
+        amount: waterAmount,
+        paid_by_member_id: state.currentUserId,
+        reviewed_by_member_id: state.currentUserId,
+        reviewed_at: new Date().toISOString(),
+        status: 'approved',
+      })
+      .eq('id', existingWater.id)
+    if (updateWaterError) throw updateWaterError
+    return
+  }
+
+  const { error: insertWaterError } = await sb
+    .from('expenses')
+    .insert({
+      group_id: session?.groupId || session?.group_id || state.currentGroupId,
+      module: 'pickleball',
+      pickle_session_id: sessionId,
+      title: 'Tiền nước',
+      amount: waterAmount,
+      expense_date: expenseDate,
+      category: 'water',
+      paid_by_member_id: state.currentUserId,
+      submitted_by_member_id: state.currentUserId,
+      status: 'approved',
+      reviewed_by_member_id: state.currentUserId,
+      reviewed_at: new Date().toISOString(),
+    })
+  if (insertWaterError) throw insertWaterError
 }
 
 function parseMoneyAmount(value) {
