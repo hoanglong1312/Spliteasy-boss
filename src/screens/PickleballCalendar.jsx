@@ -156,17 +156,23 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
     : Array.isArray(session.costs) ? session.costs : [];
   const [guestName, setGuestName] = useState('');
   const [guestFormOpen, setGuestFormOpen] = useState(false);
+  const [submittingGuest, setSubmittingGuest] = useState(false);
 
   async function addGuest(event) {
     event.preventDefault();
     const name = guestName.trim();
-    if (!name) return;
-    await onAction?.('addGuest', {
-      sessionId: session.id,
-      guestName: name,
-    });
-    setGuestName('');
-    setGuestFormOpen(false);
+    if (!name || submittingGuest) return;
+    setSubmittingGuest(true);
+    try {
+      await onAction?.('addGuest', {
+        sessionId: session.id,
+        guestName: name,
+      });
+      setGuestName('');
+      setGuestFormOpen(false);
+    } finally {
+      setSubmittingGuest(false);
+    }
   }
 
   return (
@@ -234,7 +240,7 @@ function SessionDetailPanel({ session, isTreasurer, onAction }) {
             inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 700 }}
             style={{ marginTop: 0 }}
           />
-          <Button type="submit" variant="muted" style={{ padding: '10px 12px', borderRadius: 10, fontSize: 12 }}>
+          <Button type="submit" disabled={submittingGuest} variant="muted" style={{ padding: '10px 12px', borderRadius: 10, fontSize: 12 }}>
             Thêm
           </Button>
         </form>
@@ -280,6 +286,7 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
   const allMemberIds = members.map(member => member.id);
   const [waterInput, setWaterInput] = useState('');
   const [extrasOpen, setExtrasOpen] = useState(false);
+  const [waterOpen, setWaterOpen] = useState(false);
   const [extras, setExtras] = useState([]);
   const canEdit = Boolean(isTreasurer);
   const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
@@ -290,6 +297,7 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
     setWaterInput(formatAmountInput(session.costs?.waterAmount || 0));
     setExtras(initialExtraDrafts(session.costs?.extras || [], allMemberIds));
     setExtrasOpen(false);
+    setWaterOpen(false);
   }, [costDraftKey]);
 
   const updateExtra = (id, patch) => {
@@ -342,17 +350,32 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
         </span>
       </div>
 
-      <Input
-        label="💧 Tiền nước"
-        suffix="đ"
-        value={waterInput}
-        disabled={!canEdit}
-        inputMode="numeric"
-        onChange={(event) => setWaterInput(formatAmountInput(event.target.value))}
-        placeholder="0"
-        inputStyle={{ fontWeight: 800, ...type.mono, opacity: canEdit ? 1 : 0.7 }}
-        style={{ marginTop: 0 }}
-      />
+      <button
+        type="button"
+        onClick={() => setWaterOpen(open => !open)}
+        style={{
+          marginTop: 8, width: '100%', padding: '10px 0',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: 'transparent', border: 'none',
+          color: '#cbd5e1', fontFamily: 'inherit', cursor: 'pointer',
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 800 }}>💧 Tiền nước</span>
+        <span style={{ fontSize: 11, color: colors.textSecondary }}>{waterOpen ? '▼' : '▶'}</span>
+      </button>
+      {waterOpen && (
+        <Input
+          label=""
+          suffix="đ"
+          value={waterInput}
+          disabled={!canEdit}
+          inputMode="numeric"
+          onChange={(event) => setWaterInput(formatAmountInput(event.target.value))}
+          placeholder="0"
+          inputStyle={{ fontWeight: 800, ...type.mono, opacity: canEdit ? 1 : 0.7 }}
+          style={{ marginTop: 0 }}
+        />
+      )}
 
       <button
         type="button"

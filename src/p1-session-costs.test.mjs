@@ -94,6 +94,22 @@ test('calendar detail panel contains the P1 session-cost editor contract', () =>
   assert.match(calendarSource, /memberIds/)
 })
 
+test('calendar session-cost editor keeps water input collapsed until opened', () => {
+  assert.match(calendarSource, /const \[waterOpen, setWaterOpen\] = useState\(false\)/)
+  assert.match(calendarSource, /setWaterOpen\(false\)/)
+  assert.match(calendarSource, /onClick=\{\(\) => setWaterOpen\(open => !open\)\}/)
+  assert.match(calendarSource, /\{waterOpen \? '▼' : '▶'\}/)
+  assert.match(calendarSource, /\{waterOpen && \(/)
+})
+
+test('calendar guest form disables duplicate submissions while addGuest is pending', () => {
+  assert.match(calendarSource, /const \[submittingGuest, setSubmittingGuest\] = useState\(false\)/)
+  assert.match(calendarSource, /if \(!name \|\| submittingGuest\) return/)
+  assert.match(calendarSource, /setSubmittingGuest\(true\)/)
+  assert.match(calendarSource, /finally \{\s*setSubmittingGuest\(false\);\s*\}/)
+  assert.match(calendarSource, /<Button type="submit"[^>]*disabled=\{submittingGuest\}/)
+})
+
 test('batch entry sends batch water saves and can cancel back', () => {
   assert.match(batchSource, /onAction\?\.\('saveBatchCosts'/)
   assert.match(batchSource, /sessions:\s*sessions\.map/)
