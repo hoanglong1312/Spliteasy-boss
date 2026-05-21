@@ -348,7 +348,7 @@ test('settings screen no longer renders venue selection', () => {
 
 test('calendar attendance chips call markAttendance and detail has one save path', () => {
   assert.match(calendarSource, /onAction\?\.\('markAttendance', \{\s*sessionId: session\.id,\s*memberId: a\.id,\s*status: a\.kind === 'present' \? 'absent' : 'present'/)
-  assert.match(calendarSource, />\s*Lưu\s*<\/Button>/)
+  assert.match(calendarSource, /\{savingCost \? 'Đang lưu\.\.\.' : 'Lưu'\}/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('togglePresence'/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('reschedule'/)
   assert.doesNotMatch(calendarSource, /onAction\?\.\('complete'/)

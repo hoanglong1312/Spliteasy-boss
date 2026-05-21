@@ -132,6 +132,14 @@ test('calendar detail panel contains the P1 session-cost editor contract', () =>
   assert.match(calendarSource, /memberIds/)
 })
 
+test('calendar session-cost save awaits the action and shows save feedback', () => {
+  assert.match(calendarSource, /const \[savingCost, setSavingCost\] = useState\(false\)/)
+  assert.match(calendarSource, /await onAction\?\.\('saveSessionCost'/)
+  assert.match(calendarSource, /setCostSaveState\('saved'\)/)
+  assert.match(calendarSource, /setCostSaveState\('error'\)/)
+  assert.match(calendarSource, /disabled=\{savingCost\}/)
+})
+
 test('calendar session-cost editor keeps water input collapsed until opened', () => {
   assert.match(calendarSource, /const \[waterOpen, setWaterOpen\] = useState\(false\)/)
   assert.match(calendarSource, /setWaterOpen\(false\)/)
@@ -166,6 +174,16 @@ test('app handlers persist session water and extras through pickleball_session_i
   assert.match(appSource, /\.delete\(\)[\s\S]*?\.eq\('session_id', sessionId\)[\s\S]*?\.neq\('name', 'Nước'\)/)
   assert.match(appSource, /\.insert\([\s\S]*?member_ids/)
   assert.match(appSource, /type === 'saveBatchCosts'/)
+})
+
+test('saveSessionCost saves water for primary pickle_sessions through linked expenses', () => {
+  const handlerSource = appSource.match(/if \(type === 'saveSessionCost'\) \{[\s\S]*?\n    if \(type === 'saveBatchCosts'\)/)?.[0] || ''
+
+  assert.match(handlerSource, /findSessionInPickleState\(state, sessionId\)/)
+  assert.match(handlerSource, /sourceTable === 'pickle_sessions'/)
+  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.select\('id'\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
+  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.update\(\{[\s\S]*?amount: waterAmount/)
+  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.insert\(\{[\s\S]*?pickle_session_id: sessionId[\s\S]*?category: 'water'/)
 })
 
 test('saveSessionCost writes empty member arrays for all session item upserts', () => {

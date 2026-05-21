@@ -556,6 +556,55 @@ export default function AppV2() {
       if (!token) return
       const sb = createSupabase(token)
       const waterAmount = parseMoneyAmount(payload?.waterAmount)
+      const session = findSessionInPickleState(state, sessionId)
+      const sourceTable = session?.sourceTable || session?.source_table
+      if (sourceTable === 'pickle_sessions') {
+        if (waterAmount > 0) {
+          const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
+          const { data: existingWater, error: existingWaterError } = await sb
+            .from('expenses')
+            .select('id')
+            .eq('pickle_session_id', sessionId)
+            .eq('category', 'water')
+            .limit(1)
+            .maybeSingle()
+          if (existingWaterError) throw existingWaterError
+          if (existingWater?.id) {
+            const { error: updateWaterError } = await sb
+              .from('expenses')
+              .update({
+                title: 'Tiền nước',
+                amount: waterAmount,
+                paid_by_member_id: state.currentUserId,
+                reviewed_by_member_id: state.currentUserId,
+                reviewed_at: new Date().toISOString(),
+                status: 'approved',
+              })
+              .eq('id', existingWater.id)
+            if (updateWaterError) throw updateWaterError
+          } else {
+            const { error: insertWaterError } = await sb
+              .from('expenses')
+              .insert({
+                group_id: session?.groupId || session?.group_id || state.currentGroupId,
+                module: 'pickleball',
+                pickle_session_id: sessionId,
+                title: 'Tiền nước',
+                amount: waterAmount,
+                expense_date: expenseDate,
+                category: 'water',
+                paid_by_member_id: state.currentUserId,
+                submitted_by_member_id: state.currentUserId,
+                status: 'approved',
+                reviewed_by_member_id: state.currentUserId,
+                reviewed_at: new Date().toISOString(),
+              })
+            if (insertWaterError) throw insertWaterError
+          }
+        }
+        await dispatch({ type: 'REFRESH' })
+        return
+      }
       const { error: waterError } = await sb
         .from('pickleball_session_items')
         .upsert({
@@ -1144,6 +1193,17 @@ function shiftYearMonth(yearMonth, delta) {
   const [year, month] = String(yearMonth || monthKey(new Date())).split('-').map(Number)
   const date = new Date(year || new Date().getFullYear(), (month || 1) - 1 + delta, 1)
   return monthKey(date)
+}
+
+function findSessionInPickleState(state, sessionId) {
+  const target = String(sessionId || '')
+  if (!target) return null
+  return [
+    ...safeArray(state?.pickle?.sessions),
+    ...safeArray(state?.pickle?.upcoming),
+    ...safeArray(state?._allPickle?.sessions),
+    ...safeArray(state?.sessions),
+  ].find(session => String(session?.id || '') === target) || null
 }
 
 function parseMoneyAmount(value) {

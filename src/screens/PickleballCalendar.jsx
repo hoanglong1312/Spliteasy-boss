@@ -323,6 +323,8 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
   const [extras, setExtras] = useState([]);
+  const [savingCost, setSavingCost] = useState(false);
+  const [costSaveState, setCostSaveState] = useState('');
   const canEdit = Boolean(isTreasurer);
   const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
     .map(extra => `${extra.id || ''}:${extra.note || ''}:${extra.amount || 0}:${(extra.memberIds || []).join(',')}`)
@@ -334,6 +336,10 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
     setExtrasOpen(false);
     setWaterOpen(false);
   }, [costDraftKey]);
+
+  useEffect(() => {
+    setCostSaveState('');
+  }, [session.id]);
 
   const updateExtra = (id, patch) => {
     setExtras(prev => prev.map(extra => (
@@ -352,7 +358,8 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
     ]);
     setExtrasOpen(true);
   };
-  const save = () => {
+  const save = async () => {
+    if (savingCost) return;
     const cleanedExtras = extras
       .map(extra => {
         const memberIds = allMemberIds.length > 0 && extra.memberIds.length === allMemberIds.length
@@ -365,11 +372,21 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
         };
       })
       .filter(extra => extra.amount > 0);
-    onAction?.('saveSessionCost', {
-      sessionId: session.id,
-      waterAmount: parseAmount(waterInput),
-      extras: cleanedExtras,
-    });
+    setSavingCost(true);
+    setCostSaveState('');
+    try {
+      await onAction?.('saveSessionCost', {
+        sessionId: session.id,
+        waterAmount: parseAmount(waterInput),
+        extras: cleanedExtras,
+      });
+      setCostSaveState('saved');
+    } catch (err) {
+      console.error('[PickleballCalendar] saveSessionCost:', err);
+      setCostSaveState('error');
+    } finally {
+      setSavingCost(false);
+    }
   };
 
   return (
@@ -452,9 +469,19 @@ function SessionCostSection({ session, isTreasurer, onAction }) {
       )}
 
       {canEdit && (
-        <Button block variant="success" style={{ marginTop: 14, padding: 12, borderRadius: 12 }} onClick={save}>
-          Lưu
+        <Button block variant="success" disabled={savingCost} style={{ marginTop: 14, padding: 12, borderRadius: 12, opacity: savingCost ? 0.68 : 1 }} onClick={save}>
+          {savingCost ? 'Đang lưu...' : 'Lưu'}
         </Button>
+      )}
+      {costSaveState && (
+        <div style={{
+          marginTop: 8,
+          fontSize: 10,
+          fontWeight: 800,
+          color: costSaveState === 'saved' ? '#6ee7b7' : '#fca5a5',
+        }}>
+          {costSaveState === 'saved' ? 'Đã lưu chi phí buổi.' : 'Không lưu được. Thử lại.'}
+        </div>
       )}
     </div>
   );
