@@ -85,6 +85,15 @@ test('AppV2 passes pickleball settings time and home treasurer role through prop
   assert.match(appSource, /return <Home data=\{homeData\} isTreasurer=\{isTreasurer\} onAction=\{handle\} \/>/)
 })
 
+test('AppV2 regenerates pickleball schedule from payload weekdays instead of dispatch return', () => {
+  const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+
+  assert.match(settingsSaveBlock, /const newWeekdays = normalizeScheduleWeekdays\(payload\?\.weekdays\)/)
+  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/)
+  assert.match(settingsSaveBlock, /scheduleWeekdays: newWeekdays/)
+  assert.doesNotMatch(settingsSaveBlock, /savedWeekdays/)
+})
+
 test('Member management screens are registered in the app source', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   assert.match(memberListSource, /const \[search, setSearch\] = useState\(''\)/)

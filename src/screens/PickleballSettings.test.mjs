@@ -53,6 +53,25 @@ test('PickleballSettings edits schedule time and start date before saving', () =
   assert.doesNotMatch(settingsSource, /startDate: d\.startDate/);
 });
 
+test('PickleballSettings computes the summary from locally selected weekdays', () => {
+  assert.match(settingsSource, /function computeSessionsCount\(weekdaySet, yearMonth\)/);
+  assert.match(settingsSource, /const liveSessionsCount = computeSessionsCount\(weekdays, d\.currentYearMonth\)/);
+  assert.match(settingsSource, /const perSession = Math\.round\(courtFee \/ Math\.max\(liveSessionsCount, 1\)\)/);
+  assert.match(settingsSource, /\{liveSessionsCount\} buổi × \{d\.memberCount\} thành viên/);
+  assert.doesNotMatch(settingsSource, /courtFee \/ d\.sessionsCount/);
+  assert.doesNotMatch(settingsSource, /\{d\.sessionsCount\} buổi ×/);
+});
+
+test('PickleballSettings recomputes next-month preview from local weekdays', () => {
+  assert.match(settingsSource, /function buildLiveNextMonthPreview\(today, weekdaySet\)/);
+  assert.match(settingsSource, /const liveNextMonthPreview = buildLiveNextMonthPreview\(new Date\(\), weekdays\)/);
+  assert.match(settingsSource, /Xem trước \{liveNextMonthPreview\.label\}/);
+  assert.match(settingsSource, /\{liveNextMonthPreview\.sessions\} buổi · Bắt đầu \{liveNextMonthPreview\.startLabel\}/);
+  assert.match(settingsSource, /liveNextMonthPreview\.dates\.slice\(0, 5\)\.map/);
+  assert.doesNotMatch(settingsSource, /d\.nextMonthPreview\.sessions/);
+  assert.doesNotMatch(settingsSource, /d\.nextMonthPreview\.dates/);
+});
+
 test('PickleballSettings relies on save to regenerate schedules', () => {
   assert.doesNotMatch(settingsSource, /function regenerateSessions/);
   assert.doesNotMatch(settingsSource, /regenerateSessions/);
@@ -60,8 +79,9 @@ test('PickleballSettings relies on save to regenerate schedules', () => {
   assert.match(settingsSource, /onAction\?\.\('save', \{/);
 
   assert.doesNotMatch(appSource, /type === 'regenerateSessions'/);
-  assert.match(appSource, /const savedConfig = await dispatch\(action\)/);
+  assert.match(appSource, /await dispatch\(action\)/);
   assert.match(appSource, /shouldRegenerateSchedule/);
+  assert.match(appSource, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| hasScheduledSessionsWithOldDays/);
   assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/);
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*?yearMonth[\s\S]*?config: generationConfig/);
 });

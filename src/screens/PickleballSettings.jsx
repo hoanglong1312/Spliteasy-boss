@@ -7,6 +7,45 @@ import { Button, Input } from '../primitives';
 
 const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
 const DEFAULT_TICKET_PRICE = 50000;
+const ISO_WEEKDAY_LABELS = ['', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+function hasSelectedWeekday(weekdaySet, isoWeekday) {
+  return weekdaySet.has(isoWeekday) ||
+    weekdaySet.has(String(isoWeekday)) ||
+    weekdaySet.has(ISO_WEEKDAY_LABELS[isoWeekday]);
+}
+
+function computeSessionsCount(weekdaySet, yearMonth) {
+  if (!weekdaySet.size || !yearMonth) return 0;
+  const [y, m] = yearMonth.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  let count = 0;
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(y, m - 1, day);
+    const isoWeekday = date.getDay() === 0 ? 7 : date.getDay();
+    if (hasSelectedWeekday(weekdaySet, isoWeekday)) count += 1;
+  }
+  return count;
+}
+
+function buildLiveNextMonthPreview(today, weekdaySet) {
+  const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const dates = [];
+  const labels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const daysInMonth = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(next.getFullYear(), next.getMonth(), day);
+    const isoWeekday = date.getDay() === 0 ? 7 : date.getDay();
+    if (hasSelectedWeekday(weekdaySet, isoWeekday)) dates.push(String(day).padStart(2, '0'));
+  }
+
+  return {
+    label: `tháng ${next.getMonth() + 1}`,
+    sessions: dates.length,
+    startLabel: dates[0] ? `${labels[new Date(next.getFullYear(), next.getMonth(), Number(dates[0])).getDay()]} ${dates[0]}/${String(next.getMonth() + 1).padStart(2, '0')}` : 'chưa có',
+    dates,
+  };
+}
 
 export default function PickleballSettings({ data, onAction }) {
   const d = data || DEMO;
@@ -17,7 +56,9 @@ export default function PickleballSettings({ data, onAction }) {
   const [timeRange, setTimeRange] = useState(d.timeRange || '19:00 – 21:00');
   const [startDate, setStartDate] = useState(d.startDate || '');
 
-  const perSession = Math.round(courtFee / d.sessionsCount);
+  const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
+  const liveNextMonthPreview = buildLiveNextMonthPreview(new Date(), weekdays);
+  const perSession = Math.round(courtFee / Math.max(liveSessionsCount, 1));
   const activeMemberCount = Math.max(d.memberCount || 1, 1);
   const perPerson  = Math.round(perSession / activeMemberCount);
 
@@ -90,7 +131,7 @@ export default function PickleballSettings({ data, onAction }) {
               {perSession.toLocaleString('vi-VN')} đ / buổi · <span style={{ color: colors.brandLight, fontWeight: 800 }}>{perPerson.toLocaleString('vi-VN')} đ / người</span>
             </div>
             <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3 }}>
-              {d.sessionsCount} buổi × {d.memberCount} thành viên
+              {liveSessionsCount} buổi × {d.memberCount} thành viên
             </div>
           </div>
 
@@ -161,25 +202,25 @@ export default function PickleballSettings({ data, onAction }) {
             borderRadius: 14,
           }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              📍 Xem trước {d.nextMonthPreview.label}
+              📍 Xem trước {liveNextMonthPreview.label}
             </div>
             <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary, marginTop: 6 }}>
-              {d.nextMonthPreview.sessions} buổi · Bắt đầu {d.nextMonthPreview.startLabel}
+              {liveNextMonthPreview.sessions} buổi · Bắt đầu {liveNextMonthPreview.startLabel}
             </div>
             <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}>
-              {d.nextMonthPreview.dates.slice(0, 5).map(date => (
+              {liveNextMonthPreview.dates.slice(0, 5).map(date => (
                 <span key={date} style={{
                   padding: '3px 8px', borderRadius: 6,
                   background: 'rgba(52,211,153,0.15)',
                   fontSize: 10, fontWeight: 700, color: '#6ee7b7', ...type.mono,
                 }}>{date}</span>
               ))}
-              {d.nextMonthPreview.dates.length > 5 && (
+              {liveNextMonthPreview.dates.length > 5 && (
                 <span style={{
                   padding: '3px 8px', borderRadius: 6,
                   background: 'rgba(255,255,255,0.04)',
                   fontSize: 10, fontWeight: 700, color: colors.textMuted, ...type.mono,
-                }}>+{d.nextMonthPreview.dates.length - 5}</span>
+                }}>+{liveNextMonthPreview.dates.length - 5}</span>
               )}
             </div>
           </div>

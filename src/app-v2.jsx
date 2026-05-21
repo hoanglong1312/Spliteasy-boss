@@ -175,11 +175,8 @@ export default function AppV2() {
       if ('activeMonthlyMemberIds' in (payload || {}) || 'activeMemberIds' in (payload || {})) {
         action.activeMonthlyMemberIds = payload?.activeMonthlyMemberIds ?? payload?.activeMemberIds ?? []
       }
-      const savedConfig = await dispatch(action)
-      const savedWeekdays = normalizeScheduleWeekdays(
-        savedConfig?.scheduleWeekdays ?? savedConfig?.schedule_weekdays ?? action.scheduleWeekdays
-      )
-      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, savedWeekdays) || hasScheduledSessionsWithOldDays
+      await dispatch(action)
+      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || hasScheduledSessionsWithOldDays
       if (shouldRegenerateSchedule && groupId) {
         const { token } = getStoredAuth()
         if (token) {
@@ -200,7 +197,7 @@ export default function AppV2() {
 
           const generationConfig = {
             ...sessionGenerationConfigFromState(state, yearMonth),
-            scheduleWeekdays: savedWeekdays,
+            scheduleWeekdays: newWeekdays,
             scheduleTime: action.scheduleTime,
             startDate: action.scheduleStartDay,
           }
