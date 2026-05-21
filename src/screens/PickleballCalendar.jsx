@@ -222,6 +222,9 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
           <AttendChip
             key={a.id}
             a={a}
+            isTreasurer={isTreasurer}
+            sessionId={session.id}
+            onAction={onAction}
             onToggle={isTreasurer && a.kind !== 'guest' ? () => onAction?.('markAttendance', {
               sessionId: session.id,
               memberId: a.id,
@@ -603,7 +606,7 @@ function formatAmountInput(value) {
   return amount > 0 ? amount.toLocaleString('vi-VN') : '';
 }
 
-function AttendChip({ a, onToggle }) {
+function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
   const active = a.kind === 'present' || a.kind === 'guest';
 
   return (
@@ -631,18 +634,34 @@ function AttendChip({ a, onToggle }) {
       >
         {a.initial}
       </button>
-      <span style={{
+      <div style={{
         width: '100%',
-        color: active ? '#6ee7b7' : colors.textMuted,
-        fontSize: 9,
-        fontWeight: 700,
-        textAlign: 'center',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minWidth: 0,
       }}>
-        {a.name}
-      </span>
+        <span style={{
+          color: active ? '#6ee7b7' : colors.textMuted,
+          fontSize: 9,
+          fontWeight: 700,
+          textAlign: 'center',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          minWidth: 0,
+        }}>
+          {a.name}
+        </span>
+        {a.kind === 'guest' && isTreasurer && (
+          <button
+            type="button"
+            onClick={() => onAction?.('removeGuest', { sessionId, attendeeId: a.id })}
+            style={{ marginLeft: 4, color: '#ff6b6b', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '0 2px' }}
+            aria-label="Xóa khách"
+          >×</button>
+        )}
+      </div>
     </div>
   );
 }

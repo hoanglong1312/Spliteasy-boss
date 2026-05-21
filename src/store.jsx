@@ -190,6 +190,52 @@ function generationConfigFromState(state, yearMonth, override = {}) {
   }
 }
 
+function sessionDateValue(session) {
+  return session?.sessionDate || session?.session_date || session?.date
+}
+
+function updatePickleSessions(pickle, updateSessions) {
+  if (!pickle) return pickle
+  return {
+    ...pickle,
+    sessions: updateSessions(safeArray(pickle.sessions)),
+  }
+}
+
+function removeScheduledSessionsForMonthFromState(current, groupId, yearMonth) {
+  if (!groupId || !yearMonth) return current
+  const keepSession = session => !(
+    String(session?.groupId || session?.group_id || '') === String(groupId) &&
+    String(sessionDateValue(session) || '').startsWith(String(yearMonth)) &&
+    String(session?.status || '').toLowerCase() === 'scheduled'
+  )
+
+  return {
+    ...current,
+    _allPickle: updatePickleSessions(current?._allPickle, sessions => sessions.filter(keepSession)),
+    pickle: updatePickleSessions(current?.pickle, sessions => sessions.filter(keepSession)),
+  }
+}
+
+function removeSessionGuestFromState(current, sessionId, attendeeId) {
+  if (!sessionId || !attendeeId) return current
+  const targetSessionId = String(sessionId)
+  const targetAttendeeId = String(attendeeId)
+  const removeGuest = session => {
+    if (String(session?.id || '') !== targetSessionId) return session
+    const guests = safeArray(session.guests)
+    const nextGuests = guests.filter(guest => String(guest?.id || guest?.attendee_id || guest?.guest_id || '') !== targetAttendeeId)
+    if (nextGuests.length === guests.length) return session
+    return { ...session, guests: nextGuests }
+  }
+
+  return {
+    ...current,
+    _allPickle: updatePickleSessions(current?._allPickle, sessions => sessions.map(removeGuest)),
+    pickle: updatePickleSessions(current?.pickle, sessions => sessions.map(removeGuest)),
+  }
+}
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))
 }
@@ -1089,6 +1135,15 @@ export function AppProvider({ children }) {
         break
       }
 
+      case 'CLEAR_SCHEDULED_SESSIONS': {
+        const groupId = action.groupId || action.group_id || stateRef.current.currentGroupId
+        const yearMonth = action.yearMonth || action.year_month
+        const next = removeScheduledSessionsForMonthFromState(stateRef.current, groupId, yearMonth)
+        stateRef.current = next
+        setState(next)
+        return next
+      }
+
       case 'SWITCH_GROUP': {
         const groupId = action.groupId ?? action.group_id
         if (!groupId) return null
@@ -1698,6 +1753,14 @@ export function AppProvider({ children }) {
         }
         await refresh()
         break
+      }
+
+      case 'REMOVE_SESSION_GUEST': {
+        const { sessionId, attendeeId } = action
+        const next = removeSessionGuestFromState(stateRef.current, sessionId, attendeeId)
+        stateRef.current = next
+        setState(next)
+        return next
       }
 
       case 'ADD_PICKLE_SESSION': {

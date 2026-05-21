@@ -339,3 +339,24 @@ test('app-v2 handles markAttendance and validates addTicket payloads before inse
   assert.match(appSource, /session_date: sessionDate/)
   assert.match(appSource, /member_ids: memberIds/)
 })
+
+test('calendar guest chips expose treasurer-only delete without changing member toggle behavior', () => {
+  assert.match(calendarSource, /onToggle=\{isTreasurer && a\.kind !== 'guest' \? \(\) => onAction\?\.\('markAttendance'/)
+  assert.match(calendarSource, /isTreasurer=\{isTreasurer\}/)
+  assert.match(calendarSource, /sessionId=\{session\.id\}/)
+  assert.match(calendarSource, /function AttendChip\(\{ a, onToggle, isTreasurer, sessionId, onAction \}\)/)
+  assert.match(calendarSource, /a\.kind === 'guest' && isTreasurer/)
+  assert.match(calendarSource, /onAction\?\.\('removeGuest', \{ sessionId, attendeeId: a\.id \}\)/)
+  assert.match(calendarSource, /aria-label="Xóa khách"/)
+})
+
+test('removeGuest deletes pickle attendee rows and updates session state', () => {
+  assert.match(appSource, /if \(type === 'removeGuest'\) \{[\s\S]*?if \(!isTreasurer\) return[\s\S]*?const attendeeId = payload\?\.attendeeId[\s\S]*?const sessionId = payload\?\.sessionId/)
+  assert.match(appSource, /\.from\('pickle_attendees'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', attendeeId\)/)
+  assert.match(appSource, /dispatch\(\{ type: 'REMOVE_SESSION_GUEST', attendeeId, sessionId \}\)/)
+  const inertBlock = appSource.match(/if \(\[[\s\S]*?\]\.includes\(type\)\) \{/)?.[0] || ''
+  assert.doesNotMatch(inertBlock, /'removeGuest'/)
+
+  assert.match(storeSource, /case 'REMOVE_SESSION_GUEST':\s*\{/)
+  assert.match(storeSource, /removeSessionGuestFromState\(stateRef\.current, sessionId, attendeeId\)/)
+})

@@ -233,3 +233,14 @@ test('settings save deletes scheduled sessions and regenerates when schedule wee
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'/)
   assert.match(appSource, /config: generationConfig/)
 })
+
+test('settings save clears in-memory scheduled sessions before regenerating', () => {
+  const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
+  assert.match(saveBlock, /type: 'CLEAR_SCHEDULED_SESSIONS'/)
+  assert.match(storeSource, /case 'CLEAR_SCHEDULED_SESSIONS':\s*\{/)
+  assert.match(storeSource, /removeScheduledSessionsForMonthFromState\(stateRef\.current, groupId, yearMonth\)/)
+  assert.ok(
+    saveBlock.indexOf("type: 'CLEAR_SCHEDULED_SESSIONS'") < saveBlock.indexOf("type: 'AUTO_GENERATE_SESSIONS'"),
+    'clear action runs before auto-generation',
+  )
+})

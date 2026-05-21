@@ -192,6 +192,12 @@ export default function AppV2() {
             .like('session_date', `${yearMonth}%`)
           if (deleteError) throw deleteError
 
+          await dispatch({
+            type: 'CLEAR_SCHEDULED_SESSIONS',
+            groupId,
+            yearMonth,
+          })
+
           const generationConfig = {
             ...sessionGenerationConfigFromState(state, yearMonth),
             scheduleWeekdays: savedWeekdays,
@@ -697,6 +703,23 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'removeGuest') {
+      if (!isTreasurer) return
+      const attendeeId = payload?.attendeeId
+      const sessionId = payload?.sessionId
+      if (!attendeeId || !sessionId) return
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickle_attendees')
+        .delete()
+        .eq('id', attendeeId)
+      if (error) throw error
+      await dispatch({ type: 'REMOVE_SESSION_GUEST', attendeeId, sessionId })
+      return
+    }
+
     if (type === 'filter') {
       return
     }
@@ -723,7 +746,6 @@ export default function AppV2() {
       'shareQR',
       'toggleBreakdown',
       'changeRecipient',
-      'removeGuest',
       'addAccessory',
       'reschedule',
       'remindAll',
