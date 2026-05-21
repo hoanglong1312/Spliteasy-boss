@@ -237,6 +237,26 @@ test('settings maps ISO schedule weekdays from config to Vietnamese weekday labe
   assert.deepEqual(JSON.parse(JSON.stringify(data.weekdays)), ['T2', 'T4', 'T6'])
 })
 
+test('settings calculates session count from configured weekdays in the current month', () => {
+  const { buildPickleballSettingsData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [{ id: 'm1', groupId: 'g1', name: 'An', role: 'treasurer' }],
+    pickle: { sessions: [], monthlyConfigs: [] },
+    _allPickle: {
+      configs: [{ groupId: 'g1', schedule_weekdays: [1, 3, 5], sessionsCount: 99 }],
+      monthlyConfigs: [],
+      sessions: [],
+    },
+  }
+
+  const data = buildPickleballSettingsData(state)
+
+  assert.equal(data.sessionsCount, 13)
+})
+
 test('calendar attendance chips call markAttendance and detail has one save path', () => {
   assert.match(calendarSource, /onAction\?\.\('markAttendance', \{\s*sessionId: session\.id,\s*memberId: a\.id,\s*status: a\.kind === 'present' \? 'absent' : 'present'/)
   assert.match(calendarSource, />\s*Lưu\s*<\/Button>/)

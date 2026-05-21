@@ -45,3 +45,12 @@ test('store fetches and normalizes pickleball individual tickets', () => {
   assert.match(storeSource, /externalTickets: normalTickets/)
   assert.match(storeSource, /externalTickets: safeArray\(source\.externalTickets\)\.filter/)
 })
+
+test('monthly pickleball config save persists schedule time aliases', () => {
+  const match = storeSource.match(/case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': \{[\s\S]*?\n      \}/)
+  assert.ok(match, 'SAVE_PICKLEBALL_MONTHLY_CONFIG case is available')
+  const source = match[0]
+
+  assert.match(source, /if \('scheduleTime' in action \|\| 'schedule_time' in action \|\| 'timeRange' in action\) \{/)
+  assert.match(source, /row\.schedule_time = action\.scheduleTime \?\? action\.schedule_time \?\? action\.timeRange \?\? null/)
+})

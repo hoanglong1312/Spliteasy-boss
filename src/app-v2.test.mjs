@@ -80,6 +80,11 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
 })
 
+test('AppV2 passes pickleball settings time and home treasurer role through props', () => {
+  assert.match(appSource, /scheduleStartDay: payload\?\.startDate,\s*scheduleTime: payload\?\.scheduleTime,/)
+  assert.match(appSource, /return <Home data=\{homeData\} isTreasurer=\{isTreasurer\} onAction=\{handle\} \/>/)
+})
+
 test('Member management screens are registered in the app source', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   assert.match(memberListSource, /const \[search, setSearch\] = useState\(''\)/)

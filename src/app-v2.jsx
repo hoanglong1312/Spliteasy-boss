@@ -159,6 +159,7 @@ export default function AppV2() {
         ticketPrice: payload?.ticketPrice,
         scheduleWeekdays: payload?.weekdays,
         scheduleStartDay: payload?.startDate,
+        scheduleTime: payload?.scheduleTime,
       }
       if ('activeMonthlyMemberIds' in (payload || {}) || 'activeMemberIds' in (payload || {})) {
         action.activeMonthlyMemberIds = payload?.activeMonthlyMemberIds ?? payload?.activeMemberIds ?? []
@@ -843,7 +844,7 @@ export default function AppV2() {
         return <Profile data={profileData} isTreasurer={isTreasurer} onAction={handle} />
       case 'home':
       default:
-        return <Home data={homeData} onAction={handle} />
+        return <Home data={homeData} isTreasurer={isTreasurer} onAction={handle} />
     }
   }
 

@@ -1546,6 +1546,9 @@ export function AppProvider({ children }) {
         if ('scheduleStartDay' in action || 'schedule_start_day' in action || 'startDate' in action) {
           row.schedule_start_day = action.scheduleStartDay ?? action.schedule_start_day ?? action.startDate ?? null
         }
+        if ('scheduleTime' in action || 'schedule_time' in action || 'timeRange' in action) {
+          row.schedule_time = action.scheduleTime ?? action.schedule_time ?? action.timeRange ?? null
+        }
         const { data, error } = await sb
           .from('pickleball_monthly_config')
           .upsert(row, { onConflict: 'group_id,year_month' })

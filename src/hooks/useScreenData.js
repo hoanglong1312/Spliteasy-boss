@@ -683,7 +683,15 @@ function buildPickleballSettingsData(state) {
   )
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? config?.monthlyCourtFee ?? config?.monthly_court_fee ?? group?.monthlyCourtFee ?? 0)
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
-  const sessionsCount = Number(config?.sessionsCount ?? config?.sessions_count ?? sessions.length) || Math.max(sessions.length, 1)
+  const WEEK_LABELS_LOCAL = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+  const wantedDays = new Set(weekdays)
+  const daysInCurMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  let calcSessions = 0
+  for (let dayNum = 1; dayNum <= daysInCurMonth; dayNum++) {
+    const dt = new Date(today.getFullYear(), today.getMonth(), dayNum)
+    if (wantedDays.has(WEEK_LABELS_LOCAL[dt.getDay()])) calcSessions++
+  }
+  const sessionsCount = calcSessions > 0 ? calcSessions : Math.max(sessions.length, 1)
   const scheduleTime = config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
   const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
   const memberIds = members.map(m => m.id || m.member_id).filter(Boolean)
