@@ -679,7 +679,9 @@ function buildPickleballSettingsData(state) {
   const config = currentPickleConfig(state)
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const sessions = getStateMonthSessions(state, today)
-  const members = currentGroupMembers(state).filter(m => m.isActive !== false && m.is_active !== false)
+  const members = currentGroupMembers(state).filter(isActiveMember)
+  const fixedMembers = members.filter(member => memberType(member) === 'fixed')
+  const billingMembers = fixedMembers.length > 0 ? fixedMembers : members
   const weekdays = normalizeWeekdays(
     monthlyConfig?.scheduleWeekdays ||
     monthlyConfig?.schedule_weekdays ||
@@ -705,9 +707,8 @@ function buildPickleballSettingsData(state) {
   const sessionsCount = calcSessions > 0 ? calcSessions : Math.max(sessions.length, 1)
   const scheduleTime = config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
   const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
-  const memberIds = members.map(m => m.id || m.member_id).filter(Boolean)
-  const storedActiveMemberIds = safeArray(monthlyConfig?.activeMemberIds ?? monthlyConfig?.active_member_ids).filter(Boolean)
-  const activeMonthlyMemberIds = storedActiveMemberIds.length > 0 ? storedActiveMemberIds : memberIds
+  const memberIds = billingMembers.map(m => m.id || m.member_id).filter(Boolean)
+  const activeMonthlyMemberIds = memberIds
 
   return {
     clubName: group.name || 'CLB Pickleball',
@@ -722,7 +723,7 @@ function buildPickleballSettingsData(state) {
     courtFeeTotal,
     ticketPrice,
     sessionsCount,
-    memberCount: activeMonthlyMemberIds.length || members.length || 1,
+    memberCount: billingMembers.length || 1,
     members: members.map(m => ({
       id: m.id || m.member_id,
       name: m.name || m.member_name,

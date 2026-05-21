@@ -40,7 +40,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildHomeData, buildPickleballCalendarData, buildPickleballSettingsData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildHomeData, buildPickleballCalendarData, buildPickleballMembersData, buildPickleballSettingsData }`, context)
   return context.__builders
 }
 
@@ -296,8 +296,8 @@ test('settings calculates session count from configured weekdays in the current 
   assert.equal(data.sessionsCount, 13)
 })
 
-test('settings member count uses active monthly members and does not expose venue', () => {
-  const { buildPickleballSettingsData } = loadScreenDataBuilders()
+test('settings member count follows active fixed members from members tab and does not expose venue', () => {
+  const { buildPickleballMembersData, buildPickleballSettingsData } = loadScreenDataBuilders()
   const state = {
     currentUserId: 'm1',
     currentGroupId: 'g1',
@@ -306,15 +306,17 @@ test('settings member count uses active monthly members and does not expose venu
       { id: 'm1', groupId: 'g1', name: 'An', role: 'treasurer' },
       { id: 'm2', groupId: 'g1', name: 'Binh' },
       { id: 'm3', groupId: 'g1', name: 'Chi' },
+      { id: 'm4', groupId: 'g1', name: 'Dung', memberType: 'casual' },
+      { id: 'm5', groupId: 'g1', name: 'Em', isActive: false },
     ],
     pickle: {
-      fixedMembers: ['m1', 'm2', 'm3'],
+      fixedMembers: ['m1', 'm2', 'm3', 'm5'],
       sessions: [],
       monthlyConfigs: [
         {
           groupId: 'g1',
           yearMonth: '2026-05',
-          active_member_ids: ['m1', 'm3'],
+          active_member_ids: ['m1'],
         },
       ],
     },
@@ -324,16 +326,18 @@ test('settings member count uses active monthly members and does not expose venu
         {
           groupId: 'g1',
           yearMonth: '2026-05',
-          active_member_ids: ['m1', 'm3'],
+          active_member_ids: ['m1'],
         },
       ],
       sessions: [],
     },
   }
 
+  const membersData = buildPickleballMembersData(state)
   const data = buildPickleballSettingsData(state)
 
-  assert.equal(data.memberCount, 2)
+  assert.equal(membersData.stats.fixed, 3)
+  assert.equal(data.memberCount, membersData.stats.fixed)
   assert.equal(Object.hasOwn(data, 'defaultVenue'), false)
 })
 
