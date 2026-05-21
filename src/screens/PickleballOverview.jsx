@@ -64,9 +64,6 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                 <div style={{ fontSize: 10, color: '#a7f3d0', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Có mặt</div>
               </div>
             </div>
-            <Button block variant="primary" style={{ marginTop: 18, color: '#064e3b' }} onClick={() => onAction?.('attend', d.todaySession.id)}>
-              ✓ Điểm danh Buổi #{d.todaySession.number}
-            </Button>
           </Hero>
         )}
 

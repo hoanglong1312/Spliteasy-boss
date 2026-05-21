@@ -32,6 +32,12 @@ test('overview shows treasurer-only compact batch water entry action', () => {
   assert.match(overviewSource, /variant="ghost"/)
 })
 
+test('overview does not duplicate attendance controls from calendar', () => {
+  assert.doesNotMatch(overviewSource, /onAction\?\.\('attend'/)
+  assert.doesNotMatch(overviewSource, /Điểm danh Buổi/)
+  assert.match(calendarSource, /Điểm danh · \{session\.attendance\.present\}\/\{session\.attendance\.total\} tham gia/)
+})
+
 test('calendar extra cost editor starts new extras with no selected members and shows zero count', () => {
   assert.match(calendarSource, /memberIds: \[\]/)
   assert.match(calendarSource, /const splitCount = extra\.memberIds\.length/)
