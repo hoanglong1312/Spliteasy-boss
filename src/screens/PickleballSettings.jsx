@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { colors, type } from '../tokens';
-import { Button, Card, Input, SectionLabel } from '../primitives';
+import { Button, Input } from '../primitives';
 
 const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
 const DEFAULT_TICKET_PRICE = 50000;
@@ -14,11 +14,9 @@ export default function PickleballSettings({ data, onAction }) {
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
   const [ticketPrice, setTicketPrice] = useState(d.ticketPrice || DEFAULT_TICKET_PRICE);
-  const [members, setMembers]     = useState(() => memberRowsFromData(d));
-  const [activeMemberIds, setActiveMemberIds] = useState(() => monthlyActiveIdsFromData(d));
 
   const perSession = Math.round(courtFee / d.sessionsCount);
-  const activeMemberCount = Math.max(activeMemberIds.size || d.memberCount || members.length || 1, 1);
+  const activeMemberCount = Math.max(d.memberCount || 1, 1);
   const perPerson  = Math.round(perSession / activeMemberCount);
   const canManageSchedule = d.currentRole === 'treasurer';
 
@@ -27,8 +25,6 @@ export default function PickleballSettings({ data, onAction }) {
     setAutoGen(d.autoGenerate);
     setCourtFee(d.courtFeeTotal);
     setTicketPrice(d.ticketPrice || DEFAULT_TICKET_PRICE);
-    setMembers(memberRowsFromData(d));
-    setActiveMemberIds(monthlyActiveIdsFromData(d));
   }, [data]);
 
   async function regenerateSessions() {
@@ -99,67 +95,6 @@ export default function PickleballSettings({ data, onAction }) {
               {d.sessionsCount} buổi × {d.memberCount} thành viên
             </div>
           </div>
-
-          {/* Members participation */}
-          <SectionLabel>Thành viên tháng này</SectionLabel>
-          <Card style={{ padding: '6px 16px' }}>
-            {members.length === 0 && (
-              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 0' }}>
-                Chưa có thành viên trong nhóm
-              </div>
-            )}
-            {members.map((m, i) => {
-              const playing = activeMemberIds.has(String(m.id));
-              return (
-                <div key={m.id || i} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0',
-                  borderBottom: i < members.length - 1 ? `1px solid ${colors.borderSubtle}` : 'none',
-                }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: playing ? colors.successSoft : 'rgba(255,255,255,0.06)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 14, fontWeight: 700,
-                    color: playing ? colors.success : colors.textMuted,
-                    flexShrink: 0,
-                  }}>{m.initial}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {m.name}
-                    </div>
-                    <div style={{ fontSize: 10, color: playing ? colors.success : colors.textMuted, marginTop: 2, fontWeight: 700 }}>
-                      Tháng này · {playing ? 'Đang chơi' : 'Nghỉ'}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveMemberIds(prev => {
-                      const next = new Set(prev);
-                      playing ? next.delete(String(m.id)) : next.add(String(m.id));
-                      return next;
-                    })}
-                    style={{
-                      width: 42, height: 24, borderRadius: 100,
-                      background: playing ? colors.success : 'rgba(255,255,255,0.10)',
-                      position: 'relative', border: 'none',
-                      boxShadow: playing ? '0 0 12px rgba(52,211,153,0.35)' : 'none',
-                      flexShrink: 0, cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{
-                      width: 18, height: 18, borderRadius: '50%', background: 'white',
-                      position: 'absolute', top: 3,
-                      right: playing ? 3 : 'auto',
-                      left: playing ? 'auto' : 3,
-                    }} />
-                  </button>
-                </div>
-              );
-            })}
-            <div style={{ fontSize: 10, color: colors.textSecondary, padding: '8px 0 4px' }}>
-              Tắt = nghỉ tháng này, tự động bật lại tháng sau
-            </div>
-          </Card>
 
           {/* Weekday picker */}
           <div style={{
@@ -258,7 +193,6 @@ export default function PickleballSettings({ data, onAction }) {
             autoGen,
             currentYearMonth: d.currentYearMonth,
             startDate: d.startDate,
-            activeMonthlyMemberIds: Array.from(activeMemberIds),
             ticketPrice,
           })}>💾 Lưu cài đặt</Button>
           </div>
@@ -266,23 +200,6 @@ export default function PickleballSettings({ data, onAction }) {
       </div>
     </div>
   );
-}
-
-function memberRowsFromData(data) {
-  return (data.members || []).map(m => ({
-    ...m,
-    id: m.id,
-    name: m.name,
-    initial: m.initial || m.initials || (m.name || '?')[0].toUpperCase(),
-  }));
-}
-
-function monthlyActiveIdsFromData(data) {
-  const memberIds = (data.members || []).map(m => m.id).filter(Boolean).map(String);
-  const activeIds = Array.isArray(data.activeMonthlyMemberIds)
-    ? data.activeMonthlyMemberIds.filter(Boolean).map(String)
-    : [];
-  return new Set(activeIds.length > 0 ? activeIds : memberIds);
 }
 
 function FieldLabel({ children }) {
@@ -334,8 +251,6 @@ const DEMO = {
   sessionsCount: 13, memberCount: 12,
   currentYearMonth: '2026-05',
   currentRole: 'treasurer',
-  activeMonthlyMemberIds: [],
-  members: [],
   weekdays: ['T2','T4','T6'],
   timeRange: '19:00 – 21:00',
   defaultVenue: 'Sân 3 · Trung tâm Cầu Giấy',

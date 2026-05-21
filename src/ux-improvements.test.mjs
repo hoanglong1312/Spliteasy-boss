@@ -12,14 +12,16 @@ const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 
-test('settings removes batch entry, keeps monthly toggles, and saves ticket price', () => {
+test('settings removes batch entry and member toggles, keeps schedule and ticket price', () => {
   assert.doesNotMatch(settingsSource, /Nhập nhanh chi phí tháng này/)
   assert.doesNotMatch(settingsSource, /onAction\?\.\('batchEntry'\)/)
-  assert.match(settingsSource, /Thành viên tháng này/)
-  assert.match(settingsSource, /activeMonthlyMemberIds: Array\.from\(activeMemberIds\)/)
+  assert.doesNotMatch(settingsSource, /Thành viên tháng này/)
+  assert.doesNotMatch(settingsSource, /activeMonthlyMemberIds: Array\.from\(activeMemberIds\)/)
   assert.match(settingsSource, /Giá vé lẻ/)
   assert.match(settingsSource, /const \[ticketPrice, setTicketPrice\]/)
   assert.match(settingsSource, /ticketPrice,/)
+  assert.match(settingsSource, /Lịch tự động/)
+  assert.match(settingsSource, /Tạo lại lịch tháng này/)
 })
 
 test('overview shows treasurer-only compact batch water entry action', () => {
@@ -42,6 +44,7 @@ test('calendar treats casual members as attendance chips and adds only brand new
   assert.match(appSource, /if \(type === 'addGuest'\)/)
   assert.match(appSource, /guest_name: guestName/)
   assert.match(appSource, /attendee_type: 'guest'/)
+  assert.doesNotMatch(appSource, /is_guest: true/)
   assert.match(dataSource, /memberType: memberType\(member\)/)
 })
 

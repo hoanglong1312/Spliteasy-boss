@@ -168,7 +168,18 @@ export default function BatchEntry({ data, onAction }) {
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10, marginTop: 14 }}>
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: colors.pageBg,
+          padding: '12px 16px',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          zIndex: 10,
+          display: 'grid',
+          gridTemplateColumns: '1fr 1.4fr',
+          gap: 10,
+          margin: '14px -16px 0',
+        }}>
           <Button variant="muted" onClick={() => onAction?.('back')}>Huỷ</Button>
           <Button
             variant="brand"
@@ -362,7 +373,7 @@ function emptyExtraDraft(members) {
   return {
     note: '',
     amountInput: '',
-    memberIds: (members || []).map(member => member.id).filter(Boolean),
+    memberIds: [],
   };
 }
 

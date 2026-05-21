@@ -100,6 +100,9 @@ test('batch entry sends batch water saves and can cancel back', () => {
   assert.match(batchSource, /onAction\?\.\('back'\)/)
   assert.match(batchSource, /Tổng nước tháng/)
   assert.match(batchSource, /Phát sinh/)
+  assert.match(batchSource, /position:\s*'sticky'[\s\S]*bottom:\s*0[\s\S]*background:\s*colors\.pageBg[\s\S]*zIndex:\s*10/)
+  assert.match(batchSource, /memberIds:\s*\[\]/)
+  assert.doesNotMatch(batchSource, /memberIds:\s*\(members \|\| \[\]\)\.map\(member => member\.id\)/)
 })
 
 test('app handlers persist session water and extras through pickleball_session_items', () => {

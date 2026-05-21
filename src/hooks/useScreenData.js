@@ -32,6 +32,7 @@ export function useScreenData() {
     const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName)
     const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName)
     const pickleballOverviewData = buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members)
+    const pickleballCalendarData = buildPickleballCalendarData(state)
     const profileData = buildProfileData(me, state, pickle)
     const notificationsData = buildNotificationsData(state)
     const approvalQueueData = buildApprovalQueueData(state)
@@ -43,6 +44,7 @@ export function useScreenData() {
       groupsListData,
       groupDetailData,
       pickleballOverviewData,
+      pickleballCalendarData,
       profileData,
       notificationsData,
       approvalQueueData,
@@ -53,7 +55,7 @@ export function useScreenData() {
         return buildGroupDetailData(group, currentUserId, members, currentUserName)
       },
       getSessionDetailData: (sessionId) => buildSessionDetailData(state, pickle, sessionId, currentUserId, members),
-      getPickleballCalendarData: () => buildPickleballCalendarData(state),
+      getPickleballCalendarData: () => pickleballCalendarData,
       getPickleballMembersData: () => buildPickleballMembersData(state),
       getMemberDetailData: (memberId) => buildMemberDetailData(state, memberId),
       getPickleballTicketsData: () => buildPickleballTicketsData(state),
@@ -70,12 +72,12 @@ export function useScreenData() {
   }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, me, isTreasurer, dispatch])
 
   useEffect(() => {
-    const request = screenData.pickleballOverviewData?.autoGenerateRequest
+    const request = screenData.pickleballCalendarData?.autoGenerateRequest || screenData.pickleballOverviewData?.autoGenerateRequest
     if (!request) {
       autoGenerateRef.current = ''
       return
     }
-    const key = screenData.pickleballOverviewData?.autoGenerateKey || `${state.currentGroupId}:${request.yearMonth}`
+    const key = screenData.pickleballCalendarData?.autoGenerateKey || screenData.pickleballOverviewData?.autoGenerateKey || `${state.currentGroupId}:${request.yearMonth}`
     if (autoGenerateRef.current === key) return
     autoGenerateRef.current = key
     dispatch({
@@ -85,7 +87,14 @@ export function useScreenData() {
     }).catch(err => {
       console.error('[useScreenData] AUTO_GENERATE_SESSIONS:', err)
     })
-  }, [dispatch, screenData.pickleballOverviewData?.autoGenerateKey, screenData.pickleballOverviewData?.autoGenerateRequest, state.currentGroupId])
+  }, [
+    dispatch,
+    screenData.pickleballCalendarData?.autoGenerateKey,
+    screenData.pickleballCalendarData?.autoGenerateRequest,
+    screenData.pickleballOverviewData?.autoGenerateKey,
+    screenData.pickleballOverviewData?.autoGenerateRequest,
+    state.currentGroupId,
+  ])
 
   return screenData
 }
@@ -483,6 +492,11 @@ function buildPickleballCalendarData(state) {
     sessions: calendarSessions,
     selectedSession,
     shouldAutoGenerate,
+    autoGenerateRequest: shouldAutoGenerate ? {
+      yearMonth: currentYearMonth,
+      config: autoGenerateConfig,
+    } : null,
+    autoGenerateKey: shouldAutoGenerate ? `${state?.currentGroupId || state?.currentGroup?.id || 'group'}:${currentYearMonth}` : '',
   }
 }
 
@@ -1554,23 +1568,19 @@ function ticketDate(ticket) {
 }
 
 function buildSessionGenerationConfig(state, yearMonth) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
   const group = currentGroup(state)
   const config = currentPickleConfig(state)
-  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const monthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
+    .find(row => (
+      String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
+      String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
+    )) || {}
   const [year, month] = String(yearMonth || '').split('-')
   return {
     scheduleWeekdays: normalizeIsoWeekdays(
       monthlyConfig?.scheduleWeekdays ||
-      monthlyConfig?.schedule_weekdays ||
-      config?.scheduleWeekdays ||
-      config?.schedule_weekdays ||
-      config?.weekdays ||
-      config?.scheduleDays ||
-      config?.schedule_days ||
-      group?.scheduleWeekdays ||
-      group?.schedule_weekdays ||
-      group?.scheduleDays ||
-      group?.schedule_days
+      monthlyConfig?.schedule_weekdays
     ),
     scheduleTime: monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time ||
       config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || group?.schedule_time || '19:00-21:00',

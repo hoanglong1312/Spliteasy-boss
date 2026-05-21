@@ -52,7 +52,8 @@ function loadScreenDataBuilders() {
   }
 
   const source = dataSource
-    .replace(/import \{ useMemo \} from 'react'\n/, '')
+    .replace(/import \{ useEffect, useMemo, useRef \} from 'react'\n/, '')
+    .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
     .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
     .replace('export function useScreenData', 'function useScreenData')
 
@@ -69,6 +70,10 @@ function loadScreenDataBuilders() {
   }
   vm.runInNewContext(`${source}\nglobalThis.__builders = { buildPickleballCalendarData }`, context)
   return context.__builders
+}
+
+function loadScreenDataGenerationBuilder() {
+  return loadScreenDataBuilders().buildPickleballCalendarData
 }
 
 test('generateMonthSessions creates scheduled sessions from the configured start date and ISO weekdays', () => {
@@ -107,8 +112,68 @@ test('generateMonthSessions creates scheduled sessions from the configured start
 
 test('store auto-generates sessions with Supabase upsert do nothing on duplicate dates', () => {
   assert.match(storeSource, /case 'AUTO_GENERATE_SESSIONS':\s*\{/)
+  assert.match(storeSource, /const scheduleWeekdays = normalizeScheduleWeekdays/)
+  assert.match(storeSource, /console\.warn\('\[store\] AUTO_GENERATE_SESSIONS: missing schedule weekdays'/)
+  assert.match(storeSource, /const validSessions = sessions\.filter\(session => scheduleWeekdaySet\.has\(isoWeekdayFromDate\(session\.date\)\)\)/)
   assert.match(storeSource, /\.from\('pickle_sessions'\)[\s\S]*?\.upsert\([\s\S]*?onConflict: 'group_id,session_date'[\s\S]*?ignoreDuplicates: true/)
   assert.match(storeSource, /await refresh\(\)/)
+})
+
+test('store generation config reads schedule weekdays only from current monthly config', () => {
+  const match = storeSource.match(/function generationConfigFromState[\s\S]*?\n}\n\nfunction isUuid/)
+  assert.ok(match, 'generationConfigFromState source is available')
+  const source = match[0]
+
+  assert.match(source, /state\?\.pickle\?\.monthlyConfigs/)
+  assert.doesNotMatch(source, /config\.scheduleWeekdays/)
+  assert.doesNotMatch(source, /config\.schedule_weekdays/)
+  assert.doesNotMatch(source, /group\.scheduleWeekdays/)
+  assert.doesNotMatch(source, /group\.schedule_weekdays/)
+  assert.doesNotMatch(source, /group\.scheduleDays/)
+})
+
+test('calendar auto-generation request uses loaded monthly config weekdays, not group fallback', () => {
+  const buildPickleballCalendarData = loadScreenDataGenerationBuilder()
+  const state = {
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleWeekdays: [1, 3, 5] },
+    members: [],
+    pickle: {
+      sessions: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [2, 4] }],
+    },
+    _allPickle: {
+      sessions: [],
+      configs: [{ groupId: 'g1', scheduleWeekdays: [1, 3, 5] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [2, 4] }],
+    },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.equal(data.shouldAutoGenerate, true)
+  assert.deepEqual(JSON.parse(JSON.stringify(data.autoGenerateRequest)), {
+    yearMonth: '2026-05',
+    config: {
+      scheduleWeekdays: [2, 4],
+      scheduleTime: '19:00-21:00',
+      startDate: '01/05/2026',
+      defaultVenue: 'CLB',
+    },
+  })
+
+  const withoutMonthlyWeekdays = buildPickleballCalendarData({
+    ...state,
+    pickle: { sessions: [], monthlyConfigs: [] },
+    _allPickle: {
+      sessions: [],
+      configs: [{ groupId: 'g1', scheduleWeekdays: [1, 3, 5] }],
+      monthlyConfigs: [],
+    },
+  })
+  assert.equal(withoutMonthlyWeekdays.shouldAutoGenerate, false)
+  assert.equal(withoutMonthlyWeekdays.autoGenerateRequest, null)
 })
 
 test('pickleball calendar maps current month session rows to day states and exposes auto-generate flag', () => {
@@ -161,8 +226,8 @@ test('treasurer settings exposes regenerate sessions action and app deletes empt
   assert.match(settingsSource, /window\.confirm\('Tạo lại sẽ xoá các buổi chưa có dữ liệu\. Tiếp tục\?'\)/)
   assert.match(settingsSource, /onAction\?\.\('regenerateSessions', \{ yearMonth: d\.currentYearMonth \}\)/)
   assert.match(appSource, /type === 'regenerateSessions'/)
-  assert.match(appSource, /\.from\('pickle_attendees'\)/)
-  assert.match(appSource, /\.from\('expenses'\)/)
-  assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('status', 'scheduled'\)/)
+  assert.match(appSource, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/)
+  assert.match(appSource, /const config = sessionGenerationConfigFromState\(state, yearMonth\)/)
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'/)
+  assert.match(appSource, /config,/)
 })

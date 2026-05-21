@@ -154,12 +154,21 @@ function normalizeScheduleWeekdays(value) {
     .filter(day => Number.isInteger(day) && day >= 1 && day <= 7)
 }
 
+function isoWeekdayFromDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (!match) return null
+  const [, year, month, day] = match
+  const date = new Date(Number(year), Number(month) - 1, Number(day))
+  if (Number.isNaN(date.getTime())) return null
+  return date.getDay() === 0 ? 7 : date.getDay()
+}
+
 function generationConfigFromState(state, yearMonth, override = {}) {
   const groupId = state?.currentGroupId || state?.currentGroup?.id
   const group = state?.currentGroup || safeArray(state?.groups).find(g => String(g.id) === String(groupId)) || {}
   const config = safeArray(state?._allPickle?.configs || state?.pickleConfigs)
     .find(row => String(row?.groupId || row?.group_id || '') === String(groupId || '')) || {}
-  const monthlyConfig = safeArray(state?._allPickle?.monthlyConfigs || state?.pickle?.monthlyConfigs || state?.pickleballMonthlyConfigs)
+  const monthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
     .find(row => (
       String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
       String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
@@ -169,10 +178,7 @@ function generationConfigFromState(state, yearMonth, override = {}) {
 
   return {
     scheduleWeekdays: override.scheduleWeekdays ?? override.schedule_weekdays ??
-      monthlyConfig.scheduleWeekdays ?? monthlyConfig.schedule_weekdays ??
-      config.scheduleWeekdays ?? config.schedule_weekdays ??
-      config.weekdays ?? config.scheduleDays ?? config.schedule_days ??
-      group.scheduleWeekdays ?? group.schedule_weekdays ?? group.scheduleDays ?? group.schedule_days,
+      monthlyConfig.scheduleWeekdays ?? monthlyConfig.schedule_weekdays,
     scheduleTime: override.scheduleTime ?? override.schedule_time ??
       monthlyConfig.scheduleTime ?? monthlyConfig.schedule_time ??
       config.scheduleTime ?? config.schedule_time ?? config.timeRange ?? group.scheduleTime ?? group.schedule_time,
@@ -1527,7 +1533,9 @@ export function AppProvider({ children }) {
           group_id: groupId,
           year_month: yearMonth,
           court_fee: Number(action.courtFee ?? action.court_fee) || 0,
-          active_member_ids: safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds),
+        }
+        if ('activeMonthlyMemberIds' in action || 'activeMemberIds' in action || 'active_member_ids' in action) {
+          row.active_member_ids = safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds ?? action.active_member_ids)
         }
         if ('ticketPrice' in action || 'ticket_price' in action) {
           row.ticket_price = Number(action.ticketPrice ?? action.ticket_price) || 50000
@@ -1557,12 +1565,26 @@ export function AppProvider({ children }) {
         const groupId = action.groupId || action.group_id || state.currentGroupId
         if (!yearMonth || !groupId) return []
         const config = generationConfigFromState(stateRef.current, yearMonth, action.config || {})
+        const scheduleWeekdays = normalizeScheduleWeekdays(config.scheduleWeekdays)
+        if (scheduleWeekdays.length === 0) {
+          console.warn('[store] AUTO_GENERATE_SESSIONS: missing schedule weekdays', { groupId, yearMonth })
+          return []
+        }
         const sessions = generateMonthSessions(yearMonth, {
           ...config,
-          scheduleWeekdays: normalizeScheduleWeekdays(config.scheduleWeekdays),
+          scheduleWeekdays,
         })
-        if (sessions.length === 0) return []
-        const rows = sessions.map(session => ({
+        const scheduleWeekdaySet = new Set(scheduleWeekdays)
+        const validSessions = sessions.filter(session => scheduleWeekdaySet.has(isoWeekdayFromDate(session.date)))
+        if (validSessions.length !== sessions.length) {
+          console.warn('[store] AUTO_GENERATE_SESSIONS: skipped sessions outside schedule weekdays', {
+            groupId,
+            yearMonth,
+            skipped: sessions.length - validSessions.length,
+          })
+        }
+        if (validSessions.length === 0) return []
+        const rows = validSessions.map(session => ({
           group_id: groupId,
           session_date: session.date,
           start_time: session.startTime,
@@ -1578,7 +1600,7 @@ export function AppProvider({ children }) {
           throw error
         }
         await refresh()
-        return sessions
+        return validSessions
       }
 
       case 'APPROVE_JOIN_REQUEST': {

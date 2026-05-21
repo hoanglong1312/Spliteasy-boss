@@ -16,13 +16,13 @@ test('PickleballSettings shell allocates remaining height to a scrollable conten
   assert.match(settingsSource, /flex:\s*1/);
 });
 
-test('PickleballSettings saves current-month participation through monthly config', () => {
+test('PickleballSettings no longer renders current-month member participation toggles', () => {
   assert.match(storeSource, /pickleball_monthly_config/);
-  assert.match(storeSource, /active_member_ids/);
   assert.match(dataSource, /currentYearMonth/);
-  assert.match(dataSource, /activeMonthlyMemberIds/);
-  assert.match(settingsSource, /activeMemberIds/);
-  assert.match(settingsSource, /activeMonthlyMemberIds:\s*Array\.from\(activeMemberIds\)/);
+  assert.doesNotMatch(settingsSource, /Thành viên tháng này/);
+  assert.doesNotMatch(settingsSource, /activeMemberIds/);
+  assert.doesNotMatch(settingsSource, /activeMonthlyMemberIds:\s*Array\.from\(activeMemberIds\)/);
+  assert.doesNotMatch(appSource, /activeMonthlyMemberIds: payload\?\.activeMonthlyMemberIds \|\| \[\]/);
   assert.match(appSource, /SAVE_PICKLEBALL_MONTHLY_CONFIG/);
 });
 

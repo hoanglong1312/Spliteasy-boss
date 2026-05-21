@@ -151,16 +151,19 @@ export default function AppV2() {
     }
 
     if (type === 'saveSettings' || (type === 'save' && stack[stack.length - 1]?.screen === 'pickleball-settings')) {
-      await dispatch({
+      const action = {
         type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
         groupId: state.currentGroupId,
         yearMonth: payload?.currentYearMonth,
         courtFee: payload?.courtFee,
         ticketPrice: payload?.ticketPrice,
-        activeMonthlyMemberIds: payload?.activeMonthlyMemberIds || [],
         scheduleWeekdays: payload?.weekdays,
         scheduleStartDay: payload?.startDate,
-      })
+      }
+      if ('activeMonthlyMemberIds' in (payload || {}) || 'activeMemberIds' in (payload || {})) {
+        action.activeMonthlyMemberIds = payload?.activeMonthlyMemberIds ?? payload?.activeMemberIds ?? []
+      }
+      await dispatch(action)
       alert('Đã lưu cài đặt tháng này')
       setStack((s) => s.slice(0, -1))
       return
@@ -182,43 +185,20 @@ export default function AppV2() {
       const { token } = getStoredAuth()
       if (!token || !groupId) return
       const sb = createSupabase(token)
-      const { start, end } = monthRange(yearMonth)
-      const { data: scheduledSessions, error: sessionsError } = await sb
+      const config = sessionGenerationConfigFromState(state, yearMonth)
+      const { error: deleteError } = await sb
         .from('pickle_sessions')
-        .select('id')
+        .delete()
         .eq('group_id', groupId)
         .eq('status', 'scheduled')
-        .gte('session_date', start)
-        .lte('session_date', end)
-      if (sessionsError) throw sessionsError
-
-      const sessionIds = (scheduledSessions || []).map(session => session.id).filter(Boolean)
-      if (sessionIds.length > 0) {
-        const [attendeesResult, expensesResult] = await Promise.all([
-          sb.from('pickle_attendees').select('session_id').in('session_id', sessionIds),
-          sb.from('expenses').select('pickle_session_id').in('pickle_session_id', sessionIds),
-        ])
-        if (attendeesResult.error) throw attendeesResult.error
-        if (expensesResult.error) throw expensesResult.error
-        const lockedSessionIds = new Set([
-          ...(attendeesResult.data || []).map(row => row.session_id),
-          ...(expensesResult.data || []).map(row => row.pickle_session_id),
-        ].filter(Boolean).map(String))
-        const deletableIds = sessionIds.filter(id => !lockedSessionIds.has(String(id)))
-        if (deletableIds.length > 0) {
-          const { error: deleteError } = await sb
-            .from('pickle_sessions')
-            .delete()
-            .eq('status', 'scheduled')
-            .in('id', deletableIds)
-          if (deleteError) throw deleteError
-        }
-      }
+        .like('session_date', `${yearMonth}%`)
+      if (deleteError) throw deleteError
 
       await dispatch({
         type: 'AUTO_GENERATE_SESSIONS',
         groupId,
         yearMonth,
+        config,
       })
       alert('Đã tạo lại lịch tháng này')
       return
@@ -299,13 +279,15 @@ export default function AppV2() {
 
     if (type === 'addTicket') {
       if (!isTreasurer || !state.currentGroupId || !state.currentUserId) return
-      const sessionDate = payload?.session_date || payload?.date
+      const sessionDate = normalizeTicketDate(payload?.session_date || payload?.date)
       const sessionTime = payload?.session_time || payload?.time || null
-      const memberIds = safeArray(payload?.member_ids || payload?.memberIds)
+      const memberIds = normalizeTicketMemberIds(payload?.member_ids || payload?.memberIds, state)
       const totalAmount = parseMoneyAmount(payload?.total_amount ?? payload?.totalAmount)
-      const advancerId = payload?.advancer_id ?? payload?.advancerId ?? null
       const isAdvancerMode = payload?.paymentMode === 'advancer'
-      const isTeamFund = payload?.paymentMode === 'team_fund' || payload?.teamFund === true || payload?.status === 'team_fund' || (!isAdvancerMode && !advancerId)
+      const wantsTeamFund = payload?.paymentMode === 'team_fund' || payload?.teamFund === true || payload?.status === 'team_fund'
+      const rawAdvancerId = payload?.advancer_id ?? payload?.advancerId ?? null
+      const advancerId = wantsTeamFund ? null : rawAdvancerId
+      const isTeamFund = wantsTeamFund || (!isAdvancerMode && !advancerId)
       if (!sessionDate) throw new Error('ticket_session_date_required')
       if (memberIds.length === 0) throw new Error('ticket_members_required')
       if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
@@ -672,8 +654,6 @@ export default function AppV2() {
           session_id: sessionId,
           guest_name: guestName,
           attendee_type: 'guest',
-          is_guest: true,
-          rsvp_status: 'going',
           attended: true,
         })
       if (error) throw error
@@ -908,15 +888,25 @@ export default function AppV2() {
   )
 }
 
-function monthRange(yearMonth) {
-  const [yearText, monthText] = String(yearMonth || '').split('-')
-  const year = Number(yearText)
-  const month = Number(monthText)
-  const mm = String(month).padStart(2, '0')
-  const endDay = new Date(year, month, 0).getDate()
+function sessionGenerationConfigFromState(state, yearMonth) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  const group = state?.currentGroup || safeArray(state?.groups).find(row => String(row.id) === String(groupId)) || {}
+  const monthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
+    .find(row => (
+      String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
+      String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
+    )) || {}
+  const config = safeArray(state?._allPickle?.configs || state?.pickleConfigs)
+    .find(row => String(row?.groupId || row?.group_id || '') === String(groupId || '')) || {}
+  const [year, month] = String(yearMonth || '').split('-')
+
   return {
-    start: `${year}-${mm}-01`,
-    end: `${year}-${mm}-${String(endDay).padStart(2, '0')}`,
+    scheduleWeekdays: monthlyConfig.scheduleWeekdays ?? monthlyConfig.schedule_weekdays,
+    scheduleTime: monthlyConfig.scheduleTime ?? monthlyConfig.schedule_time ??
+      config.scheduleTime ?? config.schedule_time ?? config.timeRange ?? group.scheduleTime ?? group.schedule_time,
+    startDate: monthlyConfig.scheduleStartDay ?? monthlyConfig.schedule_start_day ??
+      config.startDate ?? config.start_date ?? `01/${month || String(new Date().getMonth() + 1).padStart(2, '0')}/${year || new Date().getFullYear()}`,
+    defaultVenue: config.defaultVenue ?? config.default_venue ?? group.defaultVenue ?? group.default_venue ?? group.name,
   }
 }
 
@@ -931,6 +921,37 @@ function parseMoneyAmount(value) {
 
 function safeArray(value) {
   return Array.isArray(value) ? value : []
+}
+
+function normalizeTicketDate(value) {
+  const text = String(value || '').trim()
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (iso) {
+    const [, year, month, day] = iso
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+  }
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (!slash) return text
+  const [, day, month, year] = slash
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function normalizeTicketMemberIds(value, state) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  const members = safeArray(state?.members).filter(member => {
+    const memberGroupId = member?.groupId || member?.group_id
+    return !groupId || !memberGroupId || String(memberGroupId) === String(groupId)
+  })
+  return safeArray(value)
+    .map(item => {
+      const text = String(item || '').trim()
+      const member = members.find(row => (
+        String(row?.id || row?.member_id || '') === text ||
+        String(row?.name || row?.displayName || '').trim() === text
+      ))
+      return member?.id || member?.member_id || text
+    })
+    .filter(Boolean)
 }
 
 function dateFromLabel(label) {

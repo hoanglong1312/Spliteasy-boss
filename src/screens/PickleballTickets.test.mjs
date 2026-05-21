@@ -5,7 +5,7 @@ import test from 'node:test'
 const screenSource = readFileSync(new URL('./PickleballTickets.jsx', import.meta.url), 'utf8')
 
 test('PickleballTickets renders emerald tickets layout and treasurer actions', () => {
-  assert.match(screenSource, /import React, \{ useMemo, useState \} from 'react'/)
+  assert.match(screenSource, /import React, \{ useEffect, useMemo, useState \} from 'react'/)
   assert.match(screenSource, /Hero variant="emerald"/)
   assert.match(screenSource, />Vé lẻ<\/h1>/)
   assert.match(screenSource, /onClick=\{\(\) => setShowForm\(true\)\}/)
@@ -22,12 +22,15 @@ test('PickleballTickets renders emerald tickets layout and treasurer actions', (
 })
 
 test('PickleballTickets add form calculates total from selected participants and saves expected payload', () => {
+  assert.match(screenSource, /import React, \{ useEffect, useMemo, useState \} from 'react'/)
   assert.match(screenSource, /function AddTicketSheet\(\{ data, onClose, onSave \}\) \{/)
   assert.match(screenSource, /const \[date, setDate\] = useState/)
   assert.match(screenSource, /const \[time, setTime\] = useState/)
   assert.match(screenSource, /const \[memberIds, setMemberIds\] = useState/)
   assert.match(screenSource, /const \[paymentMode, setPaymentMode\] = useState\('team_fund'\)/)
   assert.match(screenSource, /const \[error, setError\] = useState\(''\)/)
+  assert.match(screenSource, /const selectedMembers = members\.filter\(member => memberIds\.some\(id => String\(id\) === String\(member\.id\)\)\)/)
+  assert.match(screenSource, /\{selectedMembers\.map\(member => \(/)
   assert.doesNotMatch(screenSource, /const \[totalAmount, setTotalAmount\]/)
   assert.match(screenSource, /value=\{date\}/)
   assert.match(screenSource, /value=\{time\}/)

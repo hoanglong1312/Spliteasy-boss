@@ -1,7 +1,7 @@
 // Spliteasy Boss - Pickleball · Vé lẻ
 // Props: data from buildPickleballTicketsData(state), isTreasurer
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { colors, type, formatVNDShort } from '../tokens'
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Badge, SubTabs, Pill, PillRow, Avatar, Button, Input,
@@ -261,12 +261,19 @@ function AddTicketSheet({ data, onClose, onSave }) {
   const [time, setTime] = useState('19:00')
   const [memberIds, setMemberIds] = useState([])
   const [paymentMode, setPaymentMode] = useState('team_fund')
-  const [advancerId, setAdvancerId] = useState(members[0]?.id || '')
+  const [advancerId, setAdvancerId] = useState('')
   const [error, setError] = useState('')
+  const selectedMembers = members.filter(member => memberIds.some(id => String(id) === String(member.id)))
   const ticketPrice = Number(data.ticketPricePerPerson || data.ticketPrice || data.defaultTicketAmountPerPerson || 50000) || 50000
   const totalAmountToSave = ticketPrice * memberIds.length
   const amountPerPerson = ticketPrice
   const canSave = !ticketValidationError({ date, time, memberIds, totalAmount: totalAmountToSave, paymentMode, advancerId })
+
+  useEffect(() => {
+    if (paymentMode !== 'advancer') return
+    if (selectedMembers.some(member => String(member.id) === String(advancerId))) return
+    setAdvancerId(selectedMembers[0]?.id || '')
+  }, [advancerId, paymentMode, selectedMembers])
 
   function toggleMember(memberId) {
     if (error) setError('')
@@ -416,6 +423,7 @@ function AddTicketSheet({ data, onClose, onSave }) {
             checked={paymentMode === 'advancer'}
             onChange={() => {
               setPaymentMode('advancer')
+              if (!advancerId && selectedMembers[0]?.id) setAdvancerId(selectedMembers[0].id)
               if (error) setError('')
             }}
             style={{ accentColor: colors.pickleball }}
@@ -430,7 +438,7 @@ function AddTicketSheet({ data, onClose, onSave }) {
             style={selectStyle()}
           >
             <option value="">Chọn người ứng...</option>
-            {members.map(member => (
+            {selectedMembers.map(member => (
               <option key={member.id} value={member.id}>{member.name}</option>
             ))}
           </select>
