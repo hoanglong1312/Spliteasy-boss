@@ -86,11 +86,13 @@ export function useScreenData() {
       autoGenerateRef.current = ''
       return
     }
-    const key = screenData.pickleballCalendarData?.autoGenerateKey || screenData.pickleballOverviewData?.autoGenerateKey || `${state.currentGroupId}:${request.yearMonth}`
+    const groupId = state.currentGroupId || state.currentGroup?.id
+    const key = screenData.pickleballCalendarData?.autoGenerateKey || screenData.pickleballOverviewData?.autoGenerateKey || `${groupId}:${request.yearMonth}`
     if (autoGenerateRef.current === key) return
     autoGenerateRef.current = key
     dispatch({
       type: 'AUTO_GENERATE_SESSIONS',
+      groupId,
       yearMonth: request.yearMonth,
       config: request.config,
     }).catch(err => {
@@ -103,6 +105,7 @@ export function useScreenData() {
     screenData.pickleballOverviewData?.autoGenerateKey,
     screenData.pickleballOverviewData?.autoGenerateRequest,
     state.currentGroupId,
+    state.currentGroup?.id,
   ])
 
   return screenData
@@ -334,7 +337,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   )
   const monthSessions = getStateMonthSessions(state, today)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
-  const shouldAutoGenerate = !state?._pickleRegenInProgress && monthSessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
+  const shouldAutoGenerate = !state?._pickleRegenInProgress && hasMissingGeneratedSessions(state, currentYearMonth, monthSessions, autoGenerateConfig)
   const completedSessions = monthSessions.filter(s => isDoneStatus(s?.status)).length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
@@ -492,7 +495,7 @@ function buildPickleballCalendarData(state, params = {}) {
   const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
   const sessions = getStateMonthSessions(state, monthDate)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
-  const shouldAutoGenerate = !state?._pickleRegenInProgress && sessions.length === 0 && safeArray(autoGenerateConfig.scheduleWeekdays).length > 0
+  const shouldAutoGenerate = !state?._pickleRegenInProgress && hasMissingGeneratedSessions(state, currentYearMonth, sessions, autoGenerateConfig)
   const sessionsByDay = new Map()
   sessions.forEach(session => {
     const date = parseDate(sessionDate(session))
@@ -1716,17 +1719,66 @@ function buildSessionGenerationConfig(state, yearMonth) {
       String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
     )) || {}
   const [year, month] = String(yearMonth || '').split('-')
+  const monthlyWeekdays = normalizeIsoWeekdays(
+    monthlyConfig?.scheduleWeekdays ||
+    monthlyConfig?.schedule_weekdays
+  )
   return {
-    scheduleWeekdays: normalizeIsoWeekdays(
-      monthlyConfig?.scheduleWeekdays ||
-      monthlyConfig?.schedule_weekdays
-    ),
+    scheduleWeekdays: monthlyWeekdays.length > 0 ? monthlyWeekdays : inferScheduleWeekdaysFromMonthSessions(state, yearMonth),
     scheduleTime: monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time ||
       config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || group?.schedule_time || '19:00-21:00',
     startDate: monthlyConfig?.scheduleStartDay || monthlyConfig?.schedule_start_day ||
       config?.startDate || config?.start_date || `01/${month || String(new Date().getMonth() + 1).padStart(2, '0')}/${year || new Date().getFullYear()}`,
     defaultVenue: config?.defaultVenue || config?.default_venue || group?.defaultVenue || group?.default_venue || group?.name || 'CLB Pickleball',
   }
+}
+
+function inferScheduleWeekdaysFromMonthSessions(state, yearMonth) {
+  const monthDate = parseDate(`${yearMonth}-01`)
+  if (!monthDate) return []
+  return [...new Set(getStateMonthSessions(state, monthDate)
+    .map(session => parseDate(sessionDate(session)))
+    .filter(Boolean)
+    .map(date => date.getDay() === 0 ? 7 : date.getDay()))]
+    .sort((a, b) => a - b)
+}
+
+function hasMissingGeneratedSessions(state, yearMonth, sessions, config) {
+  const scheduleWeekdays = safeArray(config?.scheduleWeekdays)
+  if (scheduleWeekdays.length === 0) return false
+  const expectedDates = generatedSessionDatesForMonth(yearMonth, config)
+  if (expectedDates.length === 0) return false
+  const existingDates = new Set(safeArray(sessions).map(session => dateKey(sessionDate(session))).filter(Boolean))
+  return expectedDates.some(date => !existingDates.has(date))
+}
+
+function generatedSessionDatesForMonth(yearMonth, config = {}) {
+  const [yearText, monthText] = String(yearMonth || '').split('-')
+  const year = Number(yearText)
+  const month = Number(monthText)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return []
+  const weekdays = new Set(safeArray(config.scheduleWeekdays))
+  if (weekdays.size === 0) return []
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const firstDay = Math.max(1, Math.min(scheduleStartDay(config.startDate), daysInMonth))
+  const mm = String(month).padStart(2, '0')
+  const dates = []
+  for (let day = firstDay; day <= daysInMonth; day += 1) {
+    const date = new Date(year, month - 1, day)
+    const isoWeekday = date.getDay() === 0 ? 7 : date.getDay()
+    if (weekdays.has(isoWeekday)) dates.push(`${year}-${mm}-${String(day).padStart(2, '0')}`)
+  }
+  return dates
+}
+
+function scheduleStartDay(value) {
+  if (typeof value === 'number' && Number.isInteger(value)) return value
+  const text = String(value || '').trim()
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (iso) return Number(iso[3])
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/)
+  if (slash) return Number(slash[1])
+  return 1
 }
 
 function normalizeIsoWeekdays(value) {

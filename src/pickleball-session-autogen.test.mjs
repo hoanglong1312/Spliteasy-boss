@@ -122,7 +122,7 @@ test('store auto-generates sessions with plain Supabase insert after scheduled r
   assert.match(storeSource, /case 'AUTO_GENERATE_SESSIONS':\s*\{/)
   assert.match(storeSource, /const scheduleWeekdays = normalizeScheduleWeekdays/)
   assert.match(storeSource, /console\.warn\('\[store\] AUTO_GENERATE_SESSIONS: missing schedule weekdays'/)
-  assert.match(storeSource, /const validSessions = sessions\.filter\(session => scheduleWeekdaySet\.has\(isoWeekdayFromDate\(session\.date\)\)\)/)
+  assert.match(storeSource, /let validSessions = sessions\.filter\(session => scheduleWeekdaySet\.has\(isoWeekdayFromDate\(session\.date\)\)\)/)
   const autoGenerateBlock = storeSource.match(/case 'AUTO_GENERATE_SESSIONS':\s*\{[\s\S]*?return validSessions\s*\n\s*\}/)?.[0] || ''
   assert.match(autoGenerateBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.insert\(rows\)/)
   assert.doesNotMatch(autoGenerateBlock, /\.upsert\(/)
@@ -215,6 +215,69 @@ test('calendar and overview suppress auto-generation while manual regeneration i
   assert.equal(overviewData.shouldAutoGenerate, false)
   assert.equal(overviewData.autoGenerateRequest, null)
   assert.equal(overviewData.autoGenerateKey, '')
+})
+
+test('calendar and overview request auto-generation when configured dates are missing', () => {
+  const { buildPickleballCalendarData, buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-04', status: 'completed', attendees: ['u1'] },
+        { id: 's2', groupId: 'g1', date: '2026-05-06', status: 'completed', attendees: ['u1'] },
+        { id: 's3', groupId: 'g1', date: '2026-05-08', status: 'cancelled', attendees: [] },
+        { id: 's4', groupId: 'g1', date: '2026-05-18', status: 'scheduled', attendees: [] },
+        { id: 's5', groupId: 'g1', date: '2026-05-20', status: 'scheduled', attendees: [] },
+      ],
+      fixedMembers: ['u1'],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5], scheduleStartDay: '01/05/2026' }],
+    },
+    _allPickle: {
+      sessions: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5], scheduleStartDay: '01/05/2026' }],
+    },
+  }
+
+  const calendarData = buildPickleballCalendarData(state)
+  const overviewData = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'u1', [])
+
+  assert.equal(calendarData.shouldAutoGenerate, true)
+  assert.equal(calendarData.autoGenerateRequest.yearMonth, '2026-05')
+  assert.equal(overviewData.shouldAutoGenerate, true)
+  assert.equal(overviewData.autoGenerateRequest.yearMonth, '2026-05')
+})
+
+test('screen data auto-generation dispatch includes current group id fallback', () => {
+  assert.match(dataSource, /const groupId = state\.currentGroupId \|\| state\.currentGroup\?\.id/)
+  assert.match(dataSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*groupId,[\s\S]*yearMonth: request\.yearMonth/)
+  assert.match(storeSource, /const groupId = action\.groupId \|\| action\.group_id \|\| state\.currentGroupId \|\| state\.currentGroup\?\.id/)
+})
+
+test('calendar infers generation weekdays from existing month sessions when config is missing weekdays', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-04', status: 'completed', attendees: ['u1'] },
+        { id: 's2', groupId: 'g1', date: '2026-05-06', status: 'completed', attendees: ['u1'] },
+        { id: 's3', groupId: 'g1', date: '2026-05-08', status: 'completed', attendees: ['u1'] },
+        { id: 's4', groupId: 'g1', date: '2026-05-18', status: 'scheduled', attendees: [] },
+        { id: 's5', groupId: 'g1', date: '2026-05-20', status: 'scheduled', attendees: [] },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+    _allPickle: { sessions: [], monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }] },
+  })
+
+  assert.equal(data.shouldAutoGenerate, true)
+  assert.deepEqual(JSON.parse(JSON.stringify(data.autoGenerateRequest.config.scheduleWeekdays)), [1, 3, 5])
 })
 
 test('pickleball calendar maps current month session rows to day states and exposes auto-generate flag', () => {
@@ -361,13 +424,20 @@ test('settings save suppresses app auto-generation while manually regenerating',
   assert.ok(generateIndex >= 0 && generateIndex < disableIndex, 'regen flag is disabled after manual generation')
 })
 
-test('store auto-generation skips existing scheduled sessions unless forced', () => {
+test('store auto-generation inserts only missing generated session dates', () => {
   assert.match(storeSource, /_pickleRegenInProgress: false/)
   assert.match(storeSource, /case 'SET_PICKLE_REGEN':\s*\{/)
 
   const autoGenerateBlock = storeSource.match(/case 'AUTO_GENERATE_SESSIONS':\s*\{[\s\S]*?return validSessions\s*\n\s*\}/)?.[0] || ''
-  assert.match(autoGenerateBlock, /if \(!action\.force\) \{[\s\S]*const \{ data: existingRows[\s\S]*\.from\('pickle_sessions'\)[\s\S]*\.select\('id'\)[\s\S]*\.eq\('group_id', groupId\)[\s\S]*\.eq\('status', 'scheduled'\)[\s\S]*\.like\('session_date', `\$\{yearMonth\}%`\)[\s\S]*\.limit\(1\)[\s\S]*if \(existingRows\?\.length > 0\) \{[\s\S]*await refresh\(\)[\s\S]*return \[\][\s\S]*\}/)
-  assert.match(autoGenerateBlock, /if \(existingRows\?\.length > 0\)/)
+  assert.match(autoGenerateBlock, /const \{ data: existingRows/)
+  assert.match(autoGenerateBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.select\('id,session_date,status'\)/)
+  assert.match(autoGenerateBlock, /const \{ start, end \} = getMonthRange\(yearMonth\)/)
+  assert.match(autoGenerateBlock, /\.gte\('session_date', start\)[\s\S]*?\.lte\('session_date', end\)/)
+  assert.doesNotMatch(autoGenerateBlock, /\.like\('session_date'/)
+  assert.doesNotMatch(autoGenerateBlock, /\.limit\(1\)/)
+  assert.match(autoGenerateBlock, /const existingDateSet = new Set/)
+  assert.match(autoGenerateBlock, /validSessions = validSessions\.filter\(session => !existingDateSet\.has\(session\.date\)\)/)
+  assert.match(autoGenerateBlock, /if \(validSessions\.length === 0\) \{[\s\S]*await refresh\(\)[\s\S]*return \[\]/)
 })
 
 test('scheduled session clear removes normalized primary and missing-status legacy rows', () => {

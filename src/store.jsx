@@ -1643,7 +1643,7 @@ export function AppProvider({ children }) {
       case 'AUTO_GENERATE_SESSIONS': {
         if (!sb) return []
         const yearMonth = action.yearMonth || action.year_month
-        const groupId = action.groupId || action.group_id || state.currentGroupId
+        const groupId = action.groupId || action.group_id || state.currentGroupId || state.currentGroup?.id
         if (!yearMonth || !groupId) return []
         const config = generationConfigFromState(stateRef.current, yearMonth, action.config || {})
         const scheduleWeekdays = normalizeScheduleWeekdays(config.scheduleWeekdays)
@@ -1651,29 +1651,23 @@ export function AppProvider({ children }) {
           console.warn('[store] AUTO_GENERATE_SESSIONS: missing schedule weekdays', { groupId, yearMonth })
           return []
         }
-        if (!action.force) {
-          const { data: existingRows, error: existingError } = await sb
-            .from('pickle_sessions')
-            .select('id')
-            .eq('group_id', groupId)
-            .eq('status', 'scheduled')
-            .like('session_date', `${yearMonth}%`)
-            .limit(1)
-          if (existingError) {
-            console.error('[store] AUTO_GENERATE_SESSIONS existing check:', existingError)
-            throw existingError
-          }
-          if (existingRows?.length > 0) {
-            await refresh()
-            return []
-          }
+        const { start, end } = getMonthRange(yearMonth)
+        const { data: existingRows, error: existingError } = await sb
+          .from('pickle_sessions')
+          .select('id,session_date,status')
+          .eq('group_id', groupId)
+          .gte('session_date', start)
+          .lte('session_date', end)
+        if (existingError) {
+          console.error('[store] AUTO_GENERATE_SESSIONS existing check:', existingError)
+          throw existingError
         }
         const sessions = generateMonthSessions(yearMonth, {
           ...config,
           scheduleWeekdays,
         })
         const scheduleWeekdaySet = new Set(scheduleWeekdays)
-        const validSessions = sessions.filter(session => scheduleWeekdaySet.has(isoWeekdayFromDate(session.date)))
+        let validSessions = sessions.filter(session => scheduleWeekdaySet.has(isoWeekdayFromDate(session.date)))
         if (validSessions.length !== sessions.length) {
           console.warn('[store] AUTO_GENERATE_SESSIONS: skipped sessions outside schedule weekdays', {
             groupId,
@@ -1681,7 +1675,22 @@ export function AppProvider({ children }) {
             skipped: sessions.length - validSessions.length,
           })
         }
-        if (validSessions.length === 0) return []
+        const existingDateSet = new Set([
+          ...safeArray(existingRows).map(row => String(row.session_date || '').slice(0, 10)),
+          ...[
+            ...safeArray(stateRef.current?.pickle?.sessions),
+            ...safeArray(stateRef.current?.pickle?.upcoming),
+            ...safeArray(stateRef.current?._allPickle?.sessions),
+          ]
+            .filter(session => String(session?.groupId || session?.group_id || '') === String(groupId))
+            .map(session => String(sessionDateValue(session) || '').slice(0, 10))
+            .filter(date => date.startsWith(`${yearMonth}-`)),
+        ].filter(Boolean))
+        validSessions = validSessions.filter(session => !existingDateSet.has(session.date))
+        if (validSessions.length === 0) {
+          await refresh()
+          return []
+        }
         const rows = validSessions.map(session => ({
           group_id: groupId,
           session_date: session.date,
