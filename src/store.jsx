@@ -207,7 +207,7 @@ function removeScheduledSessionsForMonthFromState(current, groupId, yearMonth) {
   const keepSession = session => !(
     String(session?.groupId || session?.group_id || '') === String(groupId) &&
     String(sessionDateValue(session) || '').startsWith(String(yearMonth)) &&
-    String(session?.status || '').toLowerCase() === 'scheduled'
+    (String(session?.status || '').toLowerCase() === 'scheduled' || !session?.status)
   )
 
   return {

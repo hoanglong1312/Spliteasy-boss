@@ -235,7 +235,13 @@ test('settings save deletes scheduled sessions and regenerates when schedule wee
   const saveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?alert\('Đã lưu cài đặt tháng này'\)/)?.[0] || ''
   assert.match(saveBlock, /Promise\.all\(\[/)
   assert.match(saveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.like\('session_date', `\$\{yearMonth\}%`\)/)
-  assert.match(saveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.like\('date', `\$\{yearMonth\}%`\)/)
+  assert.match(saveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.gte\('date', `\$\{yearMonth\}-01`\)[\s\S]*?\.lte\('date', `\$\{yearMonth\}-31`\)/)
+  const legacyDeleteStart = saveBlock.indexOf(".from('pickleball_sessions')")
+  const legacyDeleteEnd = saveBlock.indexOf('])', legacyDeleteStart)
+  assert.ok(legacyDeleteStart >= 0 && legacyDeleteEnd > legacyDeleteStart, 'legacy session delete block is available')
+  const legacyDeleteBlock = saveBlock.slice(legacyDeleteStart, legacyDeleteEnd)
+  assert.doesNotMatch(legacyDeleteBlock, /\.eq\('status'/)
+  assert.doesNotMatch(legacyDeleteBlock, /session_date/)
   assert.match(saveBlock, /if \(deleteResult1\.error\) throw deleteResult1\.error/)
   assert.match(saveBlock, /if \(deleteResult2\.error\) throw deleteResult2\.error/)
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'/)
@@ -253,7 +259,7 @@ test('settings save clears in-memory scheduled sessions before regenerating', ()
   )
 })
 
-test('scheduled session clear removes normalized primary and legacy scheduled rows', () => {
+test('scheduled session clear removes normalized primary and missing-status legacy rows', () => {
   const start = storeSource.indexOf('function safeArray')
   const end = storeSource.indexOf('\nfunction removeSessionGuestFromState', start)
   assert.ok(start >= 0 && end > start, 'scheduled clear helpers are available')
@@ -266,15 +272,20 @@ test('scheduled session clear removes normalized primary and legacy scheduled ro
       sessions: [
         { id: 'primary-scheduled', sourceTable: 'pickle_sessions', groupId: 'g1', sessionDate: '2026-05-06', status: 'scheduled' },
         { id: 'legacy-scheduled', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-08', status: 'scheduled' },
+        { id: 'legacy-missing-status', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-09' },
+        { id: 'legacy-null-status', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-11', status: null },
         { id: 'legacy-completed', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-10', status: 'completed' },
         { id: 'other-month', sourceTable: 'pickle_sessions', groupId: 'g1', sessionDate: '2026-06-01', status: 'scheduled' },
         { id: 'other-group', sourceTable: 'pickle_sessions', groupId: 'g2', sessionDate: '2026-05-01', status: 'scheduled' },
+        { id: 'other-month-legacy-missing-status', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-06-02' },
       ],
     },
     pickle: {
       sessions: [
         { id: 'primary-scheduled', sourceTable: 'pickle_sessions', groupId: 'g1', sessionDate: '2026-05-06', status: 'scheduled' },
         { id: 'legacy-scheduled', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-08', status: 'scheduled' },
+        { id: 'legacy-missing-status', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-09' },
+        { id: 'legacy-null-status', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-11', status: null },
         { id: 'legacy-completed', sourceTable: 'pickleball_sessions', groupId: 'g1', date: '2026-05-10', status: 'completed' },
       ],
     },
@@ -284,6 +295,7 @@ test('scheduled session clear removes normalized primary and legacy scheduled ro
     'legacy-completed',
     'other-month',
     'other-group',
+    'other-month-legacy-missing-status',
   ])
   assert.deepEqual(next.pickle.sessions.map(session => session.id), [
     'legacy-completed',

@@ -192,7 +192,8 @@ export default function AppV2() {
               .from('pickleball_sessions')
               .delete()
               .eq('group_id', groupId)
-              .like('date', `${yearMonth}%`),
+              .gte('date', `${yearMonth}-01`)
+              .lte('date', `${yearMonth}-31`),
           ])
           if (deleteResult1.error) throw deleteResult1.error
           if (deleteResult2.error) throw deleteResult2.error
