@@ -111,6 +111,48 @@ test('calendar session-cost member chips prefer real names over numeric short al
   assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.members.map(member => member.name))), ['Anh Hoàng', 'Tuấn'])
 })
 
+test('calendar selected session exposes extra costs from linked pickleball expenses', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'Anh Hoàng', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Tuấn', memberType: 'fixed' },
+      { id: 'm3', groupId: 'g1', name: 'Long', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 's1',
+          sourceTable: 'pickle_sessions',
+          groupId: 'g1',
+          date: '2026-05-20',
+          status: 'completed',
+          attendees: ['m1', 'm2', 'm3'],
+          expenses: [
+            { id: 'e1', pickleSessionId: 's1', title: 'Test', category: 'pickleball_extra', amount: 10000, participants: ['m1', 'm2'] },
+          ],
+        },
+      ],
+      monthlyConfigs: [],
+      fixedMembers: ['m1', 'm2', 'm3'],
+    },
+    _allPickle: { sessions: [], sessionItems: [], monthlyConfigs: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.costs.extras)), [
+    { id: 'e1', note: 'Test', amount: 10000, memberIds: ['m1', 'm2'] },
+  ])
+  assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.costRows.at(-1))), {
+    label: '⚡ Test',
+    amount: 5000,
+  })
+})
+
 test('calendar court cost uses monthly config for the selected session month', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {
@@ -209,6 +251,15 @@ test('saveSessionCost saves water for primary pickle_sessions through linked exp
   assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.select\('id'\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
   assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.update\(\{[\s\S]*?amount: waterAmount/)
   assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.insert\(\{[\s\S]*?pickle_session_id: sessionId[\s\S]*?category: 'water'/)
+})
+
+test('saveSessionCost saves extras for primary pickle_sessions through expenses and participants', () => {
+  const handlerSource = appSource.match(/if \(type === 'saveSessionCost'\) \{[\s\S]*?\n    if \(type === 'saveBatchCosts'\)/)?.[0] || ''
+
+  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'pickleball_extra'\)/)
+  assert.match(handlerSource, /const extras = \(payload\?\.extras \|\| \[\]\)[\s\S]*?category: 'pickleball_extra'/)
+  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.insert\(\{[\s\S]*?pickle_session_id: sessionId[\s\S]*?title: extra\.title[\s\S]*?category: 'pickleball_extra'/)
+  assert.match(handlerSource, /\.from\('expense_participants'\)[\s\S]*?\.insert\(/)
 })
 
 test('saveSessionCost writes empty member arrays for all session item upserts', () => {

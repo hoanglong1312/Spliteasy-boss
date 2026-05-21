@@ -559,8 +559,9 @@ export default function AppV2() {
       const session = findSessionInPickleState(state, sessionId)
       const sourceTable = session?.sourceTable || session?.source_table
       if (sourceTable === 'pickle_sessions') {
+        const groupId = session?.groupId || session?.group_id || state.currentGroupId
+        const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
         if (waterAmount > 0) {
-          const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
           const { data: existingWater, error: existingWaterError } = await sb
             .from('expenses')
             .select('id')
@@ -586,7 +587,7 @@ export default function AppV2() {
             const { error: insertWaterError } = await sb
               .from('expenses')
               .insert({
-                group_id: session?.groupId || session?.group_id || state.currentGroupId,
+                group_id: groupId,
                 module: 'pickleball',
                 pickle_session_id: sessionId,
                 title: 'Tiền nước',
@@ -600,6 +601,60 @@ export default function AppV2() {
                 reviewed_at: new Date().toISOString(),
               })
             if (insertWaterError) throw insertWaterError
+          }
+        }
+        const { error: deleteExtrasError } = await sb
+          .from('expenses')
+          .delete()
+          .eq('pickle_session_id', sessionId)
+          .eq('category', 'pickleball_extra')
+        if (deleteExtrasError) throw deleteExtrasError
+
+        const allMemberIds = currentGroupMemberIds(state, groupId)
+        const extras = (payload?.extras || [])
+          .map(extra => {
+            const memberIds = Array.isArray(extra?.memberIds) ? extra.memberIds : allMemberIds
+            return {
+              title: String(extra?.note || extra?.name || 'Phụ phát sinh').trim() || 'Phụ phát sinh',
+              amount: parseMoneyAmount(extra?.amount),
+              memberIds,
+              category: 'pickleball_extra',
+            }
+          })
+          .filter(extra => extra.amount > 0)
+        for (const extra of extras) {
+          const { data: insertedExtra, error: insertExtraError } = await sb
+            .from('expenses')
+            .insert({
+              group_id: groupId,
+              module: 'pickleball',
+              pickle_session_id: sessionId,
+              title: extra.title,
+              amount: extra.amount,
+              expense_date: expenseDate,
+              category: 'pickleball_extra',
+              paid_by_member_id: state.currentUserId,
+              submitted_by_member_id: state.currentUserId,
+              status: 'approved',
+              reviewed_by_member_id: state.currentUserId,
+              reviewed_at: new Date().toISOString(),
+            })
+            .select('id')
+            .single()
+          if (insertExtraError) throw insertExtraError
+
+          if (insertedExtra?.id && extra.memberIds.length > 0) {
+            const per = Math.round(extra.amount / extra.memberIds.length)
+            const { error: participantError } = await sb
+              .from('expense_participants')
+              .insert(extra.memberIds.map((memberId, index) => ({
+                expense_id: insertedExtra.id,
+                member_id: memberId,
+                share_amount: index === extra.memberIds.length - 1
+                  ? extra.amount - per * (extra.memberIds.length - 1)
+                  : per,
+              })))
+            if (participantError) throw participantError
           }
         }
         await dispatch({ type: 'REFRESH' })
@@ -1204,6 +1259,14 @@ function findSessionInPickleState(state, sessionId) {
     ...safeArray(state?._allPickle?.sessions),
     ...safeArray(state?.sessions),
   ].find(session => String(session?.id || '') === target) || null
+}
+
+function currentGroupMemberIds(state, groupId) {
+  return safeArray(state?.members)
+    .filter(member => member?.isActive !== false && member?.is_active !== false)
+    .filter(member => !groupId || String(member?.groupId || member?.group_id || '') === String(groupId))
+    .map(member => member.id)
+    .filter(Boolean)
 }
 
 function parseMoneyAmount(value) {

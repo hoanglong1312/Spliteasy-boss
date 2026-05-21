@@ -1419,13 +1419,17 @@ function calendarSessionStatus(session, today) {
 function sessionCostsForSession(state, session, members = []) {
   const items = sessionItemsForSession(state, session)
   const waterItem = items.find(isWaterSessionItem)
-  const extras = items
+  const itemExtras = items
     .filter(item => !isWaterSessionItem(item))
     .map(item => normalizeSessionCostItem(item, members))
+  const expenseExtras = safeArray(session?.expenses)
+    .filter(expense => expense?.source !== 'pickleball_session_items')
+    .filter(expense => !isWaterExpense(expense) && !isCourtExpense(expense))
+    .map(expense => normalizeExpenseCostItem(expense))
 
   return {
     waterAmount: waterItem ? Number(waterItem.amount) || 0 : sessionWaterAmount(session),
-    extras,
+    extras: [...itemExtras, ...expenseExtras],
   }
 }
 
@@ -1458,6 +1462,15 @@ function normalizeSessionCostItem(item, members) {
     note: item.note || item.name || 'Phụ phát sinh',
     amount: Number(item.amount) || 0,
     memberIds,
+  }
+}
+
+function normalizeExpenseCostItem(expense) {
+  return {
+    id: expense.id,
+    note: expense.note || expense.title || expense.name || 'Phụ phát sinh',
+    amount: Number(expense.amount) || 0,
+    memberIds: safeArray(expense.participants),
   }
 }
 
