@@ -1396,6 +1396,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
   const attendanceMembers = groupMembers.filter(member => memberType(member) === 'fixed')
+  const attendanceNames = attendanceDisplayNames(attendanceMembers)
   const fixedPresentCount = attendanceMembers
     .filter(member => presentSet.has(String(member.id)))
     .length
@@ -1403,7 +1404,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     ...attendanceMembers.map(member => ({
       id: member.id,
       initial: initials(member),
-      name: firstName(member.displayName || member.name),
+      name: attendanceNames.get(String(member.id)) || firstName(member.displayName || member.name),
       memberType: memberType(member),
       kind: presentSet.has(String(member.id)) ? 'present' : 'absent',
     })),
@@ -1456,7 +1457,30 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     ],
     totalPerPerson: courtPerPerson + waterPerPerson + extrasPerPerson,
     canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
+    canComplete: sessionKey <= todayKey && !isDoneStatus(session?.status),
   }
+}
+
+function attendanceDisplayNames(members) {
+  const baseNames = safeArray(members).map(member => ({
+    id: String(member.id),
+    base: firstName(member.displayName || member.name),
+    full: compactMemberName(member),
+  }))
+  const counts = baseNames.reduce((map, item) => {
+    map.set(item.base, (map.get(item.base) || 0) + 1)
+    return map
+  }, new Map())
+  return baseNames.reduce((map, item) => {
+    map.set(item.id, counts.get(item.base) > 1 ? item.full : item.base)
+    return map
+  }, new Map())
+}
+
+function compactMemberName(member) {
+  const full = String(member?.displayName || member?.name || '').trim().replace(/\s+/g, ' ')
+  const parts = full.split(' ').filter(Boolean)
+  return parts.length > 1 ? parts.slice(0, 2).join(' ') : (full || 'TV')
 }
 
 function calendarSessionStatus(session, today) {

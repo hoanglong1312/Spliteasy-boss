@@ -191,7 +191,18 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
             {session.timeRange} · {session.court}
           </div>
         </div>
-        <Badge tone={session.status.tone}>● {session.status.label}</Badge>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <Badge tone={session.status.tone}>● {session.status.label}</Badge>
+          {isTreasurer && session.canComplete && (
+            <Button
+              variant="success"
+              style={{ padding: '7px 10px', borderRadius: 10, fontSize: 11, whiteSpace: 'nowrap' }}
+              onClick={() => onAction?.('completeSession', session.id)}
+            >
+              Chốt buổi
+            </Button>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

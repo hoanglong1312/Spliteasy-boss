@@ -355,6 +355,15 @@ test('calendar attendance chips call markAttendance and detail has one save path
   assert.doesNotMatch(calendarSource, />\s*Lưu chi phí\s*<\/Button>/)
 })
 
+test('treasurer can explicitly complete a session before calendar marks it attended', () => {
+  assert.match(calendarSource, /session\.canComplete/)
+  assert.match(calendarSource, /onAction\?\.\('completeSession', session\.id\)/)
+  assert.match(appSource, /if \(type === 'completeSession'\)/)
+  assert.match(appSource, /type: 'COMPLETE_PICKLEBALL_SESSION'/)
+  assert.match(storeSource, /case 'COMPLETE_PICKLEBALL_SESSION':/)
+  assert.match(storeSource, /\.update\(\{ status: 'completed' \}\)/)
+})
+
 test('calendar attendance chips use compact 34px avatar-style green and grey states', () => {
   assert.match(calendarSource, /const ATTENDANCE_CHIP_SIZE = 34/)
   assert.match(calendarSource, /Điểm danh · \{session\.attendance\.present\}\/\{session\.attendance\.total\} tham gia/)
@@ -362,6 +371,28 @@ test('calendar attendance chips use compact 34px avatar-style green and grey sta
   assert.match(calendarSource, /width: ATTENDANCE_CHIP_SIZE/)
   assert.match(calendarSource, /height: ATTENDANCE_CHIP_SIZE/)
   assert.doesNotMatch(calendarSource, /memberType: a\.memberType/)
+})
+
+test('calendar disambiguates attendance chips when fixed members share a first name', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'Hoàng Anh', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Hoàng Em', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-20', status: 'scheduled', attendees: ['m1'] },
+      ],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+  assert.deepEqual(Array.from(data.selectedSession.attendees, member => member.name), ['Hoàng Anh', 'Hoàng Em'])
 })
 
 test('ticket form validates visible errors and saves normalized addTicket fields', () => {
