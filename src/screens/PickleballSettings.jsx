@@ -14,6 +14,8 @@ export default function PickleballSettings({ data, onAction }) {
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
   const [ticketPrice, setTicketPrice] = useState(d.ticketPrice || DEFAULT_TICKET_PRICE);
+  const [timeRange, setTimeRange] = useState(d.timeRange || '19:00 – 21:00');
+  const [startDate, setStartDate] = useState(d.startDate || '');
 
   const perSession = Math.round(courtFee / d.sessionsCount);
   const activeMemberCount = Math.max(d.memberCount || 1, 1);
@@ -25,6 +27,8 @@ export default function PickleballSettings({ data, onAction }) {
     setAutoGen(d.autoGenerate);
     setCourtFee(d.courtFeeTotal);
     setTicketPrice(d.ticketPrice || DEFAULT_TICKET_PRICE);
+    setTimeRange(d.timeRange || '19:00 – 21:00');
+    setStartDate(d.startDate || '');
   }, [data]);
 
   async function regenerateSessions() {
@@ -125,11 +129,31 @@ export default function PickleballSettings({ data, onAction }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
             <div>
               <FieldLabel>Giờ chơi</FieldLabel>
-              <SelectField icon="🕖" label={d.timeRange} />
+              <input
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                style={{
+                  width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+                  fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
             </div>
             <div>
               <FieldLabel>Ngày bắt đầu</FieldLabel>
-              <SelectField icon="📅" label={d.startDate} />
+              <input
+                type="date"
+                value={startDate ? (startDate.includes('-') ? startDate : startDate.split('/').reverse().join('-')) : ''}
+                onChange={(e) => {
+                  const parts = e.target.value.split('-');
+                  setStartDate(parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : e.target.value);
+                }}
+                style={{
+                  width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                  borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+                  fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
+                }}
+              />
             </div>
           </div>
           <FieldLabel>Địa điểm</FieldLabel>
@@ -192,7 +216,8 @@ export default function PickleballSettings({ data, onAction }) {
             weekdays: Array.from(weekdays),
             autoGen,
             currentYearMonth: d.currentYearMonth,
-            startDate: d.startDate,
+            startDate,
+            scheduleTime: timeRange,
             ticketPrice,
           })}>💾 Lưu cài đặt</Button>
           </div>

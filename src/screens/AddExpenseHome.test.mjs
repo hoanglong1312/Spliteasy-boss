@@ -32,12 +32,11 @@ test('Home activity list filters by title, status, and category', () => {
   assert.doesNotMatch(homeSource, /function MiniStat/);
 });
 
-test('Home renders monthly member balances and routes row payments to PaymentFlow', () => {
+test('Home hides monthly member balances and gates attendance card to treasurers', () => {
   assert.match(homeSource, /<Screen style=\{\{ paddingBottom: '72px' \}\}>/);
-  assert.match(homeSource, /<PaymentBalanceSection balances=\{d\.memberBalances \|\| \[\]\} onAction=\{onAction\} \/>/);
-  assert.match(homeSource, /💰 Số dư tháng này/);
-  assert.match(homeSource, /onAction\?\.\('payment', \{ memberId: balance\.memberId, amount: balance\.owed \}\)/);
-  assert.match(homeSource, /Thanh toán →/);
+  assert.match(homeSource, /export default function Home\(\{ data, isTreasurer, onAction \}\)/);
+  assert.doesNotMatch(homeSource, /<PaymentBalanceSection balances=\{d\.memberBalances \|\| \[\]\} onAction=\{onAction\} \/>/);
+  assert.match(homeSource, /\{isTreasurer && d\.todaySession && \(/);
   assert.match(screenDataSource, /memberBalances: buildHomeMemberBalances\(state, pickle, today\)/);
   assert.match(screenDataSource, /function buildHomeMemberBalances\(state, pickle, monthDate\)/);
   assert.match(screenDataSource, /buildMemberMonthBalance\(state, pickle, monthSessions, member\.id\)/);

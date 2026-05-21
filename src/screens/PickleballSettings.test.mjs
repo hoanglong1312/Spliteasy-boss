@@ -39,3 +39,17 @@ test('PickleballSettings no longer owns add/delete member management', () => {
   assert.match(appSource, /\.from\('members'\)/);
   assert.match(appSource, /is_active: false/);
 });
+
+test('PickleballSettings edits schedule time and start date before saving', () => {
+  assert.match(settingsSource, /const \[timeRange, setTimeRange\] = useState\(d\.timeRange \|\| '19:00 – 21:00'\)/);
+  assert.match(settingsSource, /const \[startDate, setStartDate\] = useState\(d\.startDate \|\| ''\)/);
+  assert.match(settingsSource, /setTimeRange\(d\.timeRange \|\| '19:00 – 21:00'\)/);
+  assert.match(settingsSource, /setStartDate\(d\.startDate \|\| ''\)/);
+  assert.match(settingsSource, /value=\{timeRange\}/);
+  assert.match(settingsSource, /onChange=\{\(e\) => setTimeRange\(e\.target\.value\)\}/);
+  assert.match(settingsSource, /type="date"/);
+  assert.match(settingsSource, /value=\{startDate \? \(startDate\.includes\('-'\) \? startDate : startDate\.split\('\/'\)\.reverse\(\)\.join\('-'\)\) : ''\}/);
+  assert.match(settingsSource, /setStartDate\(parts\.length === 3 \? `\$\{parts\[2\]\}\/\$\{parts\[1\]\}\/\$\{parts\[0\]\}` : e\.target\.value\)/);
+  assert.match(settingsSource, /startDate,\s*\n\s*scheduleTime: timeRange,/);
+  assert.doesNotMatch(settingsSource, /startDate: d\.startDate/);
+});
