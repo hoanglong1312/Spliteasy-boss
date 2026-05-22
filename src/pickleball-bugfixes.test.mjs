@@ -363,6 +363,46 @@ test('settings member count follows active fixed members from members tab and do
   assert.equal(Object.hasOwn(data, 'defaultVenue'), false)
 })
 
+test('members progress follows calendar attendance records', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'Long', memberType: 'fixed', isActive: true },
+      { id: 'm2', groupId: 'g1', name: 'Tuấn', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 's1',
+          groupId: 'g1',
+          date: '2026-05-07',
+          status: 'completed',
+          attendanceRecords: [{ memberId: 'm2', status: 'absent' }],
+        },
+        {
+          id: 's2',
+          groupId: 'g1',
+          date: '2026-05-09',
+          status: 'completed',
+          attendanceRecords: [{ memberId: 'm1', status: 'present' }, { memberId: 'm2', status: 'present' }],
+        },
+      ],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state)
+  const rows = Object.fromEntries(data.members.map(member => [member.id, member]))
+
+  assert.equal(rows.m1.sessionsAttended, 2)
+  assert.equal(rows.m1.progressPct, 100)
+  assert.equal(rows.m2.sessionsAttended, 1)
+  assert.equal(rows.m2.progressPct, 50)
+})
+
 test('settings screen no longer renders venue selection', () => {
   assert.doesNotMatch(settingsSource, /<FieldLabel>Địa điểm<\/FieldLabel>/)
   assert.doesNotMatch(settingsSource, /d\.defaultVenue/)

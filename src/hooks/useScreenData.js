@@ -639,7 +639,7 @@ function buildProfileData(me, state, pickle) {
   const today = new Date()
   const monthSessions = getMonthSessions(pickle, today)
   const currentUserId = state?.currentUserId
-  const attended = monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length
+  const attended = attendanceByMemberId(monthSessions, currentUserId, currentGroupMembers(state).filter(isActiveMember))
   const total = monthSessions.length
   const balance = pickleSummary(pickle || {})?.memberOwes?.[currentUserId] || 0
   const bankName = me?.bankName || me?.bank_name || ''
@@ -848,8 +848,8 @@ function buildPickleballMembersData(state) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, fixedMembers))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, fixedMembers))
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
@@ -880,7 +880,7 @@ function buildMemberDetailData(state, memberId) {
   const member = members.find(row => String(row.id) === String(memberId)) || members[0]
   if (!member) return null
 
-  const attendance = buildMemberAttendance(sessions, member.id)
+  const attendance = buildMemberAttendance(sessions, member.id, members.filter(row => memberType(row) === 'fixed'))
   const balance = buildMemberMonthBalance(state, pickle, sessions, member.id)
 
   return {
@@ -1516,8 +1516,8 @@ function buildTicketFundSummary(state) {
   }
 }
 
-function toPickleballMemberRow(member, sessions, totalSessions) {
-  const sessionsAttended = attendanceByMemberId(sessions, member.id)
+function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
+  const sessionsAttended = attendanceByMemberId(sessions, member.id, members)
   const sessionsTotal = totalSessions || sessions.length
   const progressPct = sessionsTotal > 0 ? Math.round((sessionsAttended / sessionsTotal) * 100) : 0
   const rank = calculateMemberRank(progressPct)
@@ -1544,9 +1544,9 @@ function toPickleballMemberRow(member, sessions, totalSessions) {
   }
 }
 
-function buildMemberAttendance(sessions, memberId) {
+function buildMemberAttendance(sessions, memberId, members = []) {
   const total = sessions.length
-  const attended = attendanceByMemberId(sessions, memberId)
+  const attended = attendanceByMemberId(sessions, memberId, members)
   const missed = Math.max(total - attended, 0)
   const percentage = total > 0 ? Math.round((attended / total) * 100) : 0
 
@@ -1650,9 +1650,9 @@ function memberExtrasShare(sessions, memberId, state, members = []) {
   }, 0)
 }
 
-function attendanceByMemberId(sessions, memberId) {
+function attendanceByMemberId(sessions, memberId, members = []) {
   return safeArray(sessions).filter(session => (
-    sessionMemberIds(session).some(id => String(id) === String(memberId))
+    effectiveSessionMemberIds(session, members).some(id => String(id) === String(memberId))
   )).length
 }
 
