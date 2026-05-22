@@ -1619,7 +1619,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     ],
     totalPerPerson: courtPerPerson + waterPerPerson + extrasPerPerson,
     canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
-    canComplete: !locked && sessionKey <= todayKey,
+    canComplete: !moved && sessionKey <= todayKey,
     isCompleted: locked,
     isMoved: moved,
     canReschedule: !locked,

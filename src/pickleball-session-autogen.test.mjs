@@ -360,6 +360,29 @@ test('moved sessions stay marked moved and locked even when the old date is toda
   assert.equal(futureSession.status.label, 'Sắp tới')
 })
 
+test('completed sessions keep the status toggle available for reopening', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'done-20', groupId: 'g1', date: '2026-05-20', status: 'completed', attendees: [] },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [3] }],
+    },
+    _allPickle: { sessions: [] },
+  })
+  const session = data.sessions.find(row => row.id === 'done-20')
+
+  assert.equal(session.isCompleted, true)
+  assert.equal(session.canComplete, true)
+  assert.equal(session.canReschedule, false)
+  assert.equal(session.canRestore, false)
+})
+
 test('calendar day selection prefers an active session over a stale moved duplicate on the same date', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const data = buildPickleballCalendarData({
