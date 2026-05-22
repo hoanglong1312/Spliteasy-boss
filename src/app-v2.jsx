@@ -623,48 +623,7 @@ export default function AppV2() {
       if (sourceTable === 'pickle_sessions') {
         const groupId = session?.groupId || session?.group_id || state.currentGroupId
         const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
-        if (waterAmount > 0) {
-          const { data: existingWater, error: existingWaterError } = await sb
-            .from('expenses')
-            .select('id')
-            .eq('pickle_session_id', sessionId)
-            .eq('category', 'water')
-            .limit(1)
-            .maybeSingle()
-          if (existingWaterError) throw existingWaterError
-          if (existingWater?.id) {
-            const { error: updateWaterError } = await sb
-              .from('expenses')
-              .update({
-                title: 'Tiền nước',
-                amount: waterAmount,
-                paid_by_member_id: state.currentUserId,
-                reviewed_by_member_id: state.currentUserId,
-                reviewed_at: new Date().toISOString(),
-                status: 'approved',
-              })
-              .eq('id', existingWater.id)
-            if (updateWaterError) throw updateWaterError
-          } else {
-            const { error: insertWaterError } = await sb
-              .from('expenses')
-              .insert({
-                group_id: groupId,
-                module: 'pickleball',
-                pickle_session_id: sessionId,
-                title: 'Tiền nước',
-                amount: waterAmount,
-                expense_date: expenseDate,
-                category: 'water',
-                paid_by_member_id: state.currentUserId,
-                submitted_by_member_id: state.currentUserId,
-                status: 'approved',
-                reviewed_by_member_id: state.currentUserId,
-                reviewed_at: new Date().toISOString(),
-              })
-            if (insertWaterError) throw insertWaterError
-          }
-        }
+        await savePickleSessionWaterExpense(sb, state, session, sessionId, waterAmount)
         const { error: deleteExtrasError } = await sb
           .from('expenses')
           .delete()
@@ -780,6 +739,7 @@ export default function AppV2() {
         if (sourceTable === 'pickle_sessions') {
           await savePickleSessionWaterExpense(sb, state, session, row.sessionId, row.waterAmount)
         } else {
+          await zeroWaterSessionItems(sb, waterSessionItemIds(session))
           const { error: deleteLegacyWaterError } = await sb
             .from('pickleball_session_items')
             .delete()
@@ -1376,14 +1336,8 @@ function currentGroupMemberIds(state, groupId) {
 
 async function savePickleSessionWaterExpense(sb, state, session, sessionId, waterAmount) {
   const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
-  const { data: existingWater, error: existingWaterError } = await sb
-    .from('expenses')
-    .select('id')
-    .eq('pickle_session_id', sessionId)
-    .eq('category', 'water')
-    .limit(1)
-    .maybeSingle()
-  if (existingWaterError) throw existingWaterError
+  await zeroWaterSessionItems(sb, waterSessionItemIds(session))
+  await deletePickleSessionWaterExpenses(sb, sessionId)
   const { error: deleteLegacyWaterItemError } = await sb
     .from('pickleball_session_items')
     .delete()
@@ -1392,29 +1346,6 @@ async function savePickleSessionWaterExpense(sb, state, session, sessionId, wate
   if (deleteLegacyWaterItemError) throw deleteLegacyWaterItemError
 
   if (waterAmount <= 0) {
-    if (existingWater?.id) {
-      const { error: deleteWaterError } = await sb
-        .from('expenses')
-        .delete()
-        .eq('id', existingWater.id)
-      if (deleteWaterError) throw deleteWaterError
-    }
-    return
-  }
-
-  if (existingWater?.id) {
-    const { error: updateWaterError } = await sb
-      .from('expenses')
-      .update({
-        title: 'Tiền nước',
-        amount: waterAmount,
-        paid_by_member_id: state.currentUserId,
-        reviewed_by_member_id: state.currentUserId,
-        reviewed_at: new Date().toISOString(),
-        status: 'approved',
-      })
-      .eq('id', existingWater.id)
-    if (updateWaterError) throw updateWaterError
     return
   }
 
@@ -1435,6 +1366,32 @@ async function savePickleSessionWaterExpense(sb, state, session, sessionId, wate
       reviewed_at: new Date().toISOString(),
     })
   if (insertWaterError) throw insertWaterError
+}
+
+async function deletePickleSessionWaterExpenses(sb, sessionId) {
+  const { error } = await sb
+    .from('expenses')
+    .delete()
+    .eq('pickle_session_id', sessionId)
+    .eq('category', 'water')
+  if (error) throw error
+}
+
+function waterSessionItemIds(session) {
+  return safeArray(session?.sessionItems || session?.session_items)
+    .filter(item => /nước|nuoc|water/i.test(`${item?.name || item?.title || item?.category || item?.cat || ''}`))
+    .map(item => item.id)
+    .filter(Boolean)
+}
+
+async function zeroWaterSessionItems(sb, ids) {
+  const itemIds = safeArray(ids)
+  if (itemIds.length === 0) return
+  const { error } = await sb
+    .from('pickleball_session_items')
+    .update({ amount: 0 })
+    .in('id', itemIds)
+  if (error) throw error
 }
 
 function parseMoneyAmount(value) {

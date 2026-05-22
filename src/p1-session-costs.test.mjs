@@ -287,9 +287,9 @@ test('saveSessionCost saves water for primary pickle_sessions through linked exp
 
   assert.match(handlerSource, /findSessionInPickleState\(state, sessionId\)/)
   assert.match(handlerSource, /sourceTable === 'pickle_sessions'/)
-  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.select\('id'\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
-  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.update\(\{[\s\S]*?amount: waterAmount/)
-  assert.match(handlerSource, /\.from\('expenses'\)[\s\S]*?\.insert\(\{[\s\S]*?pickle_session_id: sessionId[\s\S]*?category: 'water'/)
+  assert.match(handlerSource, /await savePickleSessionWaterExpense\(sb, state, session, sessionId, waterAmount\)/)
+  assert.match(appSource, /async function savePickleSessionWaterExpense\([\s\S]*?\.from\('expenses'\)[\s\S]*?\.insert\(\{[\s\S]*?pickle_session_id: sessionId[\s\S]*?category: 'water'/)
+  assert.doesNotMatch(handlerSource, /\.from\('expenses'\)[\s\S]*?\.update\(/)
 })
 
 test('saveBatchCosts routes primary pickle_sessions water through expenses', () => {
@@ -299,23 +299,36 @@ test('saveBatchCosts routes primary pickle_sessions water through expenses', () 
   assert.match(handlerSource, /sourceTable === 'pickle_sessions'/)
   assert.match(handlerSource, /savePickleSessionWaterExpense\(sb, state, session, row\.sessionId, row\.waterAmount\)/)
   assert.match(appSource, /async function savePickleSessionWaterExpense\(/)
-  assert.match(appSource, /\.from\('expenses'\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
-  assert.match(appSource, /if \(waterAmount <= 0\) \{[\s\S]*?\.from\('expenses'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', existingWater\.id\)/)
+  assert.match(appSource, /async function deletePickleSessionWaterExpenses\(/)
+  assert.match(appSource, /\.from\('expenses'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('pickle_session_id', sessionId\)[\s\S]*?\.eq\('category', 'water'\)/)
+  assert.match(appSource, /if \(waterAmount <= 0\) \{[\s\S]*?return/)
 })
 
 test('saveBatchCosts removes stale legacy water items for primary pickle_sessions', () => {
   const helperSource = appSource.match(/async function savePickleSessionWaterExpense\([\s\S]*?\n\}/)?.[0] || ''
 
+  assert.match(appSource, /function waterSessionItemIds\(session\)/)
+  assert.match(helperSource, /await zeroWaterSessionItems\(sb, waterSessionItemIds\(session\)\)/)
+  assert.match(helperSource, /await deletePickleSessionWaterExpenses\(sb, sessionId\)/)
   assert.match(helperSource, /\.from\('pickleball_session_items'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('session_id', sessionId\)[\s\S]*?\.eq\('name', 'Nước'\)/)
   assert.ok(
-    helperSource.indexOf(".from('pickleball_session_items')") < helperSource.indexOf('if (waterAmount <= 0)'),
-    'stale legacy water item is cleared before zero-save exits',
+    helperSource.indexOf('deletePickleSessionWaterExpenses') < helperSource.indexOf('if (waterAmount <= 0)'),
+    'stale water expense is deleted before zero-save exits',
   )
+})
+
+test('database policy allows treasurers to delete water expenses', () => {
+  const migrationSource = readFileSync(new URL('../supabase/migrations/20260522000001_expenses_delete_policy.sql', import.meta.url), 'utf8')
+
+  assert.match(migrationSource, /CREATE POLICY expenses_delete/)
+  assert.match(migrationSource, /ON expenses FOR DELETE/)
+  assert.match(migrationSource, /USING \(is_treasurer\(group_id\)\)/)
 })
 
 test('saveBatchCosts deletes legacy water rows before inserting positive replacements', () => {
   const handlerSource = appSource.match(/if \(type === 'saveBatchCosts'\) \{[\s\S]*?\n    if \(type === 'togglePresence'\)/)?.[0] || ''
 
+  assert.match(handlerSource, /await zeroWaterSessionItems\(sb, waterSessionItemIds\(session\)\)/)
   assert.match(handlerSource, /\.from\('pickleball_session_items'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('session_id', row\.sessionId\)[\s\S]*?\.eq\('name', 'Nước'\)/)
   assert.match(handlerSource, /if \(row\.waterAmount > 0\) \{[\s\S]*legacyRows\.push/)
   assert.match(handlerSource, /\.from\('pickleball_session_items'\)[\s\S]*?\.insert\(legacyRows\)/)
