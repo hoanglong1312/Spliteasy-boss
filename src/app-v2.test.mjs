@@ -42,7 +42,7 @@ test('AppV2 renders a deactivated-member error state when no groups or members l
 test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /import MemberDetail from '\.\/screens\/MemberDetail'/)
   assert.match(appSource, /getMemberDetailData/)
-  assert.match(appSource, /case 'member-detail':\s*return <MemberDetail data=\{getMemberDetailData\(route\.params\?\.memberId \?\? route\.params\)\} isTreasurer=\{isTreasurer\} onAction=\{handle\} \/>/)
+  assert.match(appSource, /case 'member-detail':\s*return <MemberDetail data=\{getMemberDetailData\(route\.params\?\.memberId \?\? route\.params\)\} isTreasurer=\{isPickleballTreasurer\} onAction=\{handle\} \/>/)
   assert.match(appSource, /memberDetail:\s*'member-detail'/)
 
   assert.match(appSource, /if \(type === 'editMember'\)/)
@@ -65,7 +65,7 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /const totalAmount = parseMoneyAmount\(payload\?\.total_amount \?\? payload\?\.totalAmount\)/)
   assert.match(appSource, /const rawAdvancerId = payload\?\.advancer_id \?\? payload\?\.advancerId \?\? null/)
   assert.match(appSource, /const advancerId = wantsTeamFund \? null : rawAdvancerId/)
-  assert.match(appSource, /const ticketStatus = isTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
+  assert.match(appSource, /const ticketStatus = isPickleballTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
   assert.match(appSource, /session_date: sessionDate/)
   assert.match(appSource, /session_time: sessionTime/)
   assert.match(appSource, /member_ids: memberIds/)
@@ -94,6 +94,16 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
 })
 
+test('AppV2 routes pickleball writes through the dedicated pickleball group context', () => {
+  assert.match(appSource, /function activePickleballGroupId\(state\)/)
+  assert.match(appSource, /state\?\.pickleballGroupId \|\| state\?\.pickleballGroup\?\.id \|\| state\?\.currentGroupId/)
+  assert.match(appSource, /const groupId = activePickleballGroupId\(state\)[\s\S]*?type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG'/)
+  assert.match(appSource, /const groupId = activePickleballGroupId\(state\)[\s\S]*?type: 'ADD_PICKLEBALL_OWNER_PAYMENT'/)
+  assert.match(appSource, /const groupId = activePickleballGroupId\(state\)[\s\S]*?\.from\('pickleball_tickets'\)[\s\S]*?group_id: groupId/)
+  assert.match(appSource, /function normalizeTicketMemberIds\(value, state\) \{[\s\S]*?const groupId = activePickleballGroupId\(state\)/)
+  assert.match(appSource, /function sessionGenerationConfigFromState\(state, yearMonth\) \{[\s\S]*?const groupId = activePickleballGroupId\(state\)/)
+})
+
 test('ticket approval migration allows pending member requests', () => {
   const migrationSource = readFileSync(new URL('../supabase/migrations/20260522000002_pickleball_ticket_approval.sql', import.meta.url), 'utf8')
 
@@ -101,6 +111,16 @@ test('ticket approval migration allows pending member requests', () => {
   assert.match(migrationSource, /CHECK \(status = ANY \(ARRAY\['unpaid', 'team_fund', 'pending_review'\]\)\)/)
   assert.match(migrationSource, /CREATE POLICY "group members can request tickets"/)
   assert.match(migrationSource, /status = 'pending_review'/)
+})
+
+test('store keeps expense group selection separate from pickleball group selection', () => {
+  assert.match(storeSource, /pickleballGroupId: null/)
+  assert.match(storeSource, /function resolvePickleballGroupId\(state, preferredGroupId = null\)/)
+  assert.match(storeSource, /function applyPickleballSelection\(state, preferredGroupId = null\)/)
+  const applyGroupBlock = storeSource.match(/function applyGroupSelection\(state, groupId, options = \{\}\) \{[\s\S]*?\n\}/)?.[0] || ''
+  assert.doesNotMatch(applyGroupBlock, /pickle:\s*pickleForGroup/)
+  assert.match(storeSource, /return applyPickleballSelection\(selectedState, preferredGroupId\)/)
+  assert.match(storeSource, /type: inferGroupType\(group, pickleGroupIds\)/)
 })
 
 test('AppV2 and store clean stale moved replacement sessions without touching tickets', () => {
@@ -122,7 +142,7 @@ test('AppV2 passes pickleball settings time and home treasurer role through prop
 
 test('AppV2 routes treasurer team-fund config through a dedicated screen and handler', () => {
   assert.match(appSource, /import PickleballTeamFund from '\.\/screens\/PickleballTeamFund'/)
-  assert.match(appSource, /case 'pickleball-team-fund':\s*return <PickleballTeamFund data=\{getPickleballTeamFundData\(\)\} isTreasurer=\{isTreasurer\} onAction=\{handle\} \/>/)
+  assert.match(appSource, /case 'pickleball-team-fund':\s*return <PickleballTeamFund data=\{getPickleballTeamFundData\(\)\} isTreasurer=\{isPickleballTreasurer\} onAction=\{handle\} \/>/)
   assert.match(appSource, /if \(type === 'saveTeamFundConfig'\)/)
   assert.match(appSource, /type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG'[\s\S]*?courtFee: payload\?\.courtFee[\s\S]*?ticketPrice: payload\?\.ticketPrice/)
   assert.match(appSource, /type: 'SAVE_VENUE_OWNER_BANK'/)

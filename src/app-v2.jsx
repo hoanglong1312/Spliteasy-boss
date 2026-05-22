@@ -41,6 +41,7 @@ export default function AppV2() {
   const members = state.members || []
   const {
     isTreasurer,
+    isPickleballTreasurer,
     homeData,
     groupsListData,
     groupDetailData,
@@ -157,7 +158,8 @@ export default function AppV2() {
     }
 
     if (type === 'saveSettings' || (type === 'save' && stack[stack.length - 1]?.screen === 'pickleball-settings')) {
-      const groupId = state.currentGroupId
+      const groupId = activePickleballGroupId(state)
+      const pickleballGroup = activePickleballGroup(state)
       const yearMonth = payload?.currentYearMonth || monthKey(new Date())
       const { token } = getStoredAuth()
       const sb = token ? createSupabase(token) : null
@@ -189,11 +191,11 @@ export default function AppV2() {
         action.activeMonthlyMemberIds = payload?.activeMonthlyMemberIds ?? payload?.activeMemberIds ?? []
       }
       const nextClubName = String(payload?.clubName || '').trim()
-      if (nextClubName && nextClubName !== state.currentGroup?.name) {
+      if (nextClubName && nextClubName !== pickleballGroup?.name) {
         await dispatch({
           type: 'EDIT_GROUP',
           group: {
-            ...state.currentGroup,
+            ...pickleballGroup,
             id: groupId,
             name: nextClubName,
           },
@@ -304,7 +306,7 @@ export default function AppV2() {
     if (type === 'AUTO_GENERATE_SESSIONS') {
       await dispatch({
         type: 'AUTO_GENERATE_SESSIONS',
-        groupId: state.currentGroupId,
+        groupId: activePickleballGroupId(state),
         yearMonth: payload?.yearMonth,
         config: payload?.config,
       })
@@ -312,8 +314,8 @@ export default function AppV2() {
     }
 
     if (type === 'saveTeamFundConfig') {
-      if (!isTreasurer) return
-      const groupId = state.currentGroupId
+      if (!isPickleballTreasurer) return
+      const groupId = activePickleballGroupId(state)
       if (!groupId) return
       await dispatch({
         type: 'SAVE_VENUE_OWNER_BANK',
@@ -333,8 +335,8 @@ export default function AppV2() {
     }
 
     if (type === 'markOwnerPayment') {
-      if (!isTreasurer) return
-      const groupId = state.currentGroupId
+      if (!isPickleballTreasurer) return
+      const groupId = activePickleballGroupId(state)
       if (!groupId) return
       await dispatch({
         type: 'ADD_PICKLEBALL_OWNER_PAYMENT',
@@ -356,7 +358,7 @@ export default function AppV2() {
         const nextYearMonth = shiftYearMonth(currentYearMonth, type === 'monthNext' ? 1 : -1)
         const nextRoute = { screen: 'pickleball-calendar', params: { ...route.params, yearMonth: nextYearMonth } }
         setStack((s) => s.map((item, index) => index === s.length - 1 ? nextRoute : item))
-        const groupId = state.currentGroupId || state.currentGroup?.id
+        const groupId = activePickleballGroupId(state)
         const generationConfig = sessionGenerationConfigFromState(state, nextYearMonth)
         if (normalizeScheduleWeekdays(generationConfig.scheduleWeekdays).length > 0) {
           await dispatch({
@@ -375,6 +377,7 @@ export default function AppV2() {
       if (!name) return null
       return dispatch({
         type: 'ADD_MEMBER',
+        groupId: activePickleballGroupId(state),
         member: { name, member_type: payload?.type || payload?.memberType || 'fixed' },
       })
     }
@@ -444,7 +447,8 @@ export default function AppV2() {
     }
 
     if (type === 'addTicket') {
-      if (!state.currentGroupId || !state.currentUserId) return
+      const groupId = activePickleballGroupId(state)
+      if (!groupId || !state.currentUserId) return
       const sessionDate = normalizeTicketDate(payload?.session_date || payload?.date)
       const sessionTime = payload?.session_time || payload?.time || null
       const memberIds = normalizeTicketMemberIds(payload?.member_ids || payload?.memberIds, state)
@@ -458,13 +462,13 @@ export default function AppV2() {
       if (memberIds.length === 0) throw new Error('ticket_members_required')
       if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
       if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
-      const ticketStatus = isTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
+      const ticketStatus = isPickleballTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('pickleball_tickets')
         .insert({
-          group_id: state.currentGroupId,
+          group_id: groupId,
           session_date: sessionDate,
           session_time: sessionTime,
           total_amount: totalAmount,
@@ -480,9 +484,10 @@ export default function AppV2() {
     }
 
     if (type === 'updateTicket') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id
-      if (!ticketId || !state.currentGroupId) return
+      const groupId = activePickleballGroupId(state)
+      if (!ticketId || !groupId) return
       const sessionDate = normalizeTicketDate(payload?.session_date || payload?.date)
       const sessionTime = payload?.session_time || payload?.time || null
       const memberIds = normalizeTicketMemberIds(payload?.member_ids || payload?.memberIds, state)
@@ -496,7 +501,7 @@ export default function AppV2() {
       if (memberIds.length === 0) throw new Error('ticket_members_required')
       if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
       if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
-      const ticketStatus = isTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
+      const ticketStatus = isPickleballTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
@@ -517,7 +522,7 @@ export default function AppV2() {
     }
 
     if (type === 'markAttendance') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.session_id
       const memberId = payload?.memberId ?? payload?.member_id
       const status = String(payload?.status || '').toLowerCase() === 'absent' ? 'absent' : 'present'
@@ -532,7 +537,7 @@ export default function AppV2() {
     }
 
     if (type === 'completeSession') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.id ?? payload
       if (!sessionId) return
       await dispatch({
@@ -543,7 +548,7 @@ export default function AppV2() {
     }
 
     if (type === 'reopenSession') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.id ?? payload
       if (!sessionId) return
       await dispatch({
@@ -554,7 +559,7 @@ export default function AppV2() {
     }
 
     if (type === 'rescheduleSession') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.id
       const date = normalizeTicketDate(payload?.date)
       if (!sessionId || !date) return
@@ -568,7 +573,7 @@ export default function AppV2() {
     }
 
     if (type === 'cleanupStaleReplacementSessions') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       await dispatch({
         type: 'CLEANUP_STALE_REPLACEMENT_SESSIONS',
         ids: payload?.ids || payload,
@@ -577,7 +582,7 @@ export default function AppV2() {
     }
 
     if (type === 'approveTicket') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id ?? payload
       if (!ticketId) return
       const approvedStatus = String(payload?.status || '').toLowerCase() === 'team_fund' ? 'team_fund' : 'unpaid'
@@ -593,7 +598,7 @@ export default function AppV2() {
     }
 
     if (type === 'deleteTicket') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id ?? payload
       if (!ticketId) return
       const { token } = getStoredAuth()
@@ -696,7 +701,7 @@ export default function AppV2() {
     }
 
     if (type === 'saveSessionCost') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId
       if (!sessionId) return
       const { token } = getStoredAuth()
@@ -706,7 +711,7 @@ export default function AppV2() {
       const session = findSessionInPickleState(state, sessionId)
       const sourceTable = session?.sourceTable || session?.source_table
       if (sourceTable === 'pickle_sessions') {
-        const groupId = session?.groupId || session?.group_id || state.currentGroupId
+        const groupId = session?.groupId || session?.group_id || activePickleballGroupId(state)
         const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
         await savePickleSessionWaterExpense(sb, state, session, sessionId, waterAmount)
         const { error: deleteExtrasError } = await sb
@@ -805,7 +810,7 @@ export default function AppV2() {
     }
 
     if (type === 'saveBatchCosts') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const rows = (payload?.sessions || [])
         .filter(session => session?.sessionId || session?.id)
         .map(session => ({
@@ -987,11 +992,11 @@ export default function AppV2() {
     }
 
     if (type === 'addGuest') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.session_id ?? (typeof payload === 'string' ? payload : null)
       const guestName = String(payload?.guestName ?? payload?.guest_name ?? '').trim()
       if (!sessionId || !guestName) return
-      const groupId = state.currentGroupId
+      const groupId = activePickleballGroupId(state)
       if (!groupId) return
       const { token } = getStoredAuth()
       if (!token) return
@@ -1027,7 +1032,7 @@ export default function AppV2() {
     }
 
     if (type === 'removeGuest') {
-      if (!isTreasurer) return
+      if (!isPickleballTreasurer) return
       const attendeeId = payload?.attendeeId
       const sessionId = payload?.sessionId
       if (!attendeeId || !sessionId) return
@@ -1216,7 +1221,7 @@ export default function AppV2() {
       case 'groups':
         return <GroupsList data={groupsListData} onAction={handle} />
       case 'pickleball':
-        return <PickleballOverview data={pickleballOverviewData} isTreasurer={isTreasurer} onAction={handle} />
+        return <PickleballOverview data={pickleballOverviewData} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'profile':
         return <Profile data={profileData} isTreasurer={isTreasurer} onAction={handle} />
       case 'home':
@@ -1229,17 +1234,17 @@ export default function AppV2() {
     switch (route.screen) {
       case 'group-detail':        return <GroupDetail data={route.params?.groupId ? getGroupDetailData(route.params.groupId) : groupDetailData} isTreasurer={isTreasurer} onAction={handle} />
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
-      case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isTreasurer} onAction={handle} />
-      case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isTreasurer} onAction={handle} />
-      case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isTreasurer} onAction={handle} />
-      case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isTreasurer} onAction={handle} />
+      case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
+      case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
+      case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
+      case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} onAction={handle} />
-      case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData()} isTreasurer={isTreasurer} onAction={handle} />
+      case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
       case 'join-group':          return <JoinGroup data={getJoinGroupData()} onAction={handle} />
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />
-      case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isTreasurer} onAction={handle} />
+      case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'new-group':           return <NewGroup data={newGroupData} onAction={handle} />
       case 'settle-all':          return <SettleAll data={getSettleAllData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'notifications':       return <Notifications data={notificationsData} onAction={handle} />
@@ -1268,8 +1273,8 @@ export default function AppV2() {
 }
 
 function sessionGenerationConfigFromState(state, yearMonth) {
-  const groupId = state?.currentGroupId || state?.currentGroup?.id
-  const group = state?.currentGroup || safeArray(state?.groups).find(row => String(row.id) === String(groupId)) || {}
+  const groupId = activePickleballGroupId(state)
+  const group = activePickleballGroup(state) || {}
   const monthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
     .find(row => (
       String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
@@ -1461,7 +1466,7 @@ async function savePickleSessionWaterExpense(sb, state, session, sessionId, wate
   const { error: insertWaterError } = await sb
     .from('expenses')
     .insert({
-      group_id: session?.groupId || session?.group_id || state.currentGroupId,
+      group_id: session?.groupId || session?.group_id || activePickleballGroupId(state),
       module: 'pickleball',
       pickle_session_id: sessionId,
       title: 'Tiền nước',
@@ -1546,7 +1551,7 @@ function normalizeTicketDate(value) {
 }
 
 function normalizeTicketMemberIds(value, state) {
-  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  const groupId = activePickleballGroupId(state)
   const members = safeArray(state?.members).filter(member => {
     const memberGroupId = member?.groupId || member?.group_id
     return !groupId || !memberGroupId || String(memberGroupId) === String(groupId)
@@ -1561,6 +1566,15 @@ function normalizeTicketMemberIds(value, state) {
       return member?.id || member?.member_id || text
     })
     .filter(Boolean)
+}
+
+function activePickleballGroupId(state) {
+  return state?.pickleballGroupId || state?.pickleballGroup?.id || state?.currentGroupId || state?.currentGroup?.id || null
+}
+
+function activePickleballGroup(state) {
+  const groupId = activePickleballGroupId(state)
+  return safeArray(state?.groups).find(group => String(group.id) === String(groupId)) || state?.pickleballGroup || state?.currentGroup || null
 }
 
 function dateFromLabel(label) {

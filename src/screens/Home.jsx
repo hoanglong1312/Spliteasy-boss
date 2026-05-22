@@ -29,6 +29,7 @@ export default function Home({ data, isTreasurer, onAction }) {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(false);
   const isNeg = d.totalBalance < 0;
+  const balanceLabel = isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
@@ -55,12 +56,12 @@ export default function Home({ data, isTreasurer, onAction }) {
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
         {/* Hero */}
-        <Hero>
+        <Hero style={{ cursor: 'pointer' }} onClick={() => onAction?.('settleAll')}>
           <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.brandLight }}>
-            Tổng số dư tháng này
+            {balanceLabel}
           </div>
           <div style={{ ...type.amountLg, marginTop: 6, color: colors.textPrimary, ...type.mono }}>
-            {formatVND(d.totalBalance)}
+            {formatVND(Math.abs(d.totalBalance))}
           </div>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
@@ -71,11 +72,11 @@ export default function Home({ data, isTreasurer, onAction }) {
             color: isNeg ? '#fca5a5' : '#6ee7b7',
           }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: isNeg ? colors.danger : colors.success, boxShadow: `0 0 8px ${isNeg ? 'rgba(248,113,113,0.6)' : 'rgba(52,211,153,0.6)'}` }} />
-            {isNeg ? `Bạn còn nợ ${d.owedTo} người` : 'Cân bằng'}
+            {isNeg ? `${d.owedTo} quỹ cần kiểm tra` : d.totalBalance > 0 ? 'Ấn để xem quỹ nào cần bù' : 'Không có khoản cần xử lý'}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('addExpense')}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('payment')}>⚡ Thanh toán</Button>
+            <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('addExpense'); }}>+ Thêm chi tiêu</Button>
+            <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}>Chi tiết quỹ</Button>
           </div>
         </Hero>
 

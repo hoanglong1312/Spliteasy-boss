@@ -37,7 +37,7 @@ test('Home hides monthly member balances and gates attendance card to treasurers
   assert.match(homeSource, /export default function Home\(\{ data, isTreasurer, onAction \}\)/);
   assert.doesNotMatch(homeSource, /<PaymentBalanceSection balances=\{d\.memberBalances \|\| \[\]\} onAction=\{onAction\} \/>/);
   assert.match(homeSource, /\{isTreasurer && d\.todaySession && \(/);
-  assert.match(screenDataSource, /memberBalances: buildHomeMemberBalances\(state, pickle, today\)/);
+  assert.match(screenDataSource, /memberBalances: buildHomeMemberBalances\(pickleballState, pickle, today\)/);
   assert.match(screenDataSource, /function buildHomeMemberBalances\(state, pickle, monthDate\)/);
   assert.match(screenDataSource, /buildMemberMonthBalance\(state, pickle, monthSessions, member\.id\)/);
 });
@@ -53,7 +53,7 @@ test('shared screens and AddExpense sheet define scrollable containers with bott
 
 test('Home data exposes member identity and current-month normalized expense rows', () => {
   assert.match(screenDataSource, /currentUserId,\s*\n\s*currentUserName: state\?\.currentUserName \|\| 'Bạn'/);
-  assert.match(screenDataSource, /expenses: buildHomeExpenses\(safeGroups, currentUserId, members, state\?\.currentUserName, today\)/);
+  assert.match(screenDataSource, /expenses: buildHomeExpenses\(expenseGroups, currentUserId, members, state\?\.currentUserName, today\)/);
   assert.match(screenDataSource, /function buildHomeExpenses\(groups, currentUserId, members, currentUserName, monthDate\)/);
   assert.match(screenDataSource, /const meForGroup = memberIdForGroup\(group, currentUserId, members, currentUserName\)/);
   assert.match(screenDataSource, /paidBy: expense\.paidBy \|\| expense\.paid_by_member_id/);

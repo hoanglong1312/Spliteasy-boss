@@ -250,10 +250,10 @@ test('calendar and overview request auto-generation when configured dates are mi
   assert.equal(overviewData.autoGenerateRequest.yearMonth, '2026-05')
 })
 
-test('screen data auto-generation dispatch includes current group id fallback', () => {
-  assert.match(dataSource, /const groupId = state\.currentGroupId \|\| state\.currentGroup\?\.id/)
+test('screen data auto-generation dispatch includes pickleball group id fallback', () => {
+  assert.match(dataSource, /const groupId = state\.pickleballGroupId \|\| state\.pickleballGroup\?\.id/)
   assert.match(dataSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*groupId,[\s\S]*yearMonth: request\.yearMonth/)
-  assert.match(storeSource, /const groupId = action\.groupId \|\| action\.group_id \|\| state\.currentGroupId \|\| state\.currentGroup\?\.id/)
+  assert.match(storeSource, /const groupId = action\.groupId \|\| action\.group_id \|\| state\.pickleballGroupId \|\| state\.pickleballGroup\?\.id \|\| state\.currentGroupId \|\| state\.currentGroup\?\.id/)
 })
 
 test('calendar infers generation weekdays from existing month sessions when config is missing weekdays', () => {

@@ -172,8 +172,8 @@ function isoWeekdayFromDate(value) {
 }
 
 function generationConfigFromState(state, yearMonth, override = {}) {
-  const groupId = state?.currentGroupId || state?.currentGroup?.id
-  const group = state?.currentGroup || safeArray(state?.groups).find(g => String(g.id) === String(groupId)) || {}
+  const groupId = override.groupId || override.group_id || state?.pickleballGroupId || state?.pickleballGroup?.id || state?.currentGroupId || state?.currentGroup?.id
+  const group = safeArray(state?.groups).find(g => String(g.id) === String(groupId)) || state?.pickleballGroup || state?.currentGroup || {}
   const config = safeArray(state?._allPickle?.configs || state?.pickleConfigs)
     .find(row => String(row?.groupId || row?.group_id || '') === String(groupId || '')) || {}
   const monthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
@@ -500,6 +500,8 @@ function buildEmptyState() {
     currentUserName: null,
     currentGroupId: null,
     currentGroup: null,
+    pickleballGroupId: null,
+    pickleballGroup: null,
     members: [],
     memberTokens: [],
     groups: [],
@@ -754,6 +756,58 @@ function pickleForGroup(allPickle, members, groupId) {
   }
 }
 
+function pickleDataGroupIds(allPickle) {
+  const ids = new Set()
+  const source = allPickle || {}
+  ;[
+    ...safeArray(source.sessions),
+    ...safeArray(source.upcoming),
+    ...safeArray(source.configs),
+    ...safeArray(source.monthlyConfigs || source.monthly_configs),
+    ...safeArray(source.externalTickets),
+    ...safeArray(source.ownerPayments),
+  ].forEach(row => {
+    const id = row?.groupId ?? row?.group_id
+    if (id) ids.add(String(id))
+  })
+  return ids
+}
+
+function inferGroupType(group, pickleGroupIds = new Set()) {
+  const explicit = String(group?.type || group?.kind || group?.group_type || '').toLowerCase()
+  if (['pickleball', 'expense'].includes(explicit)) return explicit
+  const id = group?.id
+  if (id && pickleGroupIds.has(String(id))) return 'pickleball'
+  const text = `${group?.name || ''} ${group?.emoji || ''}`.toLowerCase()
+  if (text.includes('pickle') || text.includes('🏓') || text.includes('🏸')) return 'pickleball'
+  return 'expense'
+}
+
+function resolvePickleballGroupId(state, preferredGroupId = null) {
+  const groups = safeArray(state?.groups)
+  const allPickle = state?._allPickle || state?.pickle
+  const pickleGroupIds = pickleDataGroupIds(allPickle)
+  const preferred = preferredGroupId ? groups.find(group => String(group.id) === String(preferredGroupId)) : null
+  if (preferred && inferGroupType(preferred, pickleGroupIds) === 'pickleball') return preferred.id
+  const currentPickle = state?.pickleballGroupId ? groups.find(group => String(group.id) === String(state.pickleballGroupId)) : null
+  if (currentPickle && inferGroupType(currentPickle, pickleGroupIds) === 'pickleball') return currentPickle.id
+  const dataGroup = groups.find(group => pickleGroupIds.has(String(group.id)))
+  if (dataGroup) return dataGroup.id
+  return groups.find(group => inferGroupType(group, pickleGroupIds) === 'pickleball')?.id || null
+}
+
+function applyPickleballSelection(state, preferredGroupId = null) {
+  const groupId = resolvePickleballGroupId(state, preferredGroupId)
+  const groups = safeArray(state?.groups)
+  const group = groups.find(item => String(item.id) === String(groupId)) || null
+  return {
+    ...state,
+    pickleballGroupId: group?.id || null,
+    pickleballGroup: group,
+    pickle: group ? pickleForGroup(state._allPickle || state.pickle, state.members, group.id) : pickleForGroup(state._allPickle || state.pickle, state.members, null),
+  }
+}
+
 function applyGroupSelection(state, groupId, options = {}) {
   const groups = safeArray(state.groups)
   const currentGroup = groups.find(g => g.id === groupId)
@@ -777,7 +831,6 @@ function applyGroupSelection(state, groupId, options = {}) {
     currentGroupId: groupId,
     currentGroup,
     members,
-    pickle: pickleForGroup(state._allPickle || state.pickle, members, groupId),
   }
 }
 
@@ -1059,6 +1112,10 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     name: group.name,
     emoji: group.emoji || '👥',
     color: group.color || '#574EFA',
+    type: group.type || group.kind || group.group_type || null,
+    kind: group.kind || group.type || group.group_type || null,
+    groupType: group.group_type || group.type || group.kind || null,
+    group_type: group.group_type || group.type || group.kind || null,
     venueOwnerName: group.venue_owner_name || '',
     venue_owner_name: group.venue_owner_name || '',
     venueBankName: group.venue_bank_name || '',
@@ -1140,14 +1197,31 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     createdAt: payment.created_at,
     created_at: payment.created_at,
   }))
+  const pickleGroupIds = pickleDataGroupIds({
+    sessions: [
+      ...normalLegacySessions,
+      ...normalSessions,
+    ],
+    configs: normalPickleConfigs,
+    monthlyConfigs: normalPickleballMonthlyConfigs,
+    externalTickets: normalTickets,
+    ownerPayments: normalOwnerPayments,
+  })
+  const typedGroups = normalGroups.map(group => ({
+    ...group,
+    type: inferGroupType(group, pickleGroupIds),
+    kind: group.kind || inferGroupType(group, pickleGroupIds),
+    groupType: inferGroupType(group, pickleGroupIds),
+    group_type: inferGroupType(group, pickleGroupIds),
+  }))
   const baseState = {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
     currentGroupId: currentGroup.id,
-    currentGroup: normalGroups.find(g => g.id === currentGroup.id) || normalGroups[0] || null,
+    currentGroup: typedGroups.find(g => g.id === currentGroup.id) || typedGroups[0] || null,
     members: normalMembers,
     memberTokens: normalizeMemberTokens(memberTokens),
-    groups: normalGroups,
+    groups: typedGroups,
     expenses: normalExpenses,
     joinRequests: normalJoinRequests,
     settlementPeriods: normalSettlementPeriods,
@@ -1171,10 +1245,11 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     _error: null,
   }
 
-  return applyGroupSelection(baseState, currentGroup.id, {
+  const selectedState = applyGroupSelection(baseState, currentGroup.id, {
     currentMemberId,
     currentUserName: preferredMemberName || me?.name || '',
   })
+  return applyPickleballSelection(selectedState, preferredGroupId)
 }
 
 export function AppProvider({ children }) {
@@ -1681,7 +1756,7 @@ export function AppProvider({ children }) {
 
       case 'SAVE_VENUE_OWNER_BANK': {
         if (!sb) return
-        const groupId = action.groupId || state.currentGroupId
+        const groupId = action.groupId || state.pickleballGroupId || state.currentGroupId
         if (!groupId) return
         const { error } = await sb.from('groups').update({
           venue_owner_name: action.venueOwnerName || '',
@@ -1776,7 +1851,8 @@ export function AppProvider({ children }) {
       case 'ADD_MEMBER': {
         if (!sb) return
         const { member } = action
-        const insertRow = memberInsertRow(state.currentGroupId, member, member.role || 'member')
+        const groupId = action.groupId || action.group_id || state.currentGroupId
+        const insertRow = memberInsertRow(groupId, member, member.role || 'member')
         if (isUuid(member.id)) insertRow.id = member.id
         const { data: newMember, error } = await sb
           .from('members')
@@ -1793,7 +1869,7 @@ export function AppProvider({ children }) {
 
       case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': {
         if (!sb) return
-        const groupId = action.groupId || state.currentGroupId
+        const groupId = action.groupId || state.pickleballGroupId || state.currentGroupId
         const yearMonth = action.yearMonth || action.currentYearMonth
         if (!groupId || !yearMonth) return
         const row = {
@@ -1836,7 +1912,7 @@ export function AppProvider({ children }) {
 
       case 'ADD_PICKLEBALL_OWNER_PAYMENT': {
         if (!sb) return
-        const groupId = action.groupId || state.currentGroupId
+        const groupId = action.groupId || state.pickleballGroupId || state.currentGroupId
         const yearMonth = action.yearMonth || action.currentYearMonth
         if (!groupId || !yearMonth) return
         const { data, error } = await sb
@@ -1864,7 +1940,7 @@ export function AppProvider({ children }) {
       case 'AUTO_GENERATE_SESSIONS': {
         if (!sb) return []
         const yearMonth = action.yearMonth || action.year_month
-        const groupId = action.groupId || action.group_id || state.currentGroupId || state.currentGroup?.id
+        const groupId = action.groupId || action.group_id || state.pickleballGroupId || state.pickleballGroup?.id || state.currentGroupId || state.currentGroup?.id
         if (!yearMonth || !groupId) return []
         const config = generationConfigFromState(stateRef.current, yearMonth, action.config || {})
         const scheduleWeekdays = normalizeScheduleWeekdays(config.scheduleWeekdays)
@@ -2149,7 +2225,7 @@ export function AppProvider({ children }) {
         const { data: newSession, error } = await sb
           .from('pickle_sessions')
           .insert({
-            group_id: state.currentGroupId,
+            group_id: state.pickleballGroupId || state.currentGroupId,
             session_date: date,
             status: action.status || 'external',
             notes: notes || null,

@@ -36,13 +36,20 @@ export function useScreenData() {
 
   const me = members.find(m => m.id === currentUserId)
   const isTreasurer = me?.role === 'treasurer'
+  const pickleballGroup = state?.pickleballGroup || safeArray(groups).find(group => String(group.id) === String(state?.pickleballGroupId || ''))
+  const pickleballMe = membersForGroup(pickleballGroup, members).find(member => (
+    String(member.id) === String(currentUserId) ||
+    sameName(member.name, currentUserName || me?.name)
+  ))
+  const isPickleballTreasurer = pickleballMe?.role === 'treasurer'
 
   const screenData = useMemo(() => {
-    const homeData = buildHomeData(state, currentUserId, members, groups, pickle)
+    const pickleballState = scopedPickleballState(state)
+    const homeData = buildHomeData(state, currentUserId, members, groups, pickle, pickleballState)
     const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName)
     const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName)
-    const pickleballOverviewData = buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members)
-    const pickleballCalendarData = buildPickleballCalendarData(state)
+    const pickleballOverviewData = buildPickleballOverviewData(pickleballState, pickle, _allPickle, currentUserId, members)
+    const pickleballCalendarData = buildPickleballCalendarData(pickleballState)
     const profileData = buildProfileData(me, state, pickle)
     const notificationsData = buildNotificationsData(state)
     const approvalQueueData = buildApprovalQueueData(state)
@@ -50,6 +57,7 @@ export function useScreenData() {
 
     return {
       isTreasurer,
+      isPickleballTreasurer,
       homeData,
       groupsListData,
       groupDetailData,
@@ -64,15 +72,15 @@ export function useScreenData() {
         const group = safeArray(groups).find(g => g.id === groupId) || currentGroup
         return buildGroupDetailData(group, currentUserId, members, currentUserName)
       },
-      getSessionDetailData: (sessionId) => buildSessionDetailData(state, pickle, sessionId, currentUserId, members),
-      getPickleballCalendarData: (params) => buildPickleballCalendarData(state, params),
-      getPickleballMembersData: () => buildPickleballMembersData(state),
-      getMemberDetailData: (memberId) => buildMemberDetailData(state, memberId),
-      getPickleballTicketsData: () => buildPickleballTicketsData(state),
-      getPickleballSettingsData: () => buildPickleballSettingsData(state),
-      getPickleballTeamFundData: () => buildPickleballTeamFundData(state),
-      getBatchEntryData: () => buildBatchEntryData(state),
-      getPaymentFlowData: (memberId) => buildPaymentFlowData(state, memberId),
+      getSessionDetailData: (sessionId) => buildSessionDetailData(pickleballState, pickle, sessionId, currentUserId, members),
+      getPickleballCalendarData: (params) => buildPickleballCalendarData(pickleballState, params),
+      getPickleballMembersData: () => buildPickleballMembersData(pickleballState),
+      getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId),
+      getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
+      getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState),
+      getPickleballTeamFundData: () => buildPickleballTeamFundData(pickleballState),
+      getBatchEntryData: () => buildBatchEntryData(pickleballState),
+      getPaymentFlowData: (memberId) => buildPaymentFlowData(pickleballState, memberId),
       getJoinGroupData: () => buildJoinGroupData(state),
       getAddExpenseData: (params) => buildAddExpenseData(state, params),
       getSettleAllData: () => buildSettleAllData(state),
@@ -80,7 +88,7 @@ export function useScreenData() {
       getExpenseDetailData: (params) => buildExpenseDetailData(state, params),
       dispatch,
     }
-  }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, me, isTreasurer, dispatch])
+  }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, me, isTreasurer, isPickleballTreasurer, dispatch])
 
   useEffect(() => {
     const request = screenData.pickleballCalendarData?.autoGenerateRequest || screenData.pickleballOverviewData?.autoGenerateRequest
@@ -88,7 +96,7 @@ export function useScreenData() {
       autoGenerateRef.current = ''
       return
     }
-    const groupId = state.currentGroupId || state.currentGroup?.id
+    const groupId = state.pickleballGroupId || state.pickleballGroup?.id
     const key = screenData.pickleballCalendarData?.autoGenerateKey || screenData.pickleballOverviewData?.autoGenerateKey || `${groupId}:${request.yearMonth}`
     if (autoGenerateRef.current === key) return
     autoGenerateRef.current = key
@@ -106,8 +114,8 @@ export function useScreenData() {
     screenData.pickleballCalendarData?.autoGenerateRequest,
     screenData.pickleballOverviewData?.autoGenerateKey,
     screenData.pickleballOverviewData?.autoGenerateRequest,
-    state.currentGroupId,
-    state.currentGroup?.id,
+    state.pickleballGroupId,
+    state.pickleballGroup?.id,
   ])
 
   useEffect(() => {
@@ -133,15 +141,19 @@ export function useScreenData() {
   return screenData
 }
 
-function buildHomeData(state, currentUserId, members, groups, pickle) {
+function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state) {
   const today = new Date()
   const safeGroups = safeArray(groups).map(safeGroup)
-  const totalBalance = safeGroups.reduce((sum, group) => (
+  const expenseGroups = safeGroups.filter(group => groupKind(group) !== 'pickleball')
+  const expenseBalance = expenseGroups.reduce((sum, group) => (
     sum + groupNetForMember(group, currentUserId, members, state?.currentUserName)
   ), 0)
-  const monthSessions = getStateMonthSessions(state, today)
+  const monthSessions = getStateMonthSessions(pickleballState, today)
   const summary = pickleSummary(pickle || {})
   const session = findNearestOpenSession(pickle, today)
+  const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, state?.currentUserName)
+  const pickleballBalance = buildMemberMonthBalance(pickleballState, pickle, monthSessions, pickleballMemberId).netBalance || 0
+  const totalBalance = expenseBalance + pickleballBalance
 
   return {
     user: {
@@ -151,11 +163,11 @@ function buildHomeData(state, currentUserId, members, groups, pickle) {
     },
     monthLabel: formatMonthLabel(today),
     totalBalance,
-    owedTo: safeGroups.filter(group => groupNetForMember(group, currentUserId, members, state?.currentUserName) < 0).length,
+    owedTo: expenseGroups.filter(group => groupNetForMember(group, currentUserId, members, state?.currentUserName) < 0).length + (pickleballBalance < 0 ? 1 : 0),
     pickleball: {
       sessionsAttended: monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length,
       sessionsTotal: monthSessions.length,
-      balance: summary?.memberOwes?.[currentUserId] || 0,
+      balance: pickleballBalance || summary?.memberOwes?.[pickleballMemberId] || 0,
     },
     groups: {
       count: safeGroups.length,
@@ -164,9 +176,9 @@ function buildHomeData(state, currentUserId, members, groups, pickle) {
     todaySession: session ? toTodaySessionCard(session, pickle, members) : null,
     currentUserId,
     currentUserName: state?.currentUserName || 'Bạn',
-    expenses: buildHomeExpenses(safeGroups, currentUserId, members, state?.currentUserName, today),
-    memberBalances: buildHomeMemberBalances(state, pickle, today),
-    transactions: buildTransactions(safeGroups, currentUserId, members, state?.currentUserName),
+    expenses: buildHomeExpenses(expenseGroups, currentUserId, members, state?.currentUserName, today),
+    memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
+    transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
   }
 }
 
@@ -1677,6 +1689,15 @@ function currentGroup(state) {
   return safeGroup(state?.currentGroup || safeArray(state?.groups)[0])
 }
 
+function scopedPickleballState(state) {
+  const group = state?.pickleballGroup || safeArray(state?.groups).find(item => String(item.id) === String(state?.pickleballGroupId || '')) || state?.currentGroup
+  return {
+    ...state,
+    currentGroupId: group?.id || state?.pickleballGroupId || state?.currentGroupId,
+    currentGroup: group || state?.currentGroup,
+  }
+}
+
 function currentGroupName(state, fallback = 'Nhóm') {
   return currentGroup(state).name || fallback
 }
@@ -2703,8 +2724,11 @@ function sameName(a, b) {
 }
 
 function groupKind(group) {
+  const explicit = String(group?.type || group?.kind || group?.groupType || group?.group_type || '').toLowerCase()
+  if (explicit === 'pickleball') return 'pickleball'
+  if (explicit === 'expense') return 'groups'
   const text = `${group?.name || ''} ${group?.emoji || ''}`.toLowerCase()
-  if (text.includes('pickle') || text.includes('🏓')) return 'pickleball'
+  if (text.includes('pickle') || text.includes('🏓') || text.includes('🏸')) return 'pickleball'
   if (text.includes('cafe') || text.includes('cà phê') || text.includes('☕')) return 'cafe'
   if (text.includes('ăn') || text.includes('trưa') || text.includes('food') || text.includes('🍜')) return 'food'
   if (text.includes('du lịch') || text.includes('trip')) return 'trip'

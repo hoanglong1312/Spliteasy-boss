@@ -98,6 +98,7 @@ function GroupCard({ g, onClick }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{g.name}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <Badge tone={g.kind === 'pickleball' ? 'success' : 'muted'}>{g.kind === 'pickleball' ? 'Pickleball' : 'Chi tiêu'}</Badge>
             <span style={{ display: 'inline-flex' }}>
               {g.members.slice(0, 4).map((m, i) => (
                 <span key={i} style={{ marginLeft: i === 0 ? 0 : -8 }}>

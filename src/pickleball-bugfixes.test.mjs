@@ -489,7 +489,7 @@ test('app-v2 handles markAttendance and validates addTicket payloads before inse
   assert.match(appSource, /const wantsTeamFund = payload\?\.paymentMode === 'team_fund' \|\| payload\?\.teamFund === true \|\| payload\?\.status === 'team_fund'/)
   assert.match(appSource, /const advancerId = wantsTeamFund \? null : rawAdvancerId/)
   assert.match(appSource, /const isTeamFund = wantsTeamFund \|\| \(!isAdvancerMode && !advancerId\)/)
-  assert.match(appSource, /const ticketStatus = isTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
+  assert.match(appSource, /const ticketStatus = isPickleballTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
   assert.match(appSource, /if \(!sessionDate\) throw new Error\('ticket_session_date_required'\)/)
   assert.match(appSource, /if \(memberIds\.length === 0\) throw new Error\('ticket_members_required'\)/)
   assert.match(appSource, /if \(totalAmount <= 0\) throw new Error\('ticket_total_amount_required'\)/)
@@ -508,7 +508,7 @@ test('calendar guest chips expose treasurer-only delete without changing member 
 })
 
 test('removeGuest deletes pickle attendee rows and updates session state', () => {
-  assert.match(appSource, /if \(type === 'removeGuest'\) \{[\s\S]*?if \(!isTreasurer\) return[\s\S]*?const attendeeId = payload\?\.attendeeId[\s\S]*?const sessionId = payload\?\.sessionId/)
+  assert.match(appSource, /if \(type === 'removeGuest'\) \{[\s\S]*?if \(!isPickleballTreasurer\) return[\s\S]*?const attendeeId = payload\?\.attendeeId[\s\S]*?const sessionId = payload\?\.sessionId/)
   assert.match(appSource, /\.from\('pickle_attendees'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', attendeeId\)/)
   assert.match(appSource, /dispatch\(\{ type: 'REMOVE_SESSION_GUEST', attendeeId, sessionId \}\)/)
   const inertBlock = appSource.match(/if \(\[[\s\S]*?\]\.includes\(type\)\) \{/)?.[0] || ''
