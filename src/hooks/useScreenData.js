@@ -1407,6 +1407,7 @@ function getStateMonthSessions(state, date) {
   const allSessions = getAllSessions(state)
   return allSessions
     .filter(session => !isHiddenReplacementSession(session))
+    .filter(session => !isOffScheduleStaleSession(state, session))
     .filter(session => !isStaleReplacementSession(session, allSessions))
     .filter(session => {
       const sessionGroupId = session?.groupId || session?.group_id
@@ -1457,6 +1458,29 @@ function replacementOriginDate(session) {
 function replacementTargetDate(session) {
   const matches = [...String(session?.notes || '').matchAll(/sang (\d{4}-\d{2}-\d{2})/g)]
   return matches.at(-1)?.[1] || ''
+}
+
+function isOffScheduleStaleSession(state, session) {
+  const normalizedStatus = String(session?.status || '').toLowerCase()
+  if (!['scheduled', 'upcoming'].includes(normalizedStatus)) return false
+  const date = parseDate(sessionDate(session))
+  if (!date) return false
+  const originDate = replacementOriginDate(session)
+  if (originDate && originDate !== dateKey(date)) return false
+  const monthlyConfig = currentMonthlyPickleConfig(state, monthKey(date))
+  const config = currentPickleConfig(state)
+  const group = currentGroup(state)
+  const weekdays = normalizeIsoWeekdays(
+    monthlyConfig?.scheduleWeekdays ||
+    monthlyConfig?.schedule_weekdays ||
+    config?.scheduleWeekdays ||
+    config?.schedule_weekdays ||
+    group?.scheduleWeekdays ||
+    group?.schedule_weekdays
+  )
+  if (weekdays.length === 0) return false
+  const isoWeekday = date.getDay() === 0 ? 7 : date.getDay()
+  return !weekdays.includes(isoWeekday)
 }
 
 function isStaleReplacementSession(session, sessions) {

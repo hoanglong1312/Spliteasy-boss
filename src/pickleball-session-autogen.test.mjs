@@ -197,11 +197,11 @@ test('calendar and overview suppress auto-generation while manual regeneration i
     pickle: {
       sessions: [],
       fixedMembers: ['u1'],
-      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5] }],
     },
     _allPickle: {
       sessions: [],
-      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5] }],
     },
     _pickleRegenInProgress: true,
   }
@@ -295,7 +295,7 @@ test('pickleball calendar maps current month session rows to day states and expo
         { id: 's4', groupId: 'g1', date: '2026-05-18', status: 'scheduled', attendees: [] },
         { id: 's5', groupId: 'g1', date: '2026-05-22', status: 'scheduled', attendees: [] },
       ],
-      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5] }],
     },
     _allPickle: { sessions: [] },
   }
@@ -432,6 +432,90 @@ test('calendar hides scheduled replacement rows that are no longer the moved-cha
   assert.equal(data.sessions.some(session => session.id === 'replacement-23'), false)
   assert.equal(data.sessions.some(session => session.id === 'replacement-31'), false)
   assert.deepEqual(JSON.parse(JSON.stringify(data.staleReplacementCleanup.ids)), ['replacement-23', 'replacement-31'])
+})
+
+test('calendar hides stale scheduled rows outside the configured monthly weekdays', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'fixed-22', groupId: 'g1', date: '2026-05-22', status: 'scheduled' },
+        { id: 'stale-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled' },
+        { id: 'fixed-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled' },
+        { id: 'stale-31', groupId: 'g1', date: '2026-05-31', status: 'scheduled' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5] }],
+    },
+    _allPickle: { sessions: [] },
+  }, { yearMonth: '2026-05', selectedDate: '2026-05-23' })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-22').state, 'upcoming')
+  assert.equal(byDate.get('2026-05-23').state, 'normal')
+  assert.equal(byDate.get('2026-05-29').state, 'upcoming')
+  assert.equal(byDate.get('2026-05-31').state, 'normal')
+  assert.equal(data.sessions.some(session => session.id === 'stale-23'), false)
+  assert.equal(data.sessions.some(session => session.id === 'stale-31'), false)
+})
+
+test('calendar hides stale scheduled rows using group config when monthly weekdays are empty', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleWeekdays: [1, 3, 5] },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'fixed-22', groupId: 'g1', date: '2026-05-22', status: 'scheduled' },
+        { id: 'stale-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled' },
+        { id: 'fixed-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+    _allPickle: {
+      sessions: [],
+      configs: [{ groupId: 'g1', scheduleWeekdays: [1, 3, 5] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+  }, { yearMonth: '2026-05', selectedDate: '2026-05-23' })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-22').state, 'upcoming')
+  assert.equal(byDate.get('2026-05-23').state, 'normal')
+  assert.equal(byDate.get('2026-05-29').state, 'upcoming')
+  assert.equal(data.sessions.some(session => session.id === 'stale-23'), false)
+})
+
+test('calendar hides off-schedule rows with self-referential move notes', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleWeekdays: [1, 3, 5] },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'fixed-22', groupId: 'g1', date: '2026-05-22', status: 'scheduled' },
+        { id: 'stale-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled', notes: 'Dời từ 2026-05-23 sang 2026-05-23' },
+        { id: 'fixed-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+    _allPickle: {
+      sessions: [],
+      configs: [{ groupId: 'g1', scheduleWeekdays: [1, 3, 5] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+  }, { yearMonth: '2026-05', selectedDate: '2026-05-23' })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-23').state, 'normal')
+  assert.equal(data.sessions.some(session => session.id === 'stale-23'), false)
 })
 
 test('calendar hides and schedules cleanup for replacement dates after the original session is restored', () => {
