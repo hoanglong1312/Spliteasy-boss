@@ -46,6 +46,25 @@ test('store fetches and normalizes pickleball individual tickets', () => {
   assert.match(storeSource, /externalTickets: safeArray\(source\.externalTickets\)\.filter/)
 })
 
+test('store fetches venue owner payments and persists team-fund owner actions', () => {
+  assert.match(storeSource, /popR/)
+  assert.match(storeSource, /sb\.from\('pickleball_owner_payments'\)\.select\('\*'\)\.order\('paid_at', \{ ascending: false \}\)/)
+  assert.match(storeSource, /if \(popR\.error\) console\.warn\('\[store\] pickleball_owner_payments query failed:', popR\.error\)/)
+  assert.match(storeSource, /pickleballOwnerPayments:\s*popR\.data \|\| \[\]/)
+  assert.match(storeSource, /venueOwnerName: group\.venue_owner_name/)
+  assert.match(storeSource, /venueBankName: group\.venue_bank_name/)
+  assert.match(storeSource, /venueBankAccount: group\.venue_bank_account/)
+  assert.match(storeSource, /const normalOwnerPayments = safeArray\(pickleballOwnerPayments\)\.map\(payment => \(\{/)
+  assert.match(storeSource, /ownerPayments: normalOwnerPayments/)
+  assert.match(storeSource, /ownerPayments: safeArray\(source\.ownerPayments\)\.filter/)
+  assert.match(storeSource, /case 'SAVE_VENUE_OWNER_BANK': \{/)
+  assert.match(storeSource, /\.from\('groups'\)\.update\(\{[\s\S]*venue_owner_name: action\.venueOwnerName/)
+  assert.match(storeSource, /case 'ADD_PICKLEBALL_OWNER_PAYMENT': \{/)
+  assert.match(storeSource, /\.from\('pickleball_owner_payments'\)\s*\.insert\(\{/)
+  assert.match(storeSource, /bank_snapshot: action\.bankSnapshot \|\| \{\}/)
+  assert.match(storeSource, /items: safeArray\(action\.items\)/)
+})
+
 test('monthly pickleball config save persists schedule time aliases', () => {
   const match = storeSource.match(/case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': \{[\s\S]*?\n      \}/)
   assert.ok(match, 'SAVE_PICKLEBALL_MONTHLY_CONFIG case is available')

@@ -306,11 +306,35 @@ export default function AppV2() {
       const groupId = state.currentGroupId
       if (!groupId) return
       await dispatch({
+        type: 'SAVE_VENUE_OWNER_BANK',
+        groupId,
+        venueOwnerName: payload?.venueOwnerName,
+        venueBankName: payload?.venueBankName,
+        venueBankAccount: payload?.venueBankAccount,
+      })
+      await dispatch({
         type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
         groupId,
         yearMonth: payload?.currentYearMonth || monthKey(new Date()),
         courtFee: payload?.courtFee,
         ticketPrice: payload?.ticketPrice,
+      })
+      return
+    }
+
+    if (type === 'markOwnerPayment') {
+      if (!isTreasurer) return
+      const groupId = state.currentGroupId
+      if (!groupId) return
+      await dispatch({
+        type: 'ADD_PICKLEBALL_OWNER_PAYMENT',
+        groupId,
+        yearMonth: payload?.currentYearMonth || payload?.yearMonth || monthKey(new Date()),
+        paidAt: payload?.paidAt,
+        totalAmount: payload?.totalAmount,
+        bankSnapshot: payload?.bankSnapshot,
+        items: payload?.items,
+        note: payload?.note,
       })
       return
     }

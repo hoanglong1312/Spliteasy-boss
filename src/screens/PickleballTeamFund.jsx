@@ -8,17 +8,34 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const d = data || DEMO;
   const ticketFund = d.ticketFund || { rows: [], totalDue: 0, totalCredit: 0 };
   const ticketStats = d.ticketStats || { sessionCount: 0, totalAmount: 0, participantCount: 0 };
+  const venueBank = d.venueBank || { ownerName: '', bankName: '', bankAccount: '' };
+  const paymentDraft = d.paymentDraft || { items: [], totalAmount: 0 };
+  const ownerPayments = d.ownerPayments || [];
   const [courtFee, setCourtFee] = useState(Number(d.courtFeeTotal) || 0);
   const [ticketPrice, setTicketPrice] = useState(Number(d.ticketPrice) || 50000);
+  const [venueOwnerName, setVenueOwnerName] = useState(venueBank.ownerName || '');
+  const [venueBankName, setVenueBankName] = useState(venueBank.bankName || '');
+  const [venueBankAccount, setVenueBankAccount] = useState(venueBank.bankAccount || '');
+  const [selectedPaymentKeys, setSelectedPaymentKeys] = useState(() => defaultPaymentKeys(paymentDraft.items));
+  const [paymentNote, setPaymentNote] = useState('');
+  const [openPaymentId, setOpenPaymentId] = useState('');
   const [saveState, setSaveState] = useState('');
+  const [paymentState, setPaymentState] = useState('');
   const perSession = Math.round(courtFee / Math.max(Number(d.sessionsCount) || 1, 1));
   const perMember = Math.round(courtFee / Math.max(Number(d.memberCount) || 1, 1));
+  const selectedPaymentItems = paymentDraft.items.filter(item => selectedPaymentKeys.includes(paymentItemKey(item)));
+  const selectedPaymentTotal = selectedPaymentItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   useEffect(() => {
     setCourtFee(Number(d.courtFeeTotal) || 0);
     setTicketPrice(Number(d.ticketPrice) || 50000);
+    setVenueOwnerName(venueBank.ownerName || '');
+    setVenueBankName(venueBank.bankName || '');
+    setVenueBankAccount(venueBank.bankAccount || '');
+    setSelectedPaymentKeys(defaultPaymentKeys(paymentDraft.items));
     setSaveState('');
-  }, [d.courtFeeTotal, d.ticketPrice]);
+    setPaymentState('');
+  }, [d.courtFeeTotal, d.ticketPrice, venueBank.ownerName, venueBank.bankName, venueBank.bankAccount, paymentDraft.items]);
 
   if (!isTreasurer) {
     return (
@@ -75,6 +92,36 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             inputMode="numeric"
             inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
           />
+          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${colors.borderSubtle}` }}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>
+              STK chủ sân
+            </div>
+            <Input
+              label="Tên chủ tài khoản"
+              value={venueOwnerName}
+              onChange={event => {
+                setVenueOwnerName(event.target.value);
+                setSaveState('');
+              }}
+            />
+            <Input
+              label="Ngân hàng"
+              value={venueBankName}
+              onChange={event => {
+                setVenueBankName(event.target.value);
+                setSaveState('');
+              }}
+            />
+            <Input
+              label="Số tài khoản"
+              value={venueBankAccount}
+              onChange={event => {
+                setVenueBankAccount(event.target.value.replace(/\s/g, ''));
+                setSaveState('');
+              }}
+              inputMode="numeric"
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
             <MiniStat label="Tiền sân/buổi" value={perSession} tone="info" />
             <MiniStat label="Tiền sân/người" value={perMember} tone="info" />
@@ -95,6 +142,9 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                   currentYearMonth: d.currentYearMonth,
                   courtFee,
                   ticketPrice,
+                  venueOwnerName,
+                  venueBankName,
+                  venueBankAccount,
                 });
                 setSaveState('saved');
               } catch {
@@ -103,6 +153,106 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             }}
           >
             Lưu cấu hình quỹ
+          </Button>
+        </Card>
+
+        <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px', borderColor: 'rgba(96,165,250,0.24)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Cần thanh toán
+              </div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                Nước, phát sinh, vé lẻ và tiền sân tháng sau.
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase' }}>Tổng chọn</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: '#bfdbfe', marginTop: 3, ...type.mono }}>{formatVND(selectedPaymentTotal)}</div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {paymentDraft.items.map(item => {
+              const key = paymentItemKey(item);
+              const checked = selectedPaymentKeys.includes(key);
+              return (
+                <label key={key} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 9,
+                  padding: '9px 10px',
+                  borderRadius: 10,
+                  border: `1px solid ${item.paid ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
+                  background: item.paid ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.035)',
+                  opacity: item.paid ? 0.72 : 1,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={item.paid || Number(item.amount) <= 0}
+                    onChange={event => {
+                      setSelectedPaymentKeys(keys => event.target.checked
+                        ? [...keys, key]
+                        : keys.filter(value => value !== key));
+                      setPaymentState('');
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900 }}>{item.label}</div>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
+                      {item.yearMonth}{item.paid ? ' · Đã trả chủ sân' : ''}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : colors.warning, ...type.mono }}>
+                    {formatVND(item.amount || 0)}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+
+          <Input
+            label="Ghi chú giao dịch"
+            value={paymentNote}
+            onChange={event => {
+              setPaymentNote(event.target.value);
+              setPaymentState('');
+            }}
+          />
+          {paymentState && (
+            <div style={{ marginTop: 9, color: paymentState === 'saved' ? '#86efac' : colors.danger, fontSize: 11, fontWeight: 800 }}>
+              {paymentState === 'saved' ? 'Đã ghi nhận giao dịch chuyển chủ sân.' : 'Chưa lưu được giao dịch. Thử lại sau.'}
+            </div>
+          )}
+          <Button
+            block
+            variant="success"
+            disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0}
+            style={{ marginTop: 12, padding: 12, opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 ? 0.55 : 1 }}
+            onClick={async () => {
+              setPaymentState('');
+              try {
+                await onAction?.('markOwnerPayment', {
+                  currentYearMonth: d.currentYearMonth,
+                  paidAt: new Date().toISOString().slice(0, 10),
+                  totalAmount: selectedPaymentTotal,
+                  bankSnapshot: {
+                    ownerName: venueOwnerName,
+                    bankName: venueBankName,
+                    bankAccount: venueBankAccount,
+                  },
+                  items: selectedPaymentItems,
+                  note: paymentNote,
+                });
+                setPaymentNote('');
+                setPaymentState('saved');
+              } catch {
+                setPaymentState('error');
+              }
+            }}
+          >
+            Đánh dấu đã chuyển
           </Button>
         </Card>
 
@@ -124,6 +274,64 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             <MiniStat label="Tổng vé" value={ticketStats.totalAmount || 0} tone="warn" />
             <MiniStat label="Cần thu" value={ticketFund.totalDue || 0} tone="warn" />
             <MiniStat label="Cần bù" value={ticketFund.totalCredit || 0} tone="success" />
+          </div>
+        </Card>
+
+        <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Lịch sử chuyển chủ sân
+          </div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+            Các lần thủ quỹ đã chuyển cho chủ sân.
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {ownerPayments.length === 0 && (
+              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '10px 0' }}>
+                Chưa có giao dịch chuyển chủ sân.
+              </div>
+            )}
+            {ownerPayments.map(payment => {
+              const open = openPaymentId === payment.id;
+              const bank = payment.bankSnapshot || payment.bank_snapshot || {};
+              return (
+                <div key={payment.id} style={{ padding: '10px 0', borderTop: `1px solid ${colors.borderSubtle}` }}>
+                  <button type="button" onClick={() => setOpenPaymentId(open ? '' : payment.id)} style={{
+                    width: '100%',
+                    border: 'none',
+                    background: 'transparent',
+                    color: colors.textPrimary,
+                    padding: 0,
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 900 }}>{formatPaymentDate(payment.paidAt || payment.paid_at)}</div>
+                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                          {bank.ownerName || 'Chủ sân'} · {safeArray(payment.items).length} hạng mục
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: '#6ee7b7', ...type.mono }}>{formatVND(payment.totalAmount || payment.total_amount || 0)}</div>
+                    </div>
+                  </button>
+                  {open && (
+                    <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: 'rgba(255,255,255,0.035)' }}>
+                      <div style={{ fontSize: 10, color: colors.textSecondary, marginBottom: 7 }}>
+                        {bank.bankName || 'Ngân hàng'} · {bank.bankAccount || 'Chưa có STK'}
+                      </div>
+                      {safeArray(payment.items).map(item => (
+                        <div key={paymentItemKey(item)} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '5px 0' }}>
+                          <span style={{ fontSize: 11, color: colors.textSecondary }}>{item.label} · {item.yearMonth}</span>
+                          <span style={{ fontSize: 11, fontWeight: 900, ...type.mono }}>{formatVND(item.amount || 0)}</span>
+                        </div>
+                      ))}
+                      {payment.note && <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 7 }}>{payment.note}</div>}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </Card>
 
@@ -188,6 +396,27 @@ function MiniStat({ label, value, tone }) {
   );
 }
 
+function paymentItemKey(item) {
+  return `${item?.key || item?.label}:${item?.yearMonth || ''}`;
+}
+
+function defaultPaymentKeys(items) {
+  return safeArray(items)
+    .filter(item => !item.paid && Number(item.amount) > 0)
+    .map(paymentItemKey);
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function formatPaymentDate(value) {
+  if (!value) return 'Chưa có ngày';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
 function pillButtonStyle() {
   return {
     border: 'none',
@@ -219,6 +448,29 @@ const DEMO = {
   sessionsCount: 13,
   memberCount: 8,
   ticketStats: { sessionCount: 2, participantCount: 5, totalAmount: 250000 },
+  venueBank: {
+    ownerName: 'Virgo Pickleball',
+    bankName: 'VCB',
+    bankAccount: '123456789',
+  },
+  paymentDraft: {
+    totalAmount: 4630000,
+    items: [
+      { key: 'water', label: 'Tiền nước', yearMonth: '2026-05', amount: 60000, paid: false },
+      { key: 'extras', label: 'Phát sinh', yearMonth: '2026-05', amount: 80000, paid: false },
+      { key: 'tickets', label: 'Vé lẻ team', yearMonth: '2026-05', amount: 250000, paid: false },
+      { key: 'next_court', label: 'Tiền sân tháng sau', yearMonth: '2026-06', amount: 4240000, paid: false },
+    ],
+  },
+  ownerPayments: [
+    {
+      id: 'demo-pay-1',
+      paidAt: '2026-05-01',
+      totalAmount: 4550000,
+      bankSnapshot: { ownerName: 'Virgo Pickleball', bankName: 'VCB', bankAccount: '123456789' },
+      items: [{ key: 'court', label: 'Tiền sân', yearMonth: '2026-05', amount: 4550000 }],
+    },
+  ],
   ticketFund: {
     totalDue: 200000,
     totalCredit: 50000,

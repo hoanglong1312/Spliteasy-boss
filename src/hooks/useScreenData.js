@@ -424,20 +424,33 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
 function buildPickleballTeamFundData(state) {
   const today = new Date()
   const currentYearMonth = monthKey(today)
+  const nextYearMonth = shiftMonthKey(currentYearMonth, 1)
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
+  const nextMonthlyConfig = currentMonthlyPickleConfig(state, nextYearMonth)
   const monthSessions = getStateMonthSessions(state, today)
   const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
   const currentFixedMembers = currentGroupMembers(state)
     .filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
+  const nextCourtFeeTotal = Number(nextMonthlyConfig?.courtFee ?? nextMonthlyConfig?.court_fee ?? courtFeeTotal) || 0
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
   const waterTotal = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0)
   const extrasTotal = monthSessions.reduce((sum, session) => {
     return sum + sessionCostsForSession(state, session, currentFixedMembers).extras
       .reduce((extraSum, item) => extraSum + (Number(item.amount) || 0), 0)
   }, 0)
-  const ticketPaidAmount = ticketFund.teamFundTotal || 0
+  const ownerPayments = currentGroupOwnerPayments(state)
+  const venueBank = venueBankForCurrentGroup(state)
+  const paymentDraftItems = [
+    { key: 'water', label: 'Tiền nước', yearMonth: currentYearMonth, amount: waterTotal },
+    { key: 'extras', label: 'Phát sinh', yearMonth: currentYearMonth, amount: extrasTotal },
+    { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: ticketStats.totalAmount || 0 },
+    { key: 'next_court', label: 'Tiền sân tháng sau', yearMonth: nextYearMonth, amount: nextCourtFeeTotal },
+  ].map(item => ({
+    ...item,
+    paid: ownerPaymentCoversItem(ownerPayments, item.key, item.yearMonth),
+  }))
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
@@ -449,34 +462,83 @@ function buildPickleballTeamFundData(state) {
     memberCount: currentFixedMembers.length,
     ticketStats,
     ticketFund,
+    venueBank,
+    nextMonth: {
+      yearMonth: nextYearMonth,
+      courtFee: nextCourtFeeTotal,
+    },
+    paymentDraft: {
+      items: paymentDraftItems,
+      totalAmount: paymentDraftItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+    },
+    ownerPayments: ownerPayments.map(payment => ({
+      id: payment.id,
+      yearMonth: payment.yearMonth || payment.year_month,
+      paidAt: payment.paidAt || payment.paid_at,
+      totalAmount: Number(payment.totalAmount ?? payment.total_amount) || 0,
+      bankSnapshot: payment.bankSnapshot || payment.bank_snapshot || {},
+      items: safeArray(payment.items),
+      note: payment.note || '',
+    })),
     costRows: [
       {
         key: 'court',
         label: 'Tiền sân',
         amount: courtFeeTotal,
-        paidToOwner: isPaidToOwner(monthlyConfig),
+        paidToOwner: isPaidToOwner(monthlyConfig) || ownerPaymentCoversItem(ownerPayments, 'court', currentYearMonth),
       },
       {
         key: 'water',
         label: 'Tiền nước',
         amount: waterTotal,
-        paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)),
+        paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)) ||
+          ownerPaymentCoversItem(ownerPayments, 'water', currentYearMonth),
       },
       {
         key: 'extras',
         label: 'Phát sinh',
         amount: extrasTotal,
-        paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)),
+        paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)) ||
+          ownerPaymentCoversItem(ownerPayments, 'extras', currentYearMonth),
       },
       {
         key: 'tickets',
         label: 'Vé lẻ team',
         amount: ticketStats.totalAmount || 0,
-        paidAmount: ticketPaidAmount,
-        paidToOwner: ticketPaidAmount > 0,
+        paidToOwner: ownerPaymentCoversItem(ownerPayments, 'tickets', currentYearMonth),
       },
     ],
   }
+}
+
+function shiftMonthKey(yearMonth, delta) {
+  const [year, month] = String(yearMonth || monthKey(new Date())).split('-').map(Number)
+  const date = new Date(year, (month || 1) - 1 + delta, 1)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function venueBankForCurrentGroup(state) {
+  const group = currentGroup(state)
+  return {
+    ownerName: group.venueOwnerName || group.venue_owner_name || '',
+    bankName: group.venueBankName || group.venue_bank_name || '',
+    bankAccount: group.venueBankAccount || group.venue_bank_account || '',
+  }
+}
+
+function currentGroupOwnerPayments(state) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  return safeArray(state?.pickle?.ownerPayments || state?._allPickle?.ownerPayments)
+    .filter(payment => !groupId || String(payment?.groupId || payment?.group_id || '') === String(groupId))
+}
+
+function ownerPaymentCoversItem(payments, key, yearMonth) {
+  return safeArray(payments).some(payment => {
+    return safeArray(payment?.items).some(item => (
+      String(item?.key || item?.type || '') === String(key) &&
+      String(item?.yearMonth || item?.year_month || payment?.yearMonth || payment?.year_month || '') === String(yearMonth)
+    ))
+  })
 }
 
 function isPaidToOwner(value) {

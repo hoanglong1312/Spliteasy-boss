@@ -6,6 +6,7 @@ import vm from 'node:vm'
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 const overviewSource = readFileSync(new URL('./screens/PickleballOverview.jsx', import.meta.url), 'utf8')
 const teamFundSource = readFileSync(new URL('./screens/PickleballTeamFund.jsx', import.meta.url), 'utf8')
+const ownerPaymentMigration = readFileSync(new URL('../supabase/migrations/20260522000003_pickleball_owner_payments.sql', import.meta.url), 'utf8')
 
 function loadScreenDataBuilders() {
   const fixedNow = new Date('2026-05-21T12:00:00')
@@ -98,8 +99,80 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
     ['Tiền sân', 0, false],
     ['Tiền nước', 0, false],
     ['Phát sinh', 0, false],
-    ['Vé lẻ team', 200000, true],
+    ['Vé lẻ team', 200000, false],
   ]))
+})
+
+test('team fund tracks venue bank info and owner payment history', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'viet',
+    currentGroupId: 'g1',
+    currentGroup: {
+      id: 'g1',
+      name: 'Nhóm Pickleball Quận 7',
+      venueOwnerName: 'Virgo Pickleball',
+      venueBankName: 'VCB',
+      venueBankAccount: '123456789',
+    },
+    members: [
+      { id: 'viet', groupId: 'g1', name: 'Anh Việt', memberType: 'fixed', isActive: true },
+      { id: 'minh', groupId: 'g1', name: 'Minh', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      fixedMembers: ['viet', 'minh'],
+      monthlyConfigs: [
+        { groupId: 'g1', yearMonth: '2026-05', courtFee: 4000000, ticketPrice: 50000 },
+        { groupId: 'g1', yearMonth: '2026-06', courtFee: 4200000, ticketPrice: 50000 },
+      ],
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-20', status: 'completed', attendees: ['viet', 'minh'], waterAmount: 60000 },
+      ],
+      sessionItems: [
+        { id: 'extra-1', sessionId: 's1', name: 'Bóng', amount: 80000, memberIds: ['viet', 'minh'] },
+      ],
+      externalTickets: [
+        { id: 'ticket-1', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-17', status: 'team_fund', totalAmount: 150000, memberIds: ['viet', 'minh'] },
+      ],
+      ownerPayments: [
+        {
+          id: 'pay-1',
+          groupId: 'g1',
+          yearMonth: '2026-05',
+          paidAt: '2026-05-31',
+          totalAmount: 4350000,
+          items: [
+            { key: 'court', yearMonth: '2026-05', amount: 4000000 },
+            { key: 'water', yearMonth: '2026-05', amount: 60000 },
+            { key: 'extras', yearMonth: '2026-05', amount: 80000 },
+            { key: 'tickets', yearMonth: '2026-05', amount: 150000 },
+            { key: 'next_court', yearMonth: '2026-06', amount: 4200000 },
+          ],
+        },
+      ],
+    },
+    _allPickle: { sessions: [], externalTickets: [], ownerPayments: [] },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'viet', state.members)
+  const team = data.teamFundOverview
+
+  assert.equal(JSON.stringify(team.venueBank), JSON.stringify({
+    ownerName: 'Virgo Pickleball',
+    bankName: 'VCB',
+    bankAccount: '123456789',
+  }))
+  assert.equal(team.nextMonth.yearMonth, '2026-06')
+  assert.equal(team.nextMonth.courtFee, 4200000)
+  assert.equal(JSON.stringify(team.paymentDraft.items.map(item => [item.key, item.yearMonth, item.amount, item.paid])), JSON.stringify([
+    ['water', '2026-05', 60000, true],
+    ['extras', '2026-05', 80000, true],
+    ['tickets', '2026-05', 150000, true],
+    ['next_court', '2026-06', 4200000, true],
+  ]))
+  assert.equal(team.paymentDraft.totalAmount, 4490000)
+  assert.equal(team.ownerPayments.length, 1)
+  assert.equal(team.costRows.every(row => row.paidToOwner), true)
 })
 
 test('overview separates personal tickets from treasurer team-fund view', () => {
@@ -129,6 +202,8 @@ test('overview separates personal tickets from treasurer team-fund view', () => 
   assert.match(overviewSource, /teamFundOverview\.costRows/)
   assert.match(overviewSource, /Đã trả chủ sân/)
   assert.match(overviewSource, /Chưa đánh dấu trả/)
+  assert.doesNotMatch(overviewSource, /markOwnerPayment/)
+  assert.doesNotMatch(overviewSource, /Đánh dấu đã chuyển/)
   assert.ok(overviewSource.indexOf('Của bạn tháng này') < overviewSource.indexOf('Tiến độ tháng'))
   assert.doesNotMatch(overviewSource, /Trừ vào quỹ/)
   assert.doesNotMatch(overviewSource, /Vé lẻ chưa trả/)
@@ -139,13 +214,33 @@ test('team fund screen owns treasury totals and monthly money config', () => {
   assert.match(teamFundSource, /export default function PickleballTeamFund/)
   assert.match(teamFundSource, /const \[courtFee, setCourtFee\] = useState/)
   assert.match(teamFundSource, /const \[ticketPrice, setTicketPrice\] = useState/)
+  assert.match(teamFundSource, /const \[venueOwnerName, setVenueOwnerName\] = useState/)
+  assert.match(teamFundSource, /const \[selectedPaymentKeys, setSelectedPaymentKeys\] = useState/)
   assert.match(teamFundSource, /Tiền sân tháng/)
   assert.match(teamFundSource, /Giá vé lẻ\/người/)
+  assert.match(teamFundSource, /STK chủ sân/)
+  assert.match(teamFundSource, /Cần thanh toán/)
+  assert.match(teamFundSource, /Lịch sử chuyển chủ sân/)
+  assert.match(teamFundSource, /Tiền sân tháng sau/)
+  assert.match(teamFundSource, /Đánh dấu đã chuyển/)
   assert.match(teamFundSource, /Tổng vé lẻ team/)
   assert.match(teamFundSource, /Chênh lệch qua quỹ/)
   assert.match(teamFundSource, /ticketFund\.rows\.map/)
   assert.match(teamFundSource, /onAction\?\.\('saveTeamFundConfig'/)
+  assert.match(teamFundSource, /onAction\?\.\('markOwnerPayment'/)
   assert.match(teamFundSource, /onAction\?\.\('push', 'pickleball-calendar'\)/)
+})
+
+test('owner payment migration stores venue bank and owner transfer history', () => {
+  assert.match(ownerPaymentMigration, /ALTER TABLE public\.groups/)
+  assert.match(ownerPaymentMigration, /ADD COLUMN IF NOT EXISTS venue_owner_name/)
+  assert.match(ownerPaymentMigration, /ADD COLUMN IF NOT EXISTS venue_bank_name/)
+  assert.match(ownerPaymentMigration, /ADD COLUMN IF NOT EXISTS venue_bank_account/)
+  assert.match(ownerPaymentMigration, /CREATE TABLE IF NOT EXISTS public\.pickleball_owner_payments/)
+  assert.match(ownerPaymentMigration, /bank_snapshot\s+jsonb NOT NULL DEFAULT '\{\}'::jsonb/)
+  assert.match(ownerPaymentMigration, /items\s+jsonb NOT NULL DEFAULT '\[\]'::jsonb/)
+  assert.match(ownerPaymentMigration, /pickleball_owner_payments_select/)
+  assert.match(ownerPaymentMigration, /pickleball_owner_payments_insert/)
 })
 
 test('overview folds next session into progress card instead of rendering a separate hero', () => {

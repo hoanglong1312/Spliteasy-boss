@@ -539,7 +539,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, dR, jR] = await Promise.all([
+  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('groups').select('*'),
     sb.from('member_tokens').select('member_id,revoked_at'),
@@ -556,6 +556,7 @@ async function fetchGroupData(token) {
     sb.from('pickleball_attendance').select('*'),
     sb.from('pickleball_session_items').select('*'),
     sb.from('pickleball_tickets').select('*').order('session_date', { ascending: true }),
+    sb.from('pickleball_owner_payments').select('*').order('paid_at', { ascending: false }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
   ])
@@ -570,6 +571,7 @@ async function fetchGroupData(token) {
   if (pbaR.error) console.warn('[store] pickleball_attendance query failed:', pbaR.error)
   if (psiR.error) console.warn('[store] pickleball_session_items query failed:', psiR.error)
   if (ptR.error) console.warn('[store] pickleball_tickets query failed:', ptR.error)
+  if (popR.error) console.warn('[store] pickleball_owner_payments query failed:', popR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
@@ -589,6 +591,7 @@ async function fetchGroupData(token) {
     pickleballAttendance: pbaR.data || [],
     pickleballSessionItems: psiR.data || [],
     pickleballTickets: ptR.data || [],
+    pickleballOwnerPayments: popR.data || [],
     disputeCount:    (dR.data || []).length,
     joinRequests:    jR.data || [],
   }
@@ -744,6 +747,7 @@ function pickleForGroup(allPickle, members, groupId) {
     sessionItems,
     fixedMembers,
     externalTickets: safeArray(source.externalTickets).filter(t => (t.groupId ?? t.group_id) === groupId),
+    ownerPayments: safeArray(source.ownerPayments).filter(payment => (payment.groupId ?? payment.group_id) === groupId),
     monthlyConfigs,
     monthlyCourtFee: Number(config.monthlyCourtFee ?? config.monthly_court_fee ?? 0),
     guestFeePerSession: Number(config.guestFeePerSession ?? config.guest_fee_per_session ?? 0),
@@ -796,6 +800,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     pickleballAttendance = [],
     pickleballSessionItems = [],
     pickleballTickets = [],
+    pickleballOwnerPayments = [],
     disputeCount,
     joinRequests = [],
   } = raw
@@ -1054,6 +1059,12 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     name: group.name,
     emoji: group.emoji || '👥',
     color: group.color || '#574EFA',
+    venueOwnerName: group.venue_owner_name || '',
+    venue_owner_name: group.venue_owner_name || '',
+    venueBankName: group.venue_bank_name || '',
+    venue_bank_name: group.venue_bank_name || '',
+    venueBankAccount: group.venue_bank_account || '',
+    venue_bank_account: group.venue_bank_account || '',
     inviteCode: group.invite_code,
     members: members.filter(m => m.group_id === group.id).map(m => m.id),
     expenses: normalExpenses.filter(e => e.groupId === group.id),
@@ -1110,6 +1121,25 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     createdAt: ticket.created_at,
     created_at: ticket.created_at,
   }))
+  const normalOwnerPayments = safeArray(pickleballOwnerPayments).map(payment => ({
+    id: payment.id,
+    groupId: payment.group_id,
+    group_id: payment.group_id,
+    yearMonth: payment.year_month,
+    year_month: payment.year_month,
+    paidAt: payment.paid_at,
+    paid_at: payment.paid_at,
+    totalAmount: Number(payment.total_amount) || 0,
+    total_amount: Number(payment.total_amount) || 0,
+    bankSnapshot: payment.bank_snapshot || {},
+    bank_snapshot: payment.bank_snapshot || {},
+    items: safeArray(payment.items),
+    note: payment.note || '',
+    createdBy: payment.created_by,
+    created_by: payment.created_by,
+    createdAt: payment.created_at,
+    created_at: payment.created_at,
+  }))
   const baseState = {
     currentUserId: currentMemberId,
     currentUserName: me?.name || '',
@@ -1132,6 +1162,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
       configs: normalPickleConfigs,
       monthlyConfigs: normalPickleballMonthlyConfigs,
       externalTickets: normalTickets,
+      ownerPayments: normalOwnerPayments,
     },
     notifications: [],
     disputeCount: disputeCount || 0,
@@ -1648,6 +1679,23 @@ export function AppProvider({ children }) {
         break
       }
 
+      case 'SAVE_VENUE_OWNER_BANK': {
+        if (!sb) return
+        const groupId = action.groupId || state.currentGroupId
+        if (!groupId) return
+        const { error } = await sb.from('groups').update({
+          venue_owner_name: action.venueOwnerName || '',
+          venue_bank_name: action.venueBankName || '',
+          venue_bank_account: action.venueBankAccount || '',
+        }).eq('id', groupId)
+        if (error) {
+          console.error('[store] SAVE_VENUE_OWNER_BANK:', error)
+          throw error
+        }
+        await refresh()
+        break
+      }
+
       case 'CREATE_GROUP':
       case 'ADD_GROUP': {
         if (!sb || !state.currentUserId) return null
@@ -1780,6 +1828,33 @@ export function AppProvider({ children }) {
         const { data, error } = action.skipIfExists === true ? await query.maybeSingle() : await query.single()
         if (error) {
           console.error('[store] SAVE_PICKLEBALL_MONTHLY_CONFIG:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
+      case 'ADD_PICKLEBALL_OWNER_PAYMENT': {
+        if (!sb) return
+        const groupId = action.groupId || state.currentGroupId
+        const yearMonth = action.yearMonth || action.currentYearMonth
+        if (!groupId || !yearMonth) return
+        const { data, error } = await sb
+          .from('pickleball_owner_payments')
+          .insert({
+            group_id: groupId,
+            year_month: yearMonth,
+            paid_at: action.paidAt || new Date().toISOString().slice(0, 10),
+            total_amount: Number(action.totalAmount) || 0,
+            bank_snapshot: action.bankSnapshot || {},
+            items: safeArray(action.items),
+            note: action.note || null,
+            created_by: state.currentUserId || null,
+          })
+          .select()
+          .single()
+        if (error) {
+          console.error('[store] ADD_PICKLEBALL_OWNER_PAYMENT:', error)
           throw error
         }
         await refresh()
