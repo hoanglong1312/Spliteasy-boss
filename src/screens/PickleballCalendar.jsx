@@ -484,6 +484,14 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
       extra.id === id ? { ...extra, ...patch } : extra
     )));
   };
+  const removeExtra = (id) => {
+    const nextExtras = extras.filter(extra => extra.id !== id);
+    setExtras(nextExtras);
+    saveSessionCosts(nextExtras).catch(err => {
+      console.error('[PickleballCalendar] removeExtra:', err);
+      setCostSaveState('error');
+    });
+  };
   const addExtra = () => {
     setExtras(prev => [
       ...prev,
@@ -496,7 +504,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
     ]);
     setExtrasOpen(true);
   };
-  const cleanedExtras = () => extras
+  const cleanedExtras = (sourceExtras = extras) => sourceExtras
     .map(extra => {
       const memberIds = allCostMemberIds.length > 0 && extra.memberIds.length === allCostMemberIds.length
         ? null
@@ -508,12 +516,12 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
       };
     })
     .filter(extra => extra.amount > 0);
-  const saveSessionCosts = async () => {
+  const saveSessionCosts = async (sourceExtras = extras) => {
     setCostSaveState('');
     await onAction?.('saveSessionCost', {
       sessionId: session.id,
       waterAmount: parseAmount(waterInput),
-      extras: cleanedExtras(),
+      extras: cleanedExtras(sourceExtras),
     });
     setCostSaveState('saved');
   };
@@ -853,6 +861,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
           extrasOpen={extrasOpen}
           setExtrasOpen={setExtrasOpen}
           updateExtra={updateExtra}
+          removeExtra={removeExtra}
           addExtra={addExtra}
           costSaveState={costSaveState}
           canEdit={canEditCosts}
@@ -874,6 +883,7 @@ function SessionCostSection({
   extrasOpen,
   setExtrasOpen,
   updateExtra,
+  removeExtra,
   addExtra,
   costSaveState,
   canEdit,
@@ -942,6 +952,7 @@ function SessionCostSection({
               members={members}
               disabled={!canEdit}
               onChange={(patch) => updateExtra(extra.id, patch)}
+              onRemove={() => removeExtra(extra.id)}
             />
           ))}
           {canEdit && (
@@ -971,7 +982,7 @@ function SessionCostSection({
   );
 }
 
-function ExtraCostEditor({ index, extra, members, disabled, onChange }) {
+function ExtraCostEditor({ index, extra, members, disabled, onChange, onRemove }) {
   const allMemberIds = members.map(member => member.id);
   const selectedIds = new Set(extra.memberIds);
   const allSelected = allMemberIds.length > 0 && extra.memberIds.length === allMemberIds.length;
@@ -994,8 +1005,27 @@ function ExtraCostEditor({ index, extra, members, disabled, onChange }) {
       border: `1px solid ${colors.borderSubtle}`,
       borderRadius: 12,
     }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color: colors.pickleball, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-        Phát sinh #{index + 1}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: colors.pickleball, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+          Phát sinh #{index + 1}
+        </div>
+        {!disabled && (
+          <button
+            type="button"
+            onClick={onRemove}
+            style={{
+              border: '1px solid rgba(248,113,113,0.24)',
+              background: colors.dangerSoft,
+              color: '#fca5a5',
+              borderRadius: 9,
+              padding: '5px 8px',
+              fontSize: 10,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}
+          >Xóa</button>
+        )}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 8, marginTop: 8 }}>
         <CostInput
