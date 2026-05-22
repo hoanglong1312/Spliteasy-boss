@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, TabBar, IconButton, Card, Button, Input, Avatar } from '../primitives';
+import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 export default function PickleballTeamFund({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
@@ -14,27 +15,41 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const [courtFee, setCourtFee] = useState(Number(d.courtFeeTotal) || 0);
   const [ticketPrice, setTicketPrice] = useState(Number(d.ticketPrice) || 50000);
   const [venueOwnerName, setVenueOwnerName] = useState(venueBank.ownerName || '');
-  const [venueBankName, setVenueBankName] = useState(venueBank.bankName || '');
+  const [venueBankName, setVenueBankName] = useState(normalizeBankValue(venueBank.bankName));
   const [venueBankAccount, setVenueBankAccount] = useState(venueBank.bankAccount || '');
   const [selectedPaymentKeys, setSelectedPaymentKeys] = useState(() => defaultPaymentKeys(paymentDraft.items));
   const [paymentNote, setPaymentNote] = useState('');
   const [openPaymentId, setOpenPaymentId] = useState('');
   const [saveState, setSaveState] = useState('');
   const [paymentState, setPaymentState] = useState('');
+  const [paymentQrOpen, setPaymentQrOpen] = useState(false);
   const perSession = Math.round(courtFee / Math.max(Number(d.sessionsCount) || 1, 1));
   const perMember = Math.round(courtFee / Math.max(Number(d.memberCount) || 1, 1));
   const selectedPaymentItems = paymentDraft.items.filter(item => selectedPaymentKeys.includes(paymentItemKey(item)));
   const selectedPaymentTotal = selectedPaymentItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const selectedBank = resolveBank(venueBankName);
+  const qrBankId = selectedBank?.id || venueBankName;
+  const canGenerateQr = Boolean(qrBankId && venueBankAccount && venueOwnerName && selectedPaymentTotal > 0);
+  const qrUrl = canGenerateQr
+    ? generateQRUrl({
+      bankId: qrBankId,
+      account: venueBankAccount,
+      accountName: venueOwnerName,
+      amount: selectedPaymentTotal,
+      description: `QUY PICKLEBALL ${d.currentYearMonth || ''}`.trim(),
+    })
+    : '';
 
   useEffect(() => {
     setCourtFee(Number(d.courtFeeTotal) || 0);
     setTicketPrice(Number(d.ticketPrice) || 50000);
     setVenueOwnerName(venueBank.ownerName || '');
-    setVenueBankName(venueBank.bankName || '');
+    setVenueBankName(normalizeBankValue(venueBank.bankName));
     setVenueBankAccount(venueBank.bankAccount || '');
     setSelectedPaymentKeys(defaultPaymentKeys(paymentDraft.items));
     setSaveState('');
     setPaymentState('');
+    setPaymentQrOpen(false);
   }, [d.courtFeeTotal, d.ticketPrice, venueBank.ownerName, venueBank.bankName, venueBank.bankAccount, paymentDraft.items]);
 
   if (!isTreasurer) {
@@ -104,14 +119,10 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                 setSaveState('');
               }}
             />
-            <Input
-              label="Ngân hàng"
-              value={venueBankName}
-              onChange={event => {
-                setVenueBankName(event.target.value);
-                setSaveState('');
-              }}
-            />
+            <BankSelect value={venueBankName} onChange={value => {
+              setVenueBankName(value);
+              setSaveState('');
+            }} />
             <Input
               label="Số tài khoản"
               value={venueBankAccount}
@@ -128,7 +139,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           </div>
           {saveState && (
             <div style={{ marginTop: 9, color: saveState === 'saved' ? '#86efac' : colors.danger, fontSize: 11, fontWeight: 800 }}>
-              {saveState === 'saved' ? 'Đã lưu cấu hình quỹ tháng.' : 'Chưa lưu được. Thử lại sau.'}
+              {saveState === 'saved' ? 'Đã lưu cấu hình quỹ tháng.' : 'Chưa lưu được. Cần chạy supabase db push nếu remote chưa có cột STK chủ sân.'}
             </div>
           )}
           <Button
@@ -196,12 +207,13 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                         ? [...keys, key]
                         : keys.filter(value => value !== key));
                       setPaymentState('');
+                      setPaymentQrOpen(false);
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 900 }}>{item.label}</div>
                     <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
-                      {item.yearMonth}{item.paid ? ' · Đã trả chủ sân' : ''}
+                      {item.yearMonth} · {item.paid ? 'Đã trả chủ sân' : 'Chưa chuyển'}
                     </div>
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : colors.warning, ...type.mono }}>
@@ -230,30 +242,71 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             variant="success"
             disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0}
             style={{ marginTop: 12, padding: 12, opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 ? 0.55 : 1 }}
-            onClick={async () => {
-              setPaymentState('');
-              try {
-                await onAction?.('markOwnerPayment', {
-                  currentYearMonth: d.currentYearMonth,
-                  paidAt: new Date().toISOString().slice(0, 10),
-                  totalAmount: selectedPaymentTotal,
-                  bankSnapshot: {
-                    ownerName: venueOwnerName,
-                    bankName: venueBankName,
-                    bankAccount: venueBankAccount,
-                  },
-                  items: selectedPaymentItems,
-                  note: paymentNote,
-                });
-                setPaymentNote('');
-                setPaymentState('saved');
-              } catch {
-                setPaymentState('error');
-              }
-            }}
+            onClick={() => setPaymentQrOpen(true)}
           >
-            Đánh dấu đã chuyển
+            Thanh toán
           </Button>
+
+          {paymentQrOpen && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 12,
+              background: 'rgba(15,23,42,0.72)',
+              border: `1px solid ${canGenerateQr ? 'rgba(52,211,153,0.28)' : 'rgba(248,113,113,0.26)'}`,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '1px', color: canGenerateQr ? '#6ee7b7' : colors.danger, textTransform: 'uppercase' }}>
+                Quét VietQR
+              </div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                {selectedBank?.shortName || venueBankName || 'Chưa chọn ngân hàng'} · {venueBankAccount || 'Chưa có STK'} · {formatVND(selectedPaymentTotal)}
+              </div>
+              {canGenerateQr ? (
+                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+                  <img
+                    src={qrUrl}
+                    alt="VietQR chủ sân"
+                    style={{ width: 180, height: 180, borderRadius: 12, background: '#fff', objectFit: 'cover' }}
+                  />
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, fontSize: 11, color: '#fecaca', fontWeight: 800 }}>
+                  Cần nhập đủ tên chủ tài khoản, ngân hàng và số tài khoản để tạo QR.
+                </div>
+              )}
+              <Button
+                block
+                variant="success"
+                disabled={!canGenerateQr}
+                style={{ marginTop: 12, padding: 12, opacity: canGenerateQr ? 1 : 0.55 }}
+                onClick={async () => {
+                  setPaymentState('');
+                  try {
+                    await onAction?.('markOwnerPayment', {
+                      currentYearMonth: d.currentYearMonth,
+                      paidAt: new Date().toISOString().slice(0, 10),
+                      totalAmount: selectedPaymentTotal,
+                      bankSnapshot: {
+                        ownerName: venueOwnerName,
+                        bankName: selectedBank?.shortName || venueBankName,
+                        bankId: qrBankId,
+                        bankAccount: venueBankAccount,
+                      },
+                      items: selectedPaymentItems,
+                      note: paymentNote,
+                    });
+                    setPaymentNote('');
+                    setPaymentQrOpen(false);
+                    setPaymentState('saved');
+                  } catch {
+                    setPaymentState('error');
+                  }
+                }}
+              >
+                Đánh dấu đã chuyển
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card accent="pickleball" style={{ marginTop: 10, padding: '14px 12px', borderColor: 'rgba(251,191,36,0.24)' }}>
@@ -396,8 +449,42 @@ function MiniStat({ label, value, tone }) {
   );
 }
 
+function BankSelect({ value, onChange }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '1.2px',
+        color: colors.textSecondary,
+        margin: '14px 0 6px',
+      }}>Ngân hàng</div>
+      <select value={value} onChange={event => onChange(event.target.value)} style={selectFieldStyle()}>
+        <option value="">Chọn ngân hàng</option>
+        {BANK_LIST.map(bank => (
+          <option key={bank.id} value={bank.id}>{bank.shortName}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function paymentItemKey(item) {
   return `${item?.key || item?.label}:${item?.yearMonth || ''}`;
+}
+
+function resolveBank(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return BANK_LIST.find(bank => (
+    bank.id.toLowerCase() === normalized ||
+    bank.shortName.toLowerCase() === normalized ||
+    bank.name.toLowerCase() === normalized
+  )) || null;
+}
+
+function normalizeBankValue(value) {
+  return resolveBank(value)?.id || value || '';
 }
 
 function defaultPaymentKeys(items) {
@@ -415,6 +502,21 @@ function formatPaymentDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function selectFieldStyle() {
+  return {
+    width: '100%',
+    padding: '15px 16px',
+    borderRadius: 12,
+    border: `1px solid ${colors.borderSubtle}`,
+    background: colors.inputBg,
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: 800,
+    fontFamily: 'inherit',
+    outline: 'none',
+  };
 }
 
 function pillButtonStyle() {

@@ -103,6 +103,11 @@ test('store, app handler, and screen data support ticket price and full bank col
   assert.match(dataSource, /bankAccountName: member\?\.bankAccountName/)
 })
 
+test('VietQR bank list includes PGBank for venue owner payment QR', () => {
+  const vietqrSource = readFileSync(new URL('./lib/vietqr.js', import.meta.url), 'utf8')
+  assert.match(vietqrSource, /\{ id: 'PGB', name: 'Ngân hàng Xăng dầu Petrolimex', shortName: 'PGBank' \}/)
+})
+
 test('pickleball settings can rename the club without losing schedule settings', () => {
   assert.match(settingsSource, /const \[clubName, setClubName\]/)
   assert.match(settingsSource, /<Input label="Tên CLB"/)

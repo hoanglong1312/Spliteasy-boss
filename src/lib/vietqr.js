@@ -4,6 +4,7 @@ export const BANK_LIST = [
   { id: 'TCB', name: 'Ngân hàng Kỹ Thương', shortName: 'Techcombank' },
   { id: 'ACB', name: 'Ngân hàng Á Châu', shortName: 'ACB' },
   { id: 'VPB', name: 'Ngân hàng Việt Nam Thịnh Vượng', shortName: 'VPBank' },
+  { id: 'PGB', name: 'Ngân hàng Xăng dầu Petrolimex', shortName: 'PGBank' },
   { id: 'TPB', name: 'Ngân hàng Tiên Phong', shortName: 'TPBank' },
   { id: 'STB', name: 'Ngân hàng Sài Gòn Thương Tín', shortName: 'Sacombank' },
   { id: 'VIB', name: 'Ngân hàng Quốc Tế', shortName: 'VIB' },
