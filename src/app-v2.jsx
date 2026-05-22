@@ -377,9 +377,38 @@ export default function AppV2() {
       if (!name) return null
       return dispatch({
         type: 'ADD_MEMBER',
-        groupId: activePickleballGroupId(state),
-        member: { name, member_type: payload?.type || payload?.memberType || 'fixed' },
+        groupId: payload?.groupId || activePickleballGroupId(state),
+        member: {
+          name,
+          member_type: payload?.type || payload?.memberType || 'fixed',
+          bank_account: payload?.bankAccount ?? payload?.bank_account,
+          bank_name: payload?.bankName ?? payload?.bank_name,
+          bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
+        },
       })
+    }
+
+    if (type === 'editGroup') {
+      const group = payload?.group || payload
+      if (!group?.id || !String(group?.name || '').trim()) return
+      await dispatch({
+        type: 'EDIT_GROUP',
+        group: {
+          id: group.id,
+          name: String(group.name).trim(),
+          emoji: group.emoji || '👥',
+          color: group.color || '#574EFA',
+        },
+      })
+      return
+    }
+
+    if (type === 'deleteGroup') {
+      const groupId = payload?.groupId || payload?.id || payload
+      if (!groupId) return
+      await dispatch({ type: 'DELETE_GROUP', groupId })
+      setStack((s) => s.slice(0, -1))
+      return
     }
 
     if (type === 'editMember') {
@@ -1232,7 +1261,10 @@ export default function AppV2() {
 
   function renderStackScreen(route) {
     switch (route.screen) {
-      case 'group-detail':        return <GroupDetail data={route.params?.groupId ? getGroupDetailData(route.params.groupId) : groupDetailData} isTreasurer={isTreasurer} onAction={handle} />
+      case 'group-detail': {
+        const detailData = route.params?.groupId ? getGroupDetailData(route.params.groupId) : groupDetailData
+        return <GroupDetail data={detailData} isTreasurer={detailData?.isTreasurer ?? isTreasurer} onAction={handle} />
+      }
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />

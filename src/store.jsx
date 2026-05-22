@@ -491,6 +491,9 @@ function memberInsertRow(groupId, member, role) {
     color: member?.color || '#574EFA',
     role,
     member_type: member?.memberType || member?.member_type || member?.type || 'fixed',
+    bank_name: member?.bankName ?? member?.bank_name ?? null,
+    bank_account: member?.bankAccount ?? member?.bank_account ?? null,
+    bank_account_name: member?.bankAccountName ?? member?.bank_account_name ?? null,
   }
 }
 
@@ -857,10 +860,11 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     disputeCount,
     joinRequests = [],
   } = raw
-  if (groups.length === 0) return null  // signal: data empty but keep session
+  const activeGroups = safeArray(groups).filter(group => !group.deleted_at && !group.deletedAt)
+  if (activeGroups.length === 0) return null  // signal: data empty but keep session
 
   const me = members.find(m => m.id === currentMemberId)
-  const currentGroup = groups.find(g => g.id === preferredGroupId) || groups.find(g => g.id === me?.group_id) || groups[0]
+  const currentGroup = activeGroups.find(g => g.id === preferredGroupId) || activeGroups.find(g => g.id === me?.group_id) || activeGroups[0]
   const normalJoinRequests = safeArray(joinRequests)
     .map(r => ({
       id: r.id,
@@ -1107,11 +1111,13 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     has_pin: memberHasPin(m),
   }))
 
-  const normalGroups = groups.map(group => ({
+  const normalGroups = activeGroups.map(group => ({
     id: group.id,
     name: group.name,
     emoji: group.emoji || '👥',
     color: group.color || '#574EFA',
+    createdBy: group.created_by || null,
+    created_by: group.created_by || null,
     type: group.type || group.kind || group.group_type || null,
     kind: group.kind || group.type || group.group_type || null,
     groupType: group.group_type || group.type || group.kind || null,
@@ -1754,6 +1760,22 @@ export function AppProvider({ children }) {
         break
       }
 
+      case 'DELETE_GROUP': {
+        if (!sb) return
+        const groupId = action.groupId || action.group_id
+        if (!groupId) return
+        const { error } = await sb
+          .from('groups')
+          .update({ deleted_at: new Date().toISOString() })
+          .eq('id', groupId)
+        if (error) {
+          console.error('[store] DELETE_GROUP:', error)
+          throw error
+        }
+        await refresh()
+        break
+      }
+
       case 'SAVE_VENUE_OWNER_BANK': {
         if (!sb) return
         const groupId = action.groupId || state.pickleballGroupId || state.currentGroupId
@@ -1832,6 +1854,13 @@ export function AppProvider({ children }) {
         tokenRef.current = joined.token
 
         const joinedSb = createSupabase(joined.token)
+        const { error: roleError } = await joinedSb
+          .from('members')
+          .update({ role: 'treasurer' })
+          .eq('id', joined.member_id)
+        if (roleError) {
+          console.warn('[store] CREATE_GROUP creator role:', roleError)
+        }
         const { error: creatorError } = await joinedSb
           .from('groups')
           .update({
@@ -2312,7 +2341,6 @@ export function AppProvider({ children }) {
         break
       }
 
-      case 'DELETE_GROUP':
       case 'ADD_EXTERNAL_TICKET':
       case 'TOGGLE_UPCOMING':
       case 'ADD_PICKLE_MEMBER':

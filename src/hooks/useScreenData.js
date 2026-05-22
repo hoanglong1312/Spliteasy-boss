@@ -334,6 +334,9 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName) {
 function buildGroupDetailData(group, currentUserId, members, currentUserName) {
   const g = safeGroup(group)
   const groupMembers = membersForGroup(g, members)
+  const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(g, currentUserId, members, currentUserName)))
+  const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
+  const isGroupTreasurer = currentGroupMember?.role === 'treasurer' || String(g.createdBy || g.created_by || '') === String(currentGroupMember?.id || '') || (Boolean(currentGroupMember) && isSoloExpenseGroup)
   const balanceMap = groupBalanceForMember(g, currentUserId, members, currentUserName)
   const balance = groupNetForMember(g, currentUserId, members, currentUserName)
   const activities = safeArray(g.expenses)
@@ -347,10 +350,14 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
       id: g.id,
       name: g.name || 'Nhóm',
       emoji: g.emoji || '👥',
+      color: g.color || '#574EFA',
     },
     id: g.id,
     name: g.name || 'Nhóm',
     emoji: g.emoji || '👥',
+    color: g.color || '#574EFA',
+    createdBy: g.createdBy || g.created_by || null,
+    isTreasurer: isGroupTreasurer,
     memberCount: groupMembers.length,
     balance,
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
@@ -362,6 +369,9 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
       initials: initials(member),
       color: member.color || '#6366f1',
       role: member.role,
+      bankName: member.bankName || member.bank_name || '',
+      bankAccount: member.bankAccount || member.bank_account || '',
+      bankAccountName: member.bankAccountName || member.bank_account_name || '',
       balance: balanceMap[member.id] || 0,
     })),
     balanceRows: groupMembers

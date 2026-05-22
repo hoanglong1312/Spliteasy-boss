@@ -7,10 +7,42 @@ import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs,
 } from '../primitives';
 
+const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
+
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const [activeTab, setActiveTab] = useState('activity');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState(false);
+  const [groupName, setGroupName] = useState(d.name || '');
+  const [groupEmoji, setGroupEmoji] = useState(d.emoji || '👥');
+  const [addingMember, setAddingMember] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [memberMenu, setMemberMenu] = useState(null);
+
+  function closeMemberSheets() {
+    setAddingMember(false);
+    setEditingMember(null);
+    setMemberMenu(null);
+  }
+
+  async function saveGroup(e) {
+    e.preventDefault();
+    const name = groupName.trim();
+    if (!name) return;
+    await onAction?.('editGroup', {
+      id: d.id,
+      name,
+      emoji: groupEmoji || '👥',
+      color: d.color || '#574EFA',
+    });
+    setEditingGroup(false);
+  }
+
+  async function deleteGroup() {
+    if (!window.confirm(`Xóa nhóm ${d.name}? Dữ liệu sẽ được ẩn khỏi danh sách nhóm.`)) return;
+    await onAction?.('deleteGroup', { groupId: d.id });
+  }
 
   return (
     <PhoneFrame>
@@ -34,9 +66,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 zIndex: 20,
                 boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
               }}>
-                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('addExpense', { groupId: d.id }); }}>+ Thêm chi tiêu</MenuItem>
-                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('settle', { groupId: d.id }); }}>Tất toán nhóm</MenuItem>
-                {isTreasurer && <MenuItem onClick={() => { setMenuOpen(false); onAction?.('closeMonth', { groupId: d.id }); }}>Chốt sổ tháng</MenuItem>}
+                <MenuItem onClick={() => { setMenuOpen(false); setEditingGroup(true); }}>Sửa thông tin nhóm</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('join', { groupId: d.id }); }}>Mã mời thành viên</MenuItem>
+                {isTreasurer && <MenuItem danger onClick={() => { setMenuOpen(false); deleteGroup(); }}>Xóa nhóm</MenuItem>}
               </Card>
             )}
           </div>
@@ -119,8 +151,18 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         {activeTab === 'members' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {isTreasurer && (
+              <Button variant="ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setAddingMember(true)}>
+                + Thêm thành viên
+              </Button>
+            )}
             {(d.members || []).map(member => (
-              <MemberRow key={member.id} member={member} />
+              <MemberRow
+                key={member.id}
+                member={member}
+                isTreasurer={isTreasurer}
+                onMore={setMemberMenu}
+              />
             ))}
             {(d.members || []).length === 0 && (
               <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
@@ -129,12 +171,58 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         )}
       </Screen>
 
+      {editingGroup && (
+        <BottomSheet title="Sửa thông tin nhóm" onClose={() => setEditingGroup(false)}>
+          <form onSubmit={saveGroup}>
+            <Field label="Tên nhóm" value={groupName} onChange={setGroupName} autoFocus />
+            <Field label="Biểu tượng" value={groupEmoji} onChange={setGroupEmoji} maxLength={2} />
+            <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu nhóm</Button>
+          </form>
+        </BottomSheet>
+      )}
+
+      {addingMember && (
+        <MemberEditor
+          title="Thêm thành viên"
+          groupId={d.id}
+          onClose={closeMemberSheets}
+          onAction={onAction}
+        />
+      )}
+
+      {memberMenu && isTreasurer && (
+        <BottomSheet title={memberMenu.name} onClose={() => setMemberMenu(null)}>
+          <ActionButton onClick={() => { setEditingMember(memberMenu); setMemberMenu(null); }}>Sửa thành viên</ActionButton>
+          <ActionButton onClick={async () => {
+            const role = memberMenu.role === 'treasurer' ? 'member' : 'treasurer';
+            if (!window.confirm(role === 'treasurer' ? `Cấp quyền thủ quỹ cho ${memberMenu.name}?` : `Thu quyền thủ quỹ của ${memberMenu.name}?`)) return;
+            await onAction?.('setMemberRole', { memberId: memberMenu.id, role });
+            setMemberMenu(null);
+          }}>{memberMenu.role === 'treasurer' ? 'Thu quyền thủ quỹ' : 'Cấp quyền thủ quỹ'}</ActionButton>
+          <ActionButton danger onClick={async () => {
+            if (!window.confirm(`Xóa ${memberMenu.name} khỏi nhóm?`)) return;
+            await onAction?.('deleteMember', { memberId: memberMenu.id });
+            setMemberMenu(null);
+          }}>Xóa thành viên</ActionButton>
+        </BottomSheet>
+      )}
+
+      {editingMember && (
+        <MemberEditor
+          title="Sửa thành viên"
+          member={editingMember}
+          groupId={d.id}
+          onClose={closeMemberSheets}
+          onAction={onAction}
+        />
+      )}
+
       <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
   );
 }
 
-function MenuItem({ children, onClick }) {
+function MenuItem({ children, danger, onClick }) {
   return (
     <button
       type="button"
@@ -145,7 +233,7 @@ function MenuItem({ children, onClick }) {
         border: 'none',
         borderRadius: 8,
         background: 'transparent',
-        color: colors.textPrimary,
+        color: danger ? colors.danger : colors.textPrimary,
         fontSize: 12,
         fontWeight: 700,
         textAlign: 'left',
@@ -197,7 +285,10 @@ function BalanceRow({ row }) {
   );
 }
 
-function MemberRow({ member }) {
+function MemberRow({ member, isTreasurer, onMore }) {
+  const bankLabel = member.bankName && member.bankAccount
+    ? `${member.bankName} · ${maskAccount(member.bankAccount)}`
+    : 'Chưa có thông tin ngân hàng';
   return (
     <Card>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -213,17 +304,189 @@ function MemberRow({ member }) {
           fontWeight: 900,
         }}>{member.initials}</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 800 }}>{member.name}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 13, fontWeight: 800 }}>{member.name}</div>
+            {member.role === 'treasurer' && <Badge tone="warn">THỦ QUỸ</Badge>}
+          </div>
           <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-            {member.role === 'treasurer' ? 'Thủ quỹ' : 'Thành viên'}
+            {bankLabel}
           </div>
         </div>
         <div style={{ fontSize: 12, fontWeight: 800, color: member.balance < 0 ? colors.danger : member.balance > 0 ? '#6ee7b7' : colors.textSecondary, ...type.mono }}>
           {member.balance === 0 ? '0 đ' : `${member.balance > 0 ? '+' : '-'}${formatVND(Math.abs(member.balance))}`}
         </div>
+        {isTreasurer && (
+          <button type="button" aria-label={`Sửa ${member.name}`} onClick={() => onMore?.(member)} style={{
+            width: 30,
+            height: 30,
+            borderRadius: 10,
+            border: `1px solid ${colors.borderSubtle}`,
+            background: colors.inputBg,
+            color: colors.textSecondary,
+            fontSize: 18,
+            lineHeight: 1,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}>⋯</button>
+        )}
       </div>
     </Card>
   );
+}
+
+function MemberEditor({ title, member, groupId, onClose, onAction }) {
+  const [name, setName] = useState(member?.name || '');
+  const [bankAccountName, setBankAccountName] = useState(member?.bankAccountName || '');
+  const [bankName, setBankName] = useState(member?.bankName || '');
+  const [bankAccount, setBankAccount] = useState(member?.bankAccount || '');
+
+  async function save(e) {
+    e.preventDefault();
+    const cleanName = name.trim();
+    if (!cleanName) return;
+    if (member?.id) {
+      await onAction?.('editMember', {
+        memberId: member.id,
+        name: cleanName,
+        bankAccountName: bankAccountName.trim(),
+        bankName,
+        bankAccount: bankAccount.trim(),
+      });
+    } else {
+      await onAction?.('addMember', { groupId, name: cleanName, type: 'fixed', bankAccountName: bankAccountName.trim(), bankName, bankAccount: bankAccount.trim() });
+    }
+    onClose?.();
+  }
+
+  return (
+    <BottomSheet title={title} onClose={onClose}>
+      <form onSubmit={save}>
+        <Field label="Tên hiển thị" value={name} onChange={setName} autoFocus />
+        <Field label="Tên tài khoản" value={bankAccountName} onChange={setBankAccountName} placeholder="Tên trên tài khoản ngân hàng" />
+        <BankSelect value={bankName} onChange={setBankName} />
+        <Field label="Số tài khoản" value={bankAccount} onChange={setBankAccount} inputMode="numeric" placeholder="Chưa cập nhật" />
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">{member?.id ? 'Lưu thành viên' : 'Thêm thành viên'}</Button>
+      </form>
+    </BottomSheet>
+  );
+}
+
+function Field({ label, value, onChange, autoFocus, maxLength, inputMode, placeholder }) {
+  return (
+    <label style={{ display: 'block', marginTop: 12 }}>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '1.2px',
+        color: colors.textSecondary,
+        marginBottom: 6,
+      }}>{label}</div>
+      <input
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        autoFocus={autoFocus}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        placeholder={placeholder}
+        style={fieldStyle()}
+      />
+    </label>
+  );
+}
+
+function BankSelect({ value, onChange }) {
+  return (
+    <label style={{ display: 'block', marginTop: 12 }}>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '1.2px',
+        color: colors.textSecondary,
+        marginBottom: 6,
+      }}>Ngân hàng</div>
+      <select value={value} onChange={event => onChange(event.target.value)} style={fieldStyle()}>
+        <option value="">Chọn ngân hàng</option>
+        {VN_BANKS.map(bank => <option key={bank} value={bank}>{bank}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function ActionButton({ children, danger, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: '100%',
+      border: `1px solid ${danger ? 'rgba(248,113,113,0.24)' : colors.borderSubtle}`,
+      borderRadius: 12,
+      background: danger ? colors.dangerSoft : colors.inputBg,
+      color: danger ? colors.danger : colors.textPrimary,
+      padding: '12px 14px',
+      marginTop: 8,
+      textAlign: 'left',
+      fontSize: 13,
+      fontWeight: 800,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+    }}>{children}</button>
+  );
+}
+
+function BottomSheet({ title, children, onClose }) {
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 30,
+      background: 'rgba(0,0,0,0.50)',
+      display: 'flex',
+      alignItems: 'flex-end',
+      padding: 12,
+    }}>
+      <div style={{
+        width: '100%',
+        background: colors.shellBg,
+        border: `1px solid ${colors.borderNormal}`,
+        borderRadius: 20,
+        padding: 16,
+        boxShadow: '0 -20px 50px rgba(0,0,0,0.45)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{ fontSize: 15, fontWeight: 900 }}>{title}</div>
+          <button type="button" onClick={onClose} style={{
+            border: 'none',
+            background: 'transparent',
+            color: colors.textSecondary,
+            fontSize: 20,
+            cursor: 'pointer',
+          }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function fieldStyle() {
+  return {
+    width: '100%',
+    padding: '13px 14px',
+    background: colors.inputBg,
+    border: `1px solid ${colors.borderSubtle}`,
+    borderRadius: 12,
+    color: colors.textPrimary,
+    fontSize: 14,
+    fontWeight: 600,
+    fontFamily: 'inherit',
+    outline: 'none',
+  };
+}
+
+function maskAccount(value) {
+  const text = String(value || '').replace(/\s+/g, '');
+  if (text.length <= 4) return text;
+  return `${text.slice(0, 4)} •••• ${text.slice(-3)}`;
 }
 
 function ActivityCard({ item }) {

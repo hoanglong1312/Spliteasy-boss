@@ -9,6 +9,7 @@ const expenseDetailSource = readFileSync(new URL('./ExpenseDetail.jsx', import.m
 const screenDataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 const primitivesSource = readFileSync(new URL('../primitives.jsx', import.meta.url), 'utf8');
+const storeSource = readFileSync(new URL('../store.jsx', import.meta.url), 'utf8');
 
 test('AddExpense defaults to the logged-in member and submits edit expense ids', () => {
   assert.match(addExpenseSource, /const editExpense = d\.editExpense/);
@@ -23,11 +24,51 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /const \[menuOpen, setMenuOpen\] = useState\(false\)/);
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /onAction\?\.\('settle', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /Sửa thông tin nhóm/);
+  assert.match(groupDetailSource, /Mã mời thành viên/);
+  assert.match(groupDetailSource, /Xóa nhóm/);
+  assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
+  assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /activeTab === 'balances'/);
   assert.match(groupDetailSource, /<BalanceRow key=\{row\.id\} row=\{row\} \/>/);
   assert.match(groupDetailSource, /activeTab === 'members'/);
-  assert.match(groupDetailSource, /<MemberRow key=\{member\.id\} member=\{member\} \/>/);
+  assert.match(groupDetailSource, /\+ Thêm thành viên/);
+  assert.match(groupDetailSource, /<MemberRow[\s\S]*key=\{member\.id\}[\s\S]*member=\{member\}[\s\S]*onMore=\{setMemberMenu\}/);
+  assert.match(groupDetailSource, /Sửa thành viên/);
+  assert.match(groupDetailSource, /Cấp quyền thủ quỹ/);
+  assert.match(groupDetailSource, /Xóa thành viên/);
+  assert.match(groupDetailSource, /Tên tài khoản/);
+  assert.match(groupDetailSource, /Số tài khoản/);
   assert.match(screenDataSource, /balanceRows: groupMembers/);
+});
+
+test('GroupDetail member management writes normal group and bank fields', () => {
+  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{ groupId, name: cleanName, type: 'fixed', bankAccountName: bankAccountName\.trim\(\), bankName, bankAccount: bankAccount\.trim\(\) \}\)/);
+  assert.match(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/);
+  assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
+  assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
+  assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
+  assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
+  assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);
+  assert.match(screenDataSource, /bankAccountName: member\.bankAccountName \|\| member\.bank_account_name \|\| ''/);
+});
+
+test('GroupDetail uses group-specific treasurer role for normal expense groups', () => {
+  assert.match(screenDataSource, /const currentGroupMember = groupMembers\.find\(member => String\(member\.id\) === String\(memberIdForGroup\(g, currentUserId, members, currentUserName\)\)\)/);
+  assert.match(screenDataSource, /const isSoloExpenseGroup = groupMembers\.length === 1 && groupKind\(g\) !== 'pickleball'/);
+  assert.match(screenDataSource, /const isGroupTreasurer = currentGroupMember\?\.role === 'treasurer' \|\| String\(g\.createdBy \|\| g\.created_by \|\| ''\) === String\(currentGroupMember\?\.id \|\| ''\) \|\| \(Boolean\(currentGroupMember\) && isSoloExpenseGroup\)/);
+  assert.match(screenDataSource, /isTreasurer: isGroupTreasurer/);
+  assert.match(appSource, /const detailData = route\.params\?\.groupId \? getGroupDetailData\(route\.params\.groupId\) : groupDetailData/);
+  assert.match(appSource, /<GroupDetail data=\{detailData\} isTreasurer=\{detailData\?\.isTreasurer \?\? isTreasurer\} onAction=\{handle\} \/>/);
+});
+
+test('Store preserves expense group creator for group-level management', () => {
+  assert.match(screenDataSource, /createdBy: g\.createdBy \|\| g\.created_by \|\| null/);
+  assert.match(storeSource, /createdBy: group\.created_by \|\| null/);
+  assert.match(storeSource, /created_by: group\.created_by \|\| null/);
+  assert.match(storeSource, /\.from\('members'\)[\s\S]*\.update\(\{ role: 'treasurer' \}\)[\s\S]*\.eq\('id', joined\.member_id\)/);
+  assert.match(appSource, /const detailData = route\.params\?\.groupId \? getGroupDetailData\(route\.params\.groupId\) : groupDetailData/);
+  assert.match(appSource, /<GroupDetail data=\{detailData\} isTreasurer=\{detailData\?\.isTreasurer \?\? isTreasurer\} onAction=\{handle\} \/>/);
 });
 
 test('Home activity list filters by title, status, and category', () => {
