@@ -254,6 +254,18 @@ function activePickleSessionOnDate(state, date, groupId, ignoredIds = []) {
   }) || null
 }
 
+function reusableReplacementSessionOnDate(state, date, groupId, ignoredIds = []) {
+  const ignored = new Set(safeArray(ignoredIds).map(String))
+  return allPickleSessionsForState(state).find(session => {
+    const sessionGroupId = session?.groupId || session?.group_id
+    return String(sessionDateValue(session) || '').slice(0, 10) === String(date || '').slice(0, 10) &&
+      (!groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)) &&
+      !ignored.has(String(session?.id || '')) &&
+      (session?.sourceTable || session?.source_table) === 'pickle_sessions' &&
+      (isMovedStatus(session?.status) || isHiddenReplacementSession(session) || isOffScheduleConflictSession(state, session))
+  }) || null
+}
+
 function scheduleWeekdaysForSession(state, session) {
   const groupId = session?.groupId || session?.group_id || state?.currentGroupId || state?.currentGroup?.id
   const yearMonth = String(sessionDateValue(session) || '').slice(0, 7)
@@ -1981,27 +1993,37 @@ export function AppProvider({ children }) {
         const conflictingSession = activePickleSessionOnDate(stateRef.current, newDate, groupId, [sessionId])
         if (conflictingSession) throw new Error('reschedule_date_conflict')
         const originDate = rescheduleOriginDate(session) || oldDate
+        const replacementPayload = {
+          group_id: groupId,
+          session_date: newDate,
+          start_time: session?.startTime || session?.start_time || null,
+          court: session?.court || null,
+          status: 'scheduled',
+          notes: replacementNote(originDate, oldDate, newDate, movedNote),
+          created_by_member_id: state.currentUserId || null,
+        }
+        const reusableReplacement = reusableReplacementSessionOnDate(stateRef.current, newDate, groupId, [sessionId])
+        if (reusableReplacement) {
+          const { error: updateReplacementError } = await sb
+            .from('pickle_sessions')
+            .update(replacementPayload)
+            .eq('id', reusableReplacement.id)
+          if (updateReplacementError) throw updateReplacementError
+        } else {
+          const { error: insertError } = await sb
+            .from('pickle_sessions')
+            .insert(replacementPayload)
+          if (insertError) throw insertError
+        }
+
         const { error: cancelError } = await sb
           .from(table)
           .update({
             status: 'cancelled',
-            notes: replacementNote(originDate, oldDate, newDate, movedNote),
+            notes: replacementPayload.notes,
           })
           .eq('id', sessionId)
         if (cancelError) throw cancelError
-
-        const { error: insertError } = await sb
-          .from('pickle_sessions')
-          .insert({
-            group_id: groupId,
-            session_date: newDate,
-            start_time: session?.startTime || session?.start_time || null,
-            court: session?.court || null,
-            status: 'scheduled',
-            notes: replacementNote(originDate, oldDate, newDate, movedNote),
-            created_by_member_id: state.currentUserId || null,
-          })
-        if (insertError) throw insertError
         await refresh()
         break
       }
