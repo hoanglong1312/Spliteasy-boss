@@ -373,6 +373,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
       bankName: member.bankName || member.bank_name || '',
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
+      joinDate: fullExpenseDate(member.createdAt || member.created_at),
       balance: balanceMap[member.id] || 0,
     })),
     balanceRows: groupMembers

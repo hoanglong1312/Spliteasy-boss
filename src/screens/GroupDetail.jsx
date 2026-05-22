@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs,
+  PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -19,6 +19,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [addingMember, setAddingMember] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null);
 
   function closeMemberSheets() {
     setAddingMember(false);
@@ -46,6 +47,20 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
   return (
     <PhoneFrame>
+      {selectedMember ? (
+        <MemberDetailPanel
+          groupName={d.name}
+          member={selectedMember}
+          isTreasurer={isTreasurer}
+          onBack={() => setSelectedMember(null)}
+          onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
+          onDelete={async () => {
+            if (!window.confirm(`Xóa ${selectedMember.name} khỏi nhóm?`)) return;
+            await onAction?.('deleteMember', { memberId: selectedMember.id });
+            setSelectedMember(null);
+          }}
+        />
+      ) : (
       <Screen>
         {/* Nav header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
@@ -161,6 +176,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 key={member.id}
                 member={member}
                 isTreasurer={isTreasurer}
+                onOpen={setSelectedMember}
                 onMore={setMemberMenu}
               />
             ))}
@@ -170,6 +186,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
       </Screen>
+      )}
 
       {editingGroup && (
         <BottomSheet title="Sửa thông tin nhóm" onClose={() => setEditingGroup(false)}>
@@ -217,7 +234,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
       )}
 
-      <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
+      {!selectedMember && <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />}
     </PhoneFrame>
   );
 }
@@ -285,24 +302,27 @@ function BalanceRow({ row }) {
   );
 }
 
-function MemberRow({ member, isTreasurer, onMore }) {
+function MemberRow({ member, isTreasurer, onOpen, onMore }) {
   const bankLabel = member.bankName && member.bankAccount
     ? `${member.bankName} · ${maskAccount(member.bankAccount)}`
     : 'Chưa có thông tin ngân hàng';
   return (
-    <Card>
+    <Card
+      onClick={() => onOpen?.(member)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') onOpen?.(member);
+      }}
+      style={{
+        cursor: 'pointer',
+        background: 'linear-gradient(135deg, rgba(37,99,235,0.28), rgba(20,184,166,0.14))',
+        border: '1px solid rgba(96,165,250,0.35)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{
-          width: 38,
-          height: 38,
-          borderRadius: 12,
-          background: member.color || 'rgba(255,255,255,0.08)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 13,
-          fontWeight: 900,
-        }}>{member.initials}</div>
+        <Avatar initial={member.initials} size={42} color={member.color} ring={false} style={{ borderRadius: 14 }} />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <div style={{ fontSize: 13, fontWeight: 800 }}>{member.name}</div>
@@ -316,7 +336,7 @@ function MemberRow({ member, isTreasurer, onMore }) {
           {member.balance === 0 ? '0 đ' : `${member.balance > 0 ? '+' : '-'}${formatVND(Math.abs(member.balance))}`}
         </div>
         {isTreasurer && (
-          <button type="button" aria-label={`Sửa ${member.name}`} onClick={() => onMore?.(member)} style={{
+          <button type="button" aria-label={`Sửa ${member.name}`} onClick={(event) => { event.stopPropagation(); onMore?.(member); }} style={{
             width: 30,
             height: 30,
             borderRadius: 10,
@@ -331,6 +351,94 @@ function MemberRow({ member, isTreasurer, onMore }) {
         )}
       </div>
     </Card>
+  );
+}
+
+function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onDelete }) {
+  const balance = Number(member.balance || 0);
+  const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
+  const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : 'Đang cân bằng';
+  const bankLabel = member.bankName || 'Chưa cập nhật';
+  const accountName = member.bankAccountName || 'Chưa cập nhật';
+  const accountNumber = member.bankAccount || 'Chưa cập nhật';
+
+  return (
+    <Screen style={{ paddingBottom: '28px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0 18px' }}>
+        <IconButton onClick={onBack}>‹</IconButton>
+        <div style={{ flex: 1, textAlign: 'center', paddingRight: 56 }}>
+          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '2px', color: '#34d399', textTransform: 'uppercase' }}>{groupName}</div>
+          <div style={{ fontSize: 17, fontWeight: 900, marginTop: 3 }}>Chi tiết thành viên</div>
+        </div>
+      </div>
+
+      <Hero variant="emerald" glow={false} style={{ padding: 22, borderRadius: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <Avatar initial={member.initials} size={74} color={member.color} ring style={{ border: '4px solid rgba(7,8,15,0.85)' }} />
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900 }}>{member.name}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              {member.role === 'treasurer' && <Badge tone="warn">Thủ quỹ</Badge>}
+              <Badge tone="success">Thành viên</Badge>
+            </div>
+          </div>
+        </div>
+      </Hero>
+
+      <Card style={{ marginTop: 14 }}>
+        <SectionTitle>SỐ DƯ TRONG NHÓM</SectionTitle>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 14 }}>
+          <div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 700 }}>{balanceLabel}</div>
+            <div style={{ fontSize: 32, fontWeight: 900, color: balanceTone, marginTop: 4, ...type.mono }}>
+              {balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`}
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card style={{ marginTop: 14 }}>
+        <SectionTitle>THÔNG TIN THANH TOÁN</SectionTitle>
+        <InfoLine label="Ngân hàng" value={bankLabel} />
+        <InfoLine label="Chủ tài khoản" value={accountName} />
+        <InfoLine label="STK ngân hàng" value={accountNumber} />
+        {member.joinDate && <InfoLine label="Ngày tham gia" value={member.joinDate} />}
+      </Card>
+
+      {isTreasurer && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+          <Button variant="brand" style={{ fontSize: 13 }} onClick={onEdit}>Sửa thành viên</Button>
+          <Button variant="danger" style={{ fontSize: 13 }} onClick={onDelete}>Xóa thành viên</Button>
+        </div>
+      )}
+    </Screen>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <div style={{
+      fontSize: 10,
+      fontWeight: 900,
+      letterSpacing: '2px',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+    }}>{children}</div>
+  );
+}
+
+function InfoLine({ label, value }) {
+  return (
+    <div style={{
+      display: 'flex',
+      justifyContent: 'space-between',
+      gap: 12,
+      padding: '13px 0',
+      borderBottom: `1px solid ${colors.borderSubtle}`,
+    }}>
+      <div style={{ color: colors.textSecondary, fontSize: 13, fontWeight: 800 }}>{label}</div>
+      <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 900 }}>{value}</div>
+    </div>
   );
 }
 

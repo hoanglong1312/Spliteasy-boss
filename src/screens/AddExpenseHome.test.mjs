@@ -72,6 +72,19 @@ test('GroupDetail keeps bank fields only in edit member sheet', () => {
   assert.match(groupDetailSource, /<Field label="Số tài khoản" value=\{bankAccount\}/);
 });
 
+test('GroupDetail member cards open a detail view with edit and delete actions', () => {
+  assert.match(groupDetailSource, /const \[selectedMember, setSelectedMember\] = useState\(null\)/);
+  assert.match(groupDetailSource, /onOpen=\{setSelectedMember\}/);
+  assert.match(groupDetailSource, /function MemberDetailPanel\(\{ groupName, member, isTreasurer, onBack, onEdit, onDelete \}\)/);
+  assert.match(groupDetailSource, /Chi tiết thành viên/);
+  assert.match(groupDetailSource, /SỐ DƯ TRONG NHÓM/);
+  assert.match(groupDetailSource, /THÔNG TIN THANH TOÁN/);
+  assert.match(groupDetailSource, /onClick=\{\(\) => onOpen\?\.\(member\)\}/);
+  assert.match(groupDetailSource, /event\.stopPropagation\(\)/);
+  assert.match(groupDetailSource, /onEdit=\{\(\) => \{ setEditingMember\(selectedMember\); setSelectedMember\(null\); \}\}/);
+  assert.match(groupDetailSource, /onDelete=\{async \(\) => \{[\s\S]*deleteMember', \{ memberId: selectedMember\.id \}/);
+});
+
 test('GroupDetail uses group-specific treasurer role for normal expense groups', () => {
   assert.match(screenDataSource, /const currentGroupMember = groupMembers\.find\(member => String\(member\.id\) === String\(memberIdForGroup\(g, currentUserId, members, currentUserName\)\)\)/);
   assert.match(screenDataSource, /const isSoloExpenseGroup = groupMembers\.length === 1 && groupKind\(g\) !== 'pickleball'/);
