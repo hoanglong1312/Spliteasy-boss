@@ -236,6 +236,38 @@ function replacementSessionsForOrigin(state, originalSession) {
   })
 }
 
+function allPickleSessionsForState(state) {
+  return [
+    ...safeArray(state?._allPickle?.sessions),
+    ...safeArray(state?.pickle?.sessions),
+    ...safeArray(state?.pickle?.upcoming),
+  ]
+}
+
+function isStaleReplacementSession(session, sessions) {
+  const originDate = rescheduleOriginDate(session)
+  const selfDate = sessionDateValue(session)
+  if (!originDate || originDate === selfDate || isHiddenReplacementSession(session)) return false
+  if (isMovedStatus(session?.status)) return true
+  const groupId = session?.groupId || session?.group_id
+  const originSession = safeArray(sessions).find(item => {
+    const itemGroupId = item?.groupId || item?.group_id
+    return sessionDateValue(item) === originDate &&
+      (!groupId || !itemGroupId || String(itemGroupId) === String(groupId)) &&
+      !isHiddenReplacementSession(item)
+  })
+  return Boolean(originSession && !isMovedStatus(originSession?.status))
+}
+
+function staleReplacementSessions(state, ids = []) {
+  const wantedIds = new Set(safeArray(ids).map(String))
+  const sessions = allPickleSessionsForState(state)
+  return sessions.filter(session => (
+    (wantedIds.size === 0 || wantedIds.has(String(session?.id || ''))) &&
+    isStaleReplacementSession(session, sessions)
+  ))
+}
+
 async function hideReplacementSession(sb, replacement) {
   const table = (replacement?.sourceTable || replacement?.source_table) === 'pickleball_sessions'
     ? 'pickleball_sessions'
@@ -1865,6 +1897,18 @@ export function AppProvider({ children }) {
           .update({ status: 'scheduled' })
           .eq('id', sessionId)
         if (error) throw error
+        await refresh()
+        break
+      }
+
+      case 'CLEANUP_STALE_REPLACEMENT_SESSIONS': {
+        if (!sb) return
+        const sessions = staleReplacementSessions(stateRef.current, action.ids)
+        if (sessions.length === 0) return
+        await Promise.all(sessions.map(async session => {
+          const { error } = await hideReplacementSession(sb, session)
+          if (error) throw error
+        }))
         await refresh()
         break
       }

@@ -483,6 +483,15 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'cleanupStaleReplacementSessions') {
+      if (!isTreasurer) return
+      await dispatch({
+        type: 'CLEANUP_STALE_REPLACEMENT_SESSIONS',
+        ids: payload?.ids || payload,
+      })
+      return
+    }
+
     if (type === 'markTicketPaid') {
       if (!isTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id ?? payload

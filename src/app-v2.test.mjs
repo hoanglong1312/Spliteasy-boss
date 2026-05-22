@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
+const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const mainSource = readFileSync(new URL('./main.jsx', import.meta.url), 'utf8')
 
 test('PinEntryScreen uses a controlled numeric password input instead of a numpad', () => {
@@ -78,6 +79,16 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
 
   assert.match(appSource, /if \(type === 'deleteTicket'\)/)
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
+})
+
+test('AppV2 and store clean stale moved replacement sessions without touching tickets', () => {
+  assert.match(appSource, /type === 'cleanupStaleReplacementSessions'/)
+  assert.match(appSource, /type: 'CLEANUP_STALE_REPLACEMENT_SESSIONS'/)
+  assert.match(storeSource, /case 'CLEANUP_STALE_REPLACEMENT_SESSIONS':\s*\{/)
+  const block = storeSource.match(/case 'CLEANUP_STALE_REPLACEMENT_SESSIONS':\s*\{[\s\S]*?break\s*\n\s*\}/)?.[0] || ''
+  assert.match(block, /staleReplacementSessions\(stateRef\.current/)
+  assert.match(block, /hideReplacementSession\(sb, session\)/)
+  assert.doesNotMatch(block, /pickleball_tickets/)
 })
 
 test('AppV2 passes pickleball settings time and home treasurer role through props', () => {

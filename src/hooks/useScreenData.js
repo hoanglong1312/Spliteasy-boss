@@ -23,6 +23,7 @@ function loadStoredProfilePhoto(memberId) {
 export function useScreenData() {
   const { state, dispatch } = useApp()
   const autoGenerateRef = useRef('')
+  const staleCleanupRef = useRef('')
   const {
     currentUserId,
     currentUserName,
@@ -106,6 +107,26 @@ export function useScreenData() {
     screenData.pickleballOverviewData?.autoGenerateRequest,
     state.currentGroupId,
     state.currentGroup?.id,
+  ])
+
+  useEffect(() => {
+    const request = screenData.pickleballCalendarData?.staleReplacementCleanup
+    if (!request?.ids?.length) {
+      staleCleanupRef.current = ''
+      return
+    }
+    const key = request.ids.join(',')
+    if (staleCleanupRef.current === key) return
+    staleCleanupRef.current = key
+    dispatch({
+      type: 'CLEANUP_STALE_REPLACEMENT_SESSIONS',
+      ids: request.ids,
+    }).catch(err => {
+      console.error('[useScreenData] CLEANUP_STALE_REPLACEMENT_SESSIONS:', err)
+    })
+  }, [
+    dispatch,
+    screenData.pickleballCalendarData?.staleReplacementCleanup,
   ])
 
   return screenData
@@ -348,6 +369,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const p2pTicketBalance = memberTicketBalance(state, currentUserId)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentUserId)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
+  const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
   const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
@@ -369,11 +391,14 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       waterSub: `${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi đã ghi`,
       ticketFund: ticketFund.teamFundTotal,
       ticketFundSub: `${ticketFund.teamFundCount} lượt quỹ trả hộ`,
+      ticketSessions: ticketStats.sessionCount,
+      ticketTotal: ticketStats.totalAmount,
     },
     yourBalance: {
       total: memberBalance.netBalance,
       breakdown,
     },
+    ticketStats,
     ticketFund,
     shouldAutoGenerate,
     autoGenerateRequest: shouldAutoGenerate ? {
@@ -494,6 +519,8 @@ function buildPickleballCalendarData(state, params = {}) {
   const currentYearMonth = monthKey(monthDate)
   const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
   const sessions = getStateMonthSessions(state, monthDate)
+  const allSessions = getAllSessions(state)
+  const staleReplacements = staleReplacementSessionsForMonth(state, monthDate, allSessions)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
   const shouldAutoGenerate = !state?._pickleRegenInProgress && hasMissingGeneratedSessions(state, currentYearMonth, sessions, autoGenerateConfig)
   const sessionsByDay = new Map()
@@ -503,11 +530,25 @@ function buildPickleballCalendarData(state, params = {}) {
     const day = date.getDate()
     sessionsByDay.set(day, preferredCalendarDaySession(sessionsByDay.get(day), session))
   })
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
+  const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
+  const ticketRows = monthTicketsForState(state, monthDate)
+    .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))
+    .map((ticket, index) => toTicketRow(ticket, index, state))
+  const ticketsByDate = new Map()
+  ticketRows.forEach(ticket => {
+    if (!ticket.date) return
+    ticketsByDate.set(ticket.date, [...(ticketsByDate.get(ticket.date) || []), ticket])
+  })
   const calendarSessions = sessions.map(session => toCalendarSessionDetail(state, session, sessions, today))
   const isCurrentMonth = currentYearMonth === monthKey(today)
-  const selectedSession = isCurrentMonth
+  const requestedSelectedDate = params?.selectedDate || params?.selected_date || ''
+  const selectedSession = requestedSelectedDate
+    ? calendarSessions.find(session => session.date === requestedSelectedDate) || null
+    : isCurrentMonth
     ? calendarSessions.find(session => session.date === dateKey(today)) || calendarSessions[0] || null
     : calendarSessions[0] || null
+  const selectedDate = requestedSelectedDate || selectedSession?.date || dateKey(today)
   const casualMembers = safeArray(state?.members)
     .filter(member => String(member?.groupId || member?.group_id || '') === String(currentGroupId || ''))
     .filter(isActiveMember)
@@ -521,11 +562,27 @@ function buildPickleballCalendarData(state, params = {}) {
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(monthDate),
-    selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : (isCurrentMonth ? today.getDate() : 1),
-    selectedSessionDate: selectedSession?.date || dateKey(today),
-    days: buildCalendarDays(monthDate, sessionsByDay, state),
+    selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : Number(String(selectedDate).slice(-2)) || (isCurrentMonth ? today.getDate() : 1),
+    selectedSessionDate: selectedDate,
+    days: buildCalendarDays(monthDate, sessionsByDay, state, ticketsByDate),
     sessions: calendarSessions,
     selectedSession,
+    tickets: ticketRows,
+    selectedTickets: ticketsByDate.get(selectedDate) || [],
+    ticketMembers: currentGroupMembers(state)
+      .filter(isActiveMember)
+      .map(member => ({
+        id: member.id,
+        name: member.displayName || member.name || 'Thành viên',
+        initial: initials(member),
+        color: member.color,
+      })),
+    ticketPrice,
+    ticketPricePerPerson: ticketPrice,
+    staleReplacementCleanup: staleReplacements.length > 0 ? {
+      action: 'cleanupStaleReplacementSessions',
+      ids: staleReplacements.map(session => session.id).filter(Boolean),
+    } : null,
     shouldAutoGenerate,
     autoGenerateRequest: shouldAutoGenerate ? {
       yearMonth: currentYearMonth,
@@ -638,19 +695,7 @@ function buildPickleballTicketsData(state) {
   const currentMonth = monthKey(today)
   const monthlyConfig = currentMonthlyPickleConfig(state, currentMonth)
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
-  const rawTickets = uniqueTickets([
-    ...safeArray(state?.pickle?.externalTickets),
-    ...safeArray(state?._allPickle?.externalTickets),
-    ...safeArray(state?.tickets),
-  ])
-  const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
-  const monthTickets = rawTickets
-    .filter(ticket => {
-      const groupId = ticket?.groupId || ticket?.group_id
-      const yearMonth = ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket))
-      return (!groupId || !currentGroupId || String(groupId) === String(currentGroupId)) &&
-        (!yearMonth || yearMonth === currentMonth)
-    })
+  const monthTickets = monthTicketsForState(state, today)
     .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))
   const tickets = monthTickets.map((ticket, index) => toTicketRow(ticket, index, state)).reverse()
   const paid = tickets.filter(ticket => ticket.status === 'paid')
@@ -1371,7 +1416,7 @@ function getStateMonthSessions(state, date) {
     .sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
 }
 
-function buildCalendarDays(monthDate, sessionsByDay, state) {
+function buildCalendarDays(monthDate, sessionsByDay, state, ticketsByDate = new Map()) {
   const year = monthDate.getFullYear()
   const month = monthDate.getMonth()
   const first = new Date(year, month, 1)
@@ -1383,11 +1428,14 @@ function buildCalendarDays(monthDate, sessionsByDay, state) {
     const date = new Date(year, month, 1 - offset + index)
     const inMonth = date.getMonth() === month
     const session = inMonth ? sessionsByDay.get(date.getDate()) : null
+    const tickets = inMonth ? ticketsByDate.get(dateKey(date)) || [] : []
     return {
       n: date.getDate(),
       date: dateKey(date),
       sessionId: session?.id,
-      state: inMonth ? calendarCellState(date, session, state) : 'faded',
+      hasTicket: tickets.length > 0,
+      ticketIds: tickets.map(ticket => ticket.id),
+      state: inMonth ? calendarCellState(date, session, state, tickets) : 'faded',
     }
   })
 }
@@ -1421,7 +1469,21 @@ function isStaleReplacementSession(session, sessions) {
   return Boolean(originSession && !isMovedSession(originSession))
 }
 
-function calendarCellState(date, session, state) {
+function staleReplacementSessionsForMonth(state, date, sessions = getAllSessions(state)) {
+  const month = monthKey(date)
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  return safeArray(sessions)
+    .filter(session => !isHiddenReplacementSession(session))
+    .filter(session => isStaleReplacementSession(session, sessions))
+    .filter(session => monthKey(sessionDate(session)) === month)
+    .filter(session => {
+      const sessionGroupId = session?.groupId || session?.group_id
+      return !groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)
+    })
+}
+
+function calendarCellState(date, session, state, tickets = []) {
+  if (!session && tickets.length > 0) return 'ticket'
   if (!session) return isToday(date) ? 'today' : 'normal'
   const normalizedStatus = String(session?.status || '').toLowerCase()
   if (['moved', 'cancelled', 'canceled'].includes(normalizedStatus)) return 'moved'
@@ -1671,6 +1733,7 @@ function toTicketRow(ticket, index, state) {
 
   return {
     id: ticket?.id || `ticket-${index}`,
+    date,
     number: ticket?.number || ticket?.sessionNumber || ticket?.session_number || index + 1,
     sessionNumber: ticket?.sessionNumber || ticket?.session_number || ticket?.number || index + 1,
     dateLabel: formatSessionDetailDate(date),
@@ -2551,7 +2614,11 @@ function memberTeamFundTicketShare(state, memberId) {
 }
 
 function currentMonthTicketsForState(state) {
-  const currentMonth = monthKey(new Date())
+  return monthTicketsForState(state, new Date())
+}
+
+function monthTicketsForState(state, date) {
+  const currentMonth = monthKey(date)
   const currentGroupId = state?.currentGroupId || state?.currentGroup?.id
   return uniqueTickets([
     ...safeArray(state?.pickle?.externalTickets),
@@ -2563,6 +2630,21 @@ function currentMonthTicketsForState(state) {
     return (!groupId || !currentGroupId || String(groupId) === String(currentGroupId)) &&
       (!yearMonth || yearMonth === currentMonth)
   })
+}
+
+function buildTicketMonthStats(state) {
+  const rows = currentMonthTicketsForState(state).map((ticket, index) => toTicketRow(ticket, index, state))
+  const paid = rows.filter(ticket => ticket.status === 'paid')
+  const unpaid = rows.filter(ticket => ticket.status === 'unpaid')
+  const teamFund = rows.filter(ticket => ticket.status === 'team_fund')
+  return {
+    sessionCount: rows.length,
+    totalAttendances: rows.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
+    totalAmount: rows.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0),
+    paidCount: paid.length,
+    unpaidCount: unpaid.length,
+    teamFundCount: teamFund.length,
+  }
 }
 
 function ticketBalanceForMember(tickets, currentUserId) {

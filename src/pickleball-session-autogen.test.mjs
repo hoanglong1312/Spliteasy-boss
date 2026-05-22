@@ -408,7 +408,7 @@ test('calendar hides moved replacement dates and keeps only the original moved m
   assert.equal(data.sessions.some(session => session.id === 'replacement-31'), false)
 })
 
-test('calendar hides replacement dates after the original session is restored', () => {
+test('calendar hides and schedules cleanup for replacement dates after the original session is restored', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const data = buildPickleballCalendarData({
     currentUserId: 'u1',
@@ -432,6 +432,44 @@ test('calendar hides replacement dates after the original session is restored', 
   assert.equal(byDate.get('2026-05-24').state, 'normal')
   assert.equal(data.sessions.some(session => session.id === 'replacement-23'), false)
   assert.equal(data.sessions.some(session => session.id === 'replacement-24'), false)
+  assert.deepEqual(JSON.parse(JSON.stringify(data.staleReplacementCleanup.ids)), ['replacement-23', 'replacement-24'])
+  assert.equal(data.staleReplacementCleanup.action, 'cleanupStaleReplacementSessions')
+})
+
+test('calendar exposes individual-ticket markers and a ticket-only selected day', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'u1', groupId: 'g1', name: 'Long', isActive: true },
+      { id: 'u2', groupId: 'g1', name: 'Việt', isActive: true },
+    ],
+    pickle: {
+      sessions: [{ id: 'fixed-22', groupId: 'g1', date: '2026-05-22', status: 'scheduled', attendees: [] }],
+      externalTickets: [
+        { id: 'ticket-23', groupId: 'g1', sessionDate: '2026-05-23', sessionTime: '19:30', totalAmount: 100000, memberIds: ['u1', 'u2'], status: 'team_fund', yearMonth: '2026-05' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', ticketPrice: 50000 }],
+    },
+    _allPickle: { sessions: [], externalTickets: [], monthlyConfigs: [] },
+  }, { yearMonth: '2026-05', selectedDate: '2026-05-23' })
+
+  const ticketDay = data.days.find(day => day.date === '2026-05-23')
+  assert.equal(ticketDay.hasTicket, true)
+  assert.equal(ticketDay.ticketIds[0], 'ticket-23')
+  assert.equal(ticketDay.state, 'ticket')
+  assert.equal(data.selectedTickets.length, 1)
+  assert.equal(data.selectedTickets[0].id, 'ticket-23')
+  assert.equal(data.selectedSession, null)
+})
+
+test('calendar screen moves individual tickets into the calendar flow', () => {
+  assert.doesNotMatch(calendarSource, /key: 'tickets'[\s\S]*label: 'Vé lẻ'/)
+  assert.match(calendarSource, /TicketDayPanel/)
+  assert.match(calendarSource, /onAction\?\.\('addTicket'/)
+  assert.match(calendarSource, /hasTicket/)
 })
 
 test('reschedule handler cancels old session and creates a new scheduled session', () => {

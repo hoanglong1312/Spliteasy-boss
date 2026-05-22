@@ -33,14 +33,12 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             { key: 'overview',  label: 'Tổng quan' },
             { key: 'calendar',  label: 'Buổi đánh' },
             { key: 'members',   label: 'Thành viên' },
-            { key: 'tickets',   label: 'Vé lẻ' },
           ]}
           active={tab}
           onChange={(k) => {
             setTab(k);
             if (k === 'calendar') onAction?.('push', 'pickleball-calendar');
             if (k === 'members') onAction?.('push', 'pickleball-members');
-            if (k === 'tickets') onAction?.('push', 'pickleball-tickets');
           }}
         />
 
@@ -94,6 +92,37 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             <CompactCostCard icon="🎟️" label="Vé lẻ quỹ" value={d.monthCosts.ticketFund || 0} sub={d.monthCosts.ticketFundSub || '0 lượt quỹ trả hộ'} />
           </div>
         </div>
+
+        <Card accent="pickleball" style={{ marginTop: 10, padding: '13px 12px', borderColor: 'rgba(251,191,36,0.20)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#fbbf24', textTransform: 'uppercase' }}>
+                Vé lẻ trong tháng
+              </div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                Thêm và xem chi tiết trực tiếp trên lịch
+              </div>
+            </div>
+            <button type="button" onClick={() => onAction?.('push', 'pickleball-calendar')} style={{
+              border: 'none',
+              background: 'rgba(251,191,36,0.12)',
+              color: '#fde68a',
+              borderRadius: 999,
+              padding: '8px 10px',
+              fontSize: 11,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}>
+              Mở lịch
+            </button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
+            <TicketFundStat label="Buổi vé" value={d.ticketStats?.sessionCount || 0} tone="warn" raw />
+            <TicketFundStat label="Tổng lượt" value={d.ticketStats?.totalAttendances || 0} tone="warn" raw />
+            <TicketFundStat label="Tổng tiền" value={d.ticketStats?.totalAmount || 0} tone="success" />
+          </div>
+        </Card>
 
         {isTreasurer && (
           <Button
@@ -204,7 +233,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
   );
 }
 
-function TicketFundStat({ label, value, tone }) {
+function TicketFundStat({ label, value, tone, raw = false }) {
   const palette = tone === 'success'
     ? { bg: 'rgba(52,211,153,0.10)', border: 'rgba(52,211,153,0.25)', color: '#6ee7b7' }
     : { bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.25)', color: colors.warning };
@@ -216,7 +245,7 @@ function TicketFundStat({ label, value, tone }) {
       border: `1px solid ${palette.border}`,
     }}>
       <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>{label}</div>
-      <div style={{ fontSize: 14, color: palette.color, fontWeight: 900, marginTop: 3, ...type.mono }}>{formatVND(value)}</div>
+      <div style={{ fontSize: 14, color: palette.color, fontWeight: 900, marginTop: 3, ...type.mono }}>{raw ? value : formatVND(value)}</div>
     </div>
   );
 }

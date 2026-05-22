@@ -19,9 +19,10 @@ const CELL_STATE = {
   missed:   { bg: 'rgba(248,113,113,0.08)', border: 'rgba(248,113,113,0.25)',     color: '#fca5a5' },
   upcoming: { bg: 'rgba(255,255,255,0.02)', border: 'rgba(99,102,241,0.35)', dashed: true, color: colors.brandLight },
   moved:    { bg: 'rgba(255,255,255,0.02)', border: 'transparent',                color: '#334155', lineThrough: true },
+  ticket:   { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.38)',       color: '#fde68a' },
 };
 
-const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8' };
+const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8', ticket: '#fbbf24' };
 const ATTENDANCE_CHIP_SIZE = 34;
 
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
@@ -33,6 +34,8 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
     ? ((d.sessions || []).find(session => String(session.id) === String(selectedSessionId)) ||
       (String(d.selectedSession?.id) === String(selectedSessionId) ? d.selectedSession : null))
     : null;
+  const selectedTickets = (d.tickets || []).filter(ticket => ticket.date === selectedDate);
+  const [ticketFormOpen, setTicketFormOpen] = useState(false);
 
   useEffect(() => {
     const nextSession = d.selectedSession || (d.sessions || [])[0] || null;
@@ -58,7 +61,6 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             { key: 'overview',  label: 'Tổng quan' },
             { key: 'calendar',  label: 'Buổi đánh' },
             { key: 'members',   label: 'Thành viên' },
-            { key: 'tickets',   label: 'Vé lẻ' },
           ]}
           active="calendar"
           onChange={(k) => onAction?.('subTab', k)}
@@ -72,6 +74,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
           <LegendChip color="rgba(52,211,153,0.55)" label="Đã đánh" />
           <LegendChip color="rgba(248,113,113,0.55)" label="Vắng" />
           <LegendChip dashed label="Sắp tới" />
+          <LegendChip color="rgba(251,191,36,0.75)" label="Vé lẻ" />
         </div>
 
         {/* Calendar */}
@@ -106,7 +109,28 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             onAction={onAction}
           />
         )}
+        {(selectedTickets.length > 0 || (!selectedSession && selectedDate)) && (
+          <TicketDayPanel
+            date={selectedDate}
+            tickets={selectedTickets}
+            isTreasurer={isTreasurer}
+            onAdd={() => setTicketFormOpen(true)}
+            onAction={onAction}
+          />
+        )}
       </Screen>
+
+      {ticketFormOpen && isTreasurer && (
+        <AddTicketSheet
+          data={d}
+          selectedDate={selectedDate}
+          onClose={() => setTicketFormOpen(false)}
+          onSave={async (payload) => {
+            await onAction?.('addTicket', payload);
+            setTicketFormOpen(false);
+          }}
+        />
+      )}
 
       <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
@@ -158,7 +182,230 @@ function CalendarCell({ day, selected, onClick }) {
     }}>
       {day.n}
       {dot && <span style={{ width: 5, height: 5, borderRadius: '50%', background: dot, marginTop: 3 }} />}
+      {day.hasTicket && day.state !== 'ticket' && (
+        <span style={{
+          position: 'absolute',
+          right: 4,
+          bottom: 4,
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: '#fbbf24',
+          boxShadow: '0 0 0 2px rgba(251,191,36,0.18)',
+        }} />
+      )}
     </button>
+  );
+}
+
+function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onAction }) {
+  const dateLabel = formatDayLabel(date);
+  const total = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0);
+  return (
+    <Card accent="pickleball" style={{ marginTop: 16, borderColor: 'rgba(251,191,36,0.28)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Vé lẻ · {dateLabel}
+          </div>
+          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>
+            {tickets.length > 0 ? `${tickets.length} lượt · ${formatVNDShort(total)}` : 'Chưa có dữ liệu vé lẻ ngày này'}
+          </div>
+        </div>
+        {isTreasurer && (
+          <Button variant="muted" onClick={onAdd} style={{ padding: '8px 11px', borderRadius: 10, fontSize: 12 }}>
+            + Thêm vé
+          </Button>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
+        {tickets.map(ticket => (
+          <div key={ticket.id} style={{
+            padding: 10,
+            borderRadius: 12,
+            background: 'rgba(255,255,255,0.035)',
+            border: `1px solid ${colors.borderSubtle}`,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 900 }}>
+                  {formatTimeLabel(ticket.timeLabel)} · {ticket.memberIds.length} người
+                </div>
+                <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {(ticket.memberLabels || []).join(', ')}
+                </div>
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 900, color: '#fde68a', ...type.mono }}>
+                {formatVNDShort(ticket.amountPerPerson)}/người
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 9 }}>
+              <div style={{ fontSize: 10, color: ticket.status === 'team_fund' ? '#c4b5fd' : '#fcd34d', fontWeight: 800 }}>
+                {ticket.status === 'team_fund' ? 'Quỹ team trả' : `${ticket.advancerName || 'Người ứng'} ứng`}
+              </div>
+              {isTreasurer && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {ticket.status === 'unpaid' && (
+                    <button type="button" onClick={() => onAction?.('markTicketPaid', { ticketId: ticket.id })} style={ticketActionStyle('success')}>Đã trả</button>
+                  )}
+                  <button type="button" onClick={() => onAction?.('deleteTicket', { ticketId: ticket.id })} style={ticketActionStyle('danger')}>Xóa</button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function AddTicketSheet({ data, selectedDate, onClose, onSave }) {
+  const members = data.ticketMembers || [];
+  const [time, setTime] = useState('19:00');
+  const [memberIds, setMemberIds] = useState([]);
+  const [paymentMode, setPaymentMode] = useState('team_fund');
+  const [advancerId, setAdvancerId] = useState('');
+  const [error, setError] = useState('');
+  const selectedMembers = members.filter(member => memberIds.some(id => String(id) === String(member.id)));
+  const ticketPrice = Number(data.ticketPricePerPerson || data.ticketPrice || 50000) || 50000;
+  const totalAmount = ticketPrice * memberIds.length;
+
+  useEffect(() => {
+    if (paymentMode !== 'advancer') return;
+    if (selectedMembers.some(member => String(member.id) === String(advancerId))) return;
+    setAdvancerId(selectedMembers[0]?.id || '');
+  }, [advancerId, paymentMode, selectedMembers]);
+
+  const toggleMember = (memberId) => {
+    setError('');
+    setMemberIds(current => (
+      current.some(id => String(id) === String(memberId))
+        ? current.filter(id => String(id) !== String(memberId))
+        : [...current, memberId]
+    ));
+  };
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!selectedDate) return setError('Chọn ngày chơi.');
+    if (!String(time || '').trim()) return setError('Nhập giờ chơi.');
+    if (memberIds.length === 0) return setError('Chọn ít nhất một người.');
+    if (paymentMode === 'advancer' && !advancerId) return setError('Chọn người ứng tiền.');
+    await onSave({
+      session_date: selectedDate,
+      session_time: time,
+      member_ids: memberIds,
+      total_amount: totalAmount,
+      advancer_id: paymentMode === 'advancer' ? advancerId : null,
+      paymentMode,
+    });
+  };
+
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 40,
+      background: 'rgba(0,0,0,0.58)',
+      display: 'flex',
+      alignItems: 'flex-end',
+      padding: 12,
+    }}>
+      <form onSubmit={submit} style={{
+        width: '100%',
+        maxHeight: 700,
+        overflowY: 'auto',
+        background: colors.shellBg,
+        border: `1px solid ${colors.borderNormal}`,
+        borderRadius: 18,
+        padding: 16,
+        boxShadow: '0 -20px 50px rgba(0,0,0,0.45)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', letterSpacing: '1px', textTransform: 'uppercase' }}>
+              Vé lẻ · {formatDayLabel(selectedDate)}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 900, marginTop: 2 }}>Thêm buổi xé vé</div>
+          </div>
+          <button type="button" onClick={onClose} style={{
+            border: 'none',
+            background: 'transparent',
+            color: colors.textSecondary,
+            fontSize: 22,
+            cursor: 'pointer',
+          }}>×</button>
+        </div>
+
+        <Input
+          label="Giờ"
+          value={time}
+          onChange={event => {
+            setTime(event.target.value);
+            setError('');
+          }}
+          placeholder="19:00"
+          inputMode="numeric"
+        />
+
+        <div style={{ marginTop: 14, fontSize: 10, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          Người tham gia · {memberIds.length} người
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {members.map(member => {
+            const active = memberIds.some(id => String(id) === String(member.id));
+            return (
+              <button
+                key={member.id}
+                type="button"
+                onClick={() => toggleMember(member.id)}
+                style={{
+                  borderRadius: 100,
+                  border: `1px solid ${active ? 'rgba(251,191,36,0.38)' : colors.borderSubtle}`,
+                  background: active ? 'rgba(251,191,36,0.12)' : colors.inputBg,
+                  color: active ? '#fde68a' : colors.textSecondary,
+                  padding: '7px 10px',
+                  fontFamily: 'inherit',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                }}
+              >
+                {member.name}{active ? ' ✓' : ''}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 14, padding: 11, borderRadius: 12, background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(251,191,36,0.22)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 900 }}>
+            <span>{formatVNDShort(ticketPrice)}/người</span>
+            <span style={{ ...type.mono }}>Tổng {formatVNDShort(totalAmount)}</span>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
+          <label style={paymentRowStyle(paymentMode === 'team_fund')}>
+            <input type="radio" checked={paymentMode === 'team_fund'} onChange={() => setPaymentMode('team_fund')} style={{ accentColor: colors.pickleball }} />
+            <span style={{ fontSize: 13, fontWeight: 800 }}>Quỹ team trả</span>
+          </label>
+          <label style={paymentRowStyle(paymentMode === 'advancer')}>
+            <input type="radio" checked={paymentMode === 'advancer'} onChange={() => setPaymentMode('advancer')} style={{ accentColor: colors.pickleball }} />
+            <select value={advancerId} disabled={paymentMode !== 'advancer'} onChange={event => setAdvancerId(event.target.value)} style={selectStyle()}>
+              <option value="">Chọn người ứng...</option>
+              {selectedMembers.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
+            </select>
+          </label>
+        </div>
+
+        {error && <div style={{ marginTop: 10, color: colors.danger, fontSize: 11, fontWeight: 800 }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <Button type="button" variant="ghost" block onClick={onClose} style={{ padding: 12 }}>Hủy</Button>
+          <Button type="submit" variant="success" block style={{ padding: 12 }}>Lưu vé</Button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -782,6 +1029,60 @@ function parseAmount(value) {
 function formatAmountInput(value) {
   const amount = parseAmount(value);
   return amount > 0 ? amount.toLocaleString('vi-VN') : '';
+}
+
+function ticketActionStyle(tone) {
+  const palette = tone === 'danger'
+    ? { bg: colors.dangerSoft, border: 'rgba(248,113,113,0.24)', color: '#fca5a5' }
+    : { bg: colors.successSoft, border: 'rgba(52,211,153,0.28)', color: '#86efac' };
+  return {
+    border: `1px solid ${palette.border}`,
+    background: palette.bg,
+    color: palette.color,
+    borderRadius: 9,
+    padding: '6px 9px',
+    fontSize: 11,
+    fontWeight: 900,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  };
+}
+
+function paymentRowStyle(active) {
+  return {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    background: active ? 'rgba(52,211,153,0.10)' : colors.inputBg,
+    border: `1px solid ${active ? 'rgba(52,211,153,0.30)' : colors.borderSubtle}`,
+    borderRadius: 12,
+  };
+}
+
+function selectStyle() {
+  return {
+    flex: 1,
+    minWidth: 0,
+    border: 'none',
+    outline: 'none',
+    background: 'transparent',
+    color: colors.textPrimary,
+    fontFamily: 'inherit',
+    fontSize: 13,
+    fontWeight: 800,
+  };
+}
+
+function formatTimeLabel(value) {
+  const text = String(value || '');
+  const match = text.match(/^(\d{1,2}:\d{2})/);
+  return match ? match[1] : text || '19:00';
+}
+
+function formatDayLabel(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[3]}/${match[2]}` : String(value || '');
 }
 
 function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {

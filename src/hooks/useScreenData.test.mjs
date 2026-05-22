@@ -53,8 +53,9 @@ test('Pickleball tickets data exposes individual-ticket table rows and team-fund
   assert.ok(ticketsMatch)
   const ticketsSource = ticketsMatch[0]
 
-  assert.match(ticketsSource, /state\?\._allPickle\?\.externalTickets/)
-  assert.match(ticketsSource, /state\?\.pickle\?\.externalTickets/)
+  assert.match(ticketsSource, /monthTicketsForState\(state, today\)/)
+  assert.match(dataSource, /state\?\._allPickle\?\.externalTickets/)
+  assert.match(dataSource, /state\?\.pickle\?\.externalTickets/)
   assert.match(ticketsSource, /monthLabel: formatMonthLabel\(today\)/)
   assert.match(ticketsSource, /totalAttendances: tickets\.reduce\([\s\S]*?safeArray\(ticket\.memberIds\)\.length/)
   assert.match(dataSource, /amountPerPerson/)
@@ -70,6 +71,10 @@ test('Pickleball overview and member detail include individual-ticket balances',
   assert.match(dataSource, /const p2pTicketBalance = memberTicketBalance\(state, currentUserId\)/)
   assert.match(dataSource, /const teamFundTicketShare = memberTeamFundTicketShare\(state, currentUserId\)/)
   assert.match(dataSource, /const ticketAmount = p2pTicketBalance - teamFundTicketShare/)
+  assert.match(dataSource, /const ticketStats = buildTicketMonthStats\(state\)/)
+  assert.match(dataSource, /ticketStats,\s*\n\s*ticketFund,/)
+  assert.match(dataSource, /ticketSessions: ticketStats\.sessionCount/)
+  assert.match(dataSource, /ticketTotal: ticketStats\.totalAmount/)
   assert.match(dataSource, /const ticketShare = memberTeamFundTicketShare\(state, memberId\)/)
   assert.match(dataSource, /const p2pBalance = memberTicketBalance\(state, memberId\)/)
   assert.match(dataSource, /ticketShare/)
