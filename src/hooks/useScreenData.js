@@ -1460,6 +1460,23 @@ function replacementTargetDate(session) {
   return matches.at(-1)?.[1] || ''
 }
 
+function sessionMoveInfo(session) {
+  const notes = String(session?.notes || '').trim()
+  const fromDate = replacementOriginDate(session)
+  const toDate = replacementTargetDate(session)
+  const reason = notes
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !/^Dời từ \d{4}-\d{2}-\d{2}/.test(line) && !line.includes('[hidden-replacement]'))
+    .join(' · ')
+  return {
+    fromDate,
+    toDate,
+    reason,
+  }
+}
+
 function isOffScheduleStaleSession(state, session) {
   const normalizedStatus = String(session?.status || '').toLowerCase()
   if (!['scheduled', 'upcoming'].includes(normalizedStatus)) return false
@@ -1576,6 +1593,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     timeRange: sessionTimeRange(session),
     court: sessionCourt(session),
     status: calendarSessionStatus(session, today),
+    moveInfo: sessionMoveInfo(session),
     attendance: {
       present: fixedPresentCount,
       total: attendanceMembers.length,

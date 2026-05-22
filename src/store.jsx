@@ -241,6 +241,18 @@ function replacementSessionsForOrigin(state, originalSession) {
   })
 }
 
+function activePickleSessionOnDate(state, date, groupId, ignoredIds = []) {
+  const ignored = new Set(safeArray(ignoredIds).map(String))
+  return allPickleSessionsForState(state).find(session => {
+    const sessionGroupId = session?.groupId || session?.group_id
+    return String(sessionDateValue(session) || '').slice(0, 10) === String(date || '').slice(0, 10) &&
+      (!groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)) &&
+      !ignored.has(String(session?.id || '')) &&
+      !isMovedStatus(session?.status) &&
+      !isHiddenReplacementSession(session)
+  }) || null
+}
+
 function allPickleSessionsForState(state) {
   return [
     ...safeArray(state?._allPickle?.sessions),
@@ -1930,6 +1942,10 @@ export function AppProvider({ children }) {
         const table = sourceTable === 'pickleball_sessions' ? 'pickleball_sessions' : 'pickle_sessions'
         const movedNote = String(action.notes || '').trim()
         const oldDate = sessionDateValue(session)
+        if (newDate === oldDate) throw new Error('reschedule_same_date')
+        const groupId = session?.groupId || session?.group_id || state.currentGroupId
+        const conflictingSession = activePickleSessionOnDate(stateRef.current, newDate, groupId, [sessionId])
+        if (conflictingSession) throw new Error('reschedule_date_conflict')
         const originDate = rescheduleOriginDate(session) || oldDate
         const { error: cancelError } = await sb
           .from(table)
@@ -1943,7 +1959,7 @@ export function AppProvider({ children }) {
         const { error: insertError } = await sb
           .from('pickle_sessions')
           .insert({
-            group_id: session?.groupId || session?.group_id || state.currentGroupId,
+            group_id: groupId,
             session_date: newDate,
             start_time: session?.startTime || session?.start_time || null,
             court: session?.court || null,

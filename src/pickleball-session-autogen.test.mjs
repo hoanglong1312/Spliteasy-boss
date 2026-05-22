@@ -518,6 +518,37 @@ test('calendar hides off-schedule rows with self-referential move notes', () => 
   assert.equal(data.sessions.some(session => session.id === 'stale-23'), false)
 })
 
+test('calendar keeps valid moved replacement targets even when they are off schedule', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleWeekdays: [1, 3, 5] },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'origin-22', groupId: 'g1', date: '2026-05-22', status: 'cancelled', notes: 'Mưa lớn\nDời từ 2026-05-22 sang 2026-05-23' },
+        { id: 'replacement-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled', notes: 'Mưa lớn\nDời từ 2026-05-22 sang 2026-05-23' },
+        { id: 'fixed-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+    _allPickle: {
+      sessions: [],
+      configs: [{ groupId: 'g1', scheduleWeekdays: [1, 3, 5] }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05' }],
+    },
+  }, { yearMonth: '2026-05', selectedDate: '2026-05-23' })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-22').state, 'moved')
+  assert.equal(byDate.get('2026-05-23').state, 'upcoming')
+  assert.equal(data.selectedSession.id, 'replacement-23')
+  assert.equal(data.selectedSession.moveInfo.reason, 'Mưa lớn')
+  assert.equal(data.selectedSession.moveInfo.fromDate, '2026-05-22')
+  assert.equal(data.selectedSession.moveInfo.toDate, '2026-05-23')
+})
+
 test('calendar hides and schedules cleanup for replacement dates after the original session is restored', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const data = buildPickleballCalendarData({
@@ -598,6 +629,9 @@ test('reschedule handler cancels old session and creates a new scheduled session
   assert.match(storeSource, /case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{/)
   const block = storeSource.match(/case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{[\s\S]*?break\s*\n\s*\}/)?.[0] || ''
   assert.match(block, /const originDate = rescheduleOriginDate\(session\) \|\| oldDate/)
+  assert.match(block, /const conflictingSession = activePickleSessionOnDate\(stateRef\.current, newDate/)
+  assert.match(block, /throw new Error\('reschedule_date_conflict'\)/)
+  assert.match(block, /if \(newDate === oldDate\) throw new Error\('reschedule_same_date'\)/)
   assert.match(block, /\.update\(\{[\s\S]*status: 'cancelled'/)
   assert.match(block, /\.from\(table\)[\s\S]*\.eq\('id', sessionId\)/)
   assert.match(block, /\.from\('pickle_sessions'\)[\s\S]*\.insert\(\{[\s\S]*session_date: newDate[\s\S]*status: 'scheduled'/)

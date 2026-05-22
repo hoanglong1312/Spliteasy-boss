@@ -433,6 +433,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleNote, setRescheduleNote] = useState('');
+  const [rescheduleError, setRescheduleError] = useState('');
   const canManageSession = Boolean(isTreasurer && !session.isCompleted);
   const canEditCosts = canManageSession;
   const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
@@ -451,6 +452,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
     setRescheduleOpen(false);
     setRescheduleDate(nextDateInputValue(session.date));
     setRescheduleNote('');
+    setRescheduleError('');
   }, [session.id]);
 
   const updateExtra = (id, patch) => {
@@ -511,12 +513,22 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
   const saveReschedule = async (event) => {
     event.preventDefault();
     if (!session.canReschedule || !rescheduleDate) return;
-    await onAction?.('rescheduleSession', {
-      sessionId: session.id,
-      date: rescheduleDate,
-      notes: rescheduleNote,
-    });
-    setRescheduleOpen(false);
+    setRescheduleError('');
+    try {
+      await onAction?.('rescheduleSession', {
+        sessionId: session.id,
+        date: rescheduleDate,
+        notes: rescheduleNote,
+      });
+      setRescheduleOpen(false);
+    } catch (err) {
+      const message = String(err?.message || '')
+      setRescheduleError(message === 'reschedule_date_conflict'
+        ? 'Ngày này đã có buổi trong lịch. Chọn ngày khác.'
+        : message === 'reschedule_same_date'
+        ? 'Ngày mới phải khác ngày hiện tại.'
+        : 'Chưa dời được buổi. Thử lại sau.')
+    }
   };
 
   async function addGuest(event) {
@@ -595,6 +607,27 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
         )}
       </div>
 
+      {(session.moveInfo?.fromDate || session.moveInfo?.toDate || session.moveInfo?.reason) && (
+        <div style={{
+          marginTop: 10,
+          padding: '9px 10px',
+          borderRadius: 10,
+          background: 'rgba(251,191,36,0.08)',
+          border: '1px solid rgba(251,191,36,0.18)',
+          color: '#fde68a',
+          fontSize: 11,
+          fontWeight: 700,
+          lineHeight: 1.45,
+        }}>
+          {session.moveInfo?.fromDate && session.moveInfo?.toDate && (
+            <div>Đã dời: {formatDayLabel(session.moveInfo.fromDate)} → {formatDayLabel(session.moveInfo.toDate)}</div>
+          )}
+          {session.moveInfo?.reason && (
+            <div style={{ color: colors.textSecondary, marginTop: 2 }}>Lý do: {session.moveInfo.reason}</div>
+          )}
+        </div>
+      )}
+
       <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
           Điểm danh · {session.attendance.present}/{session.attendance.total} tham gia
@@ -651,18 +684,29 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
             label="Ngày mới"
             type="date"
             value={rescheduleDate}
-            onChange={(event) => setRescheduleDate(event.target.value)}
+            onChange={(event) => {
+              setRescheduleDate(event.target.value);
+              setRescheduleError('');
+            }}
             inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 800 }}
             style={{ marginTop: 0 }}
           />
           <Input
             label="Lý do"
             value={rescheduleNote}
-            onChange={(event) => setRescheduleNote(event.target.value)}
+            onChange={(event) => {
+              setRescheduleNote(event.target.value);
+              setRescheduleError('');
+            }}
             placeholder="Ví dụ: mưa lớn"
             inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 700 }}
             style={{ marginTop: 0 }}
           />
+          {rescheduleError && (
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#fecaca', lineHeight: 1.35 }}>
+              {rescheduleError}
+            </div>
+          )}
           <Button type="submit" variant="muted" disabled={!rescheduleDate} style={{ padding: 10, borderRadius: 10, fontSize: 12 }}>
             Lưu ngày mới
           </Button>
