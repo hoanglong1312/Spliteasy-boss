@@ -50,12 +50,12 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
         />
 
         {/* Your balance */}
-        <Card accent="finance" style={{ marginTop: 10, padding: '18px 16px' }}>
+        <Card accent="finance" style={balanceHeroStyle(d.yourBalance.total)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
             <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
               <Avatar initial={d.yourBalance.initial || 'B'} color={d.yourBalance.color} size={34} ring={false} />
               <div>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#93c5fd', textTransform: 'uppercase' }}>
                   Của bạn tháng này
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 900, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -75,30 +75,17 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           }}>
             {formatPersonalBalance(d.yourBalance.total)}
           </div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-            Đã gồm tiền sân, nước, phát sinh và vé lẻ qua quỹ
-          </div>
-          <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0 8px' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {d.yourBalance.breakdown.map((b, i) => (
-            <div key={i} style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'baseline',
-              gap: 10,
-              fontSize: 11,
-              padding: '5px 0',
-            }}>
-              <span style={{ color: colors.textSecondary }}>{b.label}</span>
-              <span style={{
-                color: b.amount < 0 ? '#6ee7b7' : '#f1f5f9',
-                fontWeight: 700,
-                ...type.mono,
-              }}>
-                {formatBreakdownAmount(b.amount)}
-              </span>
-            </div>
-            ))}
+          <div style={{
+            marginTop: 10,
+            padding: '10px 11px',
+            borderRadius: 12,
+            background: d.yourBalance.total < 0 ? 'rgba(248,113,113,0.10)' : 'rgba(52,211,153,0.10)',
+            border: `1px solid ${d.yourBalance.total < 0 ? 'rgba(248,113,113,0.24)' : 'rgba(52,211,153,0.24)'}`,
+            fontSize: 11,
+            color: d.yourBalance.total < 0 ? '#fecaca' : '#a7f3d0',
+            fontWeight: 800,
+          }}>
+            {d.yourBalance.total < 0 ? 'Tổng cần nộp về quỹ trong tháng' : 'Quỹ cần bù lại cho bạn trong tháng'}
           </div>
         </Card>
 
@@ -322,6 +309,19 @@ function TicketFundStat({ label, value, tone, raw = false }) {
       <div style={{ fontSize: 14, color: palette.color, fontWeight: 900, marginTop: 3, ...type.mono }}>{raw ? value : formatVND(value)}</div>
     </div>
   );
+}
+
+function balanceHeroStyle(total) {
+  const isOwed = total < 0;
+  return {
+    marginTop: 10,
+    padding: '18px 16px',
+    background: isOwed
+      ? 'linear-gradient(135deg, rgba(30,41,59,0.98), rgba(127,29,29,0.40))'
+      : 'linear-gradient(135deg, rgba(15,23,42,0.98), rgba(6,95,70,0.42))',
+    borderColor: isOwed ? 'rgba(248,113,113,0.28)' : 'rgba(52,211,153,0.34)',
+    boxShadow: isOwed ? '0 14px 32px rgba(248,113,113,0.10)' : '0 14px 32px rgba(16,185,129,0.13)',
+  };
 }
 
 function CompactCostCard({ icon, label, value, sub }) {
