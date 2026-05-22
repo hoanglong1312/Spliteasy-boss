@@ -131,7 +131,7 @@ test('store auto-generates sessions with plain Supabase insert after scheduled r
 })
 
 test('store generation config reads schedule weekdays only from current monthly config', () => {
-  const match = storeSource.match(/function generationConfigFromState[\s\S]*?\n}\n\nfunction isUuid/)
+  const match = storeSource.match(/function generationConfigFromState[\s\S]*?\n}\n\nfunction sessionDateValue/)
   assert.ok(match, 'generationConfigFromState source is available')
   const source = match[0]
 
@@ -549,6 +549,30 @@ test('calendar keeps valid moved replacement targets even when they are off sche
   assert.equal(data.selectedSession.moveInfo.toDate, '2026-05-23')
 })
 
+test('calendar does not show stale move notes after a session is restored', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleWeekdays: [1, 3, 5] },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'restored-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled', notes: 'Dời từ 2026-05-29 sang 2026-05-30' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [1, 3, 5] }],
+    },
+    _allPickle: { sessions: [] },
+  }, { yearMonth: '2026-05', selectedDate: '2026-05-29' })
+
+  assert.equal(data.selectedSession.id, 'restored-29')
+  assert.deepEqual(JSON.parse(JSON.stringify(data.selectedSession.moveInfo)), {
+    fromDate: '',
+    toDate: '',
+    reason: '',
+  })
+})
+
 test('calendar hides and schedules cleanup for replacement dates after the original session is restored', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const data = buildPickleballCalendarData({
@@ -630,6 +654,8 @@ test('reschedule handler cancels old session and creates a new scheduled session
   const block = storeSource.match(/case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{[\s\S]*?break\s*\n\s*\}/)?.[0] || ''
   assert.match(block, /const originDate = rescheduleOriginDate\(session\) \|\| oldDate/)
   assert.match(block, /const conflictingSession = activePickleSessionOnDate\(stateRef\.current, newDate/)
+  assert.match(storeSource, /function isOffScheduleConflictSession\(state, session\)/)
+  assert.match(storeSource, /if \(isOffScheduleConflictSession\(state, session\)\) return false/)
   assert.match(block, /throw new Error\('reschedule_date_conflict'\)/)
   assert.match(block, /if \(newDate === oldDate\) throw new Error\('reschedule_same_date'\)/)
   assert.match(block, /\.update\(\{[\s\S]*status: 'cancelled'/)
@@ -649,6 +675,7 @@ test('restore handler cleans up replacement sessions created from the moved orig
   assert.match(block, /Promise\.all\(replacementSessions\.map/)
   assert.match(block, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', replacement\.id\)/)
   assert.match(block, /await hideReplacementSession\(sb, replacement\)/)
+  assert.match(block, /\.update\(\{ status: 'scheduled', notes: null \}\)/)
   assert.match(storeSource, /function rescheduleOriginDate\(session/)
   assert.match(storeSource, /function replacementNote\(originDate, fromDate, toDate, fallback/)
   assert.match(storeSource, /function replacementSessionsForOrigin\(state, originalSession/)

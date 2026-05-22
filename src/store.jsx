@@ -245,12 +245,46 @@ function activePickleSessionOnDate(state, date, groupId, ignoredIds = []) {
   const ignored = new Set(safeArray(ignoredIds).map(String))
   return allPickleSessionsForState(state).find(session => {
     const sessionGroupId = session?.groupId || session?.group_id
+    if (isOffScheduleConflictSession(state, session)) return false
     return String(sessionDateValue(session) || '').slice(0, 10) === String(date || '').slice(0, 10) &&
       (!groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)) &&
       !ignored.has(String(session?.id || '')) &&
       !isMovedStatus(session?.status) &&
       !isHiddenReplacementSession(session)
   }) || null
+}
+
+function scheduleWeekdaysForSession(state, session) {
+  const groupId = session?.groupId || session?.group_id || state?.currentGroupId || state?.currentGroup?.id
+  const yearMonth = String(sessionDateValue(session) || '').slice(0, 7)
+  const group = state?.currentGroup || safeArray(state?.groups).find(row => String(row?.id || '') === String(groupId || '')) || {}
+  const config = safeArray(state?._allPickle?.configs || state?.pickleConfigs)
+    .find(row => String(row?.groupId || row?.group_id || '') === String(groupId || '')) || {}
+  const monthlyConfig = [
+    ...safeArray(state?._allPickle?.monthlyConfigs),
+    ...safeArray(state?.pickle?.monthlyConfigs),
+  ].find(row => (
+    String(row?.groupId || row?.group_id || '') === String(groupId || '') &&
+    String(row?.yearMonth || row?.year_month || '') === String(yearMonth || '')
+  )) || {}
+  return normalizeScheduleWeekdays(
+    monthlyConfig.scheduleWeekdays ?? monthlyConfig.schedule_weekdays ??
+    config.scheduleWeekdays ?? config.schedule_weekdays ??
+    group.scheduleWeekdays ?? group.schedule_weekdays
+  )
+}
+
+function isOffScheduleConflictSession(state, session) {
+  const normalizedStatus = String(session?.status || '').toLowerCase()
+  if (!['scheduled', 'upcoming'].includes(normalizedStatus)) return false
+  const selfDate = String(sessionDateValue(session) || '').slice(0, 10)
+  const originDate = rescheduleOriginDate(session)
+  const targetDate = rescheduleTargetDate(session)
+  if (originDate && originDate !== selfDate && targetDate === selfDate) return false
+  if (originDate && originDate === selfDate) return true
+  const weekdays = scheduleWeekdaysForSession(state, session)
+  if (weekdays.length === 0) return false
+  return !weekdays.includes(isoWeekdayFromDate(selfDate))
 }
 
 function allPickleSessionsForState(state) {
@@ -1913,7 +1947,7 @@ export function AppProvider({ children }) {
         const table = sourceTable === 'pickleball_sessions' ? 'pickleball_sessions' : 'pickle_sessions'
         const { error } = await sb
           .from(table)
-          .update({ status: 'scheduled' })
+          .update({ status: 'scheduled', notes: null })
           .eq('id', sessionId)
         if (error) throw error
         await refresh()

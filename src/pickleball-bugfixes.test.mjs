@@ -372,7 +372,7 @@ test('treasurer can explicitly complete a session before calendar marks it atten
   assert.match(storeSource, /case 'COMPLETE_PICKLEBALL_SESSION':/)
   assert.match(storeSource, /case 'REOPEN_PICKLEBALL_SESSION':/)
   assert.match(storeSource, /\.update\(\{ status: 'completed' \}\)/)
-  assert.match(storeSource, /\.update\(\{ status: 'scheduled' \}\)/)
+  assert.match(storeSource, /\.update\(\{ status: 'scheduled', notes: null \}\)/)
 })
 
 test('calendar attendance chips use compact 34px avatar-style green and grey states', () => {

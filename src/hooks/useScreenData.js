@@ -1464,6 +1464,10 @@ function sessionMoveInfo(session) {
   const notes = String(session?.notes || '').trim()
   const fromDate = replacementOriginDate(session)
   const toDate = replacementTargetDate(session)
+  const sessionKey = dateKey(sessionDate(session))
+  if (fromDate && toDate && !isMovedSession(session) && toDate !== sessionKey) {
+    return { fromDate: '', toDate: '', reason: '' }
+  }
   const reason = notes
     .split('\n')
     .map(line => line.trim())
