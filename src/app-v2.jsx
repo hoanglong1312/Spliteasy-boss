@@ -1376,6 +1376,12 @@ async function savePickleSessionWaterExpense(sb, state, session, sessionId, wate
     .limit(1)
     .maybeSingle()
   if (existingWaterError) throw existingWaterError
+  const { error: deleteLegacyWaterItemError } = await sb
+    .from('pickleball_session_items')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('name', 'Nước')
+  if (deleteLegacyWaterItemError) throw deleteLegacyWaterItemError
 
   if (waterAmount <= 0) {
     if (existingWater?.id) {

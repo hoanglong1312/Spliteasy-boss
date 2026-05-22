@@ -303,6 +303,16 @@ test('saveBatchCosts routes primary pickle_sessions water through expenses', () 
   assert.match(appSource, /if \(waterAmount <= 0\) \{[\s\S]*?\.from\('expenses'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', existingWater\.id\)/)
 })
 
+test('saveBatchCosts removes stale legacy water items for primary pickle_sessions', () => {
+  const helperSource = appSource.match(/async function savePickleSessionWaterExpense\([\s\S]*?\n\}/)?.[0] || ''
+
+  assert.match(helperSource, /\.from\('pickleball_session_items'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('session_id', sessionId\)[\s\S]*?\.eq\('name', 'Nước'\)/)
+  assert.ok(
+    helperSource.indexOf(".from('pickleball_session_items')") < helperSource.indexOf('if (waterAmount <= 0)'),
+    'stale legacy water item is cleared before zero-save exits',
+  )
+})
+
 test('saveSessionCost saves extras for primary pickle_sessions through expenses and participants', () => {
   const handlerSource = appSource.match(/if \(type === 'saveSessionCost'\) \{[\s\S]*?\n    if \(type === 'saveBatchCosts'\)/)?.[0] || ''
 
