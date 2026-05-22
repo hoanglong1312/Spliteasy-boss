@@ -382,18 +382,58 @@ test('calendar day selection prefers an active session over a stale moved duplic
   assert.equal(day29.sessionId, 'active-29')
 })
 
+test('calendar hides moved replacement dates and keeps only the original moved marker', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'origin-22', groupId: 'g1', date: '2026-05-22', status: 'cancelled', notes: 'Dời từ 2026-05-22 sang 2026-05-23' },
+        { id: 'replacement-23', groupId: 'g1', date: '2026-05-23', status: 'cancelled', notes: 'Dời từ 2026-05-22 qua 2026-05-23 sang 2026-05-31' },
+        { id: 'replacement-31', groupId: 'g1', date: '2026-05-31', status: 'cancelled', notes: 'Dời từ 2026-05-22 qua 2026-05-31 sang 2026-06-01' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [5] }],
+    },
+    _allPickle: { sessions: [] },
+  })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-22').state, 'moved')
+  assert.equal(byDate.get('2026-05-23').state, 'normal')
+  assert.equal(byDate.get('2026-05-31').state, 'normal')
+  assert.equal(data.sessions.some(session => session.id === 'replacement-23'), false)
+  assert.equal(data.sessions.some(session => session.id === 'replacement-31'), false)
+})
+
 test('reschedule handler cancels old session and creates a new scheduled session', () => {
   assert.match(appSource, /type === 'rescheduleSession'/)
   assert.match(appSource, /type: 'RESCHEDULE_PICKLEBALL_SESSION'/)
   assert.match(storeSource, /case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{/)
   const block = storeSource.match(/case 'RESCHEDULE_PICKLEBALL_SESSION':\s*\{[\s\S]*?break\s*\n\s*\}/)?.[0] || ''
+  assert.match(block, /const originDate = rescheduleOriginDate\(session\) \|\| oldDate/)
   assert.match(block, /\.update\(\{[\s\S]*status: 'cancelled'/)
   assert.match(block, /\.from\(table\)[\s\S]*\.eq\('id', sessionId\)/)
   assert.match(block, /\.from\('pickle_sessions'\)[\s\S]*\.insert\(\{[\s\S]*session_date: newDate[\s\S]*status: 'scheduled'/)
+  assert.match(block, /notes: replacementNote\(originDate, oldDate, newDate, movedNote\)/)
   assert.match(block, /start_time: session\?\.startTime \|\| session\?\.start_time \|\| null/)
   assert.match(block, /court: session\?\.court \|\| null/)
   assert.doesNotMatch(block, /attendeeIds/)
   assert.doesNotMatch(block, /pickleball_session_items/)
+})
+
+test('restore handler cleans up replacement sessions created from the moved original date', () => {
+  const block = storeSource.match(/case 'REOPEN_PICKLEBALL_SESSION':\s*\{[\s\S]*?break\s*\n\s*\}/)?.[0] || ''
+
+  assert.match(block, /const replacementSessions = replacementSessionsForOrigin\(stateRef\.current, session\)/)
+  assert.match(block, /Promise\.all\(replacementSessions\.map/)
+  assert.match(block, /\.from\('pickle_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('id', replacement\.id\)/)
+  assert.match(block, /await hideReplacementSession\(sb, replacement\)/)
+  assert.match(storeSource, /function rescheduleOriginDate\(session/)
+  assert.match(storeSource, /function replacementNote\(originDate, fromDate, toDate, fallback/)
+  assert.match(storeSource, /function replacementSessionsForOrigin\(state, originalSession/)
 })
 
 test('pickleball calendar can view and auto-generate a requested future month', () => {

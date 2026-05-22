@@ -1360,6 +1360,8 @@ function getStateMonthSessions(state, date) {
   const month = monthKey(date)
   const groupId = state?.currentGroupId || state?.currentGroup?.id
   return getAllSessions(state)
+    .filter(session => !isHiddenReplacementSession(session))
+    .filter(session => !isMovedReplacementSession(session))
     .filter(session => {
       const sessionGroupId = session?.groupId || session?.group_id
       return !groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)
@@ -1393,6 +1395,15 @@ function preferredCalendarDaySession(current, next) {
   if (!current) return next
   if (isMovedSession(current) && !isMovedSession(next)) return next
   return current
+}
+
+function isHiddenReplacementSession(session) {
+  return String(session?.notes || '').includes('[hidden-replacement]')
+}
+
+function isMovedReplacementSession(session) {
+  const originDate = String(session?.notes || '').match(/Dời từ (\d{4}-\d{2}-\d{2})/)?.[1]
+  return Boolean(originDate && originDate !== dateKey(sessionDate(session)) && isMovedSession(session))
 }
 
 function calendarCellState(date, session, state) {

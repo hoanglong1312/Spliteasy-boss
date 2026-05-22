@@ -202,6 +202,53 @@ function sessionDateValue(session) {
   return session?.sessionDate || session?.session_date || session?.date
 }
 
+function rescheduleOriginDate(session) {
+  const note = String(session?.notes || '')
+  return note.match(/Dời từ (\d{4}-\d{2}-\d{2})/)?.[1] || ''
+}
+
+function replacementNote(originDate, fromDate, toDate, fallback = '') {
+  const custom = String(fallback || '').trim()
+  const hop = fromDate && fromDate !== originDate ? ` qua ${fromDate}` : ''
+  const system = `Dời từ ${originDate || fromDate || 'lịch cũ'}${hop} sang ${toDate}`
+  return custom ? `${custom}\n${system}` : system
+}
+
+function isHiddenReplacementSession(session) {
+  return String(session?.notes || '').includes('[hidden-replacement]')
+}
+
+function replacementSessionsForOrigin(state, originalSession) {
+  const originDate = rescheduleOriginDate(originalSession) || sessionDateValue(originalSession)
+  const groupId = originalSession?.groupId || originalSession?.group_id
+  const originalId = String(originalSession?.id || '')
+  if (!originDate) return []
+  return [
+    ...safeArray(state?._allPickle?.sessions),
+    ...safeArray(state?.pickle?.sessions),
+    ...safeArray(state?.pickle?.upcoming),
+  ].filter(session => {
+    const sessionGroupId = session?.groupId || session?.group_id
+    return String(session?.id || '') !== originalId &&
+      (!groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)) &&
+      rescheduleOriginDate(session) === originDate &&
+      !isHiddenReplacementSession(session)
+  })
+}
+
+async function hideReplacementSession(sb, replacement) {
+  const table = (replacement?.sourceTable || replacement?.source_table) === 'pickleball_sessions'
+    ? 'pickleball_sessions'
+    : 'pickle_sessions'
+  return sb
+    .from(table)
+    .update({
+      status: 'cancelled',
+      notes: `[hidden-replacement] ${replacement?.notes || ''}`.trim(),
+    })
+    .eq('id', replacement.id)
+}
+
 function updatePickleSessions(pickle, updateSessions) {
   if (!pickle) return pickle
   return {
@@ -1795,6 +1842,22 @@ export function AppProvider({ children }) {
         const { sessionId } = action
         if (!sessionId) return
         const session = findPickleSessionInState(stateRef.current, sessionId)
+        const replacementSessions = replacementSessionsForOrigin(stateRef.current, session)
+        await Promise.all(replacementSessions.map(async replacement => {
+          if ((replacement?.sourceTable || replacement?.source_table) !== 'pickle_sessions') {
+            const { error: hideError } = await hideReplacementSession(sb, replacement)
+            if (hideError) throw hideError
+            return
+          }
+          const { error: deleteError } = await sb
+            .from('pickle_sessions')
+            .delete()
+            .eq('id', replacement.id)
+          if (deleteError) {
+            const { error: hideError } = await hideReplacementSession(sb, replacement)
+            if (hideError) throw hideError
+          }
+        }))
         const sourceTable = session?.sourceTable || session?.source_table
         const table = sourceTable === 'pickleball_sessions' ? 'pickleball_sessions' : 'pickle_sessions'
         const { error } = await sb
@@ -1816,11 +1879,12 @@ export function AppProvider({ children }) {
         const table = sourceTable === 'pickleball_sessions' ? 'pickleball_sessions' : 'pickle_sessions'
         const movedNote = String(action.notes || '').trim()
         const oldDate = sessionDateValue(session)
+        const originDate = rescheduleOriginDate(session) || oldDate
         const { error: cancelError } = await sb
           .from(table)
           .update({
             status: 'cancelled',
-            notes: movedNote || `Dời từ ${oldDate || 'lịch cũ'} sang ${newDate}`,
+            notes: replacementNote(originDate, oldDate, newDate, movedNote),
           })
           .eq('id', sessionId)
         if (cancelError) throw cancelError
@@ -1833,7 +1897,7 @@ export function AppProvider({ children }) {
             start_time: session?.startTime || session?.start_time || null,
             court: session?.court || null,
             status: 'scheduled',
-            notes: movedNote || `Dời từ ${oldDate || 'lịch cũ'}`,
+            notes: replacementNote(originDate, oldDate, newDate, movedNote),
             created_by_member_id: state.currentUserId || null,
           })
         if (insertError) throw insertError
