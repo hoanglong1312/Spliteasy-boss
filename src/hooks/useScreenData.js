@@ -430,6 +430,7 @@ function buildPickleballTeamFundData(state) {
   const monthSessions = getStateMonthSessions(state, today)
   const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
+  const teamFundDirectTotal = ticketFund.teamFundTotal || 0
   const ticketRows = buildTeamFundTicketRows(state)
   const ticketParticipantRows = buildTeamFundTicketParticipantRows(state)
   const currentFixedMembers = currentGroupMembers(state)
@@ -447,7 +448,7 @@ function buildPickleballTeamFundData(state) {
   const paymentDraftItems = [
     { key: 'water', label: 'Tiền nước', yearMonth: currentYearMonth, amount: waterTotal },
     { key: 'extras', label: 'Phát sinh', yearMonth: currentYearMonth, amount: extrasTotal },
-    { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: ticketStats.totalAmount || 0 },
+    { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: teamFundDirectTotal },
     { key: 'next_court', label: 'Tiền sân tháng sau', yearMonth: nextYearMonth, amount: nextCourtFeeTotal },
   ].map(item => ({
     ...item,
@@ -464,6 +465,7 @@ function buildPickleballTeamFundData(state) {
     memberCount: currentFixedMembers.length,
     ticketStats,
     ticketFund,
+    teamFundDirectTotal,
     ticketRows,
     ticketParticipantRows,
     venueBank,
@@ -508,7 +510,7 @@ function buildPickleballTeamFundData(state) {
       {
         key: 'tickets',
         label: 'Vé lẻ team',
-        amount: ticketStats.totalAmount || 0,
+        amount: teamFundDirectTotal,
         paidToOwner: ownerPaymentCoversItem(ownerPayments, 'tickets', currentYearMonth),
       },
     ],
@@ -524,8 +526,44 @@ function buildTeamFundTicketRows(state) {
       return {
         ...row,
         sourceLabel: row.status === 'team_fund' ? 'Quỹ team trả hộ' : `${row.advancerName || 'Người ứng'} ứng`,
+        ledgerRows: buildTicketLedgerRows(ticket, state),
       }
     })
+}
+
+function buildTicketLedgerRows(ticket, state) {
+  const status = ticketStatus(ticket)
+  const members = safeArray(state?.members)
+  const memberIds = ticketMemberIds(ticket)
+  const perPerson = ticketAmountPerPerson(ticket)
+  const advancerId = ticketAdvancerId(ticket)
+  const rows = []
+
+  if (status === 'unpaid' && advancerId) {
+    const member = members.find(row => String(row?.id || row?.member_id) === String(advancerId)) || { id: advancerId }
+    rows.push({
+      memberId: advancerId,
+      name: member.displayName || member.name || memberName(advancerId, members),
+      initial: initials(member),
+      color: member.color,
+      amount: ticketTotalAmount(ticket),
+      roleLabel: 'Ứng tiền',
+    })
+  }
+
+  memberIds.forEach(memberId => {
+    const member = members.find(row => String(row?.id || row?.member_id) === String(memberId)) || { id: memberId }
+    rows.push({
+      memberId,
+      name: member.displayName || member.name || memberName(memberId, members),
+      initial: initials(member),
+      color: member.color,
+      amount: -perPerson,
+      roleLabel: status === 'team_fund' ? 'Quỹ trả hộ' : 'Phần tham gia',
+    })
+  })
+
+  return rows
 }
 
 function buildTeamFundTicketParticipantRows(state) {

@@ -9,6 +9,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const d = data || DEMO;
   const ticketFund = d.ticketFund || { rows: [], totalDue: 0, totalCredit: 0 };
   const ticketStats = d.ticketStats || { sessionCount: 0, totalAmount: 0, participantCount: 0 };
+  const teamFundDirectTotal = Number(d.teamFundDirectTotal ?? ticketFund.teamFundTotal) || 0;
   const ticketRows = safeArray(d.ticketRows);
   const ticketParticipantRows = safeArray(d.ticketParticipantRows);
   const venueBank = d.venueBank || { ownerName: '', bankName: '', bankAccount: '' };
@@ -377,12 +378,12 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
               Quỹ team cần trả hộ thành viên
             </div>
-            <div style={{ fontSize: 17, color: colors.warning, fontWeight: 900, marginTop: 3, ...type.mono }}>{formatVND(ticketStats.totalAmount || 0)}</div>
+            <div style={{ fontSize: 17, color: colors.warning, fontWeight: 900, marginTop: 3, ...type.mono }}>{formatVND(teamFundDirectTotal)}</div>
             <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3 }}>
-              Bao gồm vé quỹ trả trực tiếp và vé có người ứng để cuối tháng cân qua quỹ.
+              Chỉ gồm vé quỹ team trả trực tiếp. Vé có người ứng được cân bằng bằng dòng +/- trong từng giao dịch.
             </div>
           </div>
-          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 340, overflowY: 'auto', paddingRight: 2 }}>
             {ticketRows.length === 0 && (
               <div style={{ fontSize: 12, color: colors.textSecondary, padding: '10px 0' }}>
                 Chưa có giao dịch vé lẻ trong tháng.
@@ -404,6 +405,31 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     <div style={{ fontSize: 12, fontWeight: 900, color: colors.warning, ...type.mono }}>{formatVND(ticket.totalAmount || 0)}</div>
                     <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{formatVND(ticket.amountPerPerson || 0)}/người</div>
                   </div>
+                </div>
+                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {safeArray(ticket.ledgerRows).map((row, index) => {
+                    const isPositive = Number(row.amount) > 0;
+                    const signedAmount = isPositive ? `+${formatVND(row.amount)}` : `-${formatVND(Math.abs(row.amount || 0))}`;
+                    return (
+                      <div key={`${ticket.id}-${row.memberId || row.name}-${index}`} style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        padding: '6px 8px',
+                        borderRadius: 9,
+                        background: isPositive ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.07)',
+                      }}>
+                        <Avatar initial={row.initial} color={row.color} size={22} ring={false} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 900 }}>{row.name}</div>
+                          <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>{row.roleLabel}</div>
+                        </div>
+                        <div style={{ fontSize: 11, fontWeight: 900, color: isPositive ? '#6ee7b7' : '#fca5a5', ...type.mono }}>
+                          {signedAmount}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}

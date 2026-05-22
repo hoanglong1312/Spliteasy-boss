@@ -99,11 +99,29 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
     ['Tiền sân', 0, false],
     ['Tiền nước', 0, false],
     ['Phát sinh', 0, false],
-    ['Vé lẻ team', 200000, false],
+    ['Vé lẻ team', 100000, false],
+  ]))
+  assert.equal(data.teamFundOverview.teamFundDirectTotal, 100000)
+  assert.equal(JSON.stringify(data.teamFundOverview.paymentDraft.items.map(row => [row.key, row.amount])), JSON.stringify([
+    ['water', 0],
+    ['extras', 0],
+    ['tickets', 100000],
+    ['next_court', 0],
   ]))
   assert.equal(JSON.stringify(data.teamFundOverview.ticketRows.map(row => [row.dateLabel, row.sourceLabel, row.totalAmount, row.amountPerPerson])), JSON.stringify([
     ['T5 21/05', 'Anh Việt ứng', 100000, 50000],
     ['T6 22/05', 'Quỹ team trả hộ', 100000, 50000],
+  ]))
+  assert.equal(JSON.stringify(data.teamFundOverview.ticketRows.map(row => row.ledgerRows.map(item => [item.name, item.roleLabel, item.amount]))), JSON.stringify([
+    [
+      ['Anh Việt', 'Ứng tiền', 100000],
+      ['Anh Việt', 'Phần tham gia', -50000],
+      ['Cường', 'Phần tham gia', -50000],
+    ],
+    [
+      ['Cường', 'Quỹ trả hộ', -50000],
+      ['Giang', 'Quỹ trả hộ', -50000],
+    ],
   ]))
   assert.equal(JSON.stringify(data.teamFundOverview.ticketParticipantRows.map(row => [row.name, row.sessions, row.amount])), JSON.stringify([
     ['Cường', 2, 100000],
@@ -246,6 +264,11 @@ test('team fund screen owns treasury totals and monthly money config', () => {
   assert.match(teamFundSource, /setPaymentQrOpen\(true\)/)
   assert.match(teamFundSource, /Giao dịch vé lẻ/)
   assert.match(teamFundSource, /Quỹ team cần trả hộ thành viên/)
+  assert.match(teamFundSource, /teamFundDirectTotal/)
+  assert.match(teamFundSource, /safeArray\(ticket\.ledgerRows\)\.map/)
+  assert.match(teamFundSource, /overflowY: 'auto'/)
+  assert.match(teamFundSource, /\+.*formatVND/)
+  assert.match(teamFundSource, /-.*formatVND/)
   assert.match(teamFundSource, /ticketRows\.map/)
   assert.match(teamFundSource, /ticketParticipantRows\.map/)
   assert.doesNotMatch(teamFundSource, /Cần thu/)
