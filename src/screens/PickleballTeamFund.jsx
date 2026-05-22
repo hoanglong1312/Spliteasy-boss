@@ -23,6 +23,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const [selectedPaymentKeys, setSelectedPaymentKeys] = useState(() => defaultPaymentKeys(paymentDraft.items));
   const [paymentNote, setPaymentNote] = useState('');
   const [openPaymentId, setOpenPaymentId] = useState('');
+  const [openTicketId, setOpenTicketId] = useState('');
   const [saveState, setSaveState] = useState('');
   const [paymentState, setPaymentState] = useState('');
   const [paymentQrOpen, setPaymentQrOpen] = useState(false);
@@ -389,50 +390,66 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                 Chưa có giao dịch vé lẻ trong tháng.
               </div>
             )}
-            {ticketRows.map(ticket => (
-              <div key={ticket.id} style={{ padding: '10px 0', borderTop: `1px solid ${colors.borderSubtle}` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900 }}>{ticket.dateLabel} · {ticket.timeLabel || 'Chưa có giờ'}</div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
-                      {ticket.memberLabels.join(', ') || 'Chưa có người tham gia'}
-                    </div>
-                    <div style={{ fontSize: 10, color: '#fde68a', marginTop: 3 }}>
-                      {ticket.sourceLabel}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: colors.warning, ...type.mono }}>{formatVND(ticket.totalAmount || 0)}</div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{formatVND(ticket.amountPerPerson || 0)}/người</div>
-                  </div>
-                </div>
-                <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                  {safeArray(ticket.ledgerRows).map((row, index) => {
-                    const isPositive = Number(row.amount) > 0;
-                    const signedAmount = isPositive ? `+${formatVND(row.amount)}` : `-${formatVND(Math.abs(row.amount || 0))}`;
-                    return (
-                      <div key={`${ticket.id}-${row.memberId || row.name}-${index}`} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 7,
-                        padding: '6px 8px',
-                        borderRadius: 9,
-                        background: isPositive ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.07)',
-                      }}>
-                        <Avatar initial={row.initial} color={row.color} size={22} ring={false} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 11, fontWeight: 900 }}>{row.name}</div>
-                          <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>{row.roleLabel}</div>
+            {ticketRows.map(ticket => {
+              const ticketOpen = openTicketId === ticket.id;
+              return (
+                <div key={ticket.id} style={{ padding: '10px 0', borderTop: `1px solid ${colors.borderSubtle}` }}>
+                  <button type="button" onClick={() => setOpenTicketId(ticketOpen ? '' : ticket.id)} style={{
+                    width: '100%',
+                    border: 'none',
+                    background: 'transparent',
+                    color: colors.textPrimary,
+                    padding: 0,
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900 }}>{ticket.dateLabel} · {ticket.timeLabel || 'Chưa có giờ'}</div>
+                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ticket.memberLabels.join(', ') || 'Chưa có người tham gia'}
                         </div>
-                        <div style={{ fontSize: 11, fontWeight: 900, color: isPositive ? '#6ee7b7' : '#fca5a5', ...type.mono }}>
-                          {signedAmount}
+                        <div style={{ fontSize: 10, color: '#fde68a', marginTop: 3 }}>
+                          {ticket.sourceLabel} · {ticketOpen ? 'Ẩn chi tiết' : 'Xem chi tiết'}
                         </div>
                       </div>
-                    );
-                  })}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: colors.warning, ...type.mono }}>{formatVND(ticket.totalAmount || 0)}</div>
+                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{formatVND(ticket.amountPerPerson || 0)}/người</div>
+                      </div>
+                    </div>
+                  </button>
+                  {ticketOpen && (
+                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      {safeArray(ticket.ledgerRows).map((row, index) => {
+                        const isPositive = Number(row.amount) > 0;
+                        const signedAmount = isPositive ? `+${formatVND(row.amount)}` : `-${formatVND(Math.abs(row.amount || 0))}`;
+                        return (
+                          <div key={`${ticket.id}-${row.memberId || row.name}-${index}`} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 7,
+                            padding: '6px 8px',
+                            borderRadius: 9,
+                            background: isPositive ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.07)',
+                          }}>
+                            <Avatar initial={row.initial} color={row.color} size={22} ring={false} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 900 }}>{row.name}</div>
+                              <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>{row.roleLabel}</div>
+                            </div>
+                            <div style={{ fontSize: 11, fontWeight: 900, color: isPositive ? '#6ee7b7' : '#fca5a5', ...type.mono }}>
+                              {signedAmount}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {ticketParticipantRows.length > 0 && (
             <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${colors.borderSubtle}` }}>

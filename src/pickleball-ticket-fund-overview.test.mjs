@@ -114,8 +114,7 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   ]))
   assert.equal(JSON.stringify(data.teamFundOverview.ticketRows.map(row => row.ledgerRows.map(item => [item.name, item.roleLabel, item.amount]))), JSON.stringify([
     [
-      ['Anh Việt', 'Ứng tiền', 100000],
-      ['Anh Việt', 'Phần tham gia', -50000],
+      ['Anh Việt', 'Người khác trả lại', 50000],
       ['Cường', 'Phần tham gia', -50000],
     ],
     [
@@ -266,6 +265,9 @@ test('team fund screen owns treasury totals and monthly money config', () => {
   assert.match(teamFundSource, /Quỹ team cần trả hộ thành viên/)
   assert.match(teamFundSource, /teamFundDirectTotal/)
   assert.match(teamFundSource, /safeArray\(ticket\.ledgerRows\)\.map/)
+  assert.match(teamFundSource, /const \[openTicketId, setOpenTicketId\] = useState\(''\)/)
+  assert.match(teamFundSource, /setOpenTicketId\(ticketOpen \? '' : ticket\.id\)/)
+  assert.match(teamFundSource, /ticketOpen && \(/)
   assert.match(teamFundSource, /overflowY: 'auto'/)
   assert.match(teamFundSource, /\+.*formatVND/)
   assert.match(teamFundSource, /-.*formatVND/)

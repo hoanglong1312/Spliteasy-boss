@@ -540,18 +540,23 @@ function buildTicketLedgerRows(ticket, state) {
   const rows = []
 
   if (status === 'unpaid' && advancerId) {
+    const otherMemberIds = memberIds.filter(memberId => String(memberId) !== String(advancerId))
     const member = members.find(row => String(row?.id || row?.member_id) === String(advancerId)) || { id: advancerId }
-    rows.push({
-      memberId: advancerId,
-      name: member.displayName || member.name || memberName(advancerId, members),
-      initial: initials(member),
-      color: member.color,
-      amount: ticketTotalAmount(ticket),
-      roleLabel: 'Ứng tiền',
-    })
+    const creditAmount = perPerson * (memberIds.some(memberId => String(memberId) === String(advancerId)) ? otherMemberIds.length : memberIds.length)
+    if (creditAmount > 0) {
+      rows.push({
+        memberId: advancerId,
+        name: member.displayName || member.name || memberName(advancerId, members),
+        initial: initials(member),
+        color: member.color,
+        amount: creditAmount,
+        roleLabel: 'Người khác trả lại',
+      })
+    }
   }
 
   memberIds.forEach(memberId => {
+    if (status === 'unpaid' && String(memberId) === String(advancerId)) return
     const member = members.find(row => String(row?.id || row?.member_id) === String(memberId)) || { id: memberId }
     rows.push({
       memberId,
