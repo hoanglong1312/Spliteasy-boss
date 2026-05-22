@@ -1359,9 +1359,10 @@ function getAllSessions(state) {
 function getStateMonthSessions(state, date) {
   const month = monthKey(date)
   const groupId = state?.currentGroupId || state?.currentGroup?.id
-  return getAllSessions(state)
+  const allSessions = getAllSessions(state)
+  return allSessions
     .filter(session => !isHiddenReplacementSession(session))
-    .filter(session => !isMovedReplacementSession(session))
+    .filter(session => !isStaleReplacementSession(session, allSessions))
     .filter(session => {
       const sessionGroupId = session?.groupId || session?.group_id
       return !groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)
@@ -1401,9 +1402,23 @@ function isHiddenReplacementSession(session) {
   return String(session?.notes || '').includes('[hidden-replacement]')
 }
 
-function isMovedReplacementSession(session) {
-  const originDate = String(session?.notes || '').match(/Dời từ (\d{4}-\d{2}-\d{2})/)?.[1]
-  return Boolean(originDate && originDate !== dateKey(sessionDate(session)) && isMovedSession(session))
+function replacementOriginDate(session) {
+  return String(session?.notes || '').match(/Dời từ (\d{4}-\d{2}-\d{2})/)?.[1] || ''
+}
+
+function isStaleReplacementSession(session, sessions) {
+  const originDate = replacementOriginDate(session)
+  const selfDate = dateKey(sessionDate(session))
+  if (!originDate || originDate === selfDate) return false
+  if (isMovedSession(session)) return true
+  const groupId = session?.groupId || session?.group_id
+  const originSession = safeArray(sessions).find(item => {
+    const itemGroupId = item?.groupId || item?.group_id
+    return dateKey(sessionDate(item)) === originDate &&
+      (!groupId || !itemGroupId || String(itemGroupId) === String(groupId)) &&
+      !isHiddenReplacementSession(item)
+  })
+  return Boolean(originSession && !isMovedSession(originSession))
 }
 
 function calendarCellState(date, session, state) {

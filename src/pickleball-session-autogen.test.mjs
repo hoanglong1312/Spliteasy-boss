@@ -408,6 +408,32 @@ test('calendar hides moved replacement dates and keeps only the original moved m
   assert.equal(data.sessions.some(session => session.id === 'replacement-31'), false)
 })
 
+test('calendar hides replacement dates after the original session is restored', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'origin-22', groupId: 'g1', date: '2026-05-22', status: 'scheduled' },
+        { id: 'replacement-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled', notes: 'Dời từ 2026-05-22 sang 2026-05-23' },
+        { id: 'replacement-24', groupId: 'g1', date: '2026-05-24', status: 'scheduled', notes: 'Dời từ 2026-05-22 qua 2026-05-23 sang 2026-05-24' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [5] }],
+    },
+    _allPickle: { sessions: [] },
+  })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-22').state, 'upcoming')
+  assert.equal(byDate.get('2026-05-23').state, 'normal')
+  assert.equal(byDate.get('2026-05-24').state, 'normal')
+  assert.equal(data.sessions.some(session => session.id === 'replacement-23'), false)
+  assert.equal(data.sessions.some(session => session.id === 'replacement-24'), false)
+})
+
 test('reschedule handler cancels old session and creates a new scheduled session', () => {
   assert.match(appSource, /type === 'rescheduleSession'/)
   assert.match(appSource, /type: 'RESCHEDULE_PICKLEBALL_SESSION'/)
