@@ -74,6 +74,17 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /year_month: monthKey\(sessionDate \|\| new Date\(\)\)/)
   assert.match(appSource, /created_by: state\.currentUserId/)
 
+  assert.match(appSource, /if \(type === 'updateTicket'\)/)
+  assert.match(appSource, /const ticketId = payload\?\.ticketId \?\? payload\?\.id/)
+  assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.update\(\{/)
+  assert.match(appSource, /session_date: sessionDate/)
+  assert.match(appSource, /session_time: sessionTime/)
+  assert.match(appSource, /member_ids: memberIds/)
+  assert.match(appSource, /advancer_id: advancerId/)
+  assert.match(appSource, /status: ticketStatus/)
+  assert.match(appSource, /year_month: monthKey\(sessionDate \|\| new Date\(\)\)/)
+  assert.match(appSource, /\.eq\('id', ticketId\)/)
+
   assert.match(appSource, /if \(type === 'approveTicket'\)/)
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.update\(\{ status: approvedStatus \}\)/)
   assert.match(appSource, /\.eq\('id', ticketId\)/)

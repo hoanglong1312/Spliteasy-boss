@@ -433,6 +433,43 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'updateTicket') {
+      if (!isTreasurer) return
+      const ticketId = payload?.ticketId ?? payload?.id
+      if (!ticketId || !state.currentGroupId) return
+      const sessionDate = normalizeTicketDate(payload?.session_date || payload?.date)
+      const sessionTime = payload?.session_time || payload?.time || null
+      const memberIds = normalizeTicketMemberIds(payload?.member_ids || payload?.memberIds, state)
+      const totalAmount = parseMoneyAmount(payload?.total_amount ?? payload?.totalAmount)
+      const isAdvancerMode = payload?.paymentMode === 'advancer'
+      const wantsTeamFund = payload?.paymentMode === 'team_fund' || payload?.teamFund === true || payload?.status === 'team_fund'
+      const rawAdvancerId = payload?.advancer_id ?? payload?.advancerId ?? null
+      const advancerId = wantsTeamFund ? null : rawAdvancerId
+      const isTeamFund = wantsTeamFund || (!isAdvancerMode && !advancerId)
+      if (!sessionDate) throw new Error('ticket_session_date_required')
+      if (memberIds.length === 0) throw new Error('ticket_members_required')
+      if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
+      if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
+      const ticketStatus = isTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('pickleball_tickets')
+        .update({
+          session_date: sessionDate,
+          session_time: sessionTime,
+          total_amount: totalAmount,
+          member_ids: memberIds,
+          advancer_id: advancerId,
+          status: ticketStatus,
+          year_month: monthKey(sessionDate || new Date()),
+        })
+        .eq('id', ticketId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'markAttendance') {
       if (!isTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.session_id

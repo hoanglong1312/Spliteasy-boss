@@ -36,12 +36,17 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
     : null;
   const selectedTickets = (d.tickets || []).filter(ticket => ticket.date === selectedDate);
   const [ticketFormOpen, setTicketFormOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState(null);
 
   useEffect(() => {
     const nextSession = d.selectedSession || (d.sessions || [])[0] || null;
     setSelectedDate(d.selectedSessionDate || nextSession?.date || '');
     setSelectedSessionId(nextSession?.id || null);
   }, [d.selectedSession?.id, d.selectedSessionDate]);
+
+  useEffect(() => {
+    if (editingTicket) setTicketFormOpen(true);
+  }, [editingTicket]);
 
   return (
     <PhoneFrame>
@@ -114,7 +119,11 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             date={selectedDate}
             tickets={selectedTickets}
             isTreasurer={isTreasurer}
-            onAdd={() => setTicketFormOpen(true)}
+            onAdd={() => {
+              setEditingTicket(null);
+              setTicketFormOpen(true);
+            }}
+            onEdit={setEditingTicket}
             onAction={onAction}
           />
         )}
@@ -123,11 +132,20 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
       {ticketFormOpen && (
         <AddTicketSheet
           data={d}
-          selectedDate={selectedDate}
-          onClose={() => setTicketFormOpen(false)}
-          onSave={async (payload) => {
-            await onAction?.('addTicket', payload);
+          selectedDate={editingTicket?.date || selectedDate}
+          editingTicket={editingTicket}
+          onClose={() => {
             setTicketFormOpen(false);
+            setEditingTicket(null);
+          }}
+          onSave={async (payload) => {
+            if (editingTicket) {
+              await onAction?.('updateTicket', { ticketId: editingTicket.id, ...payload });
+            } else {
+              await onAction?.('addTicket', payload);
+            }
+            setTicketFormOpen(false);
+            setEditingTicket(null);
           }}
         />
       )}
@@ -198,7 +216,7 @@ function CalendarCell({ day, selected, onClick }) {
   );
 }
 
-function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onAction }) {
+function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, onAction }) {
   const dateLabel = formatDayLabel(date);
   const total = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0);
   return (
@@ -253,6 +271,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onAction }) {
                       style={ticketActionStyle('success')}
                     >Duyệt</button>
                   )}
+                  <button type="button" onClick={() => onEdit?.(ticket)} style={ticketActionStyle('neutral')}>Sửa</button>
                   <button type="button" onClick={() => onAction?.('deleteTicket', { ticketId: ticket.id })} style={ticketActionStyle('danger')}>Xóa</button>
                 </div>
               )}
@@ -264,15 +283,16 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onAction }) {
   );
 }
 
-function AddTicketSheet({ data, selectedDate, onClose, onSave }) {
+function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onSave }) {
   const members = data.ticketMembers || [];
-  const [time, setTime] = useState('19:00');
-  const [memberIds, setMemberIds] = useState([]);
-  const [paymentMode, setPaymentMode] = useState('team_fund');
-  const [advancerId, setAdvancerId] = useState('');
+  const initialPaymentMode = editingTicket?.advancerId ? 'advancer' : 'team_fund';
+  const [time, setTime] = useState(formatTimeLabel(editingTicket?.timeLabel || editingTicket?.time || '19:00'));
+  const [memberIds, setMemberIds] = useState(editingTicket?.memberIds || []);
+  const [paymentMode, setPaymentMode] = useState(initialPaymentMode);
+  const [advancerId, setAdvancerId] = useState(editingTicket?.advancerId || '');
   const [error, setError] = useState('');
   const selectedMembers = members.filter(member => memberIds.some(id => String(id) === String(member.id)));
-  const ticketPrice = Number(data.ticketPricePerPerson || data.ticketPrice || 50000) || 50000;
+  const ticketPrice = Number(editingTicket?.amountPerPerson || data.ticketPricePerPerson || data.ticketPrice || 50000) || 50000;
   const totalAmount = ticketPrice * memberIds.length;
 
   useEffect(() => {
@@ -330,7 +350,7 @@ function AddTicketSheet({ data, selectedDate, onClose, onSave }) {
             <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', letterSpacing: '1px', textTransform: 'uppercase' }}>
               Vé lẻ · {formatDayLabel(selectedDate)}
             </div>
-            <div style={{ fontSize: 16, fontWeight: 900, marginTop: 2 }}>Thêm buổi xé vé</div>
+            <div style={{ fontSize: 16, fontWeight: 900, marginTop: 2 }}>{editingTicket ? 'Sửa vé lẻ' : 'Thêm buổi xé vé'}</div>
           </div>
           <button type="button" onClick={onClose} style={{
             border: 'none',
@@ -406,7 +426,7 @@ function AddTicketSheet({ data, selectedDate, onClose, onSave }) {
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <Button type="button" variant="ghost" block onClick={onClose} style={{ padding: 12 }}>Hủy</Button>
-          <Button type="submit" variant="success" block style={{ padding: 12 }}>Lưu vé</Button>
+          <Button type="submit" variant="success" block style={{ padding: 12 }}>{editingTicket ? 'Cập nhật vé' : 'Lưu vé'}</Button>
         </div>
       </form>
     </div>
@@ -1100,7 +1120,9 @@ function formatAmountInput(value) {
 function ticketActionStyle(tone) {
   const palette = tone === 'danger'
     ? { bg: colors.dangerSoft, border: 'rgba(248,113,113,0.24)', color: '#fca5a5' }
-    : { bg: colors.successSoft, border: 'rgba(52,211,153,0.28)', color: '#86efac' };
+    : tone === 'neutral'
+      ? { bg: 'rgba(255,255,255,0.05)', border: colors.borderSubtle, color: colors.textSecondary }
+      : { bg: colors.successSoft, border: 'rgba(52,211,153,0.28)', color: '#86efac' };
   return {
     border: `1px solid ${palette.border}`,
     background: palette.bg,
