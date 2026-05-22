@@ -325,7 +325,61 @@ test('calendar exposes treasurer reschedule action only for unfinished sessions'
   assert.match(calendarSource, />Dời buổi</)
   assert.match(calendarSource, /type="date"/)
   assert.match(calendarSource, /onAction\?\.\('rescheduleSession'/)
-  assert.match(dataSource, /canReschedule: !completed && !isMovedSession\(session\)/)
+  assert.match(dataSource, /const locked = completed \|\| moved/)
+  assert.match(dataSource, /canReschedule: !locked/)
+  assert.match(calendarSource, /selected=\{day\.date === selectedDate\}/)
+})
+
+test('moved sessions stay marked moved and locked even when the old date is today', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'old-22', groupId: 'g1', date: '2026-05-22', status: 'cancelled', attendees: [] },
+        { id: 'new-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled', attendees: [] },
+        { id: 'future-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled', attendees: [] },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [5] }],
+    },
+    _allPickle: { sessions: [] },
+  })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+  const oldSession = data.sessions.find(session => session.id === 'old-22')
+  const futureSession = data.sessions.find(session => session.id === 'future-29')
+
+  assert.equal(byDate.get('2026-05-22').state, 'moved')
+  assert.equal(oldSession.status.label, 'Đã dời')
+  assert.equal(oldSession.isCompleted, true)
+  assert.equal(oldSession.canComplete, false)
+  assert.equal(oldSession.canReschedule, false)
+  assert.equal(oldSession.canRestore, true)
+  assert.equal(futureSession.status.label, 'Sắp tới')
+})
+
+test('calendar day selection prefers an active session over a stale moved duplicate on the same date', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'active-29', groupId: 'g1', date: '2026-05-29', status: 'scheduled', attendees: [] },
+        { id: 'stale-29', groupId: 'g1', date: '2026-05-29', status: 'cancelled', attendees: [] },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [5] }],
+    },
+    _allPickle: { sessions: [] },
+  })
+  const day29 = data.days.find(day => day.date === '2026-05-29')
+
+  assert.equal(day29.state, 'upcoming')
+  assert.equal(day29.sessionId, 'active-29')
 })
 
 test('reschedule handler cancels old session and creates a new scheduled session', () => {

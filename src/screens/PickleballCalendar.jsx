@@ -27,7 +27,7 @@ const ATTENDANCE_CHIP_SIZE = 34;
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const initialSession = d.selectedSession || (d.sessions || [])[0] || null;
-  const [selected, setSelected] = useState(d.selectedSessionDay || selectedDayFromSession(initialSession) || 19);
+  const [selectedDate, setSelectedDate] = useState(d.selectedSessionDate || initialSession?.date || '');
   const [selectedSessionId, setSelectedSessionId] = useState(initialSession?.id || null);
   const selectedSession = selectedSessionId
     ? ((d.sessions || []).find(session => String(session.id) === String(selectedSessionId)) ||
@@ -36,9 +36,9 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
 
   useEffect(() => {
     const nextSession = d.selectedSession || (d.sessions || [])[0] || null;
-    setSelected(d.selectedSessionDay || selectedDayFromSession(nextSession) || 19);
+    setSelectedDate(d.selectedSessionDate || nextSession?.date || '');
     setSelectedSessionId(nextSession?.id || null);
-  }, [d.selectedSession?.id, d.selectedSessionDay]);
+  }, [d.selectedSession?.id, d.selectedSessionDate]);
 
   return (
     <PhoneFrame>
@@ -87,10 +87,10 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             <CalendarCell
               key={i}
               day={day}
-              selected={day.n === selected}
+              selected={day.date === selectedDate}
               onClick={() => {
                 if (day.state === 'faded') return;
-                setSelected(day.n);
+                setSelectedDate(day.date);
                 setSelectedSessionId(day.sessionId || null);
               }}
             />
@@ -300,7 +300,27 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
             {session.timeRange} · {session.court}
           </div>
         </div>
-        {isTreasurer && session.canComplete ? (
+        {isTreasurer && session.canRestore ? (
+          <button
+            type="button"
+            onClick={() => onAction?.('reopenSession', { sessionId: session.id })}
+            style={{
+              border: '1px solid rgba(250,204,21,0.34)',
+              borderRadius: 999,
+              padding: '8px 13px',
+              minWidth: 86,
+              background: 'rgba(250,204,21,0.12)',
+              color: '#fde68a',
+              fontSize: 11,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              lineHeight: 1.1,
+              cursor: 'pointer',
+            }}
+          >
+            Khôi phục
+          </button>
+        ) : isTreasurer && session.canComplete ? (
           <button
             type="button"
             aria-pressed={session.isCompleted}
@@ -834,6 +854,7 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
       <button
         type="button"
         onClick={onToggle}
+        disabled={!onToggle}
         aria-label={`${a.name} ${active ? 'tham gia' : 'vắng'}`}
         style={{
           width: ATTENDANCE_CHIP_SIZE,
@@ -849,6 +870,7 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
           fontWeight: 900,
           fontFamily: 'inherit',
           cursor: onToggle ? 'pointer' : 'default',
+          opacity: onToggle ? 1 : 0.78,
           boxShadow: active ? '0 0 12px rgba(52,211,153,0.22)' : 'none',
         }}
       >

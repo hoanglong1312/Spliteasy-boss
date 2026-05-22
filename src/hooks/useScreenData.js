@@ -499,7 +499,9 @@ function buildPickleballCalendarData(state, params = {}) {
   const sessionsByDay = new Map()
   sessions.forEach(session => {
     const date = parseDate(sessionDate(session))
-    if (date) sessionsByDay.set(date.getDate(), session)
+    if (!date) return
+    const day = date.getDate()
+    sessionsByDay.set(day, preferredCalendarDaySession(sessionsByDay.get(day), session))
   })
   const calendarSessions = sessions.map(session => toCalendarSessionDetail(state, session, sessions, today))
   const isCurrentMonth = currentYearMonth === monthKey(today)
@@ -520,6 +522,7 @@ function buildPickleballCalendarData(state, params = {}) {
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(monthDate),
     selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : (isCurrentMonth ? today.getDate() : 1),
+    selectedSessionDate: selectedSession?.date || dateKey(today),
     days: buildCalendarDays(monthDate, sessionsByDay, state),
     sessions: calendarSessions,
     selectedSession,
@@ -1386,6 +1389,12 @@ function buildCalendarDays(monthDate, sessionsByDay, state) {
   })
 }
 
+function preferredCalendarDaySession(current, next) {
+  if (!current) return next
+  if (isMovedSession(current) && !isMovedSession(next)) return next
+  return current
+}
+
 function calendarCellState(date, session, state) {
   if (!session) return isToday(date) ? 'today' : 'normal'
   const normalizedStatus = String(session?.status || '').toLowerCase()
@@ -1437,6 +1446,8 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const sessionKey = dateKey(sessionDate(session))
   const todayKey = dateKey(today)
   const completed = isDoneStatus(session?.status)
+  const moved = isMovedSession(session)
+  const locked = completed || moved
 
   return {
     id: session.id,
@@ -1467,9 +1478,11 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     ],
     totalPerPerson: courtPerPerson + waterPerPerson + extrasPerPerson,
     canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
-    canComplete: sessionKey <= todayKey,
-    isCompleted: completed,
-    canReschedule: !completed && !isMovedSession(session),
+    canComplete: !locked && sessionKey <= todayKey,
+    isCompleted: locked,
+    isMoved: moved,
+    canReschedule: !locked,
+    canRestore: moved,
   }
 }
 
@@ -1497,8 +1510,8 @@ function compactMemberName(member) {
 
 function calendarSessionStatus(session, today) {
   const normalizedStatus = String(session?.status || '').toLowerCase()
-  if (isToday(sessionDate(session))) return { tone: 'brand', label: 'Hôm nay' }
   if (isMovedSession(session)) return { tone: 'warn', label: 'Đã dời' }
+  if (isToday(sessionDate(session))) return { tone: 'brand', label: 'Hôm nay' }
   if (isDoneStatus(normalizedStatus)) return { tone: 'success', label: 'Đã đánh' }
   return dateKey(sessionDate(session)) > dateKey(today) ? { tone: 'muted', label: 'Sắp tới' } : { tone: 'warn', label: 'Chưa chốt' }
 }
