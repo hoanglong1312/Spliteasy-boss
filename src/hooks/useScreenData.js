@@ -432,6 +432,12 @@ function buildPickleballTeamFundData(state) {
     .filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
+  const waterTotal = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0)
+  const extrasTotal = monthSessions.reduce((sum, session) => {
+    return sum + sessionCostsForSession(state, session, currentFixedMembers).extras
+      .reduce((extraSum, item) => extraSum + (Number(item.amount) || 0), 0)
+  }, 0)
+  const ticketPaidAmount = ticketFund.teamFundTotal || 0
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
@@ -443,7 +449,42 @@ function buildPickleballTeamFundData(state) {
     memberCount: currentFixedMembers.length,
     ticketStats,
     ticketFund,
+    costRows: [
+      {
+        key: 'court',
+        label: 'Tiền sân',
+        amount: courtFeeTotal,
+        paidToOwner: isPaidToOwner(monthlyConfig),
+      },
+      {
+        key: 'water',
+        label: 'Tiền nước',
+        amount: waterTotal,
+        paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)),
+      },
+      {
+        key: 'extras',
+        label: 'Phát sinh',
+        amount: extrasTotal,
+        paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)),
+      },
+      {
+        key: 'tickets',
+        label: 'Vé lẻ team',
+        amount: ticketStats.totalAmount || 0,
+        paidAmount: ticketPaidAmount,
+        paidToOwner: ticketPaidAmount > 0,
+      },
+    ],
   }
+}
+
+function isPaidToOwner(value) {
+  if (!value || typeof value !== 'object') return false
+  if (value.paidToOwner || value.paid_to_owner || value.ownerPaid || value.owner_paid) return true
+  if (value.paidToCourt || value.paid_to_court || value.courtPaid || value.court_paid) return true
+  const status = String(value.paymentStatus || value.payment_status || value.ownerPaymentStatus || value.owner_payment_status || '').toLowerCase()
+  return ['paid', 'settled', 'done'].includes(status)
 }
 
 function buildProfileData(me, state, pickle) {

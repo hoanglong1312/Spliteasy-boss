@@ -94,6 +94,12 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   assert.equal(JSON.stringify(data.yourTickets.rows.map(row => [row.dateLabel, row.sourceLabel, row.roleLabel, row.personalAmount])), JSON.stringify([
     ['T5 21/05', 'Anh Việt ứng', 'Bạn ứng tiền', -50000],
   ]))
+  assert.equal(JSON.stringify(data.teamFundOverview.costRows.map(row => [row.label, row.amount, row.paidToOwner])), JSON.stringify([
+    ['Tiền sân', 0, false],
+    ['Tiền nước', 0, false],
+    ['Phát sinh', 0, false],
+    ['Vé lẻ team', 200000, true],
+  ]))
 })
 
 test('overview separates personal tickets from treasurer team-fund view', () => {
@@ -118,7 +124,11 @@ test('overview separates personal tickets from treasurer team-fund view', () => 
   assert.match(overviewSource, /Nước của bạn/)
   assert.match(overviewSource, /Buổi thêm/)
   assert.match(overviewSource, /Phần của bạn/)
-  assert.match(overviewSource, /Có người ứng/)
+  assert.doesNotMatch(overviewSource, /Có người ứng/)
+  assert.match(overviewSource, /Chi phí team và khoản đã trả chủ sân/)
+  assert.match(overviewSource, /teamFundOverview\.costRows/)
+  assert.match(overviewSource, /Đã trả chủ sân/)
+  assert.match(overviewSource, /Chưa đánh dấu trả/)
   assert.ok(overviewSource.indexOf('Của bạn tháng này') < overviewSource.indexOf('Tiến độ tháng'))
   assert.doesNotMatch(overviewSource, /Trừ vào quỹ/)
   assert.doesNotMatch(overviewSource, /Vé lẻ chưa trả/)

@@ -10,7 +10,7 @@ import {
 export default function PickleballOverview({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const yourTickets = d.yourTickets || { summary: { sessionCount: 0, totalAdjustment: 0, advancedCount: 0 }, rows: [] };
-  const teamFundOverview = d.teamFundOverview || { ticketFund: { rows: [], totalDue: 0, totalCredit: 0 }, ticketStats: { sessionCount: 0, totalAmount: 0 } };
+  const teamFundOverview = d.teamFundOverview || { ticketFund: { rows: [], totalDue: 0, totalCredit: 0 }, ticketStats: { sessionCount: 0, totalAmount: 0 }, costRows: [] };
   const personalSummaryCards = d.yourBalance.summaryCards || [
     { icon: '🏸', label: 'Sân của bạn', amount: 0, sub: 'Phần của bạn' },
     { icon: '💧', label: 'Nước của bạn', amount: 0, sub: '0 buổi có nước' },
@@ -165,10 +165,9 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               </button>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
             <TicketFundStat label="Buổi thêm" value={yourTickets.summary.sessionCount} tone="warn" raw />
             <TicketFundStat label="Phần của bạn" value={yourTickets.summary.totalAdjustment} tone={yourTickets.summary.totalAdjustment < 0 ? 'success' : 'warn'} />
-            <TicketFundStat label="Có người ứng" value={yourTickets.summary.advancedCount} tone="warn" raw />
           </div>
 
           {yourTickets.rows.length > 0 && (
@@ -209,7 +208,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   Quỹ team tháng này
                 </div>
                 <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                  Tiền sân, vé lẻ team và chênh lệch quỹ
+                  Chi phí team và khoản đã trả chủ sân
                 </div>
               </div>
               <button type="button" onClick={() => onAction?.('push', 'pickleball-team-fund')} style={{
@@ -226,10 +225,10 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                 Mở quỹ
               </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
-              <TicketFundStat label="Tiền sân" value={teamFundOverview.courtFeeTotal || 0} tone="neutral" />
-              <TicketFundStat label="Vé lẻ team" value={teamFundOverview.ticketStats?.totalAmount || 0} tone="warn" />
-              <TicketFundStat label="Lệch quỹ" value={(teamFundOverview.ticketFund?.totalDue || 0) - (teamFundOverview.ticketFund?.totalCredit || 0)} tone="success" />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
+              {(teamFundOverview.costRows || []).map(row => (
+                <TeamCostStat key={row.key || row.label} row={row} />
+              ))}
             </div>
           </Card>
         )}
@@ -273,6 +272,43 @@ function TicketFundStat({ label, value, tone, raw = false }) {
     }}>
       <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>{label}</div>
       <div style={{ fontSize: 14, color: palette.color, fontWeight: 900, marginTop: 3, ...type.mono }}>{raw ? value : formatVND(value)}</div>
+    </div>
+  );
+}
+
+function TeamCostStat({ row }) {
+  const paid = Boolean(row?.paidToOwner);
+  const palette = paid
+    ? { bg: 'rgba(16,185,129,0.14)', border: 'rgba(52,211,153,0.34)', color: '#6ee7b7', pillBg: 'rgba(52,211,153,0.16)' }
+    : { bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.20)', color: '#bfdbfe', pillBg: 'rgba(148,163,184,0.12)' };
+  return (
+    <div style={{
+      padding: '10px 10px',
+      borderRadius: 12,
+      background: palette.bg,
+      border: `1px solid ${palette.border}`,
+      minWidth: 0,
+    }}>
+      <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+        {row.label}
+      </div>
+      <div style={{ fontSize: 14, color: palette.color, fontWeight: 900, marginTop: 4, ...type.mono }}>
+        {formatVND(row.amount || 0)}
+      </div>
+      <div style={{
+        display: 'inline-flex',
+        marginTop: 7,
+        padding: '4px 7px',
+        borderRadius: 999,
+        background: palette.pillBg,
+        color: paid ? '#a7f3d0' : colors.textMuted,
+        fontSize: 8,
+        fontWeight: 900,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+      }}>
+        {paid ? 'Đã trả chủ sân' : 'Chưa đánh dấu trả'}
+      </div>
     </div>
   );
 }
@@ -383,6 +419,16 @@ const DEMO = {
     rows: [
       { memberId: 1, name: 'Anh Việt', initial: 'AV', amount: -50000, label: 'Quỹ bù lại', roleLabel: 'Ứng tiền vé lẻ' },
       { memberId: 2, name: 'Cường', initial: 'C', amount: 100000, label: 'Nộp vào quỹ', roleLabel: 'Tham gia vé lẻ' },
+    ],
+  },
+  teamFundOverview: {
+    ticketStats: { totalAmount: 250000 },
+    ticketFund: { totalDue: 150000, totalCredit: 50000 },
+    costRows: [
+      { key: 'court', label: 'Tiền sân', amount: 4550000, paidToOwner: false },
+      { key: 'water', label: 'Tiền nước', amount: 60000, paidToOwner: false },
+      { key: 'extras', label: 'Phát sinh', amount: 0, paidToOwner: false },
+      { key: 'tickets', label: 'Vé lẻ team', amount: 250000, paidToOwner: true },
     ],
   },
 };
