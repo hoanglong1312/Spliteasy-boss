@@ -27,25 +27,6 @@ function computeSessionsCount(weekdaySet, yearMonth) {
   return count;
 }
 
-function buildLiveNextMonthPreview(today, weekdaySet) {
-  const next = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const dates = [];
-  const labels = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-  const daysInMonth = new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate();
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = new Date(next.getFullYear(), next.getMonth(), day);
-    const isoWeekday = date.getDay() === 0 ? 7 : date.getDay();
-    if (hasSelectedWeekday(weekdaySet, isoWeekday)) dates.push(String(day).padStart(2, '0'));
-  }
-
-  return {
-    label: `tháng ${next.getMonth() + 1}`,
-    sessions: dates.length,
-    startLabel: dates[0] ? `${labels[new Date(next.getFullYear(), next.getMonth(), Number(dates[0])).getDay()]} ${dates[0]}/${String(next.getMonth() + 1).padStart(2, '0')}` : 'chưa có',
-    dates,
-  };
-}
-
 function splitTimeRange(value) {
   const matches = String(value || '').match(/\d{1,2}:\d{2}/g) || [];
   return [
@@ -71,7 +52,6 @@ export default function PickleballSettings({ data, onAction }) {
   const [clubName, setClubName] = useState(d.clubName || '');
 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
-  const liveNextMonthPreview = buildLiveNextMonthPreview(new Date(), weekdays);
 
   useEffect(() => {
     setWeekdays(new Set(d.weekdays));
@@ -140,6 +120,9 @@ export default function PickleballSettings({ data, onAction }) {
             <div style={{ fontSize: 11, color: '#c7d2fe', fontWeight: 600 }}>
               {liveSessionsCount} buổi theo lịch tháng này
             </div>
+            <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 600, marginTop: 4 }}>
+              Áp dụng cho tháng này và lịch tương lai chưa chốt. Buổi đã chốt không đổi.
+            </div>
           </div>
 
           {/* Weekday picker */}
@@ -202,37 +185,6 @@ export default function PickleballSettings({ data, onAction }) {
                   fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
                 }}
               />
-            </div>
-          </div>
-
-          {/* Preview */}
-          <div style={{
-            marginTop: 14, padding: '14px 16px',
-            background: 'linear-gradient(145deg, rgba(52,211,153,0.10), rgba(52,211,153,0.04))',
-            border: '1px solid rgba(52,211,153,0.25)',
-            borderRadius: 14,
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              📍 Xem trước {liveNextMonthPreview.label}
-            </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary, marginTop: 6 }}>
-              {liveNextMonthPreview.sessions} buổi · Bắt đầu {liveNextMonthPreview.startLabel}
-            </div>
-            <div style={{ display: 'flex', gap: 4, marginTop: 10, flexWrap: 'wrap' }}>
-              {liveNextMonthPreview.dates.slice(0, 5).map(date => (
-                <span key={date} style={{
-                  padding: '3px 8px', borderRadius: 6,
-                  background: 'rgba(52,211,153,0.15)',
-                  fontSize: 10, fontWeight: 700, color: '#6ee7b7', ...type.mono,
-                }}>{date}</span>
-              ))}
-              {liveNextMonthPreview.dates.length > 5 && (
-                <span style={{
-                  padding: '3px 8px', borderRadius: 6,
-                  background: 'rgba(255,255,255,0.04)',
-                  fontSize: 10, fontWeight: 700, color: colors.textMuted, ...type.mono,
-                }}>+{liveNextMonthPreview.dates.length - 5}</span>
-              )}
             </div>
           </div>
 

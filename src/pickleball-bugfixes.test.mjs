@@ -295,6 +295,29 @@ test('settings calculates session count from configured weekdays in the current 
   assert.equal(data.sessionsCount, 13)
 })
 
+test('settings reads monthly schedule time before group default time', () => {
+  const { buildPickleballSettingsData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleTime: '19:00 – 21:00' },
+    members: [{ id: 'm1', groupId: 'g1', name: 'An', role: 'treasurer' }],
+    pickle: {
+      sessions: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', schedule_time: '19:00 – 22:00' }],
+    },
+    _allPickle: {
+      configs: [{ groupId: 'g1', schedule_time: '19:00 – 21:00' }],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', schedule_time: '19:00 – 22:00' }],
+      sessions: [],
+    },
+  }
+
+  const data = buildPickleballSettingsData(state)
+
+  assert.equal(data.timeRange, '19:00 – 22:00')
+})
+
 test('settings member count follows active fixed members from members tab and does not expose venue', () => {
   const { buildPickleballMembersData, buildPickleballSettingsData } = loadScreenDataBuilders()
   const state = {

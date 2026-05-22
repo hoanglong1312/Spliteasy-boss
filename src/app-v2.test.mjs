@@ -139,7 +139,7 @@ test('AppV2 regenerates pickleball schedule from payload weekdays instead of dis
   const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?setStack\(\(s\) => s\.slice\(0, -1\)\)/)?.[0] || ''
 
   assert.match(settingsSaveBlock, /const newWeekdays = normalizeScheduleWeekdays\(payload\?\.weekdays\)/)
-  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| hasScheduledSessionsWithOldDays/)
+  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| scheduleStartChanged \|\| hasScheduledSessionsWithOldDays/)
   assert.match(settingsSaveBlock, /scheduleWeekdays: newWeekdays/)
   assert.doesNotMatch(settingsSaveBlock, /savedWeekdays/)
 })
@@ -150,21 +150,27 @@ test('AppV2 regenerates scheduled pickleball sessions when schedule time changes
   assert.match(settingsSaveBlock, /const oldScheduleTime = normalizeScheduleTimeForCompare/)
   assert.match(settingsSaveBlock, /const newScheduleTime = normalizeScheduleTimeForCompare\(payload\?\.scheduleTime\)/)
   assert.match(settingsSaveBlock, /const scheduleTimeChanged = oldScheduleTime !== newScheduleTime/)
-  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| hasScheduledSessionsWithOldDays/)
+  assert.match(settingsSaveBlock, /const scheduleStartChanged = oldScheduleStartDay !== newScheduleStartDay/)
+  assert.match(settingsSaveBlock, /const shouldRegenerateSchedule = !sameScheduleWeekdays\(oldWeekdays, newWeekdays\) \|\| scheduleTimeChanged \|\| scheduleStartChanged \|\| hasScheduledSessionsWithOldDays/)
 })
 
-test('AppV2 saveSettings pre-generates next-month pickleball schedule', () => {
+test('AppV2 saveSettings updates only inherited future pickleball schedule', () => {
   const settingsSaveBlock = appSource.match(/if \(type === 'saveSettings'[\s\S]*?setStack\(\(s\) => s\.slice\(0, -1\)\)/)?.[0] || ''
 
   assert.match(settingsSaveBlock, /const \[y, m\] = yearMonth\.split\('-'\)\.map\(Number\)/)
   assert.match(settingsSaveBlock, /const nextYearMonth = /)
   assert.match(settingsSaveBlock, /padStart\(2, '0'\)/)
-  assert.match(settingsSaveBlock, /type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG'[\s\S]*?yearMonth: nextYearMonth[\s\S]*?scheduleStartDay: null[\s\S]*?skipIfExists: true/)
+  assert.match(settingsSaveBlock, /const oldEffectiveScheduleConfig = sessionGenerationConfigFromState\(state, yearMonth\)/)
+  assert.match(settingsSaveBlock, /const nextMonthlyConfig = findMonthlyPickleConfig\(state, groupId, nextYearMonth\)/)
+  assert.match(settingsSaveBlock, /const previousScheduleConfig = \{ scheduleWeekdays: oldWeekdays, scheduleTime: oldScheduleTime, scheduleStartDay: oldScheduleStartDay \}/)
+  assert.match(settingsSaveBlock, /const shouldUpdateNextMonthSchedule = shouldRegenerateSchedule && isFutureScheduleInherited\(nextMonthlyConfig, previousScheduleConfig\)/)
+  assert.doesNotMatch(settingsSaveBlock, /skipIfExists: true/)
   assert.match(settingsSaveBlock, /\.from\('pickle_sessions'\)[\s\S]*?\.eq\('status', 'scheduled'\)[\s\S]*?\.gte\('session_date', `\$\{nextYearMonth\}-01`\)[\s\S]*?\.lte\('session_date', `\$\{nextYearMonth\}-31`\)/)
-  assert.match(settingsSaveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.gte\('date', `\$\{nextYearMonth\}-01`\)[\s\S]*?\.lte\('date', `\$\{nextYearMonth\}-31`\)/)
+  assert.match(settingsSaveBlock, /\.from\('pickleball_sessions'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.or\('status\.is\.null,status\.eq\.scheduled'\)[\s\S]*?\.gte\('date', `\$\{nextYearMonth\}-01`\)[\s\S]*?\.lte\('date', `\$\{nextYearMonth\}-31`\)/)
   assert.match(settingsSaveBlock, /const nextConfig = \{[\s\S]*?\.\.\.sessionGenerationConfigFromState\(state, nextYearMonth\)[\s\S]*?scheduleWeekdays: newWeekdays[\s\S]*?scheduleTime: action\.scheduleTime/)
   assert.match(settingsSaveBlock, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*?yearMonth: nextYearMonth[\s\S]*?config: nextConfig[\s\S]*?force: true/)
-  assert.match(settingsSaveBlock, /alert\('Đã lưu cài đặt và tạo lịch tháng sau'\)/)
+  assert.match(appSource, /function isFutureScheduleInherited\(futureConfig, previousConfig\)/)
+  assert.match(settingsSaveBlock, /alert\('Đã lưu cài đặt lịch'\)/)
 })
 
 test('AppV2 routes pickleball month navigation through calendar params and auto-generation', () => {

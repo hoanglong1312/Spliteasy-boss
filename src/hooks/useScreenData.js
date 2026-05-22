@@ -927,7 +927,8 @@ function buildPickleballSettingsData(state) {
     if (wantedDays.has(WEEK_LABELS_LOCAL[dt.getDay()])) calcSessions++
   }
   const sessionsCount = calcSessions > 0 ? calcSessions : Math.max(sessions.length, 1)
-  const scheduleTime = config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
+  const scheduleTime = monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time ||
+    config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
   const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
   const memberIds = billingMembers.map(m => m.id || m.member_id).filter(Boolean)
   const activeMonthlyMemberIds = memberIds

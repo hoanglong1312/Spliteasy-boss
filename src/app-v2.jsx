@@ -162,10 +162,14 @@ export default function AppV2() {
       const { token } = getStoredAuth()
       const sb = token ? createSupabase(token) : null
       const oldMonthlyConfig = findMonthlyPickleConfig(state, groupId, yearMonth)
+      const oldEffectiveScheduleConfig = sessionGenerationConfigFromState(state, yearMonth)
       const oldWeekdays = normalizeScheduleWeekdays(oldMonthlyConfig.scheduleWeekdays ?? oldMonthlyConfig.schedule_weekdays)
-      const oldScheduleTime = normalizeScheduleTimeForCompare(oldMonthlyConfig.scheduleTime ?? oldMonthlyConfig.schedule_time)
+      const oldScheduleTime = normalizeScheduleTimeForCompare(oldEffectiveScheduleConfig.scheduleTime)
       const newScheduleTime = normalizeScheduleTimeForCompare(payload?.scheduleTime)
       const scheduleTimeChanged = oldScheduleTime !== newScheduleTime
+      const oldScheduleStartDay = normalizeScheduleStartDayForCompare(oldEffectiveScheduleConfig.startDate)
+      const newScheduleStartDay = normalizeScheduleStartDayForCompare(payload?.startDate)
+      const scheduleStartChanged = oldScheduleStartDay !== newScheduleStartDay
       const existingScheduledSessions = scheduledSessionsForMonth(state, groupId, yearMonth)
       const newWeekdays = normalizeScheduleWeekdays(payload?.weekdays)
       const newWeekdaySet = new Set(newWeekdays)
@@ -196,7 +200,7 @@ export default function AppV2() {
         })
       }
       await dispatch(action)
-      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || scheduleTimeChanged || hasScheduledSessionsWithOldDays
+      const shouldRegenerateSchedule = !sameScheduleWeekdays(oldWeekdays, newWeekdays) || scheduleTimeChanged || scheduleStartChanged || hasScheduledSessionsWithOldDays
       if (shouldRegenerateSchedule && groupId && sb) {
         await dispatch({ type: 'SET_PICKLE_REGEN', value: true })
         try {
@@ -212,6 +216,7 @@ export default function AppV2() {
               .from('pickleball_sessions')
               .delete()
               .eq('group_id', groupId)
+              .or('status.is.null,status.eq.scheduled')
               .gte('date', `${yearMonth}-01`)
               .lte('date', `${yearMonth}-31`),
           ])
@@ -244,49 +249,54 @@ export default function AppV2() {
       if (groupId && sb) {
         const [y, m] = yearMonth.split('-').map(Number)
         const nextYearMonth = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`
+        const nextMonthlyConfig = findMonthlyPickleConfig(state, groupId, nextYearMonth)
+        const previousScheduleConfig = { scheduleWeekdays: oldWeekdays, scheduleTime: oldScheduleTime, scheduleStartDay: oldScheduleStartDay }
+        const shouldUpdateNextMonthSchedule = shouldRegenerateSchedule && isFutureScheduleInherited(nextMonthlyConfig, previousScheduleConfig)
 
-        await dispatch({
-          type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
-          groupId,
-          yearMonth: nextYearMonth,
-          scheduleWeekdays: payload?.weekdays,
-          scheduleStartDay: null,
-          scheduleTime: payload?.scheduleTime,
-          skipIfExists: true,
-        })
+        if (shouldUpdateNextMonthSchedule) {
+          await dispatch({
+            type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
+            groupId,
+            yearMonth: nextYearMonth,
+            scheduleWeekdays: newWeekdays,
+            scheduleStartDay: null,
+            scheduleTime: payload?.scheduleTime,
+          })
 
-        const [d1, d2] = await Promise.all([
-          sb
-            .from('pickle_sessions')
-            .delete()
-            .eq('group_id', groupId)
-            .eq('status', 'scheduled')
-            .gte('session_date', `${nextYearMonth}-01`)
-            .lte('session_date', `${nextYearMonth}-31`),
-          sb
-            .from('pickleball_sessions')
-            .delete()
-            .eq('group_id', groupId)
-            .gte('date', `${nextYearMonth}-01`)
-            .lte('date', `${nextYearMonth}-31`),
-        ])
-        if (d1.error) console.warn('[saveSettings] next month delete p1:', d1.error)
-        if (d2.error) console.warn('[saveSettings] next month delete p2:', d2.error)
+          const [d1, d2] = await Promise.all([
+            sb
+              .from('pickle_sessions')
+              .delete()
+              .eq('group_id', groupId)
+              .eq('status', 'scheduled')
+              .gte('session_date', `${nextYearMonth}-01`)
+              .lte('session_date', `${nextYearMonth}-31`),
+            sb
+              .from('pickleball_sessions')
+              .delete()
+              .eq('group_id', groupId)
+              .or('status.is.null,status.eq.scheduled')
+              .gte('date', `${nextYearMonth}-01`)
+              .lte('date', `${nextYearMonth}-31`),
+          ])
+          if (d1.error) console.warn('[saveSettings] next month delete p1:', d1.error)
+          if (d2.error) console.warn('[saveSettings] next month delete p2:', d2.error)
 
-        const nextConfig = {
-          ...sessionGenerationConfigFromState(state, nextYearMonth),
-          scheduleWeekdays: newWeekdays,
-          scheduleTime: action.scheduleTime,
+          const nextConfig = {
+            ...sessionGenerationConfigFromState(state, nextYearMonth),
+            scheduleWeekdays: newWeekdays,
+            scheduleTime: action.scheduleTime,
+          }
+          await dispatch({
+            type: 'AUTO_GENERATE_SESSIONS',
+            groupId,
+            yearMonth: nextYearMonth,
+            config: nextConfig,
+            force: true,
+          })
         }
-        await dispatch({
-          type: 'AUTO_GENERATE_SESSIONS',
-          groupId,
-          yearMonth: nextYearMonth,
-          config: nextConfig,
-          force: true,
-        })
       }
-      alert('Đã lưu cài đặt và tạo lịch tháng sau')
+      alert('Đã lưu cài đặt lịch')
       setStack((s) => s.slice(0, -1))
       return
     }
@@ -1360,6 +1370,20 @@ function sameScheduleWeekdays(left, right) {
   return a.length === b.length && a.every((day, index) => day === b[index])
 }
 
+function isFutureScheduleInherited(futureConfig, previousConfig) {
+  if (!futureConfig || Object.keys(futureConfig).length === 0) return true
+  const futureWeekdays = futureConfig.scheduleWeekdays ?? futureConfig.schedule_weekdays
+  const previousWeekdays = previousConfig.scheduleWeekdays ?? previousConfig.schedule_weekdays
+  const futureTime = futureConfig.scheduleTime ?? futureConfig.schedule_time
+  const previousTime = previousConfig.scheduleTime ?? previousConfig.schedule_time
+  const futureStartDay = futureConfig.scheduleStartDay ?? futureConfig.schedule_start_day
+  const previousStartDay = previousConfig.scheduleStartDay ?? previousConfig.schedule_start_day
+  const hasOwnWeekdays = normalizeScheduleWeekdays(futureWeekdays).length > 0 && !sameScheduleWeekdays(futureWeekdays, previousWeekdays)
+  const hasOwnTime = normalizeScheduleTimeForCompare(futureTime) && normalizeScheduleTimeForCompare(futureTime) !== normalizeScheduleTimeForCompare(previousTime)
+  const hasOwnStartDay = normalizeScheduleStartDayForCompare(futureStartDay) && normalizeScheduleStartDayForCompare(futureStartDay) !== normalizeScheduleStartDayForCompare(previousStartDay)
+  return !hasOwnWeekdays && !hasOwnTime && !hasOwnStartDay
+}
+
 function normalizeScheduleTimeForCompare(value) {
   const parts = String(value || '').match(/\d{1,2}:\d{2}/g) || []
   return parts
@@ -1369,6 +1393,15 @@ function normalizeScheduleTimeForCompare(value) {
       return `${String(Math.max(0, Math.min(hour || 0, 23))).padStart(2, '0')}:${String(Math.max(0, Math.min(minute || 0, 59))).padStart(2, '0')}`
     })
     .join('-')
+}
+
+function normalizeScheduleStartDayForCompare(value) {
+  const text = String(value || '').trim()
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
+  if (iso) return String(Number(iso[3]) || 1).padStart(2, '0')
+  const slash = text.match(/^(\d{1,2})\/(\d{1,2})(?:\/\d{4})?$/)
+  if (slash) return String(Number(slash[1]) || 1).padStart(2, '0')
+  return ''
 }
 
 function isoWeekdayFromDate(value) {
