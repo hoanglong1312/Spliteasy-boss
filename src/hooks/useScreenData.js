@@ -70,6 +70,7 @@ export function useScreenData() {
       getMemberDetailData: (memberId) => buildMemberDetailData(state, memberId),
       getPickleballTicketsData: () => buildPickleballTicketsData(state),
       getPickleballSettingsData: () => buildPickleballSettingsData(state),
+      getPickleballTeamFundData: () => buildPickleballTeamFundData(state),
       getBatchEntryData: () => buildBatchEntryData(state),
       getPaymentFlowData: (memberId) => buildPaymentFlowData(state, memberId),
       getJoinGroupData: () => buildJoinGroupData(state),
@@ -371,6 +372,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
   const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
+  const teamFundOverview = buildPickleballTeamFundData(state)
   const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
   const currentMember = members.find(member => String(member.id || member.member_id) === String(currentUserId))
@@ -409,12 +411,38 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     yourTickets: buildPersonalTicketOverview(state, currentUserId),
     ticketStats,
     ticketFund,
+    teamFundOverview,
     shouldAutoGenerate,
     autoGenerateRequest: shouldAutoGenerate ? {
       yearMonth: currentYearMonth,
       config: autoGenerateConfig,
     } : null,
     autoGenerateKey: shouldAutoGenerate ? `${state?.currentGroupId || state?.currentGroup?.id || 'group'}:${currentYearMonth}` : '',
+  }
+}
+
+function buildPickleballTeamFundData(state) {
+  const today = new Date()
+  const currentYearMonth = monthKey(today)
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
+  const monthSessions = getStateMonthSessions(state, today)
+  const ticketStats = buildTicketMonthStats(state)
+  const ticketFund = buildTicketFundSummary(state)
+  const currentFixedMembers = currentGroupMembers(state)
+    .filter(member => isActiveMember(member) && memberType(member) === 'fixed')
+  const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
+  const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
+
+  return {
+    clubName: currentGroupName(state, 'CLB Pickleball'),
+    monthLabel: formatMonthLabel(today),
+    currentYearMonth,
+    courtFeeTotal,
+    ticketPrice,
+    sessionsCount: monthSessions.length,
+    memberCount: currentFixedMembers.length,
+    ticketStats,
+    ticketFund,
   }
 }
 
@@ -2774,6 +2802,7 @@ function buildTicketMonthStats(state) {
   const teamFund = rows.filter(ticket => ticket.status === 'team_fund')
   return {
     sessionCount: approvedRows.length,
+    participantCount: approvedRows.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
     totalAttendances: approvedRows.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
     totalAmount: approvedRows.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0),
     pendingCount: pending.length,

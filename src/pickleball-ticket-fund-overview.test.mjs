@@ -5,6 +5,7 @@ import vm from 'node:vm'
 
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 const overviewSource = readFileSync(new URL('./screens/PickleballOverview.jsx', import.meta.url), 'utf8')
+const teamFundSource = readFileSync(new URL('./screens/PickleballTeamFund.jsx', import.meta.url), 'utf8')
 
 function loadScreenDataBuilders() {
   const fixedNow = new Date('2026-05-21T12:00:00')
@@ -95,14 +96,18 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   ]))
 })
 
-test('overview renders ticket-fund summary card', () => {
-  assert.match(overviewSource, /d\.ticketFund\?\.rows\?\.length > 0/)
+test('overview separates personal tickets from treasurer team-fund view', () => {
+  assert.doesNotMatch(overviewSource, /d\.ticketFund\?\.rows\?\.length > 0/)
   assert.doesNotMatch(overviewSource, /Vé lẻ trong quỹ/)
   assert.match(overviewSource, /Vé lẻ qua quỹ/)
-  assert.match(overviewSource, /ticketFund\.rows\.map/)
-  assert.match(overviewSource, /Chênh lệch qua quỹ/)
-  assert.match(overviewSource, /Quỹ bù lại/)
-  assert.match(overviewSource, /Nộp vào quỹ/)
+  assert.doesNotMatch(overviewSource, /ticketFund\.rows\.map/)
+  assert.doesNotMatch(overviewSource, /Chênh lệch qua quỹ/)
+  assert.doesNotMatch(overviewSource, /Cần thu/)
+  assert.doesNotMatch(overviewSource, /Cần bù/)
+  assert.match(overviewSource, /Vé lẻ của bạn trong tháng/)
+  assert.match(overviewSource, /isTreasurer && \(/)
+  assert.match(overviewSource, /Quỹ team tháng này/)
+  assert.match(overviewSource, /onAction\?\.\('push', 'pickleball-team-fund'\)/)
   assert.match(overviewSource, /Của bạn tháng này/)
   assert.doesNotMatch(overviewSource, /Xem chi tiết/)
   assert.doesNotMatch(overviewSource, /balanceDetailsOpen/)
@@ -118,6 +123,19 @@ test('overview renders ticket-fund summary card', () => {
   assert.doesNotMatch(overviewSource, /Trừ vào quỹ/)
   assert.doesNotMatch(overviewSource, /Vé lẻ chưa trả/)
   assert.doesNotMatch(overviewSource, /CompactCostCard icon="🏸" label="Tiền sân"/)
+})
+
+test('team fund screen owns treasury totals and monthly money config', () => {
+  assert.match(teamFundSource, /export default function PickleballTeamFund/)
+  assert.match(teamFundSource, /const \[courtFee, setCourtFee\] = useState/)
+  assert.match(teamFundSource, /const \[ticketPrice, setTicketPrice\] = useState/)
+  assert.match(teamFundSource, /Tiền sân tháng/)
+  assert.match(teamFundSource, /Giá vé lẻ\/người/)
+  assert.match(teamFundSource, /Tổng vé lẻ team/)
+  assert.match(teamFundSource, /Chênh lệch qua quỹ/)
+  assert.match(teamFundSource, /ticketFund\.rows\.map/)
+  assert.match(teamFundSource, /onAction\?\.\('saveTeamFundConfig'/)
+  assert.match(teamFundSource, /onAction\?\.\('push', 'pickleball-calendar'\)/)
 })
 
 test('overview folds next session into progress card instead of rendering a separate hero', () => {

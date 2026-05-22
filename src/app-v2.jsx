@@ -15,6 +15,7 @@ import PickleballMembers from './screens/PickleballMembers'
 import MemberDetail from './screens/MemberDetail'
 import PickleballTickets from './screens/PickleballTickets'
 import PickleballSettings from './screens/PickleballSettings'
+import PickleballTeamFund from './screens/PickleballTeamFund'
 import BatchEntry from './screens/BatchEntry'
 import Profile from './screens/Profile'
 import PaymentFlow from './screens/PaymentFlow'
@@ -52,6 +53,7 @@ export default function AppV2() {
     getMemberDetailData,
     getPickleballTicketsData,
     getPickleballSettingsData,
+    getPickleballTeamFundData,
     getBatchEntryData,
     getPaymentFlowData,
     getJoinGroupData,
@@ -175,8 +177,6 @@ export default function AppV2() {
         type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
         groupId,
         yearMonth,
-        courtFee: payload?.courtFee,
-        ticketPrice: payload?.ticketPrice,
         scheduleWeekdays: payload?.weekdays,
         scheduleStartDay: payload?.startDate,
         scheduleTime: payload?.scheduleTime,
@@ -249,8 +249,6 @@ export default function AppV2() {
           type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
           groupId,
           yearMonth: nextYearMonth,
-          courtFee: payload?.courtFee,
-          ticketPrice: payload?.ticketPrice,
           scheduleWeekdays: payload?.weekdays,
           scheduleStartDay: null,
           scheduleTime: payload?.scheduleTime,
@@ -299,6 +297,20 @@ export default function AppV2() {
         groupId: state.currentGroupId,
         yearMonth: payload?.yearMonth,
         config: payload?.config,
+      })
+      return
+    }
+
+    if (type === 'saveTeamFundConfig') {
+      if (!isTreasurer) return
+      const groupId = state.currentGroupId
+      if (!groupId) return
+      await dispatch({
+        type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG',
+        groupId,
+        yearMonth: payload?.currentYearMonth || monthKey(new Date()),
+        courtFee: payload?.courtFee,
+        ticketPrice: payload?.ticketPrice,
       })
       return
     }
@@ -1188,6 +1200,7 @@ export default function AppV2() {
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} onAction={handle} />
+      case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
       case 'join-group':          return <JoinGroup data={getJoinGroupData()} onAction={handle} />

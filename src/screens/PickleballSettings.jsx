@@ -1,12 +1,11 @@
 // Spliteasy Boss — Pickleball · Cài đặt CLB (bottom sheet, thủ quỹ)
-// Props: data { clubName, courtFeeTotal, sessionsCount, memberCount, weekdays, startDate, autoGenerate, nextMonthPreview }
+// Props: data { clubName, sessionsCount, memberCount, weekdays, startDate, autoGenerate, nextMonthPreview }
 
 import React, { useEffect, useState } from 'react';
 import { colors, type } from '../tokens';
 import { Button, Input } from '../primitives';
 
 const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
-const DEFAULT_TICKET_PRICE = 50000;
 const ISO_WEEKDAY_LABELS = ['', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
 
 function hasSelectedWeekday(weekdaySet, isoWeekday) {
@@ -67,23 +66,16 @@ export default function PickleballSettings({ data, onAction }) {
   const d = data || DEMO;
   const [weekdays, setWeekdays]   = useState(new Set(d.weekdays));
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
-  const [courtFee, setCourtFee]   = useState(d.courtFeeTotal);
-  const [ticketPrice, setTicketPrice] = useState(d.ticketPrice || DEFAULT_TICKET_PRICE);
   const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(d.timeRange));
   const [startDate, setStartDate] = useState(d.startDate || '');
   const [clubName, setClubName] = useState(d.clubName || '');
 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
   const liveNextMonthPreview = buildLiveNextMonthPreview(new Date(), weekdays);
-  const perSession = Math.round(courtFee / Math.max(liveSessionsCount, 1));
-  const activeMemberCount = Math.max(d.memberCount || 1, 1);
-  const perPerson  = Math.round(perSession / activeMemberCount);
 
   useEffect(() => {
     setWeekdays(new Set(d.weekdays));
     setAutoGen(d.autoGenerate);
-    setCourtFee(d.courtFeeTotal);
-    setTicketPrice(d.ticketPrice || DEFAULT_TICKET_PRICE);
     setTimeParts(splitTimeRange(d.timeRange));
     setStartDate(d.startDate || '');
     setClubName(d.clubName || '');
@@ -140,27 +132,13 @@ export default function PickleballSettings({ data, onAction }) {
             onChange={(e) => setClubName(e.target.value)}
             inputStyle={{ fontWeight: 700, fontSize: 15 }}
           />
-          <Input label="Tiền sân tháng" suffix="đ"
-            value={courtFee.toLocaleString('vi-VN')}
-            onChange={(e) => setCourtFee(Number(e.target.value.replace(/\D/g, '')) || 0)}
-            inputStyle={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.3px', ...type.mono }}
-          />
-          <Input label="Giá vé lẻ (đ/người)" suffix="đ"
-            value={ticketPrice.toLocaleString('vi-VN')}
-            onChange={(e) => setTicketPrice(Number(e.target.value.replace(/\D/g, '')) || 0)}
-            inputMode="numeric"
-            inputStyle={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.3px', ...type.mono }}
-          />
           <div style={{
             marginTop: 10, padding: '12px 14px',
             background: 'rgba(99,102,241,0.08)',
             border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12,
           }}>
             <div style={{ fontSize: 11, color: '#c7d2fe', fontWeight: 600 }}>
-              {perSession.toLocaleString('vi-VN')} đ / buổi · <span style={{ color: colors.brandLight, fontWeight: 800 }}>{perPerson.toLocaleString('vi-VN')} đ / người</span>
-            </div>
-            <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3 }}>
-              {liveSessionsCount} buổi × {d.memberCount} thành viên
+              {liveSessionsCount} buổi theo lịch tháng này
             </div>
           </div>
 
@@ -272,13 +250,11 @@ export default function PickleballSettings({ data, onAction }) {
           </div>
 
           <Button block variant="brand" style={{ marginTop: 8 }} onClick={() => onAction?.('save', {
-            courtFee,
             weekdays: Array.from(weekdays),
             autoGen,
             currentYearMonth: d.currentYearMonth,
             startDate,
             scheduleTime: `${timeStart} – ${timeEnd}`,
-            ticketPrice,
             clubName,
           })}>💾 Lưu cài đặt</Button>
           </div>
@@ -317,8 +293,6 @@ function Toggle({ on, onChange }) {
 
 const DEMO = {
   clubName: 'Cầu Giấy',
-  courtFeeTotal: 3120000,
-  ticketPrice: DEFAULT_TICKET_PRICE,
   sessionsCount: 13, memberCount: 12,
   currentYearMonth: '2026-05',
   currentRole: 'treasurer',

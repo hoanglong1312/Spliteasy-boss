@@ -1751,7 +1751,9 @@ export function AppProvider({ children }) {
         const row = {
           group_id: groupId,
           year_month: yearMonth,
-          court_fee: Number(action.courtFee ?? action.court_fee) || 0,
+        }
+        if ('courtFee' in action || 'court_fee' in action) {
+          row.court_fee = Number(action.courtFee ?? action.court_fee) || 0
         }
         if ('activeMonthlyMemberIds' in action || 'activeMemberIds' in action || 'active_member_ids' in action) {
           row.active_member_ids = safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds ?? action.active_member_ids)

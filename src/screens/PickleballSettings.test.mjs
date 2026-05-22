@@ -51,14 +51,26 @@ test('PickleballSettings edits schedule time and start date before saving', () =
   assert.match(settingsSource, /value=\{startDate \? \(startDate\.includes\('-'\) \? startDate : startDate\.split\('\/'\)\.reverse\(\)\.join\('-'\)\) : ''\}/);
   assert.match(settingsSource, /setStartDate\(parts\.length === 3 \? `\$\{parts\[2\]\}\/\$\{parts\[1\]\}\/\$\{parts\[0\]\}` : e\.target\.value\)/);
   assert.match(settingsSource, /startDate,\s*\n\s*scheduleTime: `\$\{timeStart\} – \$\{timeEnd\}`,/);
+  assert.doesNotMatch(settingsSource, /courtFee,/);
+  assert.doesNotMatch(settingsSource, /ticketPrice,/);
   assert.doesNotMatch(settingsSource, /startDate: d\.startDate/);
 });
 
-test('PickleballSettings computes the summary from locally selected weekdays', () => {
+test('PickleballSettings no longer owns monthly money inputs', () => {
+  assert.doesNotMatch(settingsSource, /const \[courtFee, setCourtFee\]/);
+  assert.doesNotMatch(settingsSource, /const \[ticketPrice, setTicketPrice\]/);
+  assert.doesNotMatch(settingsSource, /Tiền sân tháng/);
+  assert.doesNotMatch(settingsSource, /Giá vé lẻ/);
+  assert.doesNotMatch(settingsSource, /đ \/ buổi/);
+  assert.doesNotMatch(settingsSource, /đ \/ người/);
+});
+
+test('PickleballSettings computes the schedule summary from locally selected weekdays', () => {
   assert.match(settingsSource, /function computeSessionsCount\(weekdaySet, yearMonth\)/);
   assert.match(settingsSource, /const liveSessionsCount = computeSessionsCount\(weekdays, d\.currentYearMonth\)/);
-  assert.match(settingsSource, /const perSession = Math\.round\(courtFee \/ Math\.max\(liveSessionsCount, 1\)\)/);
-  assert.match(settingsSource, /\{liveSessionsCount\} buổi × \{d\.memberCount\} thành viên/);
+  assert.match(settingsSource, /\{liveSessionsCount\} buổi theo lịch tháng này/);
+  assert.doesNotMatch(settingsSource, /const perSession = Math\.round/);
+  assert.doesNotMatch(settingsSource, /\{liveSessionsCount\} buổi × \{d\.memberCount\} thành viên/);
   assert.doesNotMatch(settingsSource, /courtFee \/ d\.sessionsCount/);
   assert.doesNotMatch(settingsSource, /\{d\.sessionsCount\} buổi ×/);
 });

@@ -9,15 +9,14 @@ import {
 
 export default function PickleballOverview({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
-  const ticketFund = d.ticketFund || { rows: [] };
   const yourTickets = d.yourTickets || { summary: { sessionCount: 0, totalAdjustment: 0, advancedCount: 0 }, rows: [] };
+  const teamFundOverview = d.teamFundOverview || { ticketFund: { rows: [], totalDue: 0, totalCredit: 0 }, ticketStats: { sessionCount: 0, totalAmount: 0 } };
   const personalSummaryCards = d.yourBalance.summaryCards || [
     { icon: '🏸', label: 'Sân của bạn', amount: 0, sub: 'Phần của bạn' },
     { icon: '💧', label: 'Nước của bạn', amount: 0, sub: '0 buổi có nước' },
     { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: 0, sub: 'Qua quỹ team' },
   ];
   const [tab, setTab] = useState('overview');
-  const [ticketDetailsOpen, setTicketDetailsOpen] = useState(false);
 
   return (
     <PhoneFrame>
@@ -147,7 +146,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                 Vé lẻ trong tháng
               </div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                Thêm và xem chi tiết trực tiếp trên lịch
+                Vé lẻ của bạn trong tháng
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -200,73 +199,40 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               ))}
             </div>
           )}
-
-          {d.ticketFund?.rows?.length > 0 && (
-            <div style={{
-              marginTop: 12,
-              paddingTop: 12,
-              borderTop: `1px solid ${colors.borderSubtle}`,
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                <div>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#6ee7b7', textTransform: 'uppercase' }}>
-                    Chênh lệch qua quỹ
-                  </div>
-                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                    {ticketFund.unpaidCount} người ứng · {ticketFund.teamFundCount} quỹ team
-                  </div>
-                </div>
-                <button type="button" onClick={() => setTicketDetailsOpen(value => !value)} style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: colors.brandLight,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  padding: 0,
-                }}>
-                  {ticketDetailsOpen ? 'Thu gọn' : 'Chi tiết →'}
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-                <TicketFundStat label="Cần thu" value={ticketFund.totalDue} tone="warn" />
-                <TicketFundStat label="Cần bù" value={ticketFund.totalCredit} tone="success" />
-              </div>
-
-              {ticketDetailsOpen && (
-                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {ticketFund.rows.map(row => (
-                    <div key={row.memberId} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 9,
-                      padding: '8px 0',
-                      borderTop: `1px solid ${colors.borderSubtle}`,
-                    }}>
-                      <Avatar initial={row.initial} color={row.color} size={26} ring={false} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 800 }}>{row.name}</div>
-                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
-                          {row.roleLabel || row.label}
-                        </div>
-                      </div>
-                      <div style={{
-                        fontSize: 13,
-                        fontWeight: 900,
-                        color: row.amount < 0 ? '#6ee7b7' : colors.warning,
-                        ...type.mono,
-                      }}>
-                        {row.amount < 0 ? `Quỹ bù ${formatVND(Math.abs(row.amount))}` : formatSignedFundAmount(row.amount)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </Card>
+
+        {isTreasurer && (
+          <Card accent="finance" style={{ marginTop: 10, padding: '13px 12px', borderColor: 'rgba(96,165,250,0.22)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#93c5fd', textTransform: 'uppercase' }}>
+                  Quỹ team tháng này
+                </div>
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                  Tiền sân, vé lẻ team và chênh lệch quỹ
+                </div>
+              </div>
+              <button type="button" onClick={() => onAction?.('push', 'pickleball-team-fund')} style={{
+                border: 'none',
+                background: 'rgba(96,165,250,0.13)',
+                color: '#bfdbfe',
+                borderRadius: 999,
+                padding: '8px 10px',
+                fontSize: 11,
+                fontWeight: 900,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}>
+                Mở quỹ
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
+              <TicketFundStat label="Tiền sân" value={teamFundOverview.courtFeeTotal || 0} tone="neutral" />
+              <TicketFundStat label="Vé lẻ team" value={teamFundOverview.ticketStats?.totalAmount || 0} tone="warn" />
+              <TicketFundStat label="Lệch quỹ" value={(teamFundOverview.ticketFund?.totalDue || 0) - (teamFundOverview.ticketFund?.totalCredit || 0)} tone="success" />
+            </div>
+          </Card>
+        )}
 
         {isTreasurer && (
           <Button
