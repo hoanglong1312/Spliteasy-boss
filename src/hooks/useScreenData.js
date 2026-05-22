@@ -373,6 +373,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const ticketFund = buildTicketFundSummary(state)
   const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
+  const currentMember = members.find(member => String(member.id || member.member_id) === String(currentUserId))
 
   return {
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
@@ -396,6 +397,11 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     },
     yourBalance: {
       total: memberBalance.netBalance,
+      name: currentMember?.displayName || currentMember?.name || 'Bạn',
+      initial: initials(currentMember),
+      color: currentMember?.color,
+      statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
+      ticketAdjustment: -ticketAmount,
       breakdown,
     },
     ticketStats,
@@ -1175,7 +1181,7 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
     { label: '🏸 Tiền sân', amount: monthBalance.courtFee },
     { label: `💧 Tiền nước (${monthSessions.filter(s => sessionWaterAmount(s) > 0).length} buổi)`, amount: monthBalance.waterFee },
     { label: '📦 Phụ phát sinh', amount: monthBalance.extras },
-    { label: '🎟️ Vé lẻ chưa trả', amount: Math.abs(ticketAmount) },
+    { label: '🎟️ Vé lẻ qua quỹ', amount: -ticketAmount },
   ]
 }
 
@@ -1191,7 +1197,8 @@ function buildTicketFundSummary(state) {
         initial: initials(member),
         color: member.color,
         amount,
-        label: amount < 0 ? 'Trừ vào quỹ' : 'Nộp thêm quỹ',
+        label: amount < 0 ? 'Quỹ bù lại' : 'Nộp vào quỹ',
+        roleLabel: amount < 0 ? 'Ứng tiền vé lẻ' : 'Tham gia vé lẻ',
       }
     })
     .filter(row => row.amount !== 0)

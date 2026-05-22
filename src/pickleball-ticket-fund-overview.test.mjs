@@ -70,19 +70,32 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   assert.equal(data.ticketFund.totalDue, 150000)
   assert.equal(data.ticketFund.netToFund, 100000)
   assert.deepEqual(data.ticketFund.rows.map(row => [row.name, row.amount, row.label]), [
-    ['Anh Việt', -50000, 'Trừ vào quỹ'],
-    ['Cường', 100000, 'Nộp thêm quỹ'],
-    ['Giang', 50000, 'Nộp thêm quỹ'],
+    ['Anh Việt', -50000, 'Quỹ bù lại'],
+    ['Cường', 100000, 'Nộp vào quỹ'],
+    ['Giang', 50000, 'Nộp vào quỹ'],
   ])
+  assert.equal(data.yourBalance.total, 50000)
+  assert.equal(data.yourBalance.statusLabel, 'Được quỹ bù')
+  assert.equal(JSON.stringify(data.yourBalance.breakdown.map(row => [row.label, row.amount])), JSON.stringify([
+    ['🏸 Tiền sân', 0],
+    ['💧 Tiền nước (0 buổi)', 0],
+    ['📦 Phụ phát sinh', 0],
+    ['🎟️ Vé lẻ qua quỹ', -50000],
+  ]))
 })
 
 test('overview renders ticket-fund summary card', () => {
   assert.match(overviewSource, /d\.ticketFund\?\.rows\?\.length > 0/)
-  assert.match(overviewSource, /Vé lẻ trong quỹ/)
+  assert.doesNotMatch(overviewSource, /Vé lẻ trong quỹ/)
   assert.match(overviewSource, /Vé lẻ quỹ/)
   assert.match(overviewSource, /ticketFund\.rows\.map/)
-  assert.match(overviewSource, /Trừ vào quỹ/)
-  assert.match(overviewSource, /Nộp thêm quỹ/)
+  assert.match(overviewSource, /Chênh lệch qua quỹ/)
+  assert.match(overviewSource, /Quỹ bù lại/)
+  assert.match(overviewSource, /Nộp vào quỹ/)
+  assert.match(overviewSource, /Của bạn tháng này/)
+  assert.match(overviewSource, /Xem chi tiết/)
+  assert.doesNotMatch(overviewSource, /Trừ vào quỹ/)
+  assert.doesNotMatch(overviewSource, /Vé lẻ chưa trả/)
 })
 
 test('overview folds next session into progress card instead of rendering a separate hero', () => {

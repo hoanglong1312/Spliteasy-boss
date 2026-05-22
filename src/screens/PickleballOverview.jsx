@@ -11,6 +11,8 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
   const d = data || DEMO;
   const ticketFund = d.ticketFund || { rows: [] };
   const [tab, setTab] = useState('overview');
+  const [ticketDetailsOpen, setTicketDetailsOpen] = useState(false);
+  const [balanceDetailsOpen, setBalanceDetailsOpen] = useState(false);
 
   return (
     <PhoneFrame>
@@ -122,6 +124,72 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             <TicketFundStat label="Tổng lượt" value={d.ticketStats?.totalAttendances || 0} tone="warn" raw />
             <TicketFundStat label="Tổng tiền" value={d.ticketStats?.totalAmount || 0} tone="success" />
           </div>
+
+          {d.ticketFund?.rows?.length > 0 && (
+            <div style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: `1px solid ${colors.borderSubtle}`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#6ee7b7', textTransform: 'uppercase' }}>
+                    Chênh lệch qua quỹ
+                  </div>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                    {ticketFund.unpaidCount} người ứng · {ticketFund.teamFundCount} quỹ team
+                  </div>
+                </div>
+                <button type="button" onClick={() => setTicketDetailsOpen(value => !value)} style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: colors.brandLight,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}>
+                  {ticketDetailsOpen ? 'Thu gọn' : 'Chi tiết →'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                <TicketFundStat label="Cần thu" value={ticketFund.totalDue} tone="warn" />
+                <TicketFundStat label="Cần bù" value={ticketFund.totalCredit} tone="success" />
+              </div>
+
+              {ticketDetailsOpen && (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {ticketFund.rows.map(row => (
+                    <div key={row.memberId} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 9,
+                      padding: '8px 0',
+                      borderTop: `1px solid ${colors.borderSubtle}`,
+                    }}>
+                      <Avatar initial={row.initial} color={row.color} size={26} ring={false} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800 }}>{row.name}</div>
+                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
+                          {row.roleLabel || row.label}
+                        </div>
+                      </div>
+                      <div style={{
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: row.amount < 0 ? '#6ee7b7' : colors.warning,
+                        ...type.mono,
+                      }}>
+                        {row.amount < 0 ? `Quỹ bù ${formatVND(Math.abs(row.amount))}` : formatSignedFundAmount(row.amount)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {isTreasurer && (
@@ -143,86 +211,60 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </Button>
         )}
 
-        {d.ticketFund?.rows?.length > 0 && (
-          <Card accent="pickleball" style={{ marginTop: 10, padding: '16px 14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: colors.pickleball, textTransform: 'uppercase' }}>
-                  Vé lẻ trong quỹ
-                </div>
-                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                  {ticketFund.unpaidCount} người ứng · {ticketFund.teamFundCount} quỹ team
-                </div>
-              </div>
-              <button type="button" onClick={() => onAction?.('push', 'pickleball-calendar')} style={{
-                border: 'none',
-                background: 'transparent',
-                color: colors.brandLight,
-                fontSize: 11,
-                fontWeight: 800,
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-                padding: 0,
-              }}>
-                Chi tiết →
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-              <TicketFundStat label="Nộp thêm" value={ticketFund.totalDue} tone="warn" />
-              <TicketFundStat label="Được trừ" value={ticketFund.totalCredit} tone="success" />
-            </div>
-
-            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {ticketFund.rows.map(row => (
-                <div key={row.memberId} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '8px 0',
-                  borderTop: `1px solid ${colors.borderSubtle}`,
-                }}>
-                  <Avatar initial={row.initial} color={row.color} size={26} ring={false} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 800 }}>{row.name}</div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
-                      {row.amount < 0 ? 'Trừ vào quỹ' : 'Nộp thêm quỹ'}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontSize: 13,
-                    fontWeight: 900,
-                    color: row.amount < 0 ? '#6ee7b7' : colors.warning,
-                    ...type.mono,
-                  }}>
-                    {formatSignedFundAmount(row.amount)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
-
         {/* Your balance */}
         <Card accent="finance" style={{ marginTop: 10, padding: '18px 16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
-                Số dư của bạn
-              </div>
-              <div style={{ ...type.amountMd, marginTop: 6, color: colors.danger, ...type.mono }}>
-                {formatVND(d.yourBalance.total)}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ display: 'flex', gap: 10, minWidth: 0 }}>
+              <Avatar initial={d.yourBalance.initial || 'B'} color={d.yourBalance.color} size={34} ring={false} />
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
+                  Của bạn tháng này
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 900, marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {d.yourBalance.name || 'Bạn'}
+                </div>
               </div>
             </div>
             <Badge tone={d.yourBalance.total < 0 ? 'danger' : 'success'} style={{ marginTop: 4 }}>
-              {d.yourBalance.total < 0 ? 'Còn nợ' : 'Cân bằng'}
+              {d.yourBalance.statusLabel || (d.yourBalance.total < 0 ? 'Cần nộp' : 'Đã cân bằng')}
             </Badge>
           </div>
-          <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0' }} />
-          {d.yourBalance.breakdown.map((b, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '4px 0' }}>
+          <div style={{
+            ...type.amountMd,
+            marginTop: 12,
+            color: d.yourBalance.total < 0 ? colors.danger : '#6ee7b7',
+            ...type.mono,
+          }}>
+            {formatPersonalBalance(d.yourBalance.total)}
+          </div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+            Đã gồm tiền sân, nước, phát sinh và vé lẻ qua quỹ
+          </div>
+          <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0 10px' }} />
+          <button type="button" onClick={() => setBalanceDetailsOpen(value => !value)} style={{
+            width: '100%',
+            border: 'none',
+            background: 'transparent',
+            color: colors.brandLight,
+            fontSize: 12,
+            fontWeight: 900,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            padding: '2px 0 4px',
+            textAlign: 'left',
+          }}>
+            {balanceDetailsOpen ? 'Ẩn chi tiết' : 'Xem chi tiết'}
+          </button>
+          {balanceDetailsOpen && d.yourBalance.breakdown.map((b, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, padding: '5px 0' }}>
               <span style={{ color: colors.textSecondary }}>{b.label}</span>
-              <span style={{ color: '#f1f5f9', fontWeight: 700, ...type.mono }}>{formatVND(b.amount)}</span>
+              <span style={{
+                color: b.amount < 0 ? '#6ee7b7' : '#f1f5f9',
+                fontWeight: 700,
+                ...type.mono,
+              }}>
+                {formatBreakdownAmount(b.amount)}
+              </span>
             </div>
           ))}
         </Card>
@@ -271,6 +313,17 @@ function formatSignedFundAmount(amount) {
   return amount > 0 ? `+${formatVND(amount)}` : formatVND(amount);
 }
 
+function formatPersonalBalance(amount) {
+  if (amount > 0) return `+${formatVND(amount)}`;
+  return formatVND(amount);
+}
+
+function formatBreakdownAmount(amount) {
+  if (amount < 0) return `-${formatVND(Math.abs(amount))}`;
+  if (amount > 0) return formatVND(amount);
+  return '0 đ';
+}
+
 function displayTimeRange(value) {
   return String(value || '').replace(/(\d{1,2}:\d{2}):00/g, '$1');
 }
@@ -315,10 +368,13 @@ const DEMO = {
   },
   yourBalance: {
     total: -333333,
+    name: 'Long',
+    initial: 'LO',
+    statusLabel: 'Cần nộp',
     breakdown: [
       { label: '🏸 Tiền sân',          amount: 240000 },
       { label: '💧 Tiền nước (8 buổi)', amount: 93333 },
-      { label: '🎟️ Vé lẻ chưa trả',     amount: 0 },
+      { label: '🎟️ Vé lẻ qua quỹ',     amount: 0 },
     ],
   },
   ticketFund: {
@@ -327,8 +383,8 @@ const DEMO = {
     unpaidCount: 1,
     teamFundCount: 1,
     rows: [
-      { memberId: 1, name: 'Anh Việt', initial: 'AV', amount: -50000, label: 'Trừ vào quỹ' },
-      { memberId: 2, name: 'Cường', initial: 'C', amount: 100000, label: 'Nộp thêm quỹ' },
+      { memberId: 1, name: 'Anh Việt', initial: 'AV', amount: -50000, label: 'Quỹ bù lại', roleLabel: 'Ứng tiền vé lẻ' },
+      { memberId: 2, name: 'Cường', initial: 'C', amount: 100000, label: 'Nộp vào quỹ', roleLabel: 'Tham gia vé lẻ' },
     ],
   },
 };
