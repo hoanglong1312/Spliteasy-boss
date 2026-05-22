@@ -374,6 +374,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
   const currentMember = members.find(member => String(member.id || member.member_id) === String(currentUserId))
+  const ticketAdjustment = -ticketAmount
 
   return {
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
@@ -401,9 +402,11 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       initial: initials(currentMember),
       color: currentMember?.color,
       statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
-      ticketAdjustment: -ticketAmount,
+      ticketAdjustment,
+      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment),
       breakdown,
     },
+    yourTickets: buildPersonalTicketOverview(state, currentUserId),
     ticketStats,
     ticketFund,
     shouldAutoGenerate,
@@ -1183,6 +1186,70 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
     { label: '📦 Phụ phát sinh', amount: monthBalance.extras },
     { label: '🎟️ Vé lẻ qua quỹ', amount: -ticketAmount },
   ]
+}
+
+function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment) {
+  const waterSessions = monthSessions.filter(s => sessionWaterAmount(s) > 0).length
+  return [
+    { icon: '🏸', label: 'Sân của bạn', amount: memberBalance.courtFee, sub: 'Phần của bạn' },
+    { icon: '💧', label: 'Nước của bạn', amount: memberBalance.waterFee, sub: `${waterSessions} buổi có nước` },
+    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: ticketAdjustment, sub: 'Qua quỹ team' },
+  ]
+}
+
+function buildPersonalTicketOverview(state, memberId) {
+  const rows = currentMonthTicketsForState(state)
+    .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+    .filter(ticket => isTicketRelatedToMember(ticket, memberId))
+    .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))
+    .map(ticket => toPersonalTicketRow(ticket, memberId, state))
+
+  return {
+    summary: {
+      sessionCount: rows.length,
+      totalAdjustment: rows.reduce((sum, row) => sum + row.personalAmount, 0),
+      advancedCount: rows.filter(row => row.hasAdvancer).length,
+    },
+    rows,
+  }
+}
+
+function isTicketRelatedToMember(ticket, memberId) {
+  const memberIds = ticketMemberIds(ticket).map(String)
+  return memberIds.includes(String(memberId)) || String(ticketAdvancerId(ticket) || '') === String(memberId)
+}
+
+function toPersonalTicketRow(ticket, memberId, state) {
+  const status = ticketStatus(ticket)
+  const advancerId = ticketAdvancerId(ticket)
+  const members = safeArray(state?.members)
+  const advancerName = advancerId ? memberName(advancerId, members) : ''
+  const personalAmount = personalTicketAdjustment(ticket, memberId)
+  return {
+    id: ticket?.id,
+    dateLabel: formatSessionDetailDate(ticketDate(ticket)) || formatDayMonth(ticketDate(ticket)),
+    sourceLabel: status === 'team_fund' ? 'Quỹ team trả' : `${advancerName || 'Người ứng'} ứng`,
+    roleLabel: String(advancerId || '') === String(memberId) ? 'Bạn ứng tiền' : 'Bạn tham gia',
+    totalAmount: ticketTotalAmount(ticket),
+    personalAmount,
+    hasAdvancer: status === 'unpaid' && Boolean(advancerId),
+  }
+}
+
+function personalTicketAdjustment(ticket, memberId) {
+  const status = ticketStatus(ticket)
+  const memberIds = ticketMemberIds(ticket)
+  const per = ticketAmountPerPerson(ticket)
+  const advancerId = ticketAdvancerId(ticket)
+  if (status === 'team_fund') {
+    return memberIds.some(id => String(id) === String(memberId)) ? per : 0
+  }
+  if (status !== 'unpaid' || !advancerId) return 0
+  if (String(advancerId) === String(memberId)) {
+    const participantCount = memberIds.filter(id => String(id) !== String(memberId)).length
+    return -per * (participantCount || memberIds.length)
+  }
+  return memberIds.some(id => String(id) === String(memberId)) ? per : 0
 }
 
 function buildTicketFundSummary(state) {

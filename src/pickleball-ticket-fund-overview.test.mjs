@@ -56,9 +56,9 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
       monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 0 }],
       sessions: [],
       externalTickets: [
-        { id: 't1', groupId: 'g1', yearMonth: '2026-05', status: 'unpaid', totalAmount: 100000, memberIds: ['viet', 'cuong'], advancerId: 'viet' },
-        { id: 't2', groupId: 'g1', yearMonth: '2026-05', status: 'team_fund', totalAmount: 100000, memberIds: ['cuong', 'giang'] },
-        { id: 't3', groupId: 'g1', yearMonth: '2026-05', status: 'pending_review', totalAmount: 50000, memberIds: ['viet'], advancerId: 'viet' },
+        { id: 't1', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-21', status: 'unpaid', totalAmount: 100000, memberIds: ['viet', 'cuong'], advancerId: 'viet' },
+        { id: 't2', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-22', status: 'team_fund', totalAmount: 100000, memberIds: ['cuong', 'giang'] },
+        { id: 't3', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-23', status: 'pending_review', totalAmount: 50000, memberIds: ['viet'], advancerId: 'viet' },
       ],
     },
     _allPickle: { externalTickets: [] },
@@ -76,26 +76,45 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   ])
   assert.equal(data.yourBalance.total, 50000)
   assert.equal(data.yourBalance.statusLabel, 'Được quỹ bù')
+  assert.equal(JSON.stringify(data.yourBalance.summaryCards.map(row => [row.label, row.amount, row.sub])), JSON.stringify([
+    ['Sân của bạn', 0, 'Phần của bạn'],
+    ['Nước của bạn', 0, '0 buổi có nước'],
+    ['Vé lẻ qua quỹ', -50000, 'Qua quỹ team'],
+  ]))
   assert.equal(JSON.stringify(data.yourBalance.breakdown.map(row => [row.label, row.amount])), JSON.stringify([
     ['🏸 Tiền sân', 0],
     ['💧 Tiền nước (0 buổi)', 0],
     ['📦 Phụ phát sinh', 0],
     ['🎟️ Vé lẻ qua quỹ', -50000],
   ]))
+  assert.equal(data.yourTickets.summary.sessionCount, 1)
+  assert.equal(data.yourTickets.summary.totalAdjustment, -50000)
+  assert.equal(data.yourTickets.summary.advancedCount, 1)
+  assert.equal(JSON.stringify(data.yourTickets.rows.map(row => [row.dateLabel, row.sourceLabel, row.roleLabel, row.personalAmount])), JSON.stringify([
+    ['T5 21/05', 'Anh Việt ứng', 'Bạn ứng tiền', -50000],
+  ]))
 })
 
 test('overview renders ticket-fund summary card', () => {
   assert.match(overviewSource, /d\.ticketFund\?\.rows\?\.length > 0/)
   assert.doesNotMatch(overviewSource, /Vé lẻ trong quỹ/)
-  assert.match(overviewSource, /Vé lẻ quỹ/)
+  assert.match(overviewSource, /Vé lẻ qua quỹ/)
   assert.match(overviewSource, /ticketFund\.rows\.map/)
   assert.match(overviewSource, /Chênh lệch qua quỹ/)
   assert.match(overviewSource, /Quỹ bù lại/)
   assert.match(overviewSource, /Nộp vào quỹ/)
   assert.match(overviewSource, /Của bạn tháng này/)
-  assert.match(overviewSource, /Xem chi tiết/)
+  assert.doesNotMatch(overviewSource, /Xem chi tiết/)
+  assert.doesNotMatch(overviewSource, /balanceDetailsOpen/)
+  assert.match(overviewSource, /Sân của bạn/)
+  assert.match(overviewSource, /Nước của bạn/)
+  assert.match(overviewSource, /Buổi thêm/)
+  assert.match(overviewSource, /Phần của bạn/)
+  assert.match(overviewSource, /Có người ứng/)
+  assert.ok(overviewSource.indexOf('Của bạn tháng này') < overviewSource.indexOf('Tiến độ tháng'))
   assert.doesNotMatch(overviewSource, /Trừ vào quỹ/)
   assert.doesNotMatch(overviewSource, /Vé lẻ chưa trả/)
+  assert.doesNotMatch(overviewSource, /CompactCostCard icon="🏸" label="Tiền sân"/)
 })
 
 test('overview folds next session into progress card instead of rendering a separate hero', () => {
