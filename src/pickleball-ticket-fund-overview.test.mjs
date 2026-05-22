@@ -91,9 +91,10 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   ]))
   assert.equal(data.yourTickets.summary.sessionCount, 1)
   assert.equal(data.yourTickets.summary.totalAdjustment, -50000)
+  assert.equal(data.yourTickets.summary.displayAdjustment, 50000)
   assert.equal(data.yourTickets.summary.advancedCount, 1)
-  assert.equal(JSON.stringify(data.yourTickets.rows.map(row => [row.dateLabel, row.sourceLabel, row.roleLabel, row.personalAmount])), JSON.stringify([
-    ['T5 21/05', 'Anh Việt ứng', 'Bạn ứng tiền', -50000],
+  assert.equal(JSON.stringify(data.yourTickets.rows.map(row => [row.dateLabel, row.sourceLabel, row.roleLabel, row.personalAmount, row.displayAmount])), JSON.stringify([
+    ['T5 21/05', 'Anh Việt ứng', 'Bạn ứng tiền', -50000, 50000],
   ]))
   assert.equal(JSON.stringify(data.teamFundOverview.costRows.map(row => [row.label, row.amount, row.paidToOwner])), JSON.stringify([
     ['Tiền sân', 0, false],
@@ -123,9 +124,9 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
     ],
   ]))
   assert.equal(JSON.stringify(data.teamFundOverview.ticketParticipantRows.map(row => [row.name, row.sessions, row.amount])), JSON.stringify([
-    ['Cường', 2, 100000],
     ['Anh Việt', 1, 50000],
-    ['Giang', 1, 50000],
+    ['Giang', 1, -50000],
+    ['Cường', 2, -100000],
   ]))
 })
 
@@ -223,6 +224,9 @@ test('overview separates personal tickets from treasurer team-fund view', () => 
   assert.match(overviewSource, /Nước của bạn/)
   assert.match(overviewSource, /Buổi thêm/)
   assert.match(overviewSource, /Phần của bạn/)
+  assert.match(overviewSource, /displayAdjustment/)
+  assert.match(overviewSource, /row\.displayAmount/)
+  assert.match(overviewSource, /formatSignedTicketAmount/)
   assert.doesNotMatch(overviewSource, /Có người ứng/)
   assert.match(overviewSource, /Chi phí team và khoản đã trả chủ sân/)
   assert.match(overviewSource, /teamFundOverview\.costRows/)
@@ -273,6 +277,8 @@ test('team fund screen owns treasury totals and monthly money config', () => {
   assert.match(teamFundSource, /-.*formatVND/)
   assert.match(teamFundSource, /ticketRows\.map/)
   assert.match(teamFundSource, /ticketParticipantRows\.map/)
+  assert.match(teamFundSource, /formatSignedTicketAmount/)
+  assert.match(teamFundSource, /row\.amount > 0 \? '#6ee7b7' : '#fca5a5'/)
   assert.doesNotMatch(teamFundSource, /Cần thu/)
   assert.doesNotMatch(teamFundSource, /Cần bù/)
   assert.doesNotMatch(teamFundSource, /Chênh lệch qua quỹ/)

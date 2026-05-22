@@ -9,7 +9,7 @@ import {
 
 export default function PickleballOverview({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
-  const yourTickets = d.yourTickets || { summary: { sessionCount: 0, totalAdjustment: 0, advancedCount: 0 }, rows: [] };
+  const yourTickets = d.yourTickets || { summary: { sessionCount: 0, totalAdjustment: 0, displayAdjustment: 0, advancedCount: 0 }, rows: [] };
   const teamFundOverview = d.teamFundOverview || { ticketFund: { rows: [], totalDue: 0, totalCredit: 0 }, ticketStats: { sessionCount: 0, totalAmount: 0 }, costRows: [] };
   const personalSummaryCards = d.yourBalance.summaryCards || [
     { icon: '🏸', label: 'Sân của bạn', amount: 0, sub: 'Phần của bạn' },
@@ -167,7 +167,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
             <TicketFundStat label="Buổi thêm" value={yourTickets.summary.sessionCount} tone="warn" raw />
-            <TicketFundStat label="Phần của bạn" value={yourTickets.summary.totalAdjustment} tone={yourTickets.summary.totalAdjustment < 0 ? 'success' : 'warn'} />
+            <TicketFundStat label="Phần của bạn" value={yourTickets.summary.displayAdjustment ?? -yourTickets.summary.totalAdjustment} tone={(yourTickets.summary.displayAdjustment ?? -yourTickets.summary.totalAdjustment) > 0 ? 'success' : 'warn'} />
           </div>
 
           {yourTickets.rows.length > 0 && (
@@ -189,10 +189,10 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   <div style={{
                     fontSize: 12,
                     fontWeight: 900,
-                    color: row.personalAmount < 0 ? '#6ee7b7' : colors.warning,
+                    color: row.displayAmount > 0 ? '#6ee7b7' : '#fca5a5',
                     ...type.mono,
                   }}>
-                    {formatBreakdownAmount(row.personalAmount)}
+                    {formatSignedTicketAmount(row.displayAmount ?? -row.personalAmount)}
                   </div>
                 </div>
               ))}
@@ -355,6 +355,12 @@ function formatPersonalBalance(amount) {
 function formatBreakdownAmount(amount) {
   if (amount < 0) return `-${formatVND(Math.abs(amount))}`;
   if (amount > 0) return formatVND(amount);
+  return '0 đ';
+}
+
+function formatSignedTicketAmount(amount) {
+  if (amount > 0) return `+${formatVND(amount)}`;
+  if (amount < 0) return `-${formatVND(Math.abs(amount))}`;
   return '0 đ';
 }
 

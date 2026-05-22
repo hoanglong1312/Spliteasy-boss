@@ -424,8 +424,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
                       {safeArray(ticket.ledgerRows).map((row, index) => {
                         const isPositive = Number(row.amount) > 0;
-                        const signedAmount = isPositive ? `+${formatVND(row.amount)}` : `-${formatVND(Math.abs(row.amount || 0))}`;
-                        return (
+                            return (
                           <div key={`${ticket.id}-${row.memberId || row.name}-${index}`} style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -440,7 +439,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                               <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 1 }}>{row.roleLabel}</div>
                             </div>
                             <div style={{ fontSize: 11, fontWeight: 900, color: isPositive ? '#6ee7b7' : '#fca5a5', ...type.mono }}>
-                              {signedAmount}
+                              {formatSignedTicketAmount(row.amount)}
                             </div>
                           </div>
                         );
@@ -464,7 +463,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                       <div style={{ fontSize: 12, fontWeight: 900 }}>{row.name}</div>
                       <div style={{ fontSize: 10, color: colors.textSecondary }}>{row.sessions} buổi vé lẻ trong tháng</div>
                     </div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: colors.warning, ...type.mono }}>{formatVND(row.amount)}</div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: row.amount > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono }}>{formatSignedTicketAmount(row.amount)}</div>
                   </div>
                 ))}
               </div>
@@ -641,6 +640,12 @@ function parseAmount(value) {
 
 function formatInputAmount(value) {
   return parseAmount(value).toLocaleString('vi-VN');
+}
+
+function formatSignedTicketAmount(amount) {
+  if (amount > 0) return `+${formatVND(amount)}`;
+  if (amount < 0) return `-${formatVND(Math.abs(amount))}`;
+  return '0 đ';
 }
 
 const DEMO = {

@@ -576,8 +576,8 @@ function buildTeamFundTicketParticipantRows(state) {
   currentMonthTicketsForState(state)
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
     .forEach(ticket => {
-      const perPerson = ticketAmountPerPerson(ticket)
-      ticketMemberIds(ticket).forEach(memberId => {
+      buildTicketLedgerRows(ticket, state).forEach(item => {
+        const memberId = item.memberId
         if (!memberMap.has(String(memberId))) {
           const member = safeArray(state?.members).find(row => String(row?.id || row?.member_id) === String(memberId)) || {}
           memberMap.set(String(memberId), {
@@ -591,7 +591,7 @@ function buildTeamFundTicketParticipantRows(state) {
         }
         const row = memberMap.get(String(memberId))
         row.sessions += 1
-        row.amount += perPerson
+        row.amount += Number(item.amount) || 0
       })
     })
   return [...memberMap.values()].sort((a, b) => b.amount - a.amount || b.sessions - a.sessions)
@@ -1426,6 +1426,7 @@ function buildPersonalTicketOverview(state, memberId) {
     summary: {
       sessionCount: rows.length,
       totalAdjustment: rows.reduce((sum, row) => sum + row.personalAmount, 0),
+      displayAdjustment: rows.reduce((sum, row) => sum + row.displayAmount, 0),
       advancedCount: rows.filter(row => row.hasAdvancer).length,
     },
     rows,
@@ -1443,6 +1444,7 @@ function toPersonalTicketRow(ticket, memberId, state) {
   const members = safeArray(state?.members)
   const advancerName = advancerId ? memberName(advancerId, members) : ''
   const personalAmount = personalTicketAdjustment(ticket, memberId)
+  const displayAmount = -personalAmount
   return {
     id: ticket?.id,
     dateLabel: formatSessionDetailDate(ticketDate(ticket)) || formatDayMonth(ticketDate(ticket)),
@@ -1450,6 +1452,7 @@ function toPersonalTicketRow(ticket, memberId, state) {
     roleLabel: String(advancerId || '') === String(memberId) ? 'Bạn ứng tiền' : 'Bạn tham gia',
     totalAmount: ticketTotalAmount(ticket),
     personalAmount,
+    displayAmount,
     hasAdvancer: status === 'unpaid' && Boolean(advancerId),
   }
 }
