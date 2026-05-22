@@ -58,7 +58,7 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
       externalTickets: [
         { id: 't1', groupId: 'g1', yearMonth: '2026-05', status: 'unpaid', totalAmount: 100000, memberIds: ['viet', 'cuong'], advancerId: 'viet' },
         { id: 't2', groupId: 'g1', yearMonth: '2026-05', status: 'team_fund', totalAmount: 100000, memberIds: ['cuong', 'giang'] },
-        { id: 't3', groupId: 'g1', yearMonth: '2026-05', status: 'paid', totalAmount: 50000, memberIds: ['viet'], advancerId: 'viet' },
+        { id: 't3', groupId: 'g1', yearMonth: '2026-05', status: 'pending_review', totalAmount: 50000, memberIds: ['viet'], advancerId: 'viet' },
       ],
     },
     _allPickle: { externalTickets: [] },

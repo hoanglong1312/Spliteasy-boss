@@ -120,7 +120,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
         )}
       </Screen>
 
-      {ticketFormOpen && isTreasurer && (
+      {ticketFormOpen && (
         <AddTicketSheet
           data={d}
           selectedDate={selectedDate}
@@ -212,11 +212,9 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onAction }) {
             {tickets.length > 0 ? `${tickets.length} lượt · ${formatVNDShort(total)}` : 'Chưa có dữ liệu vé lẻ ngày này'}
           </div>
         </div>
-        {isTreasurer && (
-          <Button variant="muted" onClick={onAdd} style={{ padding: '8px 11px', borderRadius: 10, fontSize: 12 }}>
-            + Thêm vé
-          </Button>
-        )}
+        <Button variant="muted" onClick={onAdd} style={{ padding: '8px 11px', borderRadius: 10, fontSize: 12 }}>
+          + Thêm vé
+        </Button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
@@ -241,13 +239,19 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onAction }) {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 9 }}>
-              <div style={{ fontSize: 10, color: ticket.status === 'team_fund' ? '#c4b5fd' : '#fcd34d', fontWeight: 800 }}>
-                {ticket.status === 'team_fund' ? 'Quỹ team trả' : `${ticket.advancerName || 'Người ứng'} ứng`}
+              <div style={{ fontSize: 10, color: ticket.status === 'pending_review' ? '#93c5fd' : ticket.status === 'team_fund' ? '#c4b5fd' : '#fcd34d', fontWeight: 800 }}>
+                {ticket.status === 'pending_review'
+                  ? 'Chờ thủ quỹ duyệt'
+                  : ticket.status === 'team_fund' ? 'Quỹ team trả' : `${ticket.advancerName || 'Người ứng'} ứng`}
               </div>
               {isTreasurer && (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  {ticket.status === 'unpaid' && (
-                    <button type="button" onClick={() => onAction?.('markTicketPaid', { ticketId: ticket.id })} style={ticketActionStyle('success')}>Đã trả</button>
+                  {ticket.status === 'pending_review' && (
+                    <button
+                      type="button"
+                      onClick={() => onAction?.('approveTicket', { ticketId: ticket.id, status: ticket.advancerId ? 'unpaid' : 'team_fund' })}
+                      style={ticketActionStyle('success')}
+                    >Duyệt</button>
                   )}
                   <button type="button" onClick={() => onAction?.('deleteTicket', { ticketId: ticket.id })} style={ticketActionStyle('danger')}>Xóa</button>
                 </div>

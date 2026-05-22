@@ -398,7 +398,7 @@ export default function AppV2() {
     }
 
     if (type === 'addTicket') {
-      if (!isTreasurer || !state.currentGroupId || !state.currentUserId) return
+      if (!state.currentGroupId || !state.currentUserId) return
       const sessionDate = normalizeTicketDate(payload?.session_date || payload?.date)
       const sessionTime = payload?.session_time || payload?.time || null
       const memberIds = normalizeTicketMemberIds(payload?.member_ids || payload?.memberIds, state)
@@ -412,6 +412,7 @@ export default function AppV2() {
       if (memberIds.length === 0) throw new Error('ticket_members_required')
       if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
       if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
+      const ticketStatus = isTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
@@ -423,7 +424,7 @@ export default function AppV2() {
           total_amount: totalAmount,
           member_ids: memberIds,
           advancer_id: advancerId,
-          status: advancerId ? 'unpaid' : 'team_fund',
+          status: ticketStatus,
           year_month: monthKey(sessionDate || new Date()),
           created_by: state.currentUserId,
         })
@@ -492,15 +493,16 @@ export default function AppV2() {
       return
     }
 
-    if (type === 'markTicketPaid') {
+    if (type === 'approveTicket') {
       if (!isTreasurer) return
       const ticketId = payload?.ticketId ?? payload?.id ?? payload
       if (!ticketId) return
+      const approvedStatus = String(payload?.status || '').toLowerCase() === 'team_fund' ? 'team_fund' : 'unpaid'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('pickleball_tickets')
-        .update({ status: 'paid' })
+        .update({ status: approvedStatus })
         .eq('id', ticketId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })

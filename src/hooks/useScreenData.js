@@ -698,10 +698,11 @@ function buildPickleballTicketsData(state) {
   const monthTickets = monthTicketsForState(state, today)
     .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))
   const tickets = monthTickets.map((ticket, index) => toTicketRow(ticket, index, state)).reverse()
-  const paid = tickets.filter(ticket => ticket.status === 'paid')
   const unpaid = tickets.filter(ticket => ticket.status === 'unpaid')
+  const pending = tickets.filter(ticket => ticket.status === 'pending_review')
   const teamFund = tickets.filter(ticket => ticket.status === 'team_fund')
-  const totalAmount = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0)
+  const approvedTickets = tickets.filter(ticket => ticket.status !== 'pending_review')
+  const totalAmount = approvedTickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0)
   const members = currentGroupMembers(state)
     .filter(isActiveMember)
     .map(member => ({
@@ -716,16 +717,16 @@ function buildPickleballTicketsData(state) {
     monthLabel: formatMonthLabel(today),
     summary: {
       total: tickets.length,
-      used: paid.length,
+      used: approvedTickets.length,
       remaining: unpaid.length,
       expiringSoon: tickets.filter(ticket => ticket.expiringSoon).length,
       monthLabel: formatMonthLabel(today),
-      sessionCount: tickets.length,
-      totalAttendances: tickets.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
+      sessionCount: approvedTickets.length,
+      totalAttendances: approvedTickets.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
       totalAmount,
-      paid: {
-        count: paid.length,
-        amount: paid.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0),
+      pending: {
+        count: pending.length,
+        amount: pending.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0),
       },
       unpaid: {
         count: unpaid.length,
@@ -739,8 +740,8 @@ function buildPickleballTicketsData(state) {
     },
     filters: [
       { key: 'all', label: `Tất cả · ${tickets.length}` },
-      { key: 'unpaid', label: `⏳ Chưa trả · ${unpaid.length}` },
-      { key: 'paid', label: `✅ Đã trả · ${paid.length}` },
+      { key: 'pending', label: `🕓 Chờ duyệt · ${pending.length}` },
+      { key: 'unpaid', label: `⏳ Người ứng · ${unpaid.length}` },
       { key: 'team', label: `🏦 Quỹ team · ${teamFund.length}` },
     ],
     filter: 'all',
@@ -1815,8 +1816,9 @@ function toTicketRow(ticket, index, state) {
 function ticketStatus(ticket) {
   const normalized = String(ticket?.status || '').toLowerCase()
   const advancerId = ticketAdvancerId(ticket)
+  if (normalized === 'pending' || normalized === 'pending_review') return 'pending_review'
   if (normalized === 'team' || normalized === 'team_fund' || !advancerId) return 'team_fund'
-  return ['paid', 'settled', 'done', 'complete', 'completed'].includes(normalized) ? 'paid' : 'unpaid'
+  return 'unpaid'
 }
 
 function ticketAttendees(ticket, state) {
@@ -2692,14 +2694,15 @@ function monthTicketsForState(state, date) {
 
 function buildTicketMonthStats(state) {
   const rows = currentMonthTicketsForState(state).map((ticket, index) => toTicketRow(ticket, index, state))
-  const paid = rows.filter(ticket => ticket.status === 'paid')
+  const approvedRows = rows.filter(ticket => ticket.status !== 'pending_review')
   const unpaid = rows.filter(ticket => ticket.status === 'unpaid')
+  const pending = rows.filter(ticket => ticket.status === 'pending_review')
   const teamFund = rows.filter(ticket => ticket.status === 'team_fund')
   return {
-    sessionCount: rows.length,
-    totalAttendances: rows.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
-    totalAmount: rows.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0),
-    paidCount: paid.length,
+    sessionCount: approvedRows.length,
+    totalAttendances: approvedRows.reduce((sum, ticket) => sum + safeArray(ticket.memberIds).length, 0),
+    totalAmount: approvedRows.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0),
+    pendingCount: pending.length,
     unpaidCount: unpaid.length,
     teamFundCount: teamFund.length,
   }
@@ -2709,7 +2712,7 @@ function ticketBalanceForMember(tickets, currentUserId) {
   return safeArray(tickets).reduce((sum, ticket) => {
     const attendees = safeArray(ticket.attendees || ticket.memberIds || ticket.member_ids)
     const includesMe = attendees.some(item => String(typeof item === 'object' ? item.id : item) === String(currentUserId))
-    if (!includesMe || String(ticket.status || '').toLowerCase() === 'paid') return sum
+    if (!includesMe || ticketStatus(ticket) !== 'unpaid') return sum
     const per = Number(ticket.perPerson || ticket.per_person) || (
       attendees.length ? Math.round((Number(ticket.amount) || 0) / attendees.length) : 0
     )

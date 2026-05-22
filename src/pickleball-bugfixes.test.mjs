@@ -426,6 +426,7 @@ test('app-v2 handles markAttendance and validates addTicket payloads before inse
   assert.match(appSource, /const wantsTeamFund = payload\?\.paymentMode === 'team_fund' \|\| payload\?\.teamFund === true \|\| payload\?\.status === 'team_fund'/)
   assert.match(appSource, /const advancerId = wantsTeamFund \? null : rawAdvancerId/)
   assert.match(appSource, /const isTeamFund = wantsTeamFund \|\| \(!isAdvancerMode && !advancerId\)/)
+  assert.match(appSource, /const ticketStatus = isTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
   assert.match(appSource, /if \(!sessionDate\) throw new Error\('ticket_session_date_required'\)/)
   assert.match(appSource, /if \(memberIds\.length === 0\) throw new Error\('ticket_members_required'\)/)
   assert.match(appSource, /if \(totalAmount <= 0\) throw new Error\('ticket_total_amount_required'\)/)

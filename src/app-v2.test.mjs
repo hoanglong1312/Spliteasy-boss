@@ -65,20 +65,31 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /const totalAmount = parseMoneyAmount\(payload\?\.total_amount \?\? payload\?\.totalAmount\)/)
   assert.match(appSource, /const rawAdvancerId = payload\?\.advancer_id \?\? payload\?\.advancerId \?\? null/)
   assert.match(appSource, /const advancerId = wantsTeamFund \? null : rawAdvancerId/)
+  assert.match(appSource, /const ticketStatus = isTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
   assert.match(appSource, /session_date: sessionDate/)
   assert.match(appSource, /session_time: sessionTime/)
   assert.match(appSource, /member_ids: memberIds/)
   assert.match(appSource, /advancer_id: advancerId/)
-  assert.match(appSource, /status: advancerId \? 'unpaid' : 'team_fund'/)
+  assert.match(appSource, /status: ticketStatus/)
   assert.match(appSource, /year_month: monthKey\(sessionDate \|\| new Date\(\)\)/)
   assert.match(appSource, /created_by: state\.currentUserId/)
 
-  assert.match(appSource, /if \(type === 'markTicketPaid'\)/)
-  assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.update\(\{ status: 'paid' \}\)/)
+  assert.match(appSource, /if \(type === 'approveTicket'\)/)
+  assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.update\(\{ status: approvedStatus \}\)/)
   assert.match(appSource, /\.eq\('id', ticketId\)/)
+  assert.doesNotMatch(appSource, /markTicketPaid/)
 
   assert.match(appSource, /if \(type === 'deleteTicket'\)/)
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
+})
+
+test('ticket approval migration allows pending member requests', () => {
+  const migrationSource = readFileSync(new URL('../supabase/migrations/20260522000002_pickleball_ticket_approval.sql', import.meta.url), 'utf8')
+
+  assert.match(migrationSource, /UPDATE pickleball_tickets[\s\S]*SET status = 'unpaid'[\s\S]*WHERE status = 'paid'/)
+  assert.match(migrationSource, /CHECK \(status = ANY \(ARRAY\['unpaid', 'team_fund', 'pending_review'\]\)\)/)
+  assert.match(migrationSource, /CREATE POLICY "group members can request tickets"/)
+  assert.match(migrationSource, /status = 'pending_review'/)
 })
 
 test('AppV2 and store clean stale moved replacement sessions without touching tickets', () => {

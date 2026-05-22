@@ -657,6 +657,10 @@ test('calendar screen moves individual tickets into the calendar flow', () => {
   assert.doesNotMatch(calendarSource, /key: 'tickets'[\s\S]*label: 'Vé lẻ'/)
   assert.match(calendarSource, /TicketDayPanel/)
   assert.match(calendarSource, /onAction\?\.\('addTicket'/)
+  assert.match(calendarSource, /onAction\?\.\('approveTicket'/)
+  assert.doesNotMatch(calendarSource, /markTicketPaid/)
+  assert.doesNotMatch(calendarSource, /Đã trả/)
+  assert.doesNotMatch(calendarSource, /ticketFormOpen && isTreasurer/)
   assert.match(calendarSource, /hasTicket/)
 })
 

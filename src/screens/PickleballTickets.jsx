@@ -15,14 +15,14 @@ const EMPTY_DATA = {
     sessionCount: 0,
     totalAttendances: 0,
     totalAmount: 0,
-    paid: { count: 0, amount: 0 },
     unpaid: { count: 0, amount: 0 },
+    pending: { count: 0, amount: 0 },
     teamFund: { count: 0, amount: 0 },
   },
   filters: [
     { key: 'all', label: 'Tất cả · 0' },
-    { key: 'unpaid', label: '⏳ Chưa trả · 0' },
-    { key: 'paid', label: '✅ Đã trả · 0' },
+    { key: 'pending', label: '🕓 Chờ duyệt · 0' },
+    { key: 'unpaid', label: '⏳ Người ứng · 0' },
     { key: 'team', label: '🏦 Quỹ team · 0' },
   ],
   activeFilter: 'all',
@@ -38,7 +38,7 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
   const visibleTickets = useMemo(() => {
     const tickets = d.tickets || []
     if (activeFilter === 'unpaid') return tickets.filter(t => t.status === 'unpaid')
-    if (activeFilter === 'paid') return tickets.filter(t => t.status === 'paid')
+    if (activeFilter === 'pending') return tickets.filter(t => t.status === 'pending_review')
     if (activeFilter === 'team') return tickets.filter(t => t.status === 'team_fund')
     return tickets
   }, [activeFilter, d.tickets])
@@ -59,12 +59,10 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
               </div>
               <h1 style={{ ...type.title, margin: '4px 0 0' }}>Vé lẻ</h1>
             </div>
-            {isTreasurer && (
-              <IconButton
-                style={{ background: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.18)', color: 'white', fontWeight: 900, fontSize: 20 }}
-                onClick={() => setShowForm(true)}
-              >+</IconButton>
-            )}
+            <IconButton
+              style={{ background: 'rgba(255,255,255,0.14)', borderColor: 'rgba(255,255,255,0.18)', color: 'white', fontWeight: 900, fontSize: 20 }}
+              onClick={() => setShowForm(true)}
+            >+</IconButton>
           </div>
         </Hero>
 
@@ -85,8 +83,8 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
             <SummaryStat label="Tổng tiền" value={formatShortAmount(d.summary.totalAmount)} />
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <SummaryBox tone="success" label="Đã trả" value={`${d.summary.paid.count} buổi · ${formatShortAmount(d.summary.paid.amount)}`} />
-            <SummaryBox tone="warn" label="Chưa trả" value={`${d.summary.unpaid.count} buổi · ${formatShortAmount(d.summary.unpaid.amount)}`} />
+            <SummaryBox tone="warn" label="Chờ duyệt" value={`${d.summary.pending.count} buổi · ${formatShortAmount(d.summary.pending.amount)}`} />
+            <SummaryBox tone="success" label="Đã duyệt" value={`${d.summary.unpaid.count + d.summary.teamFund.count} buổi`} />
           </div>
         </Card>
 
@@ -162,10 +160,10 @@ function SummaryBox({ tone, label, value }) {
 
 function TicketCard({ t, isTreasurer, onAction }) {
   const isTeamFund = t.status === 'team_fund'
-  const isPaid = t.status === 'paid'
-  const accentColor = isTeamFund ? '#a78bfa' : isPaid ? colors.pickleball : colors.warning
-  const badgeTone = isTeamFund ? 'brand' : isPaid ? 'success' : 'warn'
-  const badgeLabel = isTeamFund ? '🏦 Quỹ team' : isPaid ? '✅ Đã trả' : '⏳ Chưa trả'
+  const isPending = t.status === 'pending_review'
+  const accentColor = isPending ? '#60a5fa' : isTeamFund ? '#a78bfa' : colors.warning
+  const badgeTone = isPending ? 'brand' : isTeamFund ? 'brand' : 'warn'
+  const badgeLabel = isPending ? '🕓 Chờ duyệt' : isTeamFund ? '🏦 Quỹ team' : '💸 Người ứng'
   const memberCount = (t.memberIds || []).length
 
   async function deleteTicket() {
@@ -174,7 +172,7 @@ function TicketCard({ t, isTreasurer, onAction }) {
   }
 
   return (
-    <Card style={{ padding: 16, borderColor: isTeamFund ? 'rgba(167,139,250,0.25)' : isPaid ? colors.borderSubtle : 'rgba(251,191,36,0.25)' }}>
+    <Card style={{ padding: 16, borderColor: isPending ? 'rgba(96,165,250,0.28)' : isTeamFund ? 'rgba(167,139,250,0.25)' : 'rgba(251,191,36,0.25)' }}>
       <div style={{
         position: 'absolute',
         top: 0,
@@ -214,19 +212,19 @@ function TicketCard({ t, isTreasurer, onAction }) {
         marginTop: 11,
         fontSize: 11,
         fontWeight: 800,
-        color: isTeamFund ? '#c4b5fd' : isPaid ? colors.textSecondary : '#fcd34d',
+        color: isPending ? '#93c5fd' : isTeamFund ? '#c4b5fd' : '#fcd34d',
       }}>
-        {isTeamFund ? '→ cộng vào chi phí tháng' : `→ mọi người chuyển khoản ${t.advancerName}`}
+        {isPending ? '→ chờ thủ quỹ duyệt trước khi tính vào tháng' : isTeamFund ? '→ cộng vào chi phí tháng' : `→ tự động bù/trừ với ${t.advancerName}`}
       </div>
 
       {isTreasurer && (
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {!isTeamFund && !isPaid && (
+          {isPending && (
             <button
               type="button"
-              onClick={() => onAction?.('markTicketPaid', { ticketId: t.id })}
+              onClick={() => onAction?.('approveTicket', { ticketId: t.id, status: t.advancerId ? 'unpaid' : 'team_fund' })}
               style={actionButtonStyle('success')}
-            >✓ Đã trả</button>
+            >Duyệt</button>
           )}
           <button type="button" onClick={deleteTicket} style={actionButtonStyle('danger')}>🗑 Xoá</button>
         </div>
