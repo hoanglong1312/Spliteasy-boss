@@ -313,6 +313,15 @@ test('saveBatchCosts removes stale legacy water items for primary pickle_session
   )
 })
 
+test('saveBatchCosts deletes legacy water rows before inserting positive replacements', () => {
+  const handlerSource = appSource.match(/if \(type === 'saveBatchCosts'\) \{[\s\S]*?\n    if \(type === 'togglePresence'\)/)?.[0] || ''
+
+  assert.match(handlerSource, /\.from\('pickleball_session_items'\)[\s\S]*?\.delete\(\)[\s\S]*?\.eq\('session_id', row\.sessionId\)[\s\S]*?\.eq\('name', 'Nước'\)/)
+  assert.match(handlerSource, /if \(row\.waterAmount > 0\) \{[\s\S]*legacyRows\.push/)
+  assert.match(handlerSource, /\.from\('pickleball_session_items'\)[\s\S]*?\.insert\(legacyRows\)/)
+  assert.doesNotMatch(handlerSource, /\.upsert\(legacyRows/)
+})
+
 test('saveSessionCost saves extras for primary pickle_sessions through expenses and participants', () => {
   const handlerSource = appSource.match(/if \(type === 'saveSessionCost'\) \{[\s\S]*?\n    if \(type === 'saveBatchCosts'\)/)?.[0] || ''
 

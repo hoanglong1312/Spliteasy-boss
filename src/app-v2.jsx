@@ -780,19 +780,27 @@ export default function AppV2() {
         if (sourceTable === 'pickle_sessions') {
           await savePickleSessionWaterExpense(sb, state, session, row.sessionId, row.waterAmount)
         } else {
-          legacyRows.push({
-            session_id: row.sessionId,
-            name: 'Nước',
-            amount: row.waterAmount,
-            member_ids: [],
-            created_by: state.currentUserId || null,
-          })
+          const { error: deleteLegacyWaterError } = await sb
+            .from('pickleball_session_items')
+            .delete()
+            .eq('session_id', row.sessionId)
+            .eq('name', 'Nước')
+          if (deleteLegacyWaterError) throw deleteLegacyWaterError
+          if (row.waterAmount > 0) {
+            legacyRows.push({
+              session_id: row.sessionId,
+              name: 'Nước',
+              amount: row.waterAmount,
+              member_ids: [],
+              created_by: state.currentUserId || null,
+            })
+          }
         }
       }
       if (legacyRows.length > 0) {
         const { error } = await sb
           .from('pickleball_session_items')
-          .upsert(legacyRows, { onConflict: 'session_id,name' })
+          .insert(legacyRows)
         if (error) throw error
       }
       await dispatch({ type: 'REFRESH' })
