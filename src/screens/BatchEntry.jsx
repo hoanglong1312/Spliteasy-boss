@@ -15,8 +15,14 @@ export default function BatchEntry({ data, onAction }) {
   }, [data]);
 
   const parsedRows = parseMonthlyWaterInput(bulkInput, sessions);
-  const totalWater = parsedRows.reduce((sum, row) => sum + row.waterAmount, 0);
-  const matchedSessionIds = new Set(parsedRows.map(row => String(row.sessionId)));
+  const currentWaterRows = sessions.filter(session => parseAmount(session.water || session.waterAmount || 0) > 0);
+  const previewWaterTotal = sessions.reduce((sum, session) => {
+    const parsed = parsedRows.find(row => String(row.sessionId) === String(session.id));
+    return sum + (parsed ? parsed.waterAmount : parseAmount(session.water || session.waterAmount || 0));
+  }, 0);
+  const summaryLabel = parsedRows.length > 0
+    ? `${parsedRows.length}/${sessions.length} buổi khớp`
+    : `${currentWaterRows.length}/${sessions.length} buổi đã có dữ liệu`;
 
   function saveAll() {
     onAction?.('saveBatchCosts', {
@@ -41,9 +47,48 @@ export default function BatchEntry({ data, onAction }) {
           <IconButton onClick={() => setBulkInput(exampleInput(sessions))}>↺</IconButton>
         </div>
 
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          background: colors.pageBg,
+          padding: '10px 0 12px',
+          zIndex: 10,
+          display: 'grid',
+          gridTemplateColumns: '1fr',
+          gap: 8,
+        }}>
+          <div style={{
+            padding: '10px 12px',
+            background: 'rgba(52,211,153,0.08)',
+            border: '1px solid rgba(52,211,153,0.24)',
+            borderRadius: 12,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+                Tổng nước tháng
+              </div>
+              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                {summaryLabel}
+              </div>
+            </div>
+            <span style={{ fontSize: 16, fontWeight: 900, color: colors.pickleball, ...type.mono }}>
+              {formatVND(previewWaterTotal)}
+            </span>
+          </div>
+          <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
+            Lưu tất cả
+          </Button>
+        </div>
+
         <Card accent="pickleball" style={{ padding: 14 }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: colors.pickleball, textTransform: 'uppercase' }}>
             Dán tiền nước
+          </div>
+          <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 6, lineHeight: 1.4 }}>
+            Nhập 0 để xóa tiền nước đã lưu cho buổi đó.
           </div>
           <textarea
             value={bulkInput}
@@ -69,32 +114,10 @@ export default function BatchEntry({ data, onAction }) {
           />
         </Card>
 
-        <div style={{
-          marginTop: 14,
-          padding: '12px 14px',
-          background: 'rgba(52,211,153,0.08)',
-          border: '1px solid rgba(52,211,153,0.24)',
-          borderRadius: 12,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '0.7px' }}>
-              Tổng nước tháng
-            </div>
-            <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
-              {parsedRows.length}/{sessions.length} buổi khớp
-            </div>
-          </div>
-          <span style={{ fontSize: 18, fontWeight: 900, color: colors.pickleball, ...type.mono }}>
-            {formatVND(totalWater)}
-          </span>
-        </div>
-
         <Card style={{ marginTop: 10, padding: 0 }}>
           {sessions.map((session, index) => {
             const parsed = parsedRows.find(row => String(row.sessionId) === String(session.id));
+            const status = batchPreviewStatus(session, parsed);
             return (
               <div key={session.id} style={{
                 display: 'grid',
@@ -109,14 +132,14 @@ export default function BatchEntry({ data, onAction }) {
                   <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
                     Buổi #{session.number}
                   </div>
-                  <div style={{ fontSize: 10, color: matchedSessionIds.has(String(session.id)) ? '#6ee7b7' : colors.textSecondary, marginTop: 2 }}>
-                    {parsed ? 'Sẽ lưu' : 'Không đổi'}
+                  <div style={{ fontSize: 10, color: status.color, marginTop: 2 }}>
+                    {status.label}
                   </div>
                 </div>
                 <div style={{
                   fontSize: 13,
                   fontWeight: 900,
-                  color: parsed ? colors.pickleball : colors.textMuted,
+                  color: status.amountColor,
                   ...type.mono,
                 }}>
                   {parsed ? formatVND(parsed.waterAmount) : formatVND(session.water || session.waterAmount || 0)}
@@ -125,25 +148,39 @@ export default function BatchEntry({ data, onAction }) {
             );
           })}
         </Card>
-
-        <div style={{
-          position: 'sticky',
-          bottom: 0,
-          background: colors.pageBg,
-          padding: '12px 16px',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          zIndex: 10,
-          display: 'grid',
-          gridTemplateColumns: '1fr',
-          margin: '14px -16px 0',
-        }}>
-          <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
-            Lưu tất cả
-          </Button>
-        </div>
       </Screen>
     </PhoneFrame>
   );
+}
+
+function batchPreviewStatus(session, parsed) {
+  if (!parsed) {
+    return {
+      label: 'Không đổi',
+      color: colors.textSecondary,
+      amountColor: colors.textMuted,
+    };
+  }
+  const currentWater = parseAmount(session.water || session.waterAmount || 0);
+  if (parsed.waterAmount === 0 && currentWater > 0) {
+    return {
+      label: 'Sẽ xóa',
+      color: '#fca5a5',
+      amountColor: '#fca5a5',
+    };
+  }
+  if (parsed.waterAmount === 0) {
+    return {
+      label: 'Giữ 0',
+      color: colors.textSecondary,
+      amountColor: colors.textMuted,
+    };
+  }
+  return {
+    label: 'Sẽ lưu',
+    color: '#6ee7b7',
+    amountColor: colors.pickleball,
+  };
 }
 
 function parseMonthlyWaterInput(input, sessions) {
