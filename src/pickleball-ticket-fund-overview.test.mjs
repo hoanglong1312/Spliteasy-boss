@@ -101,6 +101,15 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
     ['Phát sinh', 0, false],
     ['Vé lẻ team', 200000, false],
   ]))
+  assert.equal(JSON.stringify(data.teamFundOverview.ticketRows.map(row => [row.dateLabel, row.sourceLabel, row.totalAmount, row.amountPerPerson])), JSON.stringify([
+    ['T5 21/05', 'Anh Việt ứng', 100000, 50000],
+    ['T6 22/05', 'Quỹ team trả hộ', 100000, 50000],
+  ]))
+  assert.equal(JSON.stringify(data.teamFundOverview.ticketParticipantRows.map(row => [row.name, row.sessions, row.amount])), JSON.stringify([
+    ['Cường', 2, 100000],
+    ['Anh Việt', 1, 50000],
+    ['Giang', 1, 50000],
+  ]))
 })
 
 test('team fund tracks venue bank info and owner payment history', () => {
@@ -220,6 +229,8 @@ test('team fund screen owns treasury totals and monthly money config', () => {
   assert.match(teamFundSource, /Tiền sân tháng/)
   assert.match(teamFundSource, /Giá vé lẻ\/người/)
   assert.match(teamFundSource, /STK chủ sân/)
+  assert.match(teamFundSource, /const \[ownerBankOpen, setOwnerBankOpen\] = useState\(false\)/)
+  assert.match(teamFundSource, /button type="button"[\s\S]*?setOwnerBankOpen\(!ownerBankOpen\)/)
   assert.match(teamFundSource, /<BankSelect value=\{venueBankName\} onChange=\{value => \{/)
   assert.match(teamFundSource, /function BankSelect/)
   assert.match(teamFundSource, /BANK_LIST\.map/)
@@ -233,9 +244,13 @@ test('team fund screen owns treasury totals and monthly money config', () => {
   assert.match(teamFundSource, /Tiền sân tháng sau/)
   assert.match(teamFundSource, /Đánh dấu đã chuyển/)
   assert.match(teamFundSource, /setPaymentQrOpen\(true\)/)
-  assert.match(teamFundSource, /Tổng vé lẻ team/)
-  assert.match(teamFundSource, /Chênh lệch qua quỹ/)
-  assert.match(teamFundSource, /ticketFund\.rows\.map/)
+  assert.match(teamFundSource, /Giao dịch vé lẻ/)
+  assert.match(teamFundSource, /Quỹ team cần trả hộ thành viên/)
+  assert.match(teamFundSource, /ticketRows\.map/)
+  assert.match(teamFundSource, /ticketParticipantRows\.map/)
+  assert.doesNotMatch(teamFundSource, /Cần thu/)
+  assert.doesNotMatch(teamFundSource, /Cần bù/)
+  assert.doesNotMatch(teamFundSource, /Chênh lệch qua quỹ/)
   assert.match(teamFundSource, /onAction\?\.\('saveTeamFundConfig'/)
   assert.match(teamFundSource, /onAction\?\.\('markOwnerPayment'/)
   assert.match(teamFundSource, /onAction\?\.\('push', 'pickleball-calendar'\)/)

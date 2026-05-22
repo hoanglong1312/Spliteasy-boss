@@ -430,6 +430,8 @@ function buildPickleballTeamFundData(state) {
   const monthSessions = getStateMonthSessions(state, today)
   const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
+  const ticketRows = buildTeamFundTicketRows(state)
+  const ticketParticipantRows = buildTeamFundTicketParticipantRows(state)
   const currentFixedMembers = currentGroupMembers(state)
     .filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
@@ -462,6 +464,8 @@ function buildPickleballTeamFundData(state) {
     memberCount: currentFixedMembers.length,
     ticketStats,
     ticketFund,
+    ticketRows,
+    ticketParticipantRows,
     venueBank,
     nextMonth: {
       yearMonth: nextYearMonth,
@@ -509,6 +513,45 @@ function buildPickleballTeamFundData(state) {
       },
     ],
   }
+}
+
+function buildTeamFundTicketRows(state) {
+  return currentMonthTicketsForState(state)
+    .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+    .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))
+    .map((ticket, index) => {
+      const row = toTicketRow(ticket, index, state)
+      return {
+        ...row,
+        sourceLabel: row.status === 'team_fund' ? 'Quỹ team trả hộ' : `${row.advancerName || 'Người ứng'} ứng`,
+      }
+    })
+}
+
+function buildTeamFundTicketParticipantRows(state) {
+  const memberMap = new Map()
+  currentMonthTicketsForState(state)
+    .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+    .forEach(ticket => {
+      const perPerson = ticketAmountPerPerson(ticket)
+      ticketMemberIds(ticket).forEach(memberId => {
+        if (!memberMap.has(String(memberId))) {
+          const member = safeArray(state?.members).find(row => String(row?.id || row?.member_id) === String(memberId)) || {}
+          memberMap.set(String(memberId), {
+            memberId,
+            name: member.displayName || member.name || 'Thành viên',
+            initial: initials(member),
+            color: member.color,
+            sessions: 0,
+            amount: 0,
+          })
+        }
+        const row = memberMap.get(String(memberId))
+        row.sessions += 1
+        row.amount += perPerson
+      })
+    })
+  return [...memberMap.values()].sort((a, b) => b.amount - a.amount || b.sessions - a.sessions)
 }
 
 function shiftMonthKey(yearMonth, delta) {

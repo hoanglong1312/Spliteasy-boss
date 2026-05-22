@@ -9,6 +9,8 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const d = data || DEMO;
   const ticketFund = d.ticketFund || { rows: [], totalDue: 0, totalCredit: 0 };
   const ticketStats = d.ticketStats || { sessionCount: 0, totalAmount: 0, participantCount: 0 };
+  const ticketRows = safeArray(d.ticketRows);
+  const ticketParticipantRows = safeArray(d.ticketParticipantRows);
   const venueBank = d.venueBank || { ownerName: '', bankName: '', bankAccount: '' };
   const paymentDraft = d.paymentDraft || { items: [], totalAmount: 0 };
   const ownerPayments = d.ownerPayments || [];
@@ -23,6 +25,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const [saveState, setSaveState] = useState('');
   const [paymentState, setPaymentState] = useState('');
   const [paymentQrOpen, setPaymentQrOpen] = useState(false);
+  const [ownerBankOpen, setOwnerBankOpen] = useState(false);
   const perSession = Math.round(courtFee / Math.max(Number(d.sessionsCount) || 1, 1));
   const perMember = Math.round(courtFee / Math.max(Number(d.memberCount) || 1, 1));
   const selectedPaymentItems = paymentDraft.items.filter(item => selectedPaymentKeys.includes(paymentItemKey(item)));
@@ -107,32 +110,6 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             inputMode="numeric"
             inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
           />
-          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${colors.borderSubtle}` }}>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>
-              STK chủ sân
-            </div>
-            <Input
-              label="Tên chủ tài khoản"
-              value={venueOwnerName}
-              onChange={event => {
-                setVenueOwnerName(event.target.value);
-                setSaveState('');
-              }}
-            />
-            <BankSelect value={venueBankName} onChange={value => {
-              setVenueBankName(value);
-              setSaveState('');
-            }} />
-            <Input
-              label="Số tài khoản"
-              value={venueBankAccount}
-              onChange={event => {
-                setVenueBankAccount(event.target.value.replace(/\s/g, ''));
-                setSaveState('');
-              }}
-              inputMode="numeric"
-            />
-          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
             <MiniStat label="Tiền sân/buổi" value={perSession} tone="info" />
             <MiniStat label="Tiền sân/người" value={perMember} tone="info" />
@@ -309,25 +286,147 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           )}
         </Card>
 
+        <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px', borderColor: 'rgba(52,211,153,0.22)' }}>
+          <button type="button" onClick={() => setOwnerBankOpen(!ownerBankOpen)} style={{
+            width: '100%',
+            border: 'none',
+            background: 'transparent',
+            color: colors.textPrimary,
+            padding: 0,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                  STK chủ sân
+                </div>
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                  {venueOwnerName || 'Chưa có tên'} · {selectedBank?.shortName || venueBankName || 'Chưa chọn ngân hàng'} · {venueBankAccount || 'Chưa có STK'}
+                </div>
+              </div>
+              <div style={{ fontSize: 18, color: '#6ee7b7', fontWeight: 900 }}>{ownerBankOpen ? '⌃' : '⌄'}</div>
+            </div>
+          </button>
+          {ownerBankOpen && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${colors.borderSubtle}` }}>
+              <Input
+                label="Tên chủ tài khoản"
+                value={venueOwnerName}
+                onChange={event => {
+                  setVenueOwnerName(event.target.value);
+                  setSaveState('');
+                }}
+              />
+              <BankSelect value={venueBankName} onChange={value => {
+                setVenueBankName(value);
+                setSaveState('');
+              }} />
+              <Input
+                label="Số tài khoản"
+                value={venueBankAccount}
+                onChange={event => {
+                  setVenueBankAccount(event.target.value.replace(/\s/g, ''));
+                  setSaveState('');
+                }}
+                inputMode="numeric"
+              />
+              <Button
+                block
+                variant="success"
+                style={{ marginTop: 12, padding: 12 }}
+                onClick={async () => {
+                  setSaveState('');
+                  try {
+                    await onAction?.('saveTeamFundConfig', {
+                      currentYearMonth: d.currentYearMonth,
+                      courtFee,
+                      ticketPrice,
+                      venueOwnerName,
+                      venueBankName,
+                      venueBankAccount,
+                    });
+                    setSaveState('saved');
+                  } catch {
+                    setSaveState('error');
+                  }
+                }}
+              >
+                Lưu STK chủ sân
+              </Button>
+            </div>
+          )}
+        </Card>
+
         <Card accent="pickleball" style={{ marginTop: 10, padding: '14px 12px', borderColor: 'rgba(251,191,36,0.24)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
             <div>
               <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Tổng vé lẻ team
+                Giao dịch vé lẻ
               </div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                {ticketStats.sessionCount || 0} buổi · {ticketStats.participantCount || 0} lượt tham gia
+                {ticketStats.sessionCount || 0} buổi · {ticketStats.participantCount || 0} lượt · {formatVND(ticketStats.totalAmount || 0)}
               </div>
             </div>
             <button type="button" onClick={() => onAction?.('push', 'pickleball-calendar')} style={pillButtonStyle()}>
               Mở lịch
             </button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
-            <MiniStat label="Tổng vé" value={ticketStats.totalAmount || 0} tone="warn" />
-            <MiniStat label="Cần thu" value={ticketFund.totalDue || 0} tone="warn" />
-            <MiniStat label="Cần bù" value={ticketFund.totalCredit || 0} tone="success" />
+          <div style={{ marginTop: 12, padding: 10, borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.22)' }}>
+            <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+              Quỹ team cần trả hộ thành viên
+            </div>
+            <div style={{ fontSize: 17, color: colors.warning, fontWeight: 900, marginTop: 3, ...type.mono }}>{formatVND(ticketStats.totalAmount || 0)}</div>
+            <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3 }}>
+              Bao gồm vé quỹ trả trực tiếp và vé có người ứng để cuối tháng cân qua quỹ.
+            </div>
           </div>
+          <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {ticketRows.length === 0 && (
+              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '10px 0' }}>
+                Chưa có giao dịch vé lẻ trong tháng.
+              </div>
+            )}
+            {ticketRows.map(ticket => (
+              <div key={ticket.id} style={{ padding: '10px 0', borderTop: `1px solid ${colors.borderSubtle}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900 }}>{ticket.dateLabel} · {ticket.timeLabel || 'Chưa có giờ'}</div>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                      {ticket.memberLabels.join(', ') || 'Chưa có người tham gia'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#fde68a', marginTop: 3 }}>
+                      {ticket.sourceLabel}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: colors.warning, ...type.mono }}>{formatVND(ticket.totalAmount || 0)}</div>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>{formatVND(ticket.amountPerPerson || 0)}/người</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {ticketParticipantRows.length > 0 && (
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${colors.borderSubtle}` }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Theo người tham gia
+              </div>
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                {ticketParticipantRows.map(row => (
+                  <div key={row.memberId} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Avatar initial={row.initial} color={row.color} size={26} ring={false} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 900 }}>{row.name}</div>
+                      <div style={{ fontSize: 10, color: colors.textSecondary }}>{row.sessions} buổi vé lẻ trong tháng</div>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: colors.warning, ...type.mono }}>{formatVND(row.amount)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px' }}>
@@ -388,46 +487,6 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           </div>
         </Card>
 
-        <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
-            Chênh lệch qua quỹ
-          </div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-            Người tham gia nộp vào quỹ, người ứng được quỹ bù lại.
-          </div>
-          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ticketFund.rows.length === 0 && (
-              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '10px 0' }}>
-                Chưa có chênh lệch vé lẻ trong tháng.
-              </div>
-            )}
-            {ticketFund.rows.map(row => (
-              <div key={row.memberId} style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                padding: '9px 0',
-                borderTop: `1px solid ${colors.borderSubtle}`,
-              }}>
-                <Avatar initial={row.initial} color={row.color} size={28} ring={false} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 900 }}>{row.name}</div>
-                  <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
-                    {row.roleLabel || row.label}
-                  </div>
-                </div>
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 900,
-                  color: row.amount < 0 ? '#6ee7b7' : colors.warning,
-                  ...type.mono,
-                }}>
-                  {row.amount < 0 ? `Quỹ bù ${formatVND(Math.abs(row.amount))}` : `+${formatVND(row.amount)}`}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
       </Screen>
 
       <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
