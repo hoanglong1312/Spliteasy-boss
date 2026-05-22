@@ -1454,10 +1454,17 @@ function replacementOriginDate(session) {
   return String(session?.notes || '').match(/Dời từ (\d{4}-\d{2}-\d{2})/)?.[1] || ''
 }
 
+function replacementTargetDate(session) {
+  const matches = [...String(session?.notes || '').matchAll(/sang (\d{4}-\d{2}-\d{2})/g)]
+  return matches.at(-1)?.[1] || ''
+}
+
 function isStaleReplacementSession(session, sessions) {
   const originDate = replacementOriginDate(session)
   const selfDate = dateKey(sessionDate(session))
   if (!originDate || originDate === selfDate) return false
+  const targetDate = replacementTargetDate(session)
+  if (targetDate && targetDate !== selfDate) return true
   if (isMovedSession(session)) return true
   const groupId = session?.groupId || session?.group_id
   const originSession = safeArray(sessions).find(item => {

@@ -408,6 +408,32 @@ test('calendar hides moved replacement dates and keeps only the original moved m
   assert.equal(data.sessions.some(session => session.id === 'replacement-31'), false)
 })
 
+test('calendar hides scheduled replacement rows that are no longer the moved-chain target', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const data = buildPickleballCalendarData({
+    currentUserId: 'u1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [],
+    pickle: {
+      sessions: [
+        { id: 'origin-22', groupId: 'g1', date: '2026-05-22', status: 'cancelled', notes: 'Dời từ 2026-05-22 sang 2026-05-23' },
+        { id: 'replacement-23', groupId: 'g1', date: '2026-05-23', status: 'scheduled', notes: 'Dời từ 2026-05-22 qua 2026-05-23 sang 2026-05-31' },
+        { id: 'replacement-31', groupId: 'g1', date: '2026-05-31', status: 'scheduled', notes: 'Dời từ 2026-05-22 qua 2026-05-31 sang 2026-06-01' },
+      ],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', scheduleWeekdays: [5] }],
+    },
+    _allPickle: { sessions: [] },
+  })
+  const byDate = new Map(data.days.map(day => [day.date, day]))
+
+  assert.equal(byDate.get('2026-05-23').state, 'normal')
+  assert.equal(byDate.get('2026-05-31').state, 'normal')
+  assert.equal(data.sessions.some(session => session.id === 'replacement-23'), false)
+  assert.equal(data.sessions.some(session => session.id === 'replacement-31'), false)
+  assert.deepEqual(JSON.parse(JSON.stringify(data.staleReplacementCleanup.ids)), ['replacement-23', 'replacement-31'])
+})
+
 test('calendar hides and schedules cleanup for replacement dates after the original session is restored', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const data = buildPickleballCalendarData({
@@ -470,6 +496,16 @@ test('calendar screen moves individual tickets into the calendar flow', () => {
   assert.match(calendarSource, /TicketDayPanel/)
   assert.match(calendarSource, /onAction\?\.\('addTicket'/)
   assert.match(calendarSource, /hasTicket/)
+})
+
+test('pickleball subtabs no longer expose the legacy ticket tab', () => {
+  const membersSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
+  const ticketsSource = readFileSync(new URL('./screens/PickleballTickets.jsx', import.meta.url), 'utf8')
+  const overviewSource = readFileSync(new URL('./screens/PickleballOverview.jsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(membersSource, /key: 'tickets'[\s\S]*label: 'Vé lẻ'/)
+  assert.doesNotMatch(ticketsSource, /key: 'tickets'[\s\S]*label: 'Vé lẻ'/)
+  assert.doesNotMatch(appSource, /tickets: 'pickleball-tickets'/)
+  assert.doesNotMatch(overviewSource, /push', 'pickleball-tickets'/)
 })
 
 test('reschedule handler cancels old session and creates a new scheduled session', () => {

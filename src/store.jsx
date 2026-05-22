@@ -207,6 +207,11 @@ function rescheduleOriginDate(session) {
   return note.match(/Dời từ (\d{4}-\d{2}-\d{2})/)?.[1] || ''
 }
 
+function rescheduleTargetDate(session) {
+  const matches = [...String(session?.notes || '').matchAll(/sang (\d{4}-\d{2}-\d{2})/g)]
+  return matches.at(-1)?.[1] || ''
+}
+
 function replacementNote(originDate, fromDate, toDate, fallback = '') {
   const custom = String(fallback || '').trim()
   const hop = fromDate && fromDate !== originDate ? ` qua ${fromDate}` : ''
@@ -248,6 +253,8 @@ function isStaleReplacementSession(session, sessions) {
   const originDate = rescheduleOriginDate(session)
   const selfDate = sessionDateValue(session)
   if (!originDate || originDate === selfDate || isHiddenReplacementSession(session)) return false
+  const targetDate = rescheduleTargetDate(session)
+  if (targetDate && targetDate !== selfDate) return true
   if (isMovedStatus(session?.status)) return true
   const groupId = session?.groupId || session?.group_id
   const originSession = safeArray(sessions).find(item => {

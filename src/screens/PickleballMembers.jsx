@@ -134,7 +134,6 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
             { key: 'overview',  label: 'Tổng quan' },
             { key: 'calendar',  label: 'Buổi đánh' },
             { key: 'members',   label: 'Thành viên' },
-            { key: 'tickets',   label: 'Vé lẻ' },
           ]}
           active="members"
           onChange={(key) => onAction?.('subTab', key)}

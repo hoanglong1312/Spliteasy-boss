@@ -527,7 +527,6 @@ export default function AppV2() {
         overview: 'pickleball-overview',
         calendar: 'pickleball-calendar',
         members: 'pickleball-members',
-        tickets: 'pickleball-tickets',
       }
       if (payload === 'overview') {
         setStack([])

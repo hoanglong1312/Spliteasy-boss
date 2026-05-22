@@ -154,7 +154,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   {ticketFund.unpaidCount} người ứng · {ticketFund.teamFundCount} quỹ team
                 </div>
               </div>
-              <button type="button" onClick={() => onAction?.('push', 'pickleball-tickets')} style={{
+              <button type="button" onClick={() => onAction?.('push', 'pickleball-calendar')} style={{
                 border: 'none',
                 background: 'transparent',
                 color: colors.brandLight,
