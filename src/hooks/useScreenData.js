@@ -363,6 +363,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
+    memberCandidates: buildGroupMemberCandidates(g, members),
     members: groupMembers.map(member => ({
       id: member.id,
       name: member.displayName || member.name,
@@ -386,6 +387,29 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
       .filter(row => row.amount !== 0)
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)),
   }
+}
+
+function buildGroupMemberCandidates(group, members) {
+  const currentMembers = membersForGroup(group, members)
+  const currentIds = new Set(currentMembers.map(member => String(member.id)))
+  const currentNames = new Set(currentMembers.map(member => normalizeName(member.displayName || member.name)))
+  const seenNames = new Set()
+  return safeArray(members)
+    .filter(member => !currentIds.has(String(member.id)) && !currentNames.has(normalizeName(member.displayName || member.name)))
+    .map(member => ({
+      id: member.id,
+      name: member.displayName || member.name || '',
+      bankName: member.bankName || member.bank_name || '',
+      bankAccount: member.bankAccount || member.bank_account || '',
+      bankAccountName: member.bankAccountName || member.bank_account_name || '',
+    }))
+    .filter(member => {
+      const key = normalizeName(member.name)
+      if (!key || seenNames.has(key)) return false
+      seenNames.add(key)
+      return true
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
 }
 
 function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members) {
@@ -2745,7 +2769,11 @@ function groupBalanceForMember(group, currentUserId, members, currentUserName) {
 }
 
 function sameName(a, b) {
-  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase()
+  return normalizeName(a) === normalizeName(b)
+}
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase()
 }
 
 function groupKind(group) {

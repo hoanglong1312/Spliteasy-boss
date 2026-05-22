@@ -182,9 +182,10 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       )}
 
       {addingMember && (
-        <MemberEditor
+        <AddMemberEditor
           title="Thêm thành viên"
           groupId={d.id}
+          candidates={d.memberCandidates || []}
           onClose={closeMemberSheets}
           onAction={onAction}
         />
@@ -208,10 +209,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       )}
 
       {editingMember && (
-        <MemberEditor
+        <EditMemberEditor
           title="Sửa thành viên"
           member={editingMember}
-          groupId={d.id}
           onClose={closeMemberSheets}
           onAction={onAction}
         />
@@ -334,7 +334,57 @@ function MemberRow({ member, isTreasurer, onMore }) {
   );
 }
 
-function MemberEditor({ title, member, groupId, onClose, onAction }) {
+function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction }) {
+  const [selectedCandidateId, setSelectedCandidateId] = useState('');
+  const [name, setName] = useState('');
+  const selectedCandidate = candidates.find(candidate => String(candidate.id) === String(selectedCandidateId));
+
+  async function save(e) {
+    e.preventDefault();
+    const cleanName = (selectedCandidate?.name || name).trim();
+    if (!cleanName) return;
+    await onAction?.('addMember', {
+      groupId,
+      name: cleanName,
+      type: 'fixed',
+      bankAccountName: selectedCandidate?.bankAccountName || '',
+      bankName: selectedCandidate?.bankName || '',
+      bankAccount: selectedCandidate?.bankAccount || '',
+    });
+    onClose?.();
+  }
+
+  return (
+    <BottomSheet title={title} onClose={onClose}>
+      <form onSubmit={save}>
+        {candidates.length > 0 && (
+          <CandidateSelect
+            value={selectedCandidateId}
+            candidates={candidates}
+            onChange={(nextId) => {
+              setSelectedCandidateId(nextId);
+              const candidate = candidates.find(item => String(item.id) === String(nextId));
+              if (candidate) setName(candidate.name || '');
+            }}
+          />
+        )}
+        <Field
+          label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
+          value={name}
+          onChange={(nextName) => {
+            setName(nextName);
+            setSelectedCandidateId('');
+          }}
+          autoFocus
+          placeholder="Tên thành viên"
+        />
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Thêm thành viên</Button>
+      </form>
+    </BottomSheet>
+  );
+}
+
+function EditMemberEditor({ title, member, onClose, onAction }) {
   const [name, setName] = useState(member?.name || '');
   const [bankAccountName, setBankAccountName] = useState(member?.bankAccountName || '');
   const [bankName, setBankName] = useState(member?.bankName || '');
@@ -344,17 +394,13 @@ function MemberEditor({ title, member, groupId, onClose, onAction }) {
     e.preventDefault();
     const cleanName = name.trim();
     if (!cleanName) return;
-    if (member?.id) {
-      await onAction?.('editMember', {
-        memberId: member.id,
-        name: cleanName,
-        bankAccountName: bankAccountName.trim(),
-        bankName,
-        bankAccount: bankAccount.trim(),
-      });
-    } else {
-      await onAction?.('addMember', { groupId, name: cleanName, type: 'fixed', bankAccountName: bankAccountName.trim(), bankName, bankAccount: bankAccount.trim() });
-    }
+    await onAction?.('editMember', {
+      memberId: member.id,
+      name: cleanName,
+      bankAccountName: bankAccountName.trim(),
+      bankName,
+      bankAccount: bankAccount.trim(),
+    });
     onClose?.();
   }
 
@@ -365,9 +411,30 @@ function MemberEditor({ title, member, groupId, onClose, onAction }) {
         <Field label="Tên tài khoản" value={bankAccountName} onChange={setBankAccountName} placeholder="Tên trên tài khoản ngân hàng" />
         <BankSelect value={bankName} onChange={setBankName} />
         <Field label="Số tài khoản" value={bankAccount} onChange={setBankAccount} inputMode="numeric" placeholder="Chưa cập nhật" />
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">{member?.id ? 'Lưu thành viên' : 'Thêm thành viên'}</Button>
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu thành viên</Button>
       </form>
     </BottomSheet>
+  );
+}
+
+function CandidateSelect({ value, candidates, onChange }) {
+  return (
+    <label style={{ display: 'block', marginTop: 12 }}>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '1.2px',
+        color: colors.textSecondary,
+        marginBottom: 6,
+      }}>Người đã có trong nhóm khác</div>
+      <select value={value} onChange={event => onChange(event.target.value)} style={fieldStyle()}>
+        <option value="">Chọn từ danh sách cũ</option>
+        {candidates.map(candidate => (
+          <option key={candidate.id} value={candidate.id}>{candidate.name}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 

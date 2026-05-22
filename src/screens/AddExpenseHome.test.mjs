@@ -43,14 +43,33 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
 });
 
 test('GroupDetail member management writes normal group and bank fields', () => {
-  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{ groupId, name: cleanName, type: 'fixed', bankAccountName: bankAccountName\.trim\(\), bankName, bankAccount: bankAccount\.trim\(\) \}\)/);
+  assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], onClose, onAction \}\)/);
+  assert.match(groupDetailSource, /Người đã có trong nhóm khác/);
+  assert.match(groupDetailSource, /Hoặc nhập tên mới/);
+  assert.match(groupDetailSource, /const selectedCandidate = candidates\.find\(candidate => String\(candidate\.id\) === String\(selectedCandidateId\)\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*bankAccountName: selectedCandidate\?\.bankAccountName \|\| '',[\s\S]*bankName: selectedCandidate\?\.bankName \|\| '',[\s\S]*bankAccount: selectedCandidate\?\.bankAccount \|\| '',[\s\S]*\}\)/);
+  const addMemberEditorSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function AddMemberEditor'),
+    groupDetailSource.indexOf('function EditMemberEditor')
+  );
+  assert.doesNotMatch(addMemberEditorSource, /Tên tài khoản|Ngân hàng|Số tài khoản/);
   assert.match(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/);
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
+  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members\)/);
+  assert.match(screenDataSource, /const currentNames = new Set\(currentMembers\.map\(member => normalizeName\(member\.displayName \|\| member\.name\)\)\)/);
+  assert.match(screenDataSource, /!currentNames\.has\(normalizeName\(member\.displayName \|\| member\.name\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
   assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);
   assert.match(screenDataSource, /bankAccountName: member\.bankAccountName \|\| member\.bank_account_name \|\| ''/);
+});
+
+test('GroupDetail keeps bank fields only in edit member sheet', () => {
+  assert.match(groupDetailSource, /function EditMemberEditor\(\{ title, member, onClose, onAction \}\)/);
+  assert.match(groupDetailSource, /<Field label="Tên tài khoản" value=\{bankAccountName\}/);
+  assert.match(groupDetailSource, /<BankSelect value=\{bankName\} onChange=\{setBankName\} \/>/);
+  assert.match(groupDetailSource, /<Field label="Số tài khoản" value=\{bankAccount\}/);
 });
 
 test('GroupDetail uses group-specific treasurer role for normal expense groups', () => {
