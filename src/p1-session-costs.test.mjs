@@ -191,6 +191,48 @@ test('calendar court cost uses monthly config for the selected session month', (
   assert.equal(data.selectedSession.totalPerPerson, 43333)
 })
 
+test('calendar detail distinguishes attendee cost from the current user personal cost', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm3',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'Tuấn', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Việt', memberType: 'fixed' },
+      { id: 'm3', groupId: 'g1', name: 'Long', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 's1',
+          sourceTable: 'pickle_sessions',
+          groupId: 'g1',
+          date: '2026-05-20',
+          status: 'completed',
+          attendanceRecords: [
+            { memberId: 'm1', status: 'present' },
+            { memberId: 'm2', status: 'present' },
+            { memberId: 'm3', status: 'absent' },
+          ],
+          expenses: [
+            { id: 'w1', pickleSessionId: 's1', title: 'Tiền nước', category: 'water', amount: 60000 },
+          ],
+        },
+      ],
+      monthlyConfigs: [],
+    },
+    _allPickle: { sessions: [], sessionItems: [], monthlyConfigs: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.equal(data.selectedSession.currentUserPresent, false)
+  assert.equal(data.selectedSession.currentUserTotal, 0)
+  assert.equal(data.selectedSession.personalCostNote, 'Bạn vắng buổi này · không tính chi phí')
+  assert.equal(data.selectedSession.costRows[1].label, '💧 Tiền nước/người tham gia')
+})
+
 test('calendar detail panel contains the P1 session-cost editor contract', () => {
   assert.match(calendarSource, /Chi phí buổi này/)
   assert.match(calendarSource, /Phụ phát sinh/)
