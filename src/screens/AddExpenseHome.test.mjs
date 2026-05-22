@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const addExpenseSource = readFileSync(new URL('./AddExpense.jsx', import.meta.url), 'utf8');
+const groupDetailSource = readFileSync(new URL('./GroupDetail.jsx', import.meta.url), 'utf8');
 const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8');
 const expenseDetailSource = readFileSync(new URL('./ExpenseDetail.jsx', import.meta.url), 'utf8');
 const screenDataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
@@ -14,6 +15,19 @@ test('AddExpense defaults to the logged-in member and submits edit expense ids',
   assert.match(addExpenseSource, /useState\(\(\) => editExpense\?\.paidBy \?\? d\.currentMemberId \?\? ''\)/);
   assert.match(addExpenseSource, /<h1[\s\S]*\{editExpense \? 'Sửa chi tiêu' : 'Thêm chi tiêu'\}/);
   assert.match(addExpenseSource, /expenseId: editExpense\?\.id/);
+  assert.match(addExpenseSource, /Chia trong nhóm · \{d\.memberCount \|\| \(d\.members \|\| \[\]\)\.length\} thành viên/);
+  assert.match(addExpenseSource, /\{d\.groupEmoji \|\| '👥'\}/);
+});
+
+test('GroupDetail menu, balances, and members tabs render real group data', () => {
+  assert.match(groupDetailSource, /const \[menuOpen, setMenuOpen\] = useState\(false\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('settle', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /activeTab === 'balances'/);
+  assert.match(groupDetailSource, /<BalanceRow key=\{row\.id\} row=\{row\} \/>/);
+  assert.match(groupDetailSource, /activeTab === 'members'/);
+  assert.match(groupDetailSource, /<MemberRow key=\{member\.id\} member=\{member\} \/>/);
+  assert.match(screenDataSource, /balanceRows: groupMembers/);
 });
 
 test('Home activity list filters by title, status, and category', () => {
@@ -119,6 +133,9 @@ test('Home expense rows open expense detail instead of edit form', () => {
 
 test('App routes AddExpense with current member data and existing expense data', () => {
   assert.match(screenDataSource, /getAddExpenseData: \(params\) => buildAddExpenseData\(state, params\)/);
+  assert.match(screenDataSource, /const requestedGroupId = normalizeId\(params, 'groupId'\)/);
+  assert.match(screenDataSource, /const requestedGroup = requestedGroupId \? safeArray\(state\?\.groups\)\.find/);
+  assert.match(screenDataSource, /memberCount: members\.length/);
   assert.match(screenDataSource, /currentMemberId: state\?\.currentUserId/);
   assert.match(screenDataSource, /currentMemberName: currentMember\?\.displayName \|\| currentMember\?\.name \|\| state\?\.currentUserName/);
   assert.match(screenDataSource, /editExpense: expense \? \{/);

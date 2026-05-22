@@ -10,6 +10,7 @@ import {
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const [activeTab, setActiveTab] = useState('activity');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <PhoneFrame>
@@ -21,7 +22,24 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: colors.textMuted, textTransform: 'uppercase' }}>NHÓM</div>
             <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{d.name}</div>
           </div>
-          <IconButton onClick={() => onAction?.('menu')}>⋯</IconButton>
+          <div style={{ position: 'relative' }}>
+            <IconButton onClick={() => setMenuOpen(open => !open)}>⋯</IconButton>
+            {menuOpen && (
+              <Card style={{
+                position: 'absolute',
+                right: 0,
+                top: 58,
+                width: 190,
+                padding: 8,
+                zIndex: 20,
+                boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
+              }}>
+                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('addExpense', { groupId: d.id }); }}>+ Thêm chi tiêu</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('settle', { groupId: d.id }); }}>Tất toán nhóm</MenuItem>
+                {isTreasurer && <MenuItem onClick={() => { setMenuOpen(false); onAction?.('closeMonth', { groupId: d.id }); }}>Chốt sổ tháng</MenuItem>}
+              </Card>
+            )}
+          </div>
         </div>
 
         {/* Balance hero */}
@@ -37,8 +55,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             fontSize: 11, fontWeight: 600,
           }}>{d.balanceLabel}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense')}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle')}>⚡ Tất toán</Button>
+            <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
+            <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
           </div>
         </Hero>
 
@@ -50,7 +68,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)',
               display: 'flex', alignItems: 'center', gap: 8,
               fontSize: 11, fontWeight: 600, color: '#c7d2fe', cursor: 'pointer',
-            }} onClick={() => onAction?.('closeMonth')}>
+            }} onClick={() => onAction?.('closeMonth', { groupId: d.id })}>
               <span style={{ fontSize: 14 }}>🔒</span> Chốt sổ tháng
             </div>
             <div style={{
@@ -58,8 +76,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`,
               fontSize: 11, fontWeight: 600, color: colors.textSecondary,
               display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-            }} onClick={() => onAction?.('exportCsv')}>
-              <span>📊</span> CSV
+            }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>
+              <span>＋</span> Thêm
             </div>
           </div>
         )}
@@ -85,10 +103,126 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             </div>
           </React.Fragment>
         ))}
+        {activeTab === 'activity' && d.activitiesByWeek.length === 0 && (
+          <EmptyState title="Chưa có chi tiêu" sub="Bấm Thêm chi tiêu để ghi khoản đầu tiên của nhóm này." />
+        )}
+
+        {activeTab === 'balances' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {(d.balanceRows || []).length > 0 ? d.balanceRows.map(row => (
+              <BalanceRow key={row.id} row={row} />
+            )) : (
+              <EmptyState title="Đang cân bằng" sub="Nhóm chưa có khoản nào cần nộp hoặc được quỹ bù." />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'members' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {(d.members || []).map(member => (
+              <MemberRow key={member.id} member={member} />
+            ))}
+            {(d.members || []).length === 0 && (
+              <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
+            )}
+          </div>
+        )}
       </Screen>
 
       <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
+  );
+}
+
+function MenuItem({ children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        width: '100%',
+        padding: '11px 10px',
+        border: 'none',
+        borderRadius: 8,
+        background: 'transparent',
+        color: colors.textPrimary,
+        fontSize: 12,
+        fontWeight: 700,
+        textAlign: 'left',
+        fontFamily: 'inherit',
+        cursor: 'pointer',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function EmptyState({ title, sub }) {
+  return (
+    <Card style={{ marginTop: 10, textAlign: 'center', padding: '22px 16px' }}>
+      <div style={{ fontSize: 13, fontWeight: 800 }}>{title}</div>
+      <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 5, lineHeight: 1.45 }}>{sub}</div>
+    </Card>
+  );
+}
+
+function BalanceRow({ row }) {
+  const isDebt = row.amount < 0;
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          background: row.color || 'rgba(255,255,255,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 13,
+          fontWeight: 900,
+        }}>{row.initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 800 }}>{row.name}</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+            {isDebt ? 'Cần nộp vào quỹ' : 'Quỹ cần bù lại'}
+          </div>
+        </div>
+        <div style={{ fontSize: 14, fontWeight: 900, color: isDebt ? colors.danger : '#6ee7b7', ...type.mono }}>
+          {isDebt ? '-' : '+'}{formatVND(Math.abs(row.amount))}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MemberRow({ member }) {
+  return (
+    <Card>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          background: member.color || 'rgba(255,255,255,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 13,
+          fontWeight: 900,
+        }}>{member.initials}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 800 }}>{member.name}</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+            {member.role === 'treasurer' ? 'Thủ quỹ' : 'Thành viên'}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 800, color: member.balance < 0 ? colors.danger : member.balance > 0 ? '#6ee7b7' : colors.textSecondary, ...type.mono }}>
+          {member.balance === 0 ? '0 đ' : `${member.balance > 0 ? '+' : '-'}${formatVND(Math.abs(member.balance))}`}
+        </div>
+      </div>
+    </Card>
   );
 }
 

@@ -86,6 +86,33 @@ export default function AddExpense({ data, onAction }) {
             }}>✕</button>
           </div>
           <h1 style={{ ...type.title, fontSize: 24, marginBottom: 8 }}>{editExpense ? 'Sửa chi tiêu' : 'Thêm chi tiêu'}</h1>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${colors.borderSubtle}`,
+            marginTop: 10,
+          }}>
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              background: 'rgba(245,158,11,0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 18,
+            }}>{d.groupEmoji || '👥'}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.groupName}</div>
+              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                Chia trong nhóm · {d.memberCount || (d.members || []).length} thành viên
+              </div>
+            </div>
+          </div>
 
           {/* Amount focal */}
           <div style={{

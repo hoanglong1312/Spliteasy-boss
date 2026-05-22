@@ -263,7 +263,9 @@ function isExpenseRelatedToMember(expense, memberId) {
 function buildAddExpenseData(state, params) {
   const expenseId = normalizeId(params, 'expenseId')
   const expense = expenseId ? findExpense(state, expenseId) : null
-  const group = expense ? groupForExpense(state, expense) || currentGroup(state) : currentGroup(state)
+  const requestedGroupId = normalizeId(params, 'groupId')
+  const requestedGroup = requestedGroupId ? safeArray(state?.groups).find(item => String(item.id) === String(requestedGroupId)) : null
+  const group = expense ? groupForExpense(state, expense) || requestedGroup || currentGroup(state) : requestedGroup || currentGroup(state)
   const currentMember = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
   const members = currentGroupMembers({ ...state, currentGroup: group, currentGroupId: group?.id || state?.currentGroupId })
     .map(member => ({
@@ -275,6 +277,8 @@ function buildAddExpenseData(state, params) {
   return {
     groupId: group?.id || state?.currentGroupId,
     groupName: group?.name || 'Nhóm',
+    groupEmoji: group?.emoji || '👥',
+    memberCount: members.length,
     currentMemberId: state?.currentUserId,
     currentMemberName: currentMember?.displayName || currentMember?.name || state?.currentUserName,
     members,
@@ -360,6 +364,17 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
       role: member.role,
       balance: balanceMap[member.id] || 0,
     })),
+    balanceRows: groupMembers
+      .map(member => ({
+        id: member.id,
+        name: member.displayName || member.name,
+        initials: initials(member),
+        color: member.color || '#6366f1',
+        role: member.role,
+        amount: balanceMap[member.id] || 0,
+      }))
+      .filter(row => row.amount !== 0)
+      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)),
   }
 }
 
