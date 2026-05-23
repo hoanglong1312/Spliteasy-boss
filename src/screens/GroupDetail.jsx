@@ -132,7 +132,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         <SubTabs
           items={[
             { key: 'activity', label: 'Hoạt động' },
-            { key: 'balances', label: 'Số dư' },
             { key: 'members',  label: `Thành viên · ${d.memberCount}` },
           ]}
           active={activeTab}
@@ -152,16 +151,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         ))}
         {activeTab === 'activity' && d.activitiesByWeek.length === 0 && (
           <EmptyState title="Chưa có chi tiêu" sub="Bấm Thêm chi tiêu để ghi khoản đầu tiên của nhóm này." />
-        )}
-
-        {activeTab === 'balances' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {(d.balanceRows || []).length > 0 ? d.balanceRows.map(row => (
-              <BalanceRow key={row.id} row={row} />
-            )) : (
-              <EmptyState title="Đang cân bằng" sub="Nhóm chưa có khoản nào cần nộp hoặc được quỹ bù." />
-            )}
-          </div>
         )}
 
         {activeTab === 'members' && (

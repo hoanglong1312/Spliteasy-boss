@@ -41,8 +41,8 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Xóa nhóm/);
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
-  assert.match(groupDetailSource, /activeTab === 'balances'/);
-  assert.match(groupDetailSource, /<BalanceRow key=\{row\.id\} row=\{row\} \/>/);
+  assert.doesNotMatch(groupDetailSource, /\{ key: 'balances', label: 'Số dư' \}/);
+  assert.doesNotMatch(groupDetailSource, /activeTab === 'balances'/);
   assert.match(groupDetailSource, /activeTab === 'members'/);
   assert.match(groupDetailSource, /\+ Thêm thành viên/);
   assert.match(groupDetailSource, /<MemberRow[\s\S]*key=\{member\.id\}[\s\S]*member=\{member\}[\s\S]*onMore=\{setMemberMenu\}/);
