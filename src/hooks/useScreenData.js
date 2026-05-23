@@ -3033,7 +3033,7 @@ function memberName(memberId, members) {
 
 function membersForGroup(group, members) {
   const ids = new Set(safeArray(group?.members).map(String))
-  return safeArray(members).filter(member => (
+  return safeArray(members).filter(isActiveMember).filter(member => (
     ids.has(String(member.id)) || String(member.groupId || member.group_id || '') === String(group?.id || '')
   ))
 }

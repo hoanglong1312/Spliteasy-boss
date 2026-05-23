@@ -55,7 +55,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           onBack={() => setSelectedMember(null)}
           onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
           onDelete={async () => {
-            if (!window.confirm(`Xóa ${selectedMember.name} khỏi nhóm?`)) return;
             await onAction?.('deleteMember', { memberId: selectedMember.id });
             setSelectedMember(null);
           }}
@@ -207,7 +206,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             setMemberMenu(null);
           }}>{memberMenu.role === 'treasurer' ? 'Thu quyền thủ quỹ' : 'Cấp quyền thủ quỹ'}</ActionButton>
           <ActionButton danger onClick={async () => {
-            if (!window.confirm(`Xóa ${memberMenu.name} khỏi nhóm?`)) return;
             await onAction?.('deleteMember', { memberId: memberMenu.id });
             setMemberMenu(null);
           }}>Xóa khỏi nhóm</ActionButton>

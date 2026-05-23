@@ -99,6 +99,12 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /onDelete=\{async \(\) => \{[\s\S]*deleteMember', \{ memberId: selectedMember\.id \}/);
 });
 
+test('GroupDetail delete member does not depend on native confirm dialogs', () => {
+  assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{selectedMember\.name\} khỏi nhóm\?`\)/);
+  assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{memberMenu\.name\} khỏi nhóm\?`\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('deleteMember', \{ memberId: memberMenu\.id \}\)/);
+});
+
 test('GroupDetail hides member bank accounts unless treasurer or self', () => {
   assert.match(groupDetailSource, /function canViewMemberBank\(member, isTreasurer\)/);
   assert.match(groupDetailSource, /member\.isCurrentUser/);
@@ -107,6 +113,11 @@ test('GroupDetail hides member bank accounts unless treasurer or self', () => {
   assert.match(groupDetailSource, /canViewBank && member\.bankAccount/);
   assert.match(groupDetailSource, /Ẩn với thành viên khác/);
   assert.match(screenDataSource, /isCurrentUser: String\(member\.id\) === String\(currentGroupMember\?\.id \|\| ''\)/);
+});
+
+test('Screen data excludes inactive memberships from group member lists', () => {
+  assert.match(screenDataSource, /function membersForGroup\(group, members\) \{/);
+  assert.match(screenDataSource, /\.filter\(isActiveMember\)\.filter\(member => \(/);
 });
 
 test('GroupDetail member detail shows payer transactions for the selected month', () => {
