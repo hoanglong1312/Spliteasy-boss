@@ -4,6 +4,10 @@ import test from 'node:test'
 
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const screenDataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
+const homeSource = readFileSync(new URL('./screens/Home.jsx', import.meta.url), 'utf8')
+const settlementSource = readFileSync(new URL('./screens/SettlementPeriod.jsx', import.meta.url), 'utf8')
+const settingsSource = readFileSync(new URL('./screens/Settings.jsx', import.meta.url), 'utf8')
+const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const newGroupSource = readFileSync(new URL('./screens/NewGroup.jsx', import.meta.url), 'utf8')
 const migrationSource = readFileSync(new URL('../supabase/migrations/20260523000001_profiles_identity.sql', import.meta.url), 'utf8')
 
@@ -62,4 +66,41 @@ test('screen data exposes profile aggregation helpers for home and monthly close
   assert.match(screenDataSource, /profileBreakdown: aggregateBalancesByProfile\(sourceBalances, members\)/)
   assert.match(screenDataSource, /const monthlySourceBalances = buildMonthlySourceBalances/)
   assert.match(screenDataSource, /profileBreakdown: aggregateBalancesByProfile\(monthlySourceBalances, members\)/)
+})
+
+test('home renders source breakdown for the current profile', () => {
+  assert.match(screenDataSource, /currentProfileId: profileIdForMember\(currentUserId, members\)/)
+  assert.match(screenDataSource, /sourceBreakdown: currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\)/)
+  assert.match(screenDataSource, /function currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\) \{/)
+  assert.match(homeSource, /<SourceBreakdown sources=\{d\.sourceBreakdown \|\| \[\]\} \/>/)
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources \}\) \{/)
+  assert.match(homeSource, /Theo nguồn tiền/)
+  assert.match(homeSource, /source\.sourceLabel/)
+  assert.match(homeSource, /source\.sourceType === 'pickleball'/)
+})
+
+test('monthly close renders one profile bill with source breakdown rows', () => {
+  assert.match(screenDataSource, /const monthlySourceBalances = buildGlobalMonthlySourceBalances\(state, monthDate\)/)
+  assert.match(screenDataSource, /profileBills: buildProfileBillRows\(monthlySourceBalances, members\)/)
+  assert.match(screenDataSource, /function buildGlobalMonthlySourceBalances\(state, monthDate\) \{/)
+  assert.match(screenDataSource, /function buildProfileBillRows\(sourceBalances, members\) \{/)
+  assert.match(settlementSource, /const profileBills = d\.profileBills \|\| \[\]/)
+  assert.match(settlementSource, /<ProfileBillList bills=\{profileBills\} \/>/)
+  assert.match(settlementSource, /function ProfileBillList\(\{ bills \}\) \{/)
+  assert.match(settlementSource, /Bill tổng theo người/)
+  assert.match(settlementSource, /bill\.sources\.map/)
+})
+
+test('settings exposes profile link management and app updates membership profile ids', () => {
+  assert.match(screenDataSource, /profileSync: buildProfileSyncData\(state, me\)/)
+  assert.match(screenDataSource, /function buildProfileSyncData\(state, me\) \{/)
+  assert.match(settingsSource, /const profileSync = d\.profileSync/)
+  assert.match(settingsSource, /Danh bạ liên thông/)
+  assert.match(settingsSource, /profileSync\.linkedMemberships\.map/)
+  assert.match(settingsSource, /profileSync\.candidates\.map/)
+  assert.match(settingsSource, /onAction\?\.\('linkProfile'/)
+  assert.match(settingsSource, /onAction\?\.\('unlinkProfile'/)
+  assert.match(appSource, /if \(type === 'linkProfile'\)/)
+  assert.match(appSource, /\.from\('members'\)\s*\.update\(\{ profile_id: profileId \}\)/)
+  assert.match(appSource, /if \(type === 'unlinkProfile'\)/)
 })

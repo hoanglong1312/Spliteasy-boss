@@ -80,6 +80,8 @@ export default function Home({ data, isTreasurer, onAction }) {
           </div>
         </Hero>
 
+        <SourceBreakdown sources={d.sourceBreakdown || []} />
+
         {/* Today session - only treasurer sees attendance card */}
         {isTreasurer && d.todaySession && (
           <Card accent="pickleball" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
@@ -217,6 +219,70 @@ export default function Home({ data, isTreasurer, onAction }) {
 
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
+  );
+}
+
+function SourceBreakdown({ sources }) {
+  if (!safeArray(sources).length) return null;
+  const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
+  return (
+    <>
+      <SectionLabel>Theo nguồn tiền</SectionLabel>
+      <Card style={{ padding: '6px 14px' }}>
+        {sources.map((source, index) => {
+          const amount = Number(source.amount) || 0;
+          const isPickleball = source.sourceType === 'pickleball';
+          const isNegative = amount < 0;
+          return (
+            <div key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '11px 0',
+              borderBottom: index === sources.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)',
+            }}>
+              <div style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                background: isPickleball ? 'rgba(52,211,153,0.12)' : 'rgba(99,102,241,0.12)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16,
+                flexShrink: 0,
+              }}>{isPickleball ? '🏸' : '👥'}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {source.sourceLabel}
+                </div>
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                  {isPickleball ? 'Pickleball' : 'Chi tiêu nhóm'}
+                </div>
+              </div>
+              <div style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: isNegative ? colors.danger : colors.success,
+                ...type.mono,
+              }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
+            </div>
+          );
+        })}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          paddingTop: 10,
+          marginTop: 2,
+          fontSize: 12,
+          fontWeight: 800,
+        }}>
+          <span style={{ color: colors.textSecondary }}>Tổng tháng này</span>
+          <span style={{ color: total < 0 ? colors.danger : colors.success, ...type.mono }}>{total < 0 ? '' : '+'}{formatVND(total)}</span>
+        </div>
+      </Card>
+    </>
   );
 }
 

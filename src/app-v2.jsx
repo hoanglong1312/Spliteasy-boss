@@ -435,6 +435,52 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'linkProfile') {
+      const memberId = payload?.memberId
+      const profileId = payload?.profileId || payload?.profile_id
+      if (!memberId || !profileId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('members')
+        .update({ profile_id: profileId })
+        .eq('id', memberId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'unlinkProfile') {
+      const memberId = payload?.memberId
+      if (!memberId) return
+      const member = safeArray(state?.members).find(item => String(item.id) === String(memberId))
+      if (!member) return
+      const parts = memberNameParts(member.displayName || member.name)
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { data: profile, error: profileError } = await sb
+        .from('profiles')
+        .insert({
+          name: member.displayName || member.name || 'Thành viên',
+          short: member.short || parts.short,
+          initials: member.initials || parts.initials,
+          color: member.color || '#574EFA',
+          bank_name: member.bankName || member.bank_name || null,
+          bank_account: member.bankAccount || member.bank_account || null,
+          bank_account_name: member.bankAccountName || member.bank_account_name || member.displayName || member.name || null,
+        })
+        .select('id')
+        .single()
+      if (profileError) throw profileError
+      const { error } = await sb
+        .from('members')
+        .update({ profile_id: profile.id })
+        .eq('id', memberId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'setMemberRole') {
       const memberId = payload?.memberId
       if (!memberId) return

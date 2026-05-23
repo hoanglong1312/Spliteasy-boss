@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   updated_at        timestamptz DEFAULT now()
 );
 
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS legacy_member_id uuid;
+
+DROP TRIGGER IF EXISTS profiles_updated_at ON public.profiles;
 CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
@@ -25,9 +29,20 @@ ALTER TABLE public.members
   ADD COLUMN IF NOT EXISTS bank_account_name text,
   ADD COLUMN IF NOT EXISTS pin_hash text;
 
-ALTER TABLE public.members
-  ADD CONSTRAINT members_profile_id_fkey
-  FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE RESTRICT;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'members_profile_id_fkey'
+      AND conrelid = 'public.members'::regclass
+  ) THEN
+    ALTER TABLE public.members
+      ADD CONSTRAINT members_profile_id_fkey
+      FOREIGN KEY (profile_id) REFERENCES public.profiles(id) ON DELETE RESTRICT;
+  END IF;
+END;
+$$;
 
 INSERT INTO public.profiles (legacy_member_id, name, short, initials, color, bank_name, bank_account, bank_account_name, created_at, updated_at)
 SELECT
@@ -92,6 +107,7 @@ CREATE INDEX IF NOT EXISTS profiles_bank_account_idx ON public.profiles(bank_acc
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS profiles_select ON public.profiles;
 CREATE POLICY profiles_select
   ON public.profiles FOR SELECT
   USING (
@@ -103,10 +119,12 @@ CREATE POLICY profiles_select
     )
   );
 
+DROP POLICY IF EXISTS profiles_insert ON public.profiles;
 CREATE POLICY profiles_insert
   ON public.profiles FOR INSERT
   WITH CHECK (get_current_member_id() IS NOT NULL);
 
+DROP POLICY IF EXISTS profiles_update ON public.profiles;
 CREATE POLICY profiles_update
   ON public.profiles FOR UPDATE
   USING (

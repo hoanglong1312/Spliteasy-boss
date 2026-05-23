@@ -177,9 +177,11 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     todaySession: session ? toTodaySessionCard(session, pickle, members) : null,
     currentUserId,
     currentUserName: state?.currentUserName || 'Bạn',
+    currentProfileId: profileIdForMember(currentUserId, members),
     expenses: buildHomeExpenses(expenseGroups, currentUserId, members, state?.currentUserName, today),
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
+    sourceBreakdown: currentProfileSourceBreakdown(sourceBalances, currentUserId, members),
     profileBreakdown: aggregateBalancesByProfile(sourceBalances, members),
   }
 }
@@ -1372,6 +1374,7 @@ function buildAccountSettingsData(state) {
   return {
     accountHolder: me?.bankAccountName || me?.bank_account_name || me?.displayName || me?.name || state?.currentUserName || 'Bạn',
     banks: [bankData(me, true)],
+    profileSync: buildProfileSyncData(state, me),
     pinEnabled: false,
     faceIdEnabled: false,
     language: 'vi',
@@ -1381,7 +1384,8 @@ function buildAccountSettingsData(state) {
 
 function buildSettlementPeriodData(state, params) {
   const group = currentGroup(state)
-  const members = currentGroupMembers(state)
+  const members = safeArray(state?.members)
+  const groupMembers = currentGroupMembers(state)
   const monthDate = periodDate(params)
   const month = monthKey(monthDate)
   const expenses = allExpenses(state)
@@ -1389,7 +1393,7 @@ function buildSettlementPeriodData(state, params) {
     .filter(expense => !month || monthKey(expense.date || expense.expense_date) === month)
   const totalExpenses = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
   const categories = buildExpenseCategories(expenses)
-  const balances = members.map(member => {
+  const balances = groupMembers.map(member => {
     const balance = groupNet(group, member.id)
     return {
       initial: initials(member),
@@ -1404,13 +1408,13 @@ function buildSettlementPeriodData(state, params) {
     .filter(member => member.balance >= 0)
     .reduce((sum, member) => sum + Math.abs(member.balance), 0)
   const sessions = getStateMonthSessions(state, monthDate)
-  const monthlySourceBalances = buildMonthlySourceBalances(state, group, members, monthDate)
+  const monthlySourceBalances = buildGlobalMonthlySourceBalances(state, monthDate)
 
   return {
     groupName: group.name || 'Nhóm',
     monthLabel: `Tháng ${monthDate.getMonth() + 1}/${monthDate.getFullYear()}`,
     totalExpenses,
-    memberCount: members.length,
+    memberCount: groupMembers.length,
     settlements: buildOptimizedSettlements(group, members),
     closingDate: monthEndKey(monthDate),
     totalSpent: totalExpenses,
@@ -1421,6 +1425,7 @@ function buildSettlementPeriodData(state, params) {
     previewLimit: 5,
     members: balances,
     profileBreakdown: aggregateBalancesByProfile(monthlySourceBalances, members),
+    profileBills: buildProfileBillRows(monthlySourceBalances, members),
     remainingCount: balances.filter(member => member.status !== 'paid').length,
   }
 }
@@ -1437,6 +1442,38 @@ function buildMonthlySourceBalances(state, group, members, monthDate) {
       month,
     }))
     .filter(row => row.memberId && row.amount !== 0)
+}
+
+function buildGlobalMonthlySourceBalances(state, monthDate) {
+  const month = monthKey(monthDate)
+  const members = safeArray(state?.members)
+  const groups = safeArray(state?.groups).map(safeGroup)
+  const expenseRows = groups
+    .filter(group => groupKind(group) !== 'pickleball')
+    .flatMap(group => {
+      const expenses = allExpenses(state)
+        .filter(expense => String(expense.groupId || expense.group_id || '') === String(group.id || ''))
+        .filter(expense => !month || monthKey(expense.date || expense.expense_date) === month)
+      const monthlyGroup = safeGroup({ ...group, expenses })
+      const monthlySourceBalances = buildMonthlySourceBalances(state, monthlyGroup, membersForGroup(monthlyGroup, members), monthDate)
+      return monthlySourceBalances
+    })
+
+  const pickleballState = scopedPickleballState(state)
+  const pickleballGroup = currentGroup(pickleballState)
+  const pickleRows = groupKind(pickleballGroup) === 'pickleball'
+    ? buildHomeSourceBalances(
+      state,
+      [],
+      pickleballState,
+      state?.pickle || {},
+      getStateMonthSessions(pickleballState, monthDate),
+      members,
+      monthDate
+    )
+    : []
+
+  return [...expenseRows, ...pickleRows].filter(row => row.memberId && row.amount !== 0)
 }
 
 function buildExpenseDetailData(state, params) {
@@ -2601,6 +2638,29 @@ function memberIdsForProfile(profileId, members) {
     .filter(Boolean)
 }
 
+function currentProfileSourceBreakdown(sourceBalances, currentUserId, members) {
+  const profileId = profileIdForMember(currentUserId, members)
+  const memberIds = new Set(memberIdsForProfile(profileId, members).map(String))
+  if (memberIds.size === 0 && currentUserId) memberIds.add(String(currentUserId))
+  const bySource = new Map()
+
+  safeArray(sourceBalances)
+    .filter(row => memberIds.has(String(row.memberId || row.member_id || '')))
+    .forEach(row => {
+      const key = `${row.sourceType || row.source_type || 'group'}:${row.sourceId || row.source_id || row.sourceLabel || row.source_label || ''}`
+      const existing = bySource.get(key) || {
+        sourceId: row.sourceId || row.source_id,
+        sourceType: row.sourceType || row.source_type || 'group',
+        sourceLabel: row.sourceLabel || row.source_label || 'Nguồn tiền',
+        amount: 0,
+      }
+      existing.amount += Number(row.amount) || 0
+      bySource.set(key, existing)
+    })
+
+  return [...bySource.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.sourceLabel.localeCompare(b.sourceLabel, 'vi'))
+}
+
 function aggregateBalancesByProfile(sourceBalances, members) {
   const byProfile = new Map()
   safeArray(sourceBalances).forEach(row => {
@@ -2630,6 +2690,70 @@ function aggregateBalancesByProfile(sourceBalances, members) {
     })
   })
   return [...byProfile.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.name.localeCompare(b.name, 'vi'))
+}
+
+function buildProfileBillRows(sourceBalances, members) {
+  return aggregateBalancesByProfile(sourceBalances, members)
+    .map(bill => {
+      const sourceMap = new Map()
+      safeArray(bill.sources).forEach(source => {
+        const key = `${source.sourceType}:${source.sourceId || source.sourceLabel}`
+        const existing = sourceMap.get(key) || { ...source, amount: 0 }
+        existing.amount += Number(source.amount) || 0
+        sourceMap.set(key, existing)
+      })
+      const sources = [...sourceMap.values()]
+        .filter(source => source.amount !== 0)
+        .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.sourceLabel.localeCompare(b.sourceLabel, 'vi'))
+      return {
+        ...bill,
+        sources,
+        status: bill.amount < 0 ? 'unpaid' : 'paid',
+        sub: bill.amount < 0 ? `${sources.length} nguồn cần nộp` : `${sources.length} nguồn cần bù`,
+      }
+    })
+    .filter(bill => bill.amount !== 0)
+}
+
+function buildProfileSyncData(state, me) {
+  const members = safeArray(state?.members)
+  const profiles = safeArray(state?.profiles)
+  const currentProfileId = me?.profileId || me?.profile_id || me?.id || state?.currentUserId
+  const profile = profiles.find(item => String(item.id) === String(currentProfileId)) || me || {}
+  const linkedMemberships = members
+    .filter(member => String(member.profileId || member.profile_id || member.id) === String(currentProfileId))
+    .map(member => profileMembershipRow(member, state))
+    .sort((a, b) => a.groupName.localeCompare(b.groupName, 'vi') || a.name.localeCompare(b.name, 'vi'))
+  const candidates = members
+    .filter(member => String(member.profileId || member.profile_id || member.id) !== String(currentProfileId))
+    .map(member => profileMembershipRow(member, state))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi') || a.groupName.localeCompare(b.groupName, 'vi'))
+
+  return {
+    profileId: currentProfileId,
+    name: profile.displayName || profile.name || me?.displayName || me?.name || state?.currentUserName || 'Bạn',
+    bankName: profile.bankName || profile.bank_name || me?.bankName || me?.bank_name || '',
+    bankAccount: profile.bankAccount || profile.bank_account || me?.bankAccount || me?.bank_account || '',
+    linkedMemberships,
+    candidates,
+  }
+}
+
+function profileMembershipRow(member, state) {
+  const groupId = member.groupId || member.group_id
+  const group = safeArray(state?.groups).find(item => String(item.id) === String(groupId)) || {}
+  return {
+    memberId: member.id,
+    profileId: member.profileId || member.profile_id || member.id,
+    name: member.displayName || member.name || 'Thành viên',
+    initials: initials(member),
+    groupId,
+    groupName: group.name || 'Nhóm',
+    groupEmoji: group.emoji || '👥',
+    role: member.role || 'member',
+    bankName: member.bankName || member.bank_name || '',
+    bankAccount: member.bankAccount || member.bank_account || '',
+  }
 }
 
 function personBrief(memberId, members) {

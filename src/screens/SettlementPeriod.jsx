@@ -16,6 +16,7 @@ const STATUS_BADGE = {
 
 export default function SettlementPeriod({ data, onAction }) {
   const d = data || DEMO;
+  const profileBills = d.profileBills || [];
   const paidPct = Math.round((d.totalPaid / d.totalSpent) * 100);
   const remaining = d.members.filter((m) => m.status !== 'paid').length;
 
@@ -95,6 +96,8 @@ export default function SettlementPeriod({ data, onAction }) {
           ))}
         </Card>
 
+        <ProfileBillList bills={profileBills} />
+
         {/* Per member balance */}
         <SectionLabel action="cần thu">Số dư từng người · {d.members.length}</SectionLabel>
 
@@ -142,6 +145,62 @@ export default function SettlementPeriod({ data, onAction }) {
         </Button>
       </Screen>
     </PhoneFrame>
+  );
+}
+
+function ProfileBillList({ bills }) {
+  if (!bills.length) return null;
+  return (
+    <>
+      <SectionLabel>Bill tổng theo người</SectionLabel>
+      <Card style={{ padding: '6px 14px' }}>
+        {bills.map((bill, index) => {
+          const amount = Number(bill.amount) || 0;
+          const isPositive = amount > 0;
+          return (
+            <div key={bill.profileId || index} style={{
+              padding: '12px 0',
+              borderBottom: index === bills.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Avatar initial={bill.initials || bill.initial} size={38} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>{bill.name}</div>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{bill.sub}</div>
+                </div>
+                <div style={{
+                  fontSize: 14,
+                  fontWeight: 900,
+                  color: isPositive ? '#34d399' : '#f87171',
+                  ...type.mono,
+                }}>{isPositive ? '+' : ''}{formatVND(amount)}</div>
+              </div>
+              <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+                {bill.sources.map((source, sourceIndex) => {
+                  const sourceAmount = Number(source.amount) || 0;
+                  return (
+                    <div key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${sourceIndex}`} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      fontSize: 11,
+                      color: colors.textSecondary,
+                    }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {source.sourceType === 'pickleball' ? '🏸' : '👥'} {source.sourceLabel}
+                      </span>
+                      <span style={{ flexShrink: 0, color: sourceAmount < 0 ? '#fca5a5' : '#6ee7b7', ...type.mono }}>
+                        {sourceAmount > 0 ? '+' : ''}{formatVND(sourceAmount)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+    </>
   );
 }
 
