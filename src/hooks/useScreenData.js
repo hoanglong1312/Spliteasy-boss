@@ -411,7 +411,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
-    memberCandidates: buildGroupMemberCandidates(g, members),
+    memberCandidates: buildGroupMemberCandidates(g, members, state?.profiles),
     members: groupMembers.map(member => ({
       id: member.id,
       name: member.displayName || member.name,
@@ -440,13 +440,12 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   }
 }
 
-function buildGroupMemberCandidates(group, members) {
+function buildGroupMemberCandidates(group, members, profiles = []) {
   const currentMembers = membersForGroup(group, members)
   const currentIds = new Set(currentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
-  return safeArray(members)
-    .filter(isActiveMember)
+  return candidateProfilesFromDirectory(members, profiles)
     .filter(member => !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id)))
     .map(member => ({
       id: member.profileId || member.profile_id || member.id,
@@ -464,6 +463,41 @@ function buildGroupMemberCandidates(group, members) {
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+}
+
+function candidateProfilesFromDirectory(members, profiles = []) {
+  const profileRows = safeArray(profiles)
+  const membersByProfile = new Map()
+  safeArray(members).forEach(member => {
+    const key = String(member.profileId || member.profile_id || member.id || '')
+    if (!key) return
+    const rows = membersByProfile.get(key) || []
+    rows.push(member)
+    membersByProfile.set(key, rows)
+  })
+  const profilesById = new Map(profileRows.map(profile => [String(profile.id), profile]))
+  const rows = profileRows.map(profile => {
+    const key = String(profile.id || '')
+    const memberRows = membersByProfile.get(key) || []
+    const activeMember = memberRows.find(isActiveMember)
+    const hasInactiveRows = memberRows.some(member => !isActiveMember(member))
+    if (!activeMember && hasInactiveRows) return null
+    return {
+      id: activeMember?.id || profile.id,
+      profileId: profile.id,
+      profile_id: profile.id,
+      name: profile.name || activeMember?.displayName || activeMember?.name || '',
+      bankName: profile.bankName || profile.bank_name || activeMember?.bankName || activeMember?.bank_name || '',
+      bankAccount: profile.bankAccount || profile.bank_account || activeMember?.bankAccount || activeMember?.bank_account || '',
+      bankAccountName: profile.bankAccountName || profile.bank_account_name || activeMember?.bankAccountName || activeMember?.bank_account_name || '',
+    }
+  })
+  safeArray(members).filter(isActiveMember).forEach(member => {
+    const key = String(member.profileId || member.profile_id || member.id || '')
+    if (key && profilesById.has(key)) return
+    rows.push(member)
+  })
+  return rows.filter(row => row && row.name)
 }
 
 function buildMemberPayerTransactions(group, memberId, selectedYearMonth) {
@@ -1000,6 +1034,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     guests: casualRows,
     fixedMembers: fixedRows,
     casualMembers: casualRows,
+    memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles),
     legacyGuests: buildGuestRows(sessions),
   }
 }

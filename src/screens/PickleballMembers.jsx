@@ -22,9 +22,18 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberType, setNewMemberType] = useState('fixed');
+  const [candidateQuery, setCandidateQuery] = useState('');
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
 
   const fixedMembers = d.fixedMembers || d.members || [];
   const casualMembers = d.casualMembers || d.guests || [];
+  const memberCandidates = d.memberCandidates || [];
+  const selectedCandidates = memberCandidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
+  const filteredCandidateCards = memberCandidates.filter(candidate => {
+    const normalizedQuery = normalizeSearch(candidateQuery);
+    if (!normalizedQuery) return true;
+    return normalizeSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(normalizedQuery);
+  });
   const query = search.trim().toLowerCase();
   const filteredFixed = useMemo(() => filterMembers(fixedMembers, query), [fixedMembers, query]);
   const filteredCasual = useMemo(() => filterMembers(casualMembers, query), [casualMembers, query]);
@@ -55,11 +64,32 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   async function saveNewMember(e) {
     e.preventDefault();
     const name = newMemberName.trim();
-    if (!name) return;
-    await onAction?.('addMember', { name, type: newMemberType });
+    if (selectedCandidates.length === 0 && !name) return;
+    for (const candidate of selectedCandidates) {
+      await onAction?.('addMember', {
+        name: candidate.name,
+        profileId: candidate?.profileId || candidate?.id || '',
+        type: newMemberType,
+        bankAccountName: candidate?.bankAccountName || '',
+        bankName: candidate?.bankName || '',
+        bankAccount: candidate?.bankAccount || '',
+      });
+    }
+    if (name) {
+      await onAction?.('addMember', { name, profileId: '', type: newMemberType });
+    }
     setNewMemberName('');
     setNewMemberType('fixed');
+    setCandidateQuery('');
+    setSelectedCandidateIds([]);
     setShowAddMember(false);
+  }
+
+  function toggleCandidate(candidateId) {
+    const id = String(candidateId);
+    setSelectedCandidateIds(current => (
+      current.includes(id) ? current.filter(item => item !== id) : [...current, id]
+    ));
   }
 
   async function changeType(member) {
@@ -188,15 +218,91 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
       {showAddMember && isTreasurer && (
         <BottomSheet title="Thêm thành viên" onClose={() => setShowAddMember(false)}>
           <form onSubmit={saveNewMember}>
+            <div style={{
+              background: colors.heroEmerald,
+              border: `1px solid rgba(52,211,153,0.28)`,
+              borderRadius: 16,
+              padding: 14,
+              marginBottom: 12,
+            }}>
+              <div style={{ ...type.label, color: colors.pickleball, marginBottom: 8 }}>Thành viên có sẵn</div>
+              <input
+                value={candidateQuery}
+                onChange={e => setCandidateQuery(e.target.value)}
+                placeholder="Tìm vài ký tự để lọc thành viên"
+                style={{ ...selectFieldStyle(), marginBottom: 10 }}
+              />
+              {selectedCandidates.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {selectedCandidates.map(candidate => (
+                    <span key={candidate.id} style={{
+                      borderRadius: 999,
+                      background: colors.successSoft,
+                      color: colors.pickleball,
+                      padding: '6px 9px',
+                      fontSize: 11,
+                      fontWeight: 900,
+                    }}>{candidate.name}</span>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
+                {filteredCandidateCards.map(candidate => {
+                  const active = selectedCandidateIds.includes(String(candidate.id));
+                  return (
+                    <button key={candidate.id} type="button" onClick={() => toggleCandidate(candidate.id)} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '24px minmax(0, 1fr)',
+                      gap: 10,
+                      alignItems: 'center',
+                      width: '100%',
+                      border: `1px solid ${active ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
+                      borderRadius: 12,
+                      background: active ? colors.successSoft : colors.inputBg,
+                      color: colors.textPrimary,
+                      padding: 12,
+                      textAlign: 'left',
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                    }}>
+                      <span style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 8,
+                        border: active ? 'none' : `1px solid ${colors.borderSubtle}`,
+                        background: active ? colors.pickleball : 'transparent',
+                        color: '#06281f',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 13,
+                        fontWeight: 900,
+                      }}>{active ? '✓' : ''}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{candidate.name}</span>
+                        <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                          {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+                {filteredCandidateCards.length === 0 && (
+                  <div style={{ fontSize: 12, color: colors.textSecondary, padding: '10px 2px' }}>Không có thành viên phù hợp.</div>
+                )}
+              </div>
+            </div>
             <Input
-              label="Tên"
+              label={memberCandidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên'}
               value={newMemberName}
               onChange={e => setNewMemberName(e.target.value)}
               placeholder="Tên thành viên"
               autoFocus
             />
             <TypeSwitch value={newMemberType} onChange={setNewMemberType} />
-            <Button block variant="success" style={{ marginTop: 14 }} type="submit">Lưu thành viên</Button>
+            <Button block variant="success" style={{ marginTop: 14 }} type="submit">
+              {selectedCandidates.length > 0 ? `Lưu ${selectedCandidates.length + (newMemberName.trim() ? 1 : 0)} thành viên` : 'Lưu thành viên'}
+            </Button>
           </form>
         </BottomSheet>
       )}
@@ -239,6 +345,22 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 function filterMembers(members, query) {
   if (!query) return members;
   return members.filter(member => String(member.name || '').toLowerCase().includes(query));
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim()
+    .toLowerCase();
+}
+
+function maskAccount(value) {
+  const text = String(value || '').replace(/\s+/g, '');
+  if (text.length <= 4) return text;
+  return `${text.slice(0, 4)} •••• ${text.slice(-3)}`;
 }
 
 function MemberSection({ title, members, expanded, onExpand, isTreasurer, onMore, onAction }) {

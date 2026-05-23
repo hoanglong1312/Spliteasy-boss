@@ -211,6 +211,11 @@ test('Member management screens are registered in the app source', () => {
   assert.match(memberListSource, /quickAction/)
   assert.match(memberListSource, /Cố định ·/)
   assert.match(memberListSource, /Vãng lai ·/)
+  assert.match(memberListSource, /const memberCandidates = d\.memberCandidates \|\| \[\]/)
+  assert.match(memberListSource, /selectedCandidateIds/)
+  assert.match(memberListSource, /placeholder="Tìm vài ký tự để lọc thành viên"/)
+  assert.match(memberListSource, /for \(const candidate of selectedCandidates\)/)
+  assert.match(memberListSource, /profileId: candidate\?\.profileId \|\| candidate\?\.id \|\| ''/)
 })
 
 test('main renders AppProvider directly without the legacy toast bridge', () => {

@@ -78,8 +78,10 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
-  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members\)/);
+  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, state\?\.profiles\)/);
   assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
+  assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
+  assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
   assert.match(screenDataSource, /\.filter\(isActiveMember\)/);
   assert.match(screenDataSource, /!currentProfileIds\.has\(String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
