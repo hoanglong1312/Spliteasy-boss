@@ -1171,6 +1171,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     kind: group.kind || group.type || group.group_type || null,
     groupType: group.group_type || group.type || group.kind || null,
     group_type: group.group_type || group.type || group.kind || null,
+    linkedPickleballGroupId: group.linked_pickleball_group_id || null,
+    linked_pickleball_group_id: group.linked_pickleball_group_id || null,
     venueOwnerName: group.venue_owner_name || '',
     venue_owner_name: group.venue_owner_name || '',
     venueBankName: group.venue_bank_name || '',

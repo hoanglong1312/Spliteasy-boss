@@ -104,3 +104,14 @@ test('settings exposes profile link management and app updates membership profil
   assert.match(appSource, /\.from\('members'\)\s*\.update\(\{ profile_id: profileId \}\)/)
   assert.match(appSource, /if \(type === 'unlinkProfile'\)/)
 })
+
+test('groups list can highlight the one expense group linked to pickleball profiles', () => {
+  const groupsListSource = readFileSync(new URL('./screens/GroupsList.jsx', import.meta.url), 'utf8')
+
+  assert.match(screenDataSource, /isLinkedPickleballExpenseGroup: Boolean\(linkedPickleballGroupId\)/)
+  assert.match(screenDataSource, /linkedPickleballGroupName/)
+  assert.match(storeSource, /linkedPickleballGroupId: group\.linked_pickleball_group_id \|\| null/)
+  assert.match(groupsListSource, /const linked = g\.isLinkedPickleballExpenseGroup/)
+  assert.match(groupsListSource, /Liên kết Pickleball/)
+  assert.match(groupsListSource, /Dùng chung danh bạ với/)
+})

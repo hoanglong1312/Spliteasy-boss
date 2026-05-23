@@ -324,16 +324,23 @@ function buildAddExpenseData(state, params) {
 }
 
 function buildGroupsListData(groups, currentUserId, members, currentUserName) {
+  const pickleballGroup = safeArray(groups).find(group => groupKind(group) === 'pickleball')
   const rows = safeArray(groups).map(safeGroup).map(group => {
     const groupMembers = membersForGroup(group, members)
     const balance = groupNetForMember(group, currentUserId, members, currentUserName)
     const avatars = groupMembers.slice(0, 4).map(m => initials(m))
+    const linkedPickleballGroupId = group.linkedPickleballGroupId || group.linked_pickleball_group_id || null
 
     return {
       id: group.id,
       kind: groupKind(group),
       emoji: group.emoji || '👥',
       name: group.name || 'Nhóm',
+      isLinkedPickleballExpenseGroup: Boolean(linkedPickleballGroupId),
+      linkedPickleballGroupId,
+      linkedPickleballGroupName: linkedPickleballGroupId && String(linkedPickleballGroupId) === String(pickleballGroup?.id)
+        ? pickleballGroup.name
+        : 'Pickleball',
       memberCount: groupMembers.length || safeArray(group.members).length,
       members: avatars,
       avatars,

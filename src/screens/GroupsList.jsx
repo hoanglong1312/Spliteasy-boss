@@ -87,8 +87,15 @@ function GroupCard({ g, onClick }) {
     cafe:       { bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.25)' },
   }[g.kind] || { bg: 'rgba(255,255,255,0.04)', border: colors.borderSubtle };
 
+  const linked = g.isLinkedPickleballExpenseGroup;
+
   return (
-    <Card accent={accentMap[g.kind]} style={{ padding: '18px 16px', cursor: 'pointer' }} onClick={onClick}>
+    <Card accent={accentMap[g.kind]} style={{
+      padding: '18px 16px',
+      cursor: 'pointer',
+      borderColor: linked ? 'rgba(52,211,153,0.55)' : undefined,
+      boxShadow: linked ? '0 0 0 1px rgba(52,211,153,0.12), 0 14px 36px rgba(16,185,129,0.08)' : undefined,
+    }} onClick={onClick}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{
           width: 48, height: 48, borderRadius: 14,
@@ -98,7 +105,7 @@ function GroupCard({ g, onClick }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>{g.name}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <Badge tone={g.kind === 'pickleball' ? 'success' : 'muted'}>{g.kind === 'pickleball' ? 'Pickleball' : 'Chi tiêu'}</Badge>
+            <Badge tone={g.kind === 'pickleball' || linked ? 'success' : 'muted'}>{g.kind === 'pickleball' ? 'Pickleball' : linked ? 'Liên kết Pickleball' : 'Chi tiêu'}</Badge>
             <span style={{ display: 'inline-flex' }}>
               {g.members.slice(0, 4).map((m, i) => (
                 <span key={i} style={{ marginLeft: i === 0 ? 0 : -8 }}>
@@ -113,6 +120,11 @@ function GroupCard({ g, onClick }) {
             </span>
             <span style={{ fontSize: 11, color: colors.textSecondary }}>{g.memberCount} thành viên</span>
           </div>
+          {linked && (
+            <div style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 700, marginTop: 7 }}>
+              Dùng chung danh bạ với {g.linkedPickleballGroupName}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{
