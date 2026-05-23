@@ -443,6 +443,7 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
     await onAction?.('addMember', {
       groupId,
       name: cleanName,
+      profileId: selectedCandidate?.profileId || selectedCandidate?.id || '',
       type: 'fixed',
       bankAccountName: selectedCandidate?.bankAccountName || '',
       bankName: selectedCandidate?.bankName || '',

@@ -17,6 +17,20 @@ export default function NewGroup({ data, onAction }) {
   const [emoji, setEmoji] = useState(d.emoji);
   const [description, setDescription] = useState(d.description);
   const [requiresApproval, setRequiresApproval] = useState(d.requiresApproval);
+  const [selectedProfileIds, setSelectedProfileIds] = useState([]);
+  const profileOptions = d.profileOptions || [];
+
+  function toggleProfile(profileId) {
+    setSelectedProfileIds(current => (
+      current.includes(profileId)
+        ? current.filter(id => id !== profileId)
+        : [...current, profileId]
+    ));
+  }
+
+  function createPayload() {
+    return { name, emoji, description, requiresApproval, profileIds: selectedProfileIds };
+  }
 
   return (
     <PhoneFrame>
@@ -28,7 +42,7 @@ export default function NewGroup({ data, onAction }) {
         }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
           <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700 }}>Tạo nhóm mới</div>
-          <button onClick={() => onAction?.('create', { name, emoji, description, requiresApproval })} style={{
+          <button onClick={() => onAction?.('create', createPayload())} style={{
             background: 'rgba(99,102,241,0.18)',
             border: '1px solid rgba(99,102,241,0.4)',
             color: '#c7d2fe', fontSize: 12, fontWeight: 700,
@@ -126,6 +140,68 @@ export default function NewGroup({ data, onAction }) {
           }}
         />
 
+        {profileOptions.length > 0 && (
+          <>
+            <Label>Thêm thành viên có sẵn</Label>
+            <Card style={{ padding: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {profileOptions.map(profile => {
+                  const active = selectedProfileIds.includes(profile.id);
+                  return (
+                    <button key={profile.id} type="button" onClick={() => toggleProfile(profile.id)} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
+                      border: active ? '1px solid rgba(129,140,248,0.55)' : `1px solid ${colors.borderSubtle}`,
+                      borderRadius: 10,
+                      color: colors.textPrimary,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}>
+                      <span style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 8,
+                        background: profile.color || colors.brand,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        fontWeight: 900,
+                        color: 'white',
+                        flexShrink: 0,
+                      }}>{profile.initials || String(profile.name || '?').slice(0, 2).toUpperCase()}</span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800 }}>{profile.name}</span>
+                        <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
+                          {profile.bankName || profile.bankAccount ? `${profile.bankName || 'Ngân hàng'} · ${profile.bankAccount || 'chưa có STK'}` : 'Chưa có thông tin ngân hàng'}
+                        </span>
+                      </span>
+                      <span style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 6,
+                        border: active ? 'none' : `1px solid ${colors.borderSubtle}`,
+                        background: active ? colors.brand : 'rgba(255,255,255,0.04)',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 12,
+                        fontWeight: 900,
+                      }}>{active ? '✓' : ''}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Card>
+          </>
+        )}
+
         {/* Approval toggle */}
         <div style={{
           marginTop: 14, display: 'flex', alignItems: 'center', gap: 14,
@@ -164,7 +240,7 @@ export default function NewGroup({ data, onAction }) {
           </div>
         </div>
 
-        <Button block variant="brand" style={{ marginTop: 18 }} onClick={() => onAction?.('create', { name, emoji, description, requiresApproval })}>
+        <Button block variant="brand" style={{ marginTop: 18 }} onClick={() => onAction?.('create', createPayload())}>
           Tạo nhóm
         </Button>
       </Screen>

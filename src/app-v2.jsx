@@ -380,6 +380,7 @@ export default function AppV2() {
         groupId: payload?.groupId || activePickleballGroupId(state),
         member: {
           name,
+          profileId: payload?.profileId || payload?.profile_id,
           member_type: payload?.type || payload?.memberType || 'fixed',
           bank_account: payload?.bankAccount ?? payload?.bank_account,
           bank_name: payload?.bankName ?? payload?.bank_name,
@@ -416,18 +417,19 @@ export default function AppV2() {
       if (!memberId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const memberUpdate = {
+      const member = safeArray(state?.members).find(item => String(item.id) === String(memberId))
+      const profileUpdate = {
         name: payload?.name,
         bank_account: payload?.bankAccount ?? payload?.bank_account,
         bank_name: payload?.bankName ?? payload?.bank_name,
         bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
       }
-      if (!('bankName' in (payload || {})) && !('bank_name' in (payload || {}))) delete memberUpdate.bank_name
-      if (!('bankAccountName' in (payload || {})) && !('bank_account_name' in (payload || {}))) delete memberUpdate.bank_account_name
-      const { error } = await sb
-        .from('members')
-        .update(memberUpdate)
-        .eq('id', memberId)
+      if (!('bankName' in (payload || {})) && !('bank_name' in (payload || {}))) delete profileUpdate.bank_name
+      if (!('bankAccountName' in (payload || {})) && !('bank_account_name' in (payload || {}))) delete profileUpdate.bank_account_name
+      const profileId = payload?.profileId || payload?.profile_id || member?.profileId || member?.profile_id
+      const { error } = profileId
+        ? await sb.from('profiles').update(profileUpdate).eq('id', profileId)
+        : await sb.from('members').update(profileUpdate).eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
       return

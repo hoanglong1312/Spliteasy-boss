@@ -483,7 +483,7 @@ function randomInviteCode(name) {
 
 function memberInsertRow(groupId, member, role) {
   const parts = memberNameParts(member?.name)
-  return {
+  const row = {
     group_id: groupId,
     name: String(member?.name || '').trim(),
     short: member?.short || parts.short,
@@ -495,6 +495,29 @@ function memberInsertRow(groupId, member, role) {
     bank_account: member?.bankAccount ?? member?.bank_account ?? null,
     bank_account_name: member?.bankAccountName ?? member?.bank_account_name ?? null,
   }
+  const profileId = member?.profileId || member?.profile_id
+  if (profileId) row.profile_id = profileId
+  return row
+}
+
+async function ensureProfileForMember(sb, member) {
+  if (member?.profileId || member?.profile_id) return member.profileId || member.profile_id
+  const parts = memberNameParts(member?.name)
+  const { data, error } = await sb
+    .from('profiles')
+    .insert({
+      name: String(member?.name || '').trim(),
+      short: member?.short || parts.short,
+      initials: member?.initials || parts.initials,
+      color: member?.color || '#574EFA',
+      bank_name: member?.bankName ?? member?.bank_name ?? null,
+      bank_account: member?.bankAccount ?? member?.bank_account ?? null,
+      bank_account_name: member?.bankAccountName ?? member?.bank_account_name ?? null,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  return data?.id
 }
 
 function buildEmptyState() {
@@ -505,6 +528,7 @@ function buildEmptyState() {
     currentGroup: null,
     pickleballGroupId: null,
     pickleballGroup: null,
+    profiles: [],
     members: [],
     memberTokens: [],
     groups: [],
@@ -544,8 +568,9 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, jR] = await Promise.all([
+  const [mR, prR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, jR] = await Promise.all([
     sb.from('members').select('*'),
+    sb.from('profiles').select('*'),
     sb.from('groups').select('*'),
     sb.from('member_tokens').select('member_id,revoked_at'),
     sb.from('expenses').select('*').order('expense_date', { ascending: false }),
@@ -566,6 +591,7 @@ async function fetchGroupData(token) {
     sb.from('join_requests').select('*').eq('status', 'pending'),
   ])
   if (mR.error) throw mR.error
+  if (prR.error) console.warn('[store] profiles query failed:', prR.error)
   if (gR.error) throw gR.error
   if (mtR.error) console.warn('[store] member_tokens query failed:', mtR.error)
   if (spR.error) console.warn('[store] settlement_periods query failed:', spR.error)
@@ -581,6 +607,7 @@ async function fetchGroupData(token) {
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
     members:         mR.data || [],
+    profiles:        prR.data || [],
     groups:          gR.data || [],
     memberTokens:    mtR.data || [],
     expenses:        eR.data || [],
@@ -840,6 +867,7 @@ function applyGroupSelection(state, groupId, options = {}) {
 function normalize(raw, currentMemberId, preferredGroupId = null, preferredMemberName = '') {
   const {
     members,
+    profiles = [],
     groups,
     memberTokens = [],
     expenses,
@@ -1085,31 +1113,52 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     }
   })
 
-  const normalMembers = members.map(m => ({
+  const normalProfiles = safeArray(profiles).map(profile => ({
+    id: profile.id,
+    name: String(profile.name || '').trim(),
+    short: profile.short || String(profile.name || '').trim().split(' ').pop(),
+    initials: profile.initials || String(profile.name || '').trim().slice(0, 2).toUpperCase(),
+    color: profile.color || '#574EFA',
+    bankName: profile.bank_name || '',
+    bankAccount: profile.bank_account || '',
+    bankAccountName: profile.bank_account_name || '',
+    bank_name: profile.bank_name || '',
+    bank_account: profile.bank_account || '',
+    bank_account_name: profile.bank_account_name || '',
+    createdAt: profile.created_at,
+    created_at: profile.created_at,
+  }))
+  const profilesById = new Map(normalProfiles.map(profile => [String(profile.id), profile]))
+  const normalMembers = members.map(m => {
+    const profile = profilesById.get(String(m.profile_id || ''))
+    return {
     id: m.id,
+    profileId: m.profile_id,
+    profile_id: m.profile_id,
     groupId: m.group_id,
     group_id: m.group_id,
-    name: String(m.name || '').trim(),
-    short: m.short || String(m.name || '').trim().split(' ').pop(),
-    initials: m.initials || String(m.name || '').trim().slice(0, 2).toUpperCase(),
-    color: m.color || '#574EFA',
+    name: String(profile?.name || m.name || '').trim(),
+    short: profile?.short || m.short || String(profile?.name || m.name || '').trim().split(' ').pop(),
+    initials: profile?.initials || m.initials || String(profile?.name || m.name || '').trim().slice(0, 2).toUpperCase(),
+    color: profile?.color || m.color || '#574EFA',
     role: m.role,
     memberType: m.member_type || 'fixed',
     member_type: m.member_type || 'fixed',
     isMe: m.id === currentMemberId,
     isActive: m.is_active !== false,
     is_active: m.is_active !== false,
-    bankName: m.bank_name || '',
-    bankAccount: m.bank_account || '',
-    bankAccountName: m.bank_account_name || '',
-    bank_name: m.bank_name || '',
-    bank_account: m.bank_account || '',
-    bank_account_name: m.bank_account_name || '',
+    bankName: profile?.bank_name || m.bank_name || '',
+    bankAccount: profile?.bank_account || m.bank_account || '',
+    bankAccountName: profile?.bank_account_name || m.bank_account_name || '',
+    bank_name: profile?.bank_name || m.bank_name || '',
+    bank_account: profile?.bank_account || m.bank_account || '',
+    bank_account_name: profile?.bank_account_name || m.bank_account_name || '',
     createdAt: m.created_at,
     created_at: m.created_at,
     hasPin: memberHasPin(m),
     has_pin: memberHasPin(m),
-  }))
+    }
+  })
 
   const normalGroups = activeGroups.map(group => ({
     id: group.id,
@@ -1225,6 +1274,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     currentUserName: me?.name || '',
     currentGroupId: currentGroup.id,
     currentGroup: typedGroups.find(g => g.id === currentGroup.id) || typedGroups[0] || null,
+    profiles: normalProfiles,
     members: normalMembers,
     memberTokens: normalizeMemberTokens(memberTokens),
     groups: typedGroups,
@@ -1514,14 +1564,18 @@ export function AppProvider({ children }) {
       case 'UPDATE_BANK_INFO': {
         if (!sb || !state.currentUserId) return
         const bankInfo = action.bankInfo || action
+        const member = safeArray(state.members).find(item => String(item.id) === String(state.currentUserId))
+        const table = member?.profileId || member?.profile_id ? 'profiles' : 'members'
+        const id = member?.profileId || member?.profile_id || state.currentUserId
         const { error } = await sb
-          .from('members')
+          .from(table)
           .update({
+            ...(table === 'profiles' && bankInfo.name ? { name: bankInfo.name } : {}),
             bank_name: bankInfo.bankName ?? bankInfo.bank_name ?? null,
             bank_account: bankInfo.bankAccount ?? bankInfo.bank_account ?? null,
             bank_account_name: bankInfo.bankAccountName ?? bankInfo.bank_account_name ?? null,
           })
-          .eq('id', state.currentUserId)
+          .eq('id', id)
         if (error) {
           console.error('[store] UPDATE_BANK_INFO:', error)
           throw error
@@ -1801,22 +1855,55 @@ export function AppProvider({ children }) {
         if (!name) return null
 
         const memberIds = safeArray(action.memberIds ?? group.members)
+        const profileIds = safeArray(action.profileIds ?? group.profileIds)
         const currentMembers = stateRef.current.members || []
+        const currentProfiles = stateRef.current.profiles || []
         const currentMember = currentMembers.find(m => m.id === state.currentUserId)
+        const currentProfile = currentMember?.profileId
+          ? currentProfiles.find(profile => String(profile.id) === String(currentMember.profileId))
+          : null
         let selectedMembers = memberIds
           .map(id => currentMembers.find(m => m.id === id))
           .filter(Boolean)
+        let selectedProfiles = profileIds
+          .map(id => currentProfiles.find(profile => String(profile.id) === String(id)))
+          .filter(Boolean)
+        selectedMembers.forEach(member => {
+          const profile = currentProfiles.find(item => String(item.id) === String(member.profileId || member.profile_id || ''))
+          if (profile && !selectedProfiles.some(item => String(item.id) === String(profile.id))) {
+            selectedProfiles.push(profile)
+          }
+        })
         if (currentMember) {
           selectedMembers = [
             currentMember,
             ...selectedMembers.filter(m => m.id !== currentMember.id),
           ]
         }
-        if (selectedMembers.length === 0) return null
+        if (currentProfile && !selectedProfiles.some(profile => String(profile.id) === String(currentProfile.id))) {
+          selectedProfiles = [currentProfile, ...selectedProfiles]
+        }
+        if (selectedMembers.length === 0 && selectedProfiles.length === 0) return null
 
-        const memberNamesArray = selectedMembers
-          .map(member => String(member?.name || '').trim())
-          .filter(Boolean)
+        const seenIdentityKeys = new Set()
+        const memberNamesArray = [
+          ...selectedMembers.map(member => ({
+            key: member?.profileId || member?.profile_id
+              ? `profile:${member.profileId || member.profile_id}`
+              : `member:${member?.id || ''}`,
+            name: String(member?.name || '').trim(),
+          })),
+          ...selectedProfiles.map(profile => ({
+            key: `profile:${profile?.id || ''}`,
+            name: String(profile?.name || '').trim(),
+          })),
+        ].filter(row => {
+          if (!row.name) return false
+          const key = row.key || `name:${row.name}`
+          if (seenIdentityKeys.has(key)) return false
+          seenIdentityKeys.add(key)
+          return true
+        }).map(row => row.name)
         const inviteCode = group.inviteCode || group.invite_code || randomInviteCode(name)
         const { data, error } = await sb.rpc('create_group', {
           p_name: name,
@@ -1861,6 +1948,27 @@ export function AppProvider({ children }) {
         if (roleError) {
           console.warn('[store] CREATE_GROUP creator role:', roleError)
         }
+        if (currentMember?.profileId) {
+          const { error: profileError } = await joinedSb
+            .from('members')
+            .update({ profile_id: currentMember.profileId })
+            .eq('id', joined.member_id)
+          if (profileError) {
+            console.warn('[store] CREATE_GROUP creator profile:', profileError)
+          }
+        }
+        const selectedProfileRows = selectedProfiles
+          .filter(selectedProfile => String(selectedProfile.profileId || selectedProfile.id || '') !== String(currentMember?.profileId || ''))
+        for (const selectedProfile of selectedProfileRows) {
+          const { error: profileLinkError } = await joinedSb
+            .from('members')
+            .update({ profile_id: selectedProfile.profileId || selectedProfile.id })
+            .eq('group_id', joined.group_id || newGroupId)
+            .ilike('name', selectedProfile.name)
+          if (profileLinkError) {
+            console.warn('[store] CREATE_GROUP profile link:', profileLinkError)
+          }
+        }
         const { error: creatorError } = await joinedSb
           .from('groups')
           .update({
@@ -1881,7 +1989,8 @@ export function AppProvider({ children }) {
         if (!sb) return
         const { member } = action
         const groupId = action.groupId || action.group_id || state.currentGroupId
-        const insertRow = memberInsertRow(groupId, member, member.role || 'member')
+        const profileId = await ensureProfileForMember(sb, member)
+        const insertRow = memberInsertRow(groupId, { ...member, profileId }, member.role || 'member')
         if (isUuid(member.id)) insertRow.id = member.id
         const { data: newMember, error } = await sb
           .from('members')
