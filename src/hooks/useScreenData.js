@@ -446,6 +446,7 @@ function buildGroupMemberCandidates(group, members) {
   const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
   return safeArray(members)
+    .filter(isActiveMember)
     .filter(member => !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id)))
     .map(member => ({
       id: member.profileId || member.profile_id || member.id,

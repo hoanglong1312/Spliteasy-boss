@@ -58,10 +58,15 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], onClose, onAction \}\)/);
   assert.match(groupDetailSource, /Thành viên có sẵn/);
   assert.match(groupDetailSource, /candidateCards/);
-  assert.match(groupDetailSource, /selectedCandidateId === String\(candidate\.id\)/);
+  assert.match(groupDetailSource, /selectedCandidateIds\.includes\(String\(candidate\.id\)\)/);
+  assert.match(groupDetailSource, /filteredCandidateCards/);
+  assert.match(groupDetailSource, /placeholder="Tìm vài ký tự để lọc thành viên"/);
+  assert.match(groupDetailSource, /\.normalize\('NFD'\)/);
+  assert.match(groupDetailSource, /selectedCandidates = candidates\.filter\(candidate => selectedCandidateIds\.includes\(String\(candidate\.id\)\)\)/);
+  assert.match(groupDetailSource, /for \(const candidate of selectedCandidates\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*profileId: candidate\?\.profileId \|\| candidate\?\.id \|\| '',[\s\S]*\}\)/);
   assert.match(groupDetailSource, /Hoặc nhập tên mới/);
-  assert.match(groupDetailSource, /const selectedCandidate = candidates\.find\(candidate => String\(candidate\.id\) === String\(selectedCandidateId\)\)/);
-  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*bankAccountName: selectedCandidate\?\.bankAccountName \|\| '',[\s\S]*bankName: selectedCandidate\?\.bankName \|\| '',[\s\S]*bankAccount: selectedCandidate\?\.bankAccount \|\| '',[\s\S]*\}\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*profileId: '',[\s\S]*\}\)/);
   const addMemberEditorSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function AddMemberEditor'),
     groupDetailSource.indexOf('function EditMemberEditor')
@@ -73,6 +78,7 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
   assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members\)/);
   assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
+  assert.match(screenDataSource, /\.filter\(isActiveMember\)/);
   assert.match(screenDataSource, /!currentProfileIds\.has\(String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
   assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);

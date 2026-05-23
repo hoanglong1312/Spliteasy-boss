@@ -470,29 +470,59 @@ function InfoLine({ label, value }) {
 }
 
 function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction }) {
-  const [selectedCandidateId, setSelectedCandidateId] = useState('');
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
+  const [candidateQuery, setCandidateQuery] = useState('');
   const [name, setName] = useState('');
-  const selectedCandidate = candidates.find(candidate => String(candidate.id) === String(selectedCandidateId));
+  const selectedCandidates = candidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
   const candidateCards = candidates.map(candidate => ({
     ...candidate,
-    selected: selectedCandidateId === String(candidate.id),
+    selected: selectedCandidateIds.includes(String(candidate.id)),
   }));
+  const filteredCandidateCards = candidateCards.filter(candidate => {
+    const query = normalizeSearch(candidateQuery);
+    if (!query) return true;
+    return normalizeSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(query);
+  });
 
   async function save(e) {
     e.preventDefault();
-    const cleanName = (selectedCandidate?.name || name).trim();
-    if (!cleanName) return;
-    await onAction?.('addMember', {
-      groupId,
-      name: cleanName,
-      profileId: selectedCandidate?.profileId || selectedCandidate?.id || '',
-      type: 'fixed',
-      bankAccountName: selectedCandidate?.bankAccountName || '',
-      bankName: selectedCandidate?.bankName || '',
-      bankAccount: selectedCandidate?.bankAccount || '',
-    });
+    const cleanName = name.trim();
+    if (selectedCandidates.length === 0 && !cleanName) return;
+    for (const candidate of selectedCandidates) {
+      await onAction?.('addMember', {
+        groupId,
+        name: candidate.name,
+        profileId: candidate?.profileId || candidate?.id || '',
+        type: 'fixed',
+        bankAccountName: candidate?.bankAccountName || '',
+        bankName: candidate?.bankName || '',
+        bankAccount: candidate?.bankAccount || '',
+      });
+    }
+    if (cleanName) {
+      await onAction?.('addMember', {
+        groupId,
+        name: cleanName,
+        profileId: '',
+        type: 'fixed',
+        bankAccountName: '',
+        bankName: '',
+        bankAccount: '',
+      });
+    }
     onClose?.();
   }
+
+  function toggleCandidate(candidateId) {
+    const id = String(candidateId);
+    setSelectedCandidateIds(current => (
+      current.includes(id) ? current.filter(item => item !== id) : [...current, id]
+    ));
+  }
+
+  const actionLabel = selectedCandidates.length > 0
+    ? `Thêm ${selectedCandidates.length + (name.trim() ? 1 : 0)} thành viên`
+    : 'Thêm thành viên';
 
   return (
     <BottomSheet title={title} onClose={onClose}>
@@ -507,15 +537,33 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
               color: colors.textSecondary,
               marginBottom: 8,
             }}>Thành viên có sẵn</div>
+            <input
+              value={candidateQuery}
+              onChange={event => setCandidateQuery(event.target.value)}
+              placeholder="Tìm vài ký tự để lọc thành viên"
+              style={{ ...fieldStyle(), marginBottom: 10 }}
+            />
+            {selectedCandidates.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                {selectedCandidates.map(candidate => (
+                  <span key={candidate.id} style={{
+                    border: `1px solid ${colors.borderSubtle}`,
+                    borderRadius: 999,
+                    background: 'rgba(87,78,250,0.18)',
+                    color: colors.textPrimary,
+                    padding: '6px 9px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                  }}>{candidate.name}</span>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
-              {candidateCards.map(candidate => (
+              {filteredCandidateCards.map(candidate => (
                 <button
                   key={candidate.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedCandidateId(String(candidate.id));
-                    setName(candidate.name || '');
-                  }}
+                  onClick={() => toggleCandidate(candidate.id)}
                   style={{
                     width: '100%',
                     border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
@@ -526,31 +574,58 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
                     textAlign: 'left',
                     fontFamily: 'inherit',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
                   }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 900 }}>{candidate.name}</div>
-                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                    {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
-                  </div>
+                  <span style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 8,
+                    border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
+                    background: candidate.selected ? colors.brand : 'transparent',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 13,
+                    fontWeight: 900,
+                  }}>{candidate.selected ? '✓' : ''}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{candidate.name}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                      {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
+                    </span>
+                  </span>
                 </button>
               ))}
+              {filteredCandidateCards.length === 0 && (
+                <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 2px' }}>Không có thành viên phù hợp.</div>
+              )}
             </div>
           </div>
         )}
         <Field
           label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
           value={name}
-          onChange={(nextName) => {
-            setName(nextName);
-            setSelectedCandidateId('');
-          }}
+          onChange={setName}
           autoFocus
           placeholder="Tên thành viên"
         />
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Thêm thành viên</Button>
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">{actionLabel}</Button>
       </form>
     </BottomSheet>
   );
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim()
+    .toLowerCase();
 }
 
 function EditMemberEditor({ title, member, onClose, onAction }) {
