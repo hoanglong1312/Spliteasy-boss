@@ -527,84 +527,84 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
   return (
     <BottomSheet title={title} onClose={onClose}>
       <form onSubmit={save}>
-        {candidates.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <div style={{
-              fontSize: 9,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '1.2px',
-              color: colors.textSecondary,
-              marginBottom: 8,
-            }}>Thành viên có sẵn</div>
-            <input
-              value={candidateQuery}
-              onChange={event => setCandidateQuery(event.target.value)}
-              placeholder="Tìm vài ký tự để lọc thành viên"
-              style={{ ...fieldStyle(), marginBottom: 10 }}
-            />
-            {selectedCandidates.length > 0 && (
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                {selectedCandidates.map(candidate => (
-                  <span key={candidate.id} style={{
-                    border: `1px solid ${colors.borderSubtle}`,
-                    borderRadius: 999,
-                    background: 'rgba(87,78,250,0.18)',
-                    color: colors.textPrimary,
-                    padding: '6px 9px',
-                    fontSize: 11,
-                    fontWeight: 800,
-                  }}>{candidate.name}</span>
-                ))}
+        <div style={{ marginTop: 12 }}>
+          <div style={{
+            fontSize: 9,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '1.2px',
+            color: colors.textSecondary,
+            marginBottom: 8,
+          }}>Thành viên có sẵn</div>
+          <input
+            value={candidateQuery}
+            onChange={event => setCandidateQuery(event.target.value)}
+            placeholder="Tìm vài ký tự để lọc thành viên"
+            style={{ ...fieldStyle(), marginBottom: 10 }}
+          />
+          {selectedCandidates.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {selectedCandidates.map(candidate => (
+                <span key={candidate.id} style={{
+                  border: `1px solid ${colors.borderSubtle}`,
+                  borderRadius: 999,
+                  background: 'rgba(87,78,250,0.18)',
+                  color: colors.textPrimary,
+                  padding: '6px 9px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}>{candidate.name}</span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
+            {filteredCandidateCards.map(candidate => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => toggleCandidate(candidate.id)}
+                style={{
+                  width: '100%',
+                  border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
+                  background: candidate.selected ? 'rgba(87,78,250,0.18)' : colors.inputBg,
+                  color: colors.textPrimary,
+                  borderRadius: 12,
+                  padding: 12,
+                  textAlign: 'left',
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <span style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 8,
+                  border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
+                  background: candidate.selected ? colors.brand : 'transparent',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 13,
+                  fontWeight: 900,
+                }}>{candidate.selected ? '✓' : ''}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{candidate.name}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                    {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
+                  </span>
+                </span>
+              </button>
+            ))}
+            {filteredCandidateCards.length === 0 && (
+              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 2px' }}>
+                {candidates.length > 0 ? 'Không có thành viên phù hợp.' : 'Không còn thành viên có sẵn để thêm vào nhóm này.'}
               </div>
             )}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
-              {filteredCandidateCards.map(candidate => (
-                <button
-                  key={candidate.id}
-                  type="button"
-                  onClick={() => toggleCandidate(candidate.id)}
-                  style={{
-                    width: '100%',
-                    border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
-                    background: candidate.selected ? 'rgba(87,78,250,0.18)' : colors.inputBg,
-                    color: colors.textPrimary,
-                    borderRadius: 12,
-                    padding: 12,
-                    textAlign: 'left',
-                    fontFamily: 'inherit',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
-                >
-                  <span style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: 8,
-                    border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
-                    background: candidate.selected ? colors.brand : 'transparent',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 13,
-                    fontWeight: 900,
-                  }}>{candidate.selected ? '✓' : ''}</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{candidate.name}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                      {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
-                    </span>
-                  </span>
-                </button>
-              ))}
-              {filteredCandidateCards.length === 0 && (
-                <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 2px' }}>Không có thành viên phù hợp.</div>
-              )}
-            </div>
           </div>
-        )}
+        </div>
         <Field
           label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
           value={name}

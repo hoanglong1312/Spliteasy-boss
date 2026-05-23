@@ -1308,9 +1308,7 @@ function buildNewGroupData(state = {}) {
 
 function buildProfileOptions(state = {}) {
   const profiles = safeArray(state?.profiles)
-  const profileRows = profiles.length > 0
-    ? profiles
-    : dedupeProfilesFromMembers(safeArray(state?.members))
+  const profileRows = dedupeProfilesFromMembers(safeArray(state?.members), profiles)
   return profileRows
     .map(profile => ({
       id: profile.id || profile.profileId || profile.profile_id,
@@ -1325,19 +1323,21 @@ function buildProfileOptions(state = {}) {
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
 }
 
-function dedupeProfilesFromMembers(members) {
+function dedupeProfilesFromMembers(members, profiles = []) {
   const byProfile = new Map()
-  safeArray(members).forEach(member => {
+  const profilesById = new Map(safeArray(profiles).map(profile => [String(profile.id), profile]))
+  safeArray(members).filter(isActiveMember).forEach(member => {
     const key = String(member.profileId || member.profile_id || member.id || '')
     if (!key || byProfile.has(key)) return
+    const profile = profilesById.get(key) || {}
     byProfile.set(key, {
       id: member.profileId || member.profile_id || member.id,
-      name: member.displayName || member.name,
-      initials: initials(member),
-      color: member.color,
-      bankName: member.bankName || member.bank_name,
-      bankAccount: member.bankAccount || member.bank_account,
-      bankAccountName: member.bankAccountName || member.bank_account_name,
+      name: profile.name || member.displayName || member.name,
+      initials: initials(profile.name ? profile : member),
+      color: profile.color || member.color,
+      bankName: profile.bankName || profile.bank_name || member.bankName || member.bank_name,
+      bankAccount: profile.bankAccount || profile.bank_account || member.bankAccount || member.bank_account,
+      bankAccountName: profile.bankAccountName || profile.bank_account_name || member.bankAccountName || member.bank_account_name,
     })
   })
   return [...byProfile.values()]

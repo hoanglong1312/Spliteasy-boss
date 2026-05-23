@@ -18,7 +18,13 @@ export default function NewGroup({ data, onAction }) {
   const [description, setDescription] = useState(d.description);
   const [requiresApproval, setRequiresApproval] = useState(d.requiresApproval);
   const [selectedProfileIds, setSelectedProfileIds] = useState([]);
+  const [profileQuery, setProfileQuery] = useState('');
   const profileOptions = d.profileOptions || [];
+  const filteredProfileOptions = profileOptions.filter(profile => {
+    const query = normalizeSearch(profileQuery);
+    if (!query) return true;
+    return normalizeSearch(`${profile.name} ${profile.bankName} ${profile.bankAccount}`).includes(query);
+  });
 
   function toggleProfile(profileId) {
     setSelectedProfileIds(current => (
@@ -144,8 +150,26 @@ export default function NewGroup({ data, onAction }) {
           <>
             <Label>Thêm thành viên có sẵn</Label>
             <Card style={{ padding: 10 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {profileOptions.map(profile => {
+              <input
+                value={profileQuery}
+                onChange={(e) => setProfileQuery(e.target.value)}
+                placeholder="Tìm vài ký tự để lọc thành viên"
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  marginBottom: 10,
+                  background: colors.inputBg,
+                  border: `1px solid ${colors.borderSubtle}`,
+                  borderRadius: 12,
+                  color: colors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflowY: 'auto', paddingRight: 2 }}>
+                {filteredProfileOptions.map(profile => {
                   const active = selectedProfileIds.includes(profile.id);
                   return (
                     <button key={profile.id} type="button" onClick={() => toggleProfile(profile.id)} style={{
@@ -197,6 +221,9 @@ export default function NewGroup({ data, onAction }) {
                     </button>
                   );
                 })}
+                {filteredProfileOptions.length === 0 && (
+                  <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 4px' }}>Không có thành viên phù hợp.</div>
+                )}
               </div>
             </Card>
           </>
@@ -256,6 +283,16 @@ function Label({ children }) {
       margin: '14px 0 6px',
     }}>{children}</div>
   );
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim()
+    .toLowerCase();
 }
 
 function Toggle({ on, onChange }) {

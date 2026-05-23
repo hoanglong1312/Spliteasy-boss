@@ -61,6 +61,8 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(groupDetailSource, /selectedCandidateIds\.includes\(String\(candidate\.id\)\)/);
   assert.match(groupDetailSource, /filteredCandidateCards/);
   assert.match(groupDetailSource, /placeholder="Tìm vài ký tự để lọc thành viên"/);
+  assert.doesNotMatch(groupDetailSource, /\{candidates\.length > 0 && \(/);
+  assert.match(groupDetailSource, /Không còn thành viên có sẵn để thêm vào nhóm này\./);
   assert.match(groupDetailSource, /\.normalize\('NFD'\)/);
   assert.match(groupDetailSource, /selectedCandidates = candidates\.filter\(candidate => selectedCandidateIds\.includes\(String\(candidate\.id\)\)\)/);
   assert.match(groupDetailSource, /for \(const candidate of selectedCandidates\)/);
