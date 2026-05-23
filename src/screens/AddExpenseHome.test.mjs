@@ -20,6 +20,18 @@ test('AddExpense defaults to the logged-in member and submits edit expense ids',
   assert.match(addExpenseSource, /\{d\.groupEmoji \|\| '👥'\}/);
 });
 
+test('AddExpense uses scroll date picker and supports receipt image previews', () => {
+  assert.match(addExpenseSource, /const \[datePickerOpen, setDatePickerOpen\] = useState\(false\)/);
+  assert.match(addExpenseSource, /function DateScrollPicker\(\{ value, onChange, onClose \}\)/);
+  assert.match(addExpenseSource, /const years = Array\.from\(\{ length: 7 \}/);
+  assert.match(addExpenseSource, /overflowY: 'auto'/);
+  assert.match(addExpenseSource, /setDatePickerOpen\(true\)/);
+  assert.match(addExpenseSource, /function ReceiptImages\(\{ images, onAdd, onRemove \}\)/);
+  assert.match(addExpenseSource, /accept="image\/\*"/);
+  assert.match(addExpenseSource, /URL\.createObjectURL\(file\)/);
+  assert.match(addExpenseSource, /receiptImages/);
+});
+
 test('GroupDetail menu, balances, and members tabs render real group data', () => {
   assert.match(groupDetailSource, /const \[menuOpen, setMenuOpen\] = useState\(false\)/);
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);

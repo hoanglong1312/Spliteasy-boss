@@ -1,7 +1,7 @@
 // Spliteasy Boss — Thêm chi tiêu (bottom sheet)
 // Props: data { groupName, amount, title, payer, category, dateLabel, participants[] }
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, type } from '../tokens';
 import { Avatar, Button, Input } from '../primitives';
 
@@ -21,7 +21,9 @@ export default function AddExpense({ data, onAction }) {
   const [paidBy, setPaidBy] = useState(() => editExpense?.paidBy ?? d.currentMemberId ?? '');
   const [category, setCategory] = useState(() => editExpense?.category ?? 'general');
   const [dateLabel, setDateLabel] = useState(() => editExpense?.date ? dateLabelFromValue(editExpense.date) : todayLabel());
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [notes, setNotes] = useState(() => editExpense?.notes ?? '');
+  const [receiptImages, setReceiptImages] = useState(() => editExpense?.receiptImages || []);
   const [participants, setParticipants] = useState(() => {
     const selected = new Set((editExpense?.participants || []).map(id => String(id)));
     return (d.members || []).map(m => ({
@@ -193,18 +195,38 @@ export default function AddExpense({ data, onAction }) {
             </div>
           </div>
 
-          <Input
-            label="Ngày"
-            value={dateLabel}
-            onChange={e => setDateLabel(e.target.value)}
-            placeholder="dd/mm/yyyy"
-          />
+          <FieldLabel>Ngày</FieldLabel>
+          <PickerRow onClick={() => setDatePickerOpen(true)}>
+            <span>{dateLabel}</span>
+            <span style={{ marginLeft: 'auto', color: colors.textMuted }}>›</span>
+          </PickerRow>
 
           <Input
             label="Ghi chú"
             value={notes}
             onChange={e => setNotes(e.target.value)}
             placeholder="Ghi chú thêm..."
+          />
+
+          <ReceiptImages
+            images={receiptImages}
+            onAdd={(files) => {
+              const nextImages = Array.from(files || [])
+                .filter(file => file.type.startsWith('image/'))
+                .map(file => ({
+                  id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
+                  name: file.name,
+                  url: URL.createObjectURL(file),
+                }));
+              setReceiptImages(items => [...items, ...nextImages]);
+            }}
+            onRemove={(imageId) => {
+              setReceiptImages(items => {
+                const removed = items.find(image => image.id === imageId);
+                if (removed?.url?.startsWith('blob:')) URL.revokeObjectURL(removed.url);
+                return items.filter(image => image.id !== imageId);
+              });
+            }}
           />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 6px' }}>
@@ -287,6 +309,7 @@ export default function AddExpense({ data, onAction }) {
                   category,
                   notes: notes.trim(),
                   dateLabel,
+                  receiptImages,
                   participants: participants.filter(p => p.included).map(p => p.id),
                   splitMode: 'equal',
                 });
@@ -300,6 +323,13 @@ export default function AddExpense({ data, onAction }) {
           </Button>
         </div>
       </div>
+      {datePickerOpen && (
+        <DateScrollPicker
+          value={dateLabel}
+          onChange={setDateLabel}
+          onClose={() => setDatePickerOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -326,6 +356,25 @@ function SelectField({ children }) {
   );
 }
 
+function PickerRow({ children, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: '100%',
+      padding: '15px 14px',
+      background: colors.inputBg,
+      border: `1px solid ${colors.borderSubtle}`,
+      borderRadius: 12,
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: 800,
+      fontFamily: 'inherit',
+      display: 'flex',
+      alignItems: 'center',
+      cursor: 'pointer',
+    }}>{children}</button>
+  );
+}
+
 const selectStyle = {
   minWidth: 0,
   flex: 1,
@@ -342,7 +391,7 @@ const selectStyle = {
 function ParticipantChip({ p, onToggle }) {
   if (!p.included) {
     return (
-      <button onClick={onToggle} style={{
+      <button type="button" onClick={onToggle} style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px 6px 6px',
         borderRadius: 100, background: 'rgba(255,255,255,0.05)',
         border: '1px dashed rgba(255,255,255,0.15)',
@@ -354,7 +403,7 @@ function ParticipantChip({ p, onToggle }) {
     );
   }
   return (
-    <button onClick={onToggle} style={{
+    <button type="button" onClick={onToggle} style={{
       display: 'flex', alignItems: 'center', gap: 6, padding: '6px 10px 6px 6px',
       borderRadius: 100,
       background: 'rgba(99,102,241,0.15)',
@@ -367,9 +416,213 @@ function ParticipantChip({ p, onToggle }) {
   );
 }
 
+function ReceiptImages({ images, onAdd, onRemove }) {
+  return (
+    <div style={{ marginTop: 14 }}>
+      <FieldLabel>Hình ảnh</FieldLabel>
+      <div style={{
+        padding: 14,
+        borderRadius: 16,
+        background: colors.inputBg,
+        border: `1px solid ${colors.borderSubtle}`,
+      }}>
+        <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 2 }}>
+          {images.map(image => (
+            <div key={image.id} style={{ position: 'relative', flex: '0 0 86px', height: 86 }}>
+              <img src={image.url} alt={image.name || 'Ảnh chi tiêu'} style={{
+                width: 86,
+                height: 86,
+                objectFit: 'cover',
+                borderRadius: 12,
+                border: `1px solid ${colors.borderSubtle}`,
+              }} />
+              <button type="button" aria-label="Xóa ảnh" onClick={() => onRemove(image.id)} style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                border: 'none',
+                background: colors.danger,
+                color: 'white',
+                fontSize: 16,
+                lineHeight: '24px',
+                cursor: 'pointer',
+              }}>×</button>
+            </div>
+          ))}
+          <label style={{
+            flex: '0 0 86px',
+            height: 86,
+            borderRadius: 12,
+            border: `1px dashed ${colors.borderNormal}`,
+            background: 'rgba(255,255,255,0.04)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: colors.textMuted,
+            fontSize: 30,
+            cursor: 'pointer',
+          }}>
+            +
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={event => {
+                onAdd(event.target.files);
+                event.target.value = '';
+              }}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DateScrollPicker({ value, onChange, onClose }) {
+  const selected = parseDateParts(value);
+  const [year, setYear] = useState(selected.year);
+  const [month, setMonth] = useState(selected.month);
+  const [day, setDay] = useState(selected.day);
+  const years = Array.from({ length: 7 }, (_, index) => new Date().getFullYear() - 3 + index);
+  const months = Array.from({ length: 12 }, (_, index) => index + 1);
+  const days = Array.from({ length: daysInMonth(year, month) }, (_, index) => index + 1);
+
+  useEffect(() => {
+    const maxDay = daysInMonth(year, month);
+    if (day > maxDay) setDay(maxDay);
+  }, [day, month, year]);
+
+  function saveDate() {
+    onChange(formatDateLabel(day, month, year));
+    onClose?.();
+  }
+
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 40,
+      background: 'rgba(0,0,0,0.58)',
+      display: 'flex',
+      alignItems: 'flex-end',
+    }}>
+      <div style={{
+        width: '100%',
+        background: colors.shellBg,
+        borderTop: `1px solid ${colors.borderNormal}`,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: '14px 16px 18px',
+        boxShadow: '0 -24px 60px rgba(0,0,0,0.55)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button type="button" onClick={onClose} style={pickerTextButton(colors.textSecondary)}>Hủy</button>
+          <div style={{ fontSize: 14, fontWeight: 900 }}>Chọn ngày</div>
+          <button type="button" onClick={saveDate} style={pickerTextButton(colors.brandLight)}>Xong</button>
+        </div>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr 1fr',
+          gap: 10,
+          marginTop: 16,
+        }}>
+          <ScrollColumn label="Năm" value={year} items={years} onChange={setYear} />
+          <ScrollColumn label="Tháng" value={month} items={months} onChange={setMonth} render={item => `Tháng ${item}`} />
+          <ScrollColumn label="Ngày" value={day} items={days} onChange={setDay} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScrollColumn({ label, value, items, onChange, render }) {
+  return (
+    <div>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 800,
+        color: colors.textSecondary,
+        textTransform: 'uppercase',
+        letterSpacing: '1px',
+        textAlign: 'center',
+        marginBottom: 6,
+      }}>{label}</div>
+      <div style={{
+        height: 156,
+        overflowY: 'auto',
+        borderRadius: 14,
+        background: colors.inputBg,
+        border: `1px solid ${colors.borderSubtle}`,
+        padding: 6,
+      }}>
+        {items.map(item => {
+          const active = Number(item) === Number(value);
+          return (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onChange(item)}
+              style={{
+                width: '100%',
+                minHeight: 42,
+                border: 'none',
+                borderRadius: 10,
+                background: active ? 'rgba(129,140,248,0.20)' : 'transparent',
+                color: active ? colors.textPrimary : colors.textSecondary,
+                fontSize: active ? 17 : 14,
+                fontWeight: active ? 900 : 700,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >{render ? render(item) : item}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function pickerTextButton(color) {
+  return {
+    border: 'none',
+    background: 'transparent',
+    color,
+    fontSize: 14,
+    fontWeight: 800,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  };
+}
+
 function todayLabel() {
   const d = new Date();
   return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function formatDateLabel(day, month, year) {
+  return `${String(day).padStart(2,'0')}/${String(month).padStart(2,'0')}/${year}`;
+}
+
+function parseDateParts(value) {
+  const fallback = new Date();
+  const match = String(value || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!match) {
+    return { day: fallback.getDate(), month: fallback.getMonth() + 1, year: fallback.getFullYear() };
+  }
+  return {
+    day: Number(match[1]) || fallback.getDate(),
+    month: Number(match[2]) || fallback.getMonth() + 1,
+    year: Number(match[3]) || fallback.getFullYear(),
+  };
+}
+
+function daysInMonth(year, month) {
+  return new Date(Number(year), Number(month), 0).getDate();
 }
 
 function dateLabelFromValue(value) {

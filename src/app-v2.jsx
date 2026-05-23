@@ -693,6 +693,7 @@ export default function AppV2() {
           cat: payload.category,
           notes: payload.notes,
           date: dateFromLabel(payload.dateLabel),
+          receiptImages: payload.receiptImages || [],
           participants: payload.participants || [],
           splitMode: payload.splitMode,
         }
