@@ -186,6 +186,54 @@ export function Hero({ variant = 'indigo', children, glow = true, style }) {
   );
 }
 
+const TONE = {
+  pickleball: {
+    hero: 'emerald',
+    accent: colors.pickleball,
+    text: '#064e3b',
+    soft: colors.successSoft,
+  },
+  groups: {
+    hero: 'amber',
+    accent: colors.warning,
+    text: '#7c2d12',
+    soft: colors.warningSoft,
+  },
+  finance: {
+    hero: 'indigo',
+    accent: colors.brandLight,
+    text: '#1e1b4b',
+    soft: colors.brandSoftBg,
+  },
+  profile: {
+    hero: 'violet',
+    accent: '#c4b5fd',
+    text: '#3b0764',
+    soft: 'rgba(167,139,250,0.16)',
+  },
+};
+
+function toneConfig(tone = 'finance') {
+  return TONE[tone] || TONE.finance;
+}
+
+export function ModuleHero({ eyebrow, title, subtitle, action, tone = 'finance', children, style, ...rest }) {
+  const t = toneConfig(tone);
+  return (
+    <Hero variant={t.hero} style={{ marginTop: 8, padding: 18, ...style }} {...rest}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {eyebrow && <div style={{ ...type.label, color: t.accent }}>{eyebrow}</div>}
+          {title && <h1 style={{ ...type.title, margin: '4px 0 0' }}>{title}</h1>}
+          {subtitle && <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>{subtitle}</div>}
+        </div>
+        {action && <div style={{ flexShrink: 0 }}>{action}</div>}
+      </div>
+      {children && <div style={{ marginTop: 16 }}>{children}</div>}
+    </Hero>
+  );
+}
+
 /* ───────────────────────── Atoms ───────────────────────── */
 
 const AVATAR_GRADIENTS = {
@@ -327,6 +375,33 @@ export function Button({ variant = 'brand', block, children, style, ...rest }) {
   );
 }
 
+export function ActionButton({ children, danger, tone = 'finance', icon, style, ...rest }) {
+  const t = toneConfig(danger ? 'groups' : tone);
+  return (
+    <button type="button" style={{
+      width: '100%',
+      border: `1px solid ${danger ? 'rgba(248,113,113,0.24)' : colors.borderSubtle}`,
+      borderRadius: 12,
+      background: danger ? colors.dangerSoft : colors.inputBg,
+      color: danger ? colors.danger : colors.textPrimary,
+      padding: '12px 14px',
+      marginTop: 8,
+      textAlign: 'left',
+      fontSize: 13,
+      fontWeight: 800,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      ...style,
+    }} {...rest}>
+      {icon && <span style={{ color: t.accent, fontSize: 15, lineHeight: 1 }}>{icon}</span>}
+      <span>{children}</span>
+    </button>
+  );
+}
+
 export function IconButton({ children, dot, style, ...rest }) {
   return (
     <button style={{
@@ -344,6 +419,28 @@ export function IconButton({ children, dot, style, ...rest }) {
         background: colors.danger, boxShadow: '0 0 8px rgba(248,113,113,0.6)',
       }} />}
     </button>
+  );
+}
+
+export function IconActionButton({ children, tone = 'finance', style, ...rest }) {
+  const t = toneConfig(tone);
+  return (
+    <button type="button" style={{
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      background: t.soft,
+      border: `1px solid ${t.accent}`,
+      color: t.text,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: 16,
+      fontWeight: 900,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      ...style,
+    }} {...rest}>{children}</button>
   );
 }
 
@@ -371,6 +468,41 @@ export function Input({ label, suffix, style, inputStyle, ...rest }) {
           color: colors.textMuted, fontSize: 13, fontWeight: 600,
         }}>{suffix}</span>}
       </div>
+    </div>
+  );
+}
+
+export function SearchInput({ value, onChange, placeholder = 'Tìm kiếm...', style, inputStyle, ...rest }) {
+  return (
+    <div style={{
+      display: 'flex',
+      gap: 8,
+      alignItems: 'center',
+      background: colors.inputBg,
+      border: `1px solid ${colors.borderSubtle}`,
+      borderRadius: 12,
+      padding: '11px 14px',
+      ...style,
+    }}>
+      <span style={{ color: colors.textMuted, fontSize: 14 }}>⌕</span>
+      <input
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          background: 'transparent',
+          border: 'none',
+          outline: 'none',
+          color: colors.textPrimary,
+          fontSize: 13,
+          fontFamily: 'inherit',
+          fontWeight: 600,
+          ...inputStyle,
+        }}
+        {...rest}
+      />
     </div>
   );
 }
@@ -406,6 +538,14 @@ export function Row({ icon, iconBg, title, sub, amount, amountColor = colors.tex
   );
 }
 
+export function ListCard({ children, style, ...rest }) {
+  return (
+    <Card style={{ padding: '4px 12px', ...style }} {...rest}>
+      {children}
+    </Card>
+  );
+}
+
 /* ───────────────────────── Misc ───────────────────────── */
 
 export function SectionLabel({ children, action, onAction }) {
@@ -426,6 +566,37 @@ export function SectionLabel({ children, action, onAction }) {
             cursor: onAction ? 'pointer' : 'default',
           }}
         >{action}</span>
+      )}
+    </div>
+  );
+}
+
+export function SectionHeader({ children, action, onAction, style }) {
+  return (
+    <div style={{
+      fontSize: 9,
+      fontWeight: 800,
+      textTransform: 'uppercase',
+      letterSpacing: '1.2px',
+      color: colors.textMuted,
+      margin: '18px 0 8px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      ...style,
+    }}>
+      <span>{children}</span>
+      {action && (
+        <button type="button" onClick={onAction} style={{
+          border: 'none',
+          background: 'transparent',
+          color: colors.brandLight,
+          fontSize: 11,
+          fontWeight: 800,
+          fontFamily: 'inherit',
+          cursor: onAction ? 'pointer' : 'default',
+          padding: 0,
+        }}>{action}</button>
       )}
     </div>
   );
@@ -462,4 +633,172 @@ export function Stat({ value, label, color, accent }) {
       }}>{label}</div>
     </Card>
   );
+}
+
+export function StatGrid({ children, style }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(3, 1fr)',
+      gap: 8,
+      marginBottom: 12,
+      ...style,
+    }}>{children}</div>
+  );
+}
+
+export function BottomSheet({ title, children, onClose, tone = 'finance', style }) {
+  const t = toneConfig(tone);
+  return (
+    <div style={{
+      position: 'absolute',
+      inset: 0,
+      zIndex: 30,
+      background: 'rgba(0,0,0,0.50)',
+      display: 'flex',
+      alignItems: 'flex-end',
+      padding: 12,
+    }}>
+      <div style={{
+        width: '100%',
+        maxHeight: '86%',
+        overflowY: 'auto',
+        background: colors.shellBg,
+        border: `1px solid ${colors.borderNormal}`,
+        borderRadius: 20,
+        padding: 16,
+        boxShadow: '0 -20px 50px rgba(0,0,0,0.45)',
+        ...style,
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div>
+            <div style={{ width: 34, height: 3, borderRadius: 99, background: t.accent, opacity: 0.7, marginBottom: 10 }} />
+            <div style={{ fontSize: 15, fontWeight: 900 }}>{title}</div>
+          </div>
+          <button type="button" onClick={onClose} style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            border: `1px solid ${colors.borderSubtle}`,
+            background: colors.inputBg,
+            color: colors.textSecondary,
+            fontSize: 18,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function MemberPicker({
+  candidates = [],
+  selectedIds = [],
+  query = '',
+  onQueryChange,
+  onToggle,
+  emptyText = 'Không có thành viên phù hợp.',
+  placeholder = 'Tìm vài ký tự để lọc thành viên',
+  tone = 'finance',
+  maxListHeight = 260,
+}) {
+  const t = toneConfig(tone);
+  const normalizedQuery = normalizePickerSearch(query);
+  const visible = candidates.filter(candidate => {
+    if (!normalizedQuery) return true;
+    return normalizePickerSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(normalizedQuery);
+  });
+  const selected = candidates.filter(candidate => selectedIds.includes(String(candidate.id)));
+
+  return (
+    <div style={{
+      background: tone === 'pickleball' ? colors.heroEmerald : colors.cardSurface,
+      border: `1px solid ${tone === 'pickleball' ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
+      borderRadius: 16,
+      padding: 14,
+    }}>
+      <SectionHeader style={{ marginTop: 0, color: t.accent }}>Thành viên có sẵn</SectionHeader>
+      <SearchInput
+        value={query}
+        onChange={event => onQueryChange?.(event.target.value)}
+        placeholder={placeholder}
+        style={{ marginBottom: 10 }}
+      />
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {selected.map(candidate => (
+            <button key={candidate.id} type="button" onClick={() => onToggle?.(candidate.id)} style={{
+              border: `1px solid ${t.accent}`,
+              borderRadius: 999,
+              background: t.soft,
+              color: t.accent,
+              padding: '6px 9px',
+              fontSize: 11,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}>{candidate.name} ×</button>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: maxListHeight, overflowY: 'auto', paddingRight: 2 }}>
+        {visible.map(candidate => {
+          const active = selectedIds.includes(String(candidate.id));
+          const hasBank = candidate.bankName || candidate.bankAccount;
+          return (
+            <button key={candidate.id} type="button" onClick={() => onToggle?.(candidate.id)} style={{
+              display: 'grid',
+              gridTemplateColumns: '24px minmax(0, 1fr)',
+              gap: 10,
+              alignItems: 'center',
+              width: '100%',
+              border: `1px solid ${active ? t.accent : colors.borderSubtle}`,
+              borderRadius: 12,
+              background: active ? t.soft : colors.inputBg,
+              color: colors.textPrimary,
+              padding: 12,
+              textAlign: 'left',
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}>
+              <span style={{
+                width: 22,
+                height: 22,
+                borderRadius: 8,
+                border: active ? 'none' : `1px solid ${colors.borderSubtle}`,
+                background: active ? t.accent : 'transparent',
+                color: t.text,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 13,
+                fontWeight: 900,
+              }}>{active ? '✓' : ''}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.name}</span>
+                <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {hasBank ? `${candidate.bankName || 'Ngân hàng'} · ${candidate.bankAccount || 'chưa có STK'}` : 'Chưa cập nhật ngân hàng'}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+        {visible.length === 0 && (
+          <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 2px' }}>{emptyText}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function normalizePickerSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim()
+    .toLowerCase();
 }

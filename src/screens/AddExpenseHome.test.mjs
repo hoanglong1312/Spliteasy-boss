@@ -78,7 +78,7 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
-  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, state\?\.profiles\)/);
+  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles\)/);
   assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
@@ -145,7 +145,7 @@ test('App uses one selectedYearMonth across home, groups, group detail, and pick
   assert.match(screenDataSource, /selectedYearMonth = monthKey\(new Date\(\)\)/);
   assert.match(screenDataSource, /buildHomeData\(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth\)/);
   assert.match(screenDataSource, /buildGroupsListData\(groups, currentUserId, members, currentUserName, selectedYearMonth\)/);
-  assert.match(screenDataSource, /buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth\)/);
+  assert.match(screenDataSource, /buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles\)/);
   assert.match(screenDataSource, /buildPickleballOverviewData\(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth\)/);
   assert.match(screenDataSource, /buildPickleballMembersData\(pickleballState, selectedYearMonth\)/);
   assert.match(screenDataSource, /buildMemberDetailData\(pickleballState, memberId, selectedYearMonth\)/);

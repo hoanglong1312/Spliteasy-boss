@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Card, Pill, PillRow, Avatar, Badge,
-  SectionLabel,
+  SectionHeader, ModuleHero, SearchInput, ListCard,
 } from '../primitives';
 
 export default function GroupsList({ data, onAction }) {
@@ -22,41 +22,20 @@ export default function GroupsList({ data, onAction }) {
   return (
     <PhoneFrame>
       <Screen>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0 16px' }}>
-          <div>
-            <h1 style={type.title}>Nhóm</h1>
-            <div style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 500, marginTop: 2 }}>
-              {d.activeCount} đang hoạt động · {d.archivedCount} đã chốt
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <IconButton>⚲</IconButton>
-            <IconButton style={{ background: colors.brandGradient, borderColor: 'transparent', color: 'white', fontWeight: 700, fontSize: 20 }} onClick={() => onAction?.('newGroup')}>+</IconButton>
-          </div>
-        </div>
+        <ModuleHero
+          tone="groups"
+          eyebrow="QUẢN LÝ NHÓM"
+          title="Nhóm"
+          subtitle={`${d.activeCount} đang hoạt động · ${d.archivedCount} đã chốt`}
+          action={<IconButton style={{ background: colors.brandGradient, borderColor: 'transparent', color: 'white', fontWeight: 700, fontSize: 20 }} onClick={() => onAction?.('newGroup')}>+</IconButton>}
+        />
 
-        {/* Search */}
-        <div style={{
-          display: 'flex', gap: 8, alignItems: 'center',
-          background: colors.inputBg,
-          border: `1px solid ${colors.borderSubtle}`,
-          borderRadius: 12, padding: '11px 14px', marginBottom: 14,
-        }}>
-          <span style={{ color: colors.textMuted, fontSize: 14 }}>🔍</span>
-          <input
-            placeholder="Tìm nhóm…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              flex: 1, background: 'transparent', border: 'none', outline: 'none',
-              color: colors.textPrimary, fontSize: 13, fontFamily: 'inherit',
-            }}
-          />
-          <span style={{
-            fontSize: 10, color: colors.brandLight, fontWeight: 700, letterSpacing: '0.4px',
-            borderLeft: `1px solid ${colors.borderNormal}`, paddingLeft: 10, cursor: 'pointer',
-          }} onClick={() => onAction?.('join')}>+ THAM GIA</span>
-        </div>
+        <SearchInput
+          placeholder="Tìm nhóm…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ margin: '14px 0' }}
+        />
 
         <PillRow>
           {d.filters.map(f => (
@@ -69,7 +48,7 @@ export default function GroupsList({ data, onAction }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {visibleGroups.map(g => <GroupCard key={g.id} g={g} onClick={() => onAction?.('open', g.id)} />)}
 
-          <SectionLabel>Đã chốt sổ</SectionLabel>
+          <SectionHeader>Đã chốt sổ</SectionHeader>
           {visibleArchived.map(g => <ArchivedCard key={g.id} g={g} />)}
         </div>
       </Screen>
@@ -90,7 +69,7 @@ function GroupCard({ g, onClick }) {
   const linked = g.isLinkedPickleballExpenseGroup;
 
   return (
-    <Card accent={accentMap[g.kind]} style={{
+    <ListCard accent={accentMap[g.kind]} style={{
       padding: '18px 16px',
       cursor: 'pointer',
       borderColor: linked ? 'rgba(52,211,153,0.55)' : undefined,
@@ -139,7 +118,7 @@ function GroupCard({ g, onClick }) {
           </div>
         </div>
       </div>
-    </Card>
+    </ListCard>
   );
 }
 

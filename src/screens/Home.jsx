@@ -4,8 +4,8 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Hero, Card, Button,
-  SectionLabel,
+  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button,
+  SectionLabel, ModuleHero, SearchInput, SectionHeader, ListCard,
 } from '../primitives';
 
 const STATUS_FILTERS = [
@@ -55,14 +55,14 @@ export default function Home({ data, isTreasurer, onAction }) {
 
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
-        {/* Hero */}
-        <Hero style={{ cursor: 'pointer' }} onClick={() => onAction?.('settleAll')}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.brandLight }}>
-            {balanceLabel}
-          </div>
-          <div style={{ ...type.amountLg, marginTop: 6, color: colors.textPrimary, ...type.mono }}>
-            {formatVND(Math.abs(d.totalBalance))}
-          </div>
+        <ModuleHero
+          tone="finance"
+          eyebrow={balanceLabel}
+          title={formatVND(Math.abs(d.totalBalance))}
+          subtitle="Tổng hợp tất cả nguồn tiền tháng này"
+          style={{ cursor: 'pointer' }}
+          onClick={() => onAction?.('settleAll')}
+        >
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
             padding: '5px 10px', borderRadius: 100,
@@ -78,7 +78,7 @@ export default function Home({ data, isTreasurer, onAction }) {
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('addExpense'); }}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}>Chi tiết quỹ</Button>
           </div>
-        </Hero>
+        </ModuleHero>
 
         <SourceBreakdown sources={d.sourceBreakdown || []} />
 
@@ -105,30 +105,13 @@ export default function Home({ data, isTreasurer, onAction }) {
           </Card>
         )}
 
-        <SectionLabel action="Xem tất cả →">Giao dịch gần đây</SectionLabel>
-        <div style={{ position: 'relative', marginBottom: 8 }}>
-          <span style={{
-            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 13, color: colors.textMuted, pointerEvents: 'none',
-          }}>🔍</span>
-          <input
-            value={filterText}
-            onChange={e => setFilterText(e.target.value)}
-            placeholder="Tìm chi tiêu..."
-            style={{
-              width: '100%',
-              padding: '12px 12px 12px 34px',
-              background: colors.inputBg,
-              border: `1px solid ${colors.borderSubtle}`,
-              borderRadius: 12,
-              color: colors.textPrimary,
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: 'inherit',
-              outline: 'none',
-            }}
-          />
-        </div>
+        <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
+        <SearchInput
+          value={filterText}
+          onChange={e => setFilterText(e.target.value)}
+          placeholder="Tìm chi tiêu..."
+          style={{ marginBottom: 8 }}
+        />
         <div style={{
           display: 'flex',
           gap: 8,
@@ -201,7 +184,7 @@ export default function Home({ data, isTreasurer, onAction }) {
             ))}
           </select>
         </div>
-        <Card>
+        <ListCard>
           {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (
             <ActivityRow
               key={tx.id}
@@ -214,7 +197,7 @@ export default function Home({ data, isTreasurer, onAction }) {
               Không tìm thấy chi tiêu
             </div>
           )}
-        </Card>
+        </ListCard>
       </Screen>
 
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />

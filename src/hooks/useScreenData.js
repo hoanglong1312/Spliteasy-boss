@@ -48,7 +48,7 @@ export function useScreenData() {
     const pickleballState = scopedPickleballState(state)
     const homeData = buildHomeData(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth)
     const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth)
-    const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName, selectedYearMonth)
+    const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles)
     const pickleballOverviewData = buildPickleballOverviewData(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth)
     const pickleballCalendarData = buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth })
     const profileData = buildProfileData(me, state, pickle)
@@ -71,7 +71,7 @@ export function useScreenData() {
       newGroupData: buildNewGroupData(state),
       getGroupDetailData: (groupId) => {
         const group = safeArray(groups).find(g => g.id === groupId) || currentGroup
-        return buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth)
+        return buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles)
       },
       getSessionDetailData: (sessionId) => buildSessionDetailData(pickleballState, pickle, sessionId, currentUserId, members),
       getPickleballCalendarData: (params) => buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth, ...params }),
@@ -377,7 +377,7 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
   }
 }
 
-function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth) {
+function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = []) {
   const g = safeGroup(group)
   const monthDate = dateFromYearMonth(selectedYearMonth)
   const monthlyGroup = groupWithMonthExpenses(g, monthDate)
@@ -411,7 +411,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
-    memberCandidates: buildGroupMemberCandidates(g, members, state?.profiles),
+    memberCandidates: buildGroupMemberCandidates(g, members, profiles),
     members: groupMembers.map(member => ({
       id: member.id,
       name: member.displayName || member.name,

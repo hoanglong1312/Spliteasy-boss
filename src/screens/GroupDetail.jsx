@@ -5,6 +5,8 @@ import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
+  ModuleHero, ActionButton, SearchInput, SectionHeader, StatGrid, ListCard, BottomSheet,
+  MemberPicker, Stat,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -20,6 +22,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [memberSearch, setMemberSearch] = useState('');
+  const visibleMembers = (d.members || []).filter(member => {
+    const query = normalizeSearch(memberSearch);
+    if (!query) return true;
+    return normalizeSearch(`${member.name} ${member.bankName} ${member.bankAccount}`).includes(query);
+  });
 
   function closeMemberSheets() {
     setAddingMember(false);
@@ -88,11 +96,14 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         </div>
 
-        {/* Balance hero */}
-        <Hero variant="amber">
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>
-            SỐ DƯ CỦA BẠN
-          </div>
+        <ModuleHero
+          tone="groups"
+          eyebrow="CHI TIÊU NHÓM"
+          title={d.name}
+          subtitle={`${d.memberCount || (d.members || []).length} thành viên · ${d.monthLabel || 'Tháng này'}`}
+          style={{ cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
           <div style={{ ...type.amountLg, marginTop: 6, ...type.mono }}>{formatVND(d.balance)}</div>
           <div style={{
             display: 'inline-flex', gap: 6, marginTop: 10, padding: '5px 10px',
@@ -104,7 +115,13 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
           </div>
-        </Hero>
+        </ModuleHero>
+
+        <StatGrid style={{ marginTop: 12 }}>
+          <Stat value={d.memberCount || (d.members || []).length} label="Thành viên" accent="groups" />
+          <Stat value={(d.activitiesByWeek || []).reduce((sum, week) => sum + (week.items || []).length, 0)} label="Chi tiêu" color={colors.warning} />
+          <Stat value={formatVND(Math.abs(d.balance || 0))} label="Số dư" color={(d.balance || 0) < 0 ? colors.danger : colors.success} />
+        </StatGrid>
 
         {/* Treasurer actions */}
         {isTreasurer && (
@@ -139,10 +156,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         {activeTab === 'activity' && d.activitiesByWeek.map(week => (
           <React.Fragment key={week.label}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: '1.2px',
-              color: colors.textMuted, textTransform: 'uppercase', margin: '8px 0',
-            }}>{week.label}</div>
+            <SectionHeader>{week.label}</SectionHeader>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {week.items.map(it => <ActivityCard key={it.id} item={it} />)}
             </div>
@@ -159,7 +173,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 + Thêm thành viên
               </Button>
             )}
-            {(d.members || []).map(member => (
+            <SearchInput
+              value={memberSearch}
+              onChange={event => setMemberSearch(event.target.value)}
+              placeholder="Tìm thành viên..."
+            />
+            {visibleMembers.map(member => (
               <MemberRow
                 key={member.id}
                 member={member}
@@ -168,7 +187,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 onMore={setMemberMenu}
               />
             ))}
-            {(d.members || []).length === 0 && (
+            {visibleMembers.length === 0 && (
               <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
             )}
           </div>
@@ -528,82 +547,17 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
     <BottomSheet title={title} onClose={onClose}>
       <form onSubmit={save}>
         <div style={{ marginTop: 12 }}>
-          <div style={{
-            fontSize: 9,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '1.2px',
-            color: colors.textSecondary,
-            marginBottom: 8,
-          }}>Thành viên có sẵn</div>
-          <input
-            value={candidateQuery}
-            onChange={event => setCandidateQuery(event.target.value)}
+          <MemberPicker
+            aria-label="Thành viên có sẵn"
+            candidates={candidateCards}
+            selectedIds={selectedCandidateIds}
+            query={candidateQuery}
+            onQueryChange={setCandidateQuery}
+            onToggle={toggleCandidate}
             placeholder="Tìm vài ký tự để lọc thành viên"
-            style={{ ...fieldStyle(), marginBottom: 10 }}
+            emptyText={candidates.length > 0 ? 'Không có thành viên phù hợp.' : 'Không còn thành viên có sẵn để thêm vào nhóm này.'}
+            tone="groups"
           />
-          {selectedCandidates.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-              {selectedCandidates.map(candidate => (
-                <span key={candidate.id} style={{
-                  border: `1px solid ${colors.borderSubtle}`,
-                  borderRadius: 999,
-                  background: 'rgba(87,78,250,0.18)',
-                  color: colors.textPrimary,
-                  padding: '6px 9px',
-                  fontSize: 11,
-                  fontWeight: 800,
-                }}>{candidate.name}</span>
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
-            {filteredCandidateCards.map(candidate => (
-              <button
-                key={candidate.id}
-                type="button"
-                onClick={() => toggleCandidate(candidate.id)}
-                style={{
-                  width: '100%',
-                  border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
-                  background: candidate.selected ? 'rgba(87,78,250,0.18)' : colors.inputBg,
-                  color: colors.textPrimary,
-                  borderRadius: 12,
-                  padding: 12,
-                  textAlign: 'left',
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                }}
-              >
-                <span style={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: 8,
-                  border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
-                  background: candidate.selected ? colors.brand : 'transparent',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 13,
-                  fontWeight: 900,
-                }}>{candidate.selected ? '✓' : ''}</span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{candidate.name}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                    {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
-                  </span>
-                </span>
-              </button>
-            ))}
-            {filteredCandidateCards.length === 0 && (
-              <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 2px' }}>
-                {candidates.length > 0 ? 'Không có thành viên phù hợp.' : 'Không còn thành viên có sẵn để thêm vào nhóm này.'}
-              </div>
-            )}
-          </div>
         </div>
         <Field
           label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
@@ -725,60 +679,6 @@ function BankSelect({ value, onChange }) {
   );
 }
 
-function ActionButton({ children, danger, onClick }) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      width: '100%',
-      border: `1px solid ${danger ? 'rgba(248,113,113,0.24)' : colors.borderSubtle}`,
-      borderRadius: 12,
-      background: danger ? colors.dangerSoft : colors.inputBg,
-      color: danger ? colors.danger : colors.textPrimary,
-      padding: '12px 14px',
-      marginTop: 8,
-      textAlign: 'left',
-      fontSize: 13,
-      fontWeight: 800,
-      fontFamily: 'inherit',
-      cursor: 'pointer',
-    }}>{children}</button>
-  );
-}
-
-function BottomSheet({ title, children, onClose }) {
-  return (
-    <div style={{
-      position: 'absolute',
-      inset: 0,
-      zIndex: 30,
-      background: 'rgba(0,0,0,0.50)',
-      display: 'flex',
-      alignItems: 'flex-end',
-      padding: 12,
-    }}>
-      <div style={{
-        width: '100%',
-        background: colors.shellBg,
-        border: `1px solid ${colors.borderNormal}`,
-        borderRadius: 20,
-        padding: 16,
-        boxShadow: '0 -20px 50px rgba(0,0,0,0.45)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 15, fontWeight: 900 }}>{title}</div>
-          <button type="button" onClick={onClose} style={{
-            border: 'none',
-            background: 'transparent',
-            color: colors.textSecondary,
-            fontSize: 20,
-            cursor: 'pointer',
-          }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 function fieldStyle() {
   return {
     width: '100%',
@@ -807,7 +707,7 @@ function ActivityCard({ item }) {
     veg:   'rgba(52,211,153,0.12)',
   }[item.category] || 'rgba(255,255,255,0.06)';
   return (
-    <Card>
+    <ListCard style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{
           width: 38, height: 38, borderRadius: 12,
@@ -827,7 +727,7 @@ function ActivityCard({ item }) {
           </div>
         </div>
       </div>
-    </Card>
+    </ListCard>
   );
 }
 

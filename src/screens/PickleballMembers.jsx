@@ -1,9 +1,10 @@
 // Spliteasy Boss — Pickleball · Thành viên
 
 import React, { useMemo, useState } from 'react';
-import { colors, type, radius } from '../tokens';
+import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, Card, Badge, SubTabs, Avatar, Stat, Button, Input,
+  ModuleHero, ActionButton, SearchInput, StatGrid, BottomSheet, MemberPicker,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -116,48 +117,15 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   return (
     <PhoneFrame>
       <Screen style={{ background: colors.pageBg }}>
-        <div style={{
-          background: colors.heroEmerald,
-          border: `1px solid rgba(52,211,153,0.35)`,
-          borderRadius: radius.hero,
-          padding: 18,
-          marginTop: 8,
-          position: 'relative',
-          overflow: 'hidden',
-        }}>
-          <div style={{
-            position: 'absolute',
-            top: -44,
-            right: -48,
-            width: 170,
-            height: 170,
-            background: 'radial-gradient(circle, rgba(52,211,153,0.28) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }} />
-          <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 14 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ ...type.label, color: colors.pickleball }}>CLB PICKLEBALL · {d.clubName}</div>
-              <h1 style={{ ...type.title, margin: '4px 0 0' }}>Thành viên</h1>
-              <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 3 }}>
-                {d.monthLabel}
-              </div>
-            </div>
-            {isTreasurer && (
-              <button type="button" onClick={() => setShowAddMember(true)} style={{
-                border: 'none',
-                borderRadius: 12,
-                background: colors.textPrimary,
-                color: '#064e3b',
-                padding: '10px 12px',
-                fontSize: 12,
-                fontWeight: 800,
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}>+ Thêm</button>
-            )}
-          </div>
-        </div>
+        <ModuleHero
+          tone="pickleball"
+          eyebrow={`CLB PICKLEBALL · ${d.clubName}`}
+          title="Thành viên"
+          subtitle={d.monthLabel}
+          action={isTreasurer ? (
+            <Button type="button" variant="primary" onClick={() => setShowAddMember(true)} style={{ padding: '10px 12px', fontSize: 12, color: '#064e3b' }}>+ Thêm</Button>
+          ) : null}
+        />
 
         <SubTabs
           items={[
@@ -169,18 +137,17 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           onChange={(key) => onAction?.('subTab', key)}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 12 }}>
+        <StatGrid>
           <Stat value={d.stats?.permanent || fixedMembers.length} label="Cố định" accent="pickleball" />
           <Stat value={d.stats?.casual || casualMembers.length} label="Vãng lai" color={colors.warning} />
           <Stat value={d.stats?.total || fixedMembers.length + casualMembers.length} label="Tổng" color={colors.textPrimary} />
-        </div>
+        </StatGrid>
 
-        <Input
+        <SearchInput
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Tìm theo tên"
           style={{ marginBottom: 14 }}
-          inputStyle={{ fontSize: 13, padding: '12px 14px' }}
         />
 
         <MemberSection
@@ -218,80 +185,17 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
       {showAddMember && isTreasurer && (
         <BottomSheet title="Thêm thành viên" onClose={() => setShowAddMember(false)}>
           <form onSubmit={saveNewMember}>
-            <div style={{
-              background: colors.heroEmerald,
-              border: `1px solid rgba(52,211,153,0.28)`,
-              borderRadius: 16,
-              padding: 14,
-              marginBottom: 12,
-            }}>
-              <div style={{ ...type.label, color: colors.pickleball, marginBottom: 8 }}>Thành viên có sẵn</div>
-              <input
-                value={candidateQuery}
-                onChange={e => setCandidateQuery(e.target.value)}
-                placeholder="Tìm vài ký tự để lọc thành viên"
-                style={{ ...selectFieldStyle(), marginBottom: 10 }}
-              />
-              {selectedCandidates.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                  {selectedCandidates.map(candidate => (
-                    <span key={candidate.id} style={{
-                      borderRadius: 999,
-                      background: colors.successSoft,
-                      color: colors.pickleball,
-                      padding: '6px 9px',
-                      fontSize: 11,
-                      fontWeight: 900,
-                    }}>{candidate.name}</span>
-                  ))}
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
-                {filteredCandidateCards.map(candidate => {
-                  const active = selectedCandidateIds.includes(String(candidate.id));
-                  return (
-                    <button key={candidate.id} type="button" onClick={() => toggleCandidate(candidate.id)} style={{
-                      display: 'grid',
-                      gridTemplateColumns: '24px minmax(0, 1fr)',
-                      gap: 10,
-                      alignItems: 'center',
-                      width: '100%',
-                      border: `1px solid ${active ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
-                      borderRadius: 12,
-                      background: active ? colors.successSoft : colors.inputBg,
-                      color: colors.textPrimary,
-                      padding: 12,
-                      textAlign: 'left',
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                    }}>
-                      <span style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 8,
-                        border: active ? 'none' : `1px solid ${colors.borderSubtle}`,
-                        background: active ? colors.pickleball : 'transparent',
-                        color: '#06281f',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 13,
-                        fontWeight: 900,
-                      }}>{active ? '✓' : ''}</span>
-                      <span style={{ minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{candidate.name}</span>
-                        <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                          {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-                {filteredCandidateCards.length === 0 && (
-                  <div style={{ fontSize: 12, color: colors.textSecondary, padding: '10px 2px' }}>Không có thành viên phù hợp.</div>
-                )}
-              </div>
-            </div>
+            <MemberPicker
+              candidates={filteredCandidateCards.length === memberCandidates.length ? memberCandidates : memberCandidates}
+              selectedIds={selectedCandidateIds}
+              query={candidateQuery}
+              onQueryChange={setCandidateQuery}
+              onToggle={toggleCandidate}
+              placeholder="Tìm vài ký tự để lọc thành viên"
+              emptyText="Không có thành viên phù hợp."
+              tone="pickleball"
+              maxListHeight={220}
+            />
             <Input
               label={memberCandidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên'}
               value={newMemberName}
@@ -543,60 +447,6 @@ function TypeSwitch({ value, onChange }) {
           cursor: 'pointer',
         }}>{item.label}</button>
       ))}
-    </div>
-  );
-}
-
-function ActionButton({ children, danger, onClick }) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      width: '100%',
-      border: `1px solid ${danger ? 'rgba(248,113,113,0.24)' : colors.borderSubtle}`,
-      borderRadius: 12,
-      background: danger ? colors.dangerSoft : colors.inputBg,
-      color: danger ? colors.danger : colors.textPrimary,
-      padding: '12px 14px',
-      marginTop: 8,
-      textAlign: 'left',
-      fontSize: 13,
-      fontWeight: 800,
-      fontFamily: 'inherit',
-      cursor: 'pointer',
-    }}>{children}</button>
-  );
-}
-
-function BottomSheet({ title, children, onClose }) {
-  return (
-    <div style={{
-      position: 'absolute',
-      inset: 0,
-      zIndex: 30,
-      background: 'rgba(0,0,0,0.50)',
-      display: 'flex',
-      alignItems: 'flex-end',
-      padding: 12,
-    }}>
-      <div style={{
-        width: '100%',
-        background: colors.shellBg,
-        border: `1px solid ${colors.borderNormal}`,
-        borderRadius: 20,
-        padding: 16,
-        boxShadow: '0 -20px 50px rgba(0,0,0,0.45)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 15, fontWeight: 900 }}>{title}</div>
-          <button type="button" onClick={onClose} style={{
-            border: 'none',
-            background: 'transparent',
-            color: colors.textSecondary,
-            fontSize: 20,
-            cursor: 'pointer',
-          }}>×</button>
-        </div>
-        {children}
-      </div>
     </div>
   );
 }

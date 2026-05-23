@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { colors, type, radius } from '../tokens';
-import { PhoneFrame, Screen, IconButton, Card, Button, Badge } from '../primitives';
+import { PhoneFrame, Screen, IconButton, Card, Button, Badge, ModuleHero, MemberPicker, SectionHeader, SearchInput } from '../primitives';
 
 const DEFAULT_EMOJIS = [
   '🏓','⚽','🏀','🎾','🏸','🏐',
@@ -25,6 +25,7 @@ export default function NewGroup({ data, onAction }) {
     if (!query) return true;
     return normalizeSearch(`${profile.name} ${profile.bankName} ${profile.bankAccount}`).includes(query);
   });
+  const pickerListConstraint = { maxHeight: 360 };
 
   function toggleProfile(profileId) {
     setSelectedProfileIds(current => (
@@ -41,7 +42,6 @@ export default function NewGroup({ data, onAction }) {
   return (
     <PhoneFrame>
       <Screen>
-        {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '12px 0 14px',
@@ -57,9 +57,13 @@ export default function NewGroup({ data, onAction }) {
           }}>Tạo</button>
         </div>
 
-        {/* Live preview */}
-        <Label>XEM TRƯỚC</Label>
-        <Card accent="pickleball" style={{ padding: '18px 16px' }}>
+        <ModuleHero
+          tone="groups"
+          eyebrow="TẠO NHÓM CHI TIÊU"
+          title={name || 'Tên nhóm mới'}
+          subtitle={description || 'Mô tả ngắn'}
+          action={<div style={{ fontSize: 26 }}>{emoji}</div>}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
               width: 52, height: 52, borderRadius: 14,
@@ -75,7 +79,7 @@ export default function NewGroup({ data, onAction }) {
               )}
             </div>
           </div>
-        </Card>
+        </ModuleHero>
 
         {/* Name */}
         <Label>Tên nhóm *</Label>
@@ -148,84 +152,18 @@ export default function NewGroup({ data, onAction }) {
 
         {profileOptions.length > 0 && (
           <>
-            <Label>Thêm thành viên có sẵn</Label>
-            <Card style={{ padding: 10 }}>
-              <input
-                value={profileQuery}
-                onChange={(e) => setProfileQuery(e.target.value)}
-                placeholder="Tìm vài ký tự để lọc thành viên"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  marginBottom: 10,
-                  background: colors.inputBg,
-                  border: `1px solid ${colors.borderSubtle}`,
-                  borderRadius: 12,
-                  color: colors.textPrimary,
-                  fontSize: 13,
-                  fontWeight: 700,
-                  fontFamily: 'inherit',
-                  outline: 'none',
-                }}
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 360, overflowY: 'auto', paddingRight: 2 }}>
-                {filteredProfileOptions.map(profile => {
-                  const active = selectedProfileIds.includes(profile.id);
-                  return (
-                    <button key={profile.id} type="button" onClick={() => toggleProfile(profile.id)} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      width: '100%',
-                      padding: '10px 12px',
-                      background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
-                      border: active ? '1px solid rgba(129,140,248,0.55)' : `1px solid ${colors.borderSubtle}`,
-                      borderRadius: 10,
-                      color: colors.textPrimary,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}>
-                      <span style={{
-                        width: 24,
-                        height: 24,
-                        borderRadius: 8,
-                        background: profile.color || colors.brand,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 11,
-                        fontWeight: 900,
-                        color: 'white',
-                        flexShrink: 0,
-                      }}>{profile.initials || String(profile.name || '?').slice(0, 2).toUpperCase()}</span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: 'block', fontSize: 13, fontWeight: 800 }}>{profile.name}</span>
-                        <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
-                          {profile.bankName || profile.bankAccount ? `${profile.bankName || 'Ngân hàng'} · ${profile.bankAccount || 'chưa có STK'}` : 'Chưa có thông tin ngân hàng'}
-                        </span>
-                      </span>
-                      <span style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: 6,
-                        border: active ? 'none' : `1px solid ${colors.borderSubtle}`,
-                        background: active ? colors.brand : 'rgba(255,255,255,0.04)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 900,
-                      }}>{active ? '✓' : ''}</span>
-                    </button>
-                  );
-                })}
-                {filteredProfileOptions.length === 0 && (
-                  <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 4px' }}>Không có thành viên phù hợp.</div>
-                )}
-              </div>
-            </Card>
+            <SectionHeader>Thêm thành viên có sẵn</SectionHeader>
+            <MemberPicker
+              candidates={profileOptions}
+              selectedIds={selectedProfileIds}
+              query={profileQuery}
+              onQueryChange={setProfileQuery}
+              onToggle={toggleProfile}
+              placeholder="Tìm vài ký tự để lọc thành viên"
+              emptyText="Không có thành viên phù hợp."
+              tone="groups"
+              maxListHeight={pickerListConstraint.maxHeight}
+            />
           </>
         )}
 
