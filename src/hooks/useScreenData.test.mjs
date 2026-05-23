@@ -21,8 +21,8 @@ test('Pickleball overview reads current-month court fee and current fixed member
 
 test('Screen data scopes pickleball builders to pickleballGroupId instead of the opened expense group', () => {
   assert.match(dataSource, /const pickleballState = scopedPickleballState\(state\)/)
-  assert.match(dataSource, /buildPickleballOverviewData\(pickleballState, pickle, _allPickle, currentUserId, members\)/)
-  assert.match(dataSource, /buildPickleballCalendarData\(pickleballState\)/)
+  assert.match(dataSource, /buildPickleballOverviewData\(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth\)/)
+  assert.match(dataSource, /buildPickleballCalendarData\(pickleballState, \{ yearMonth: selectedYearMonth \}\)/)
   assert.match(dataSource, /getPickleballSettingsData: \(\) => buildPickleballSettingsData\(pickleballState\)/)
   assert.match(dataSource, /function scopedPickleballState\(state\) \{/)
   assert.match(dataSource, /currentGroupId: group\?\.id \|\| state\?\.pickleballGroupId \|\| state\?\.currentGroupId/)
@@ -43,7 +43,7 @@ test('Pickleball members data exposes fixed/casual rows with rank metadata', () 
 })
 
 test('Member detail data includes attendance rank and casual court-fee logic', () => {
-  assert.match(dataSource, /getMemberDetailData: \(memberId\) => buildMemberDetailData\(pickleballState, memberId\)/)
+  assert.match(dataSource, /getMemberDetailData: \(memberId\) => buildMemberDetailData\(pickleballState, memberId, selectedYearMonth\)/)
 
   const detailMatch = dataSource.match(/function buildMemberDetailData[\s\S]*?\n}\n\nfunction buildPickleballTicketsData/)
   assert.ok(detailMatch)

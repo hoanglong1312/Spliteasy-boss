@@ -48,7 +48,7 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /<MemberRow[\s\S]*key=\{member\.id\}[\s\S]*member=\{member\}[\s\S]*onMore=\{setMemberMenu\}/);
   assert.match(groupDetailSource, /Sửa thành viên/);
   assert.match(groupDetailSource, /Cấp quyền thủ quỹ/);
-  assert.match(groupDetailSource, /Xóa thành viên/);
+  assert.match(groupDetailSource, /Xóa khỏi nhóm/);
   assert.match(groupDetailSource, /Tên tài khoản/);
   assert.match(groupDetailSource, /Số tài khoản/);
   assert.match(screenDataSource, /balanceRows: groupMembers/);
@@ -56,7 +56,9 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
 
 test('GroupDetail member management writes normal group and bank fields', () => {
   assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], onClose, onAction \}\)/);
-  assert.match(groupDetailSource, /Người đã có trong nhóm khác/);
+  assert.match(groupDetailSource, /Thành viên có sẵn/);
+  assert.match(groupDetailSource, /candidateCards/);
+  assert.match(groupDetailSource, /selectedCandidateId === String\(candidate\.id\)/);
   assert.match(groupDetailSource, /Hoặc nhập tên mới/);
   assert.match(groupDetailSource, /const selectedCandidate = candidates\.find\(candidate => String\(candidate\.id\) === String\(selectedCandidateId\)\)/);
   assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*bankAccountName: selectedCandidate\?\.bankAccountName \|\| '',[\s\S]*bankName: selectedCandidate\?\.bankName \|\| '',[\s\S]*bankAccount: selectedCandidate\?\.bankAccount \|\| '',[\s\S]*\}\)/);
@@ -70,8 +72,8 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
   assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members\)/);
-  assert.match(screenDataSource, /const currentNames = new Set\(currentMembers\.map\(member => normalizeName\(member\.displayName \|\| member\.name\)\)\)/);
-  assert.match(screenDataSource, /!currentNames\.has\(normalizeName\(member\.displayName \|\| member\.name\)\)/);
+  assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
+  assert.match(screenDataSource, /!currentProfileIds\.has\(String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
   assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);
   assert.match(screenDataSource, /bankAccountName: member\.bankAccountName \|\| member\.bank_account_name \|\| ''/);
@@ -95,6 +97,37 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /event\.stopPropagation\(\)/);
   assert.match(groupDetailSource, /onEdit=\{\(\) => \{ setEditingMember\(selectedMember\); setSelectedMember\(null\); \}\}/);
   assert.match(groupDetailSource, /onDelete=\{async \(\) => \{[\s\S]*deleteMember', \{ memberId: selectedMember\.id \}/);
+});
+
+test('GroupDetail hides member bank accounts unless treasurer or self', () => {
+  assert.match(groupDetailSource, /function canViewMemberBank\(member, isTreasurer\)/);
+  assert.match(groupDetailSource, /member\.isCurrentUser/);
+  assert.match(groupDetailSource, /const canViewBank = canViewMemberBank\(member, isTreasurer\)/);
+  assert.match(groupDetailSource, /canViewBank \? `\$\{member\.bankName\} · \$\{maskAccount\(member\.bankAccount\)\}` : 'Đã cập nhật ngân hàng'/);
+  assert.match(groupDetailSource, /canViewBank && member\.bankAccount/);
+  assert.match(groupDetailSource, /Ẩn với thành viên khác/);
+  assert.match(screenDataSource, /isCurrentUser: String\(member\.id\) === String\(currentGroupMember\?\.id \|\| ''\)/);
+});
+
+test('GroupDetail member detail shows payer transactions for the selected month', () => {
+  assert.match(screenDataSource, /payerTransactions: buildMemberPayerTransactions\(g, member\.id, selectedYearMonth\)/);
+  assert.match(screenDataSource, /function buildMemberPayerTransactions\(group, memberId, selectedYearMonth\)/);
+  assert.match(groupDetailSource, /THÁNG NÀY ĐÃ THANH TOÁN/);
+  assert.match(groupDetailSource, /member\.payerTransactions/);
+  assert.match(groupDetailSource, /function MemberPaidTransactionRow\(\{ transaction \}\)/);
+});
+
+test('App uses one selectedYearMonth across home, groups, group detail, and pickleball screens', () => {
+  assert.match(storeSource, /selectedYearMonth: monthKey\(new Date\(\)\)/);
+  assert.match(storeSource, /case 'SET_SELECTED_MONTH':/);
+  assert.match(appSource, /dispatch\(\{ type: 'SET_SELECTED_MONTH', selectedYearMonth: nextYearMonth \}\)/);
+  assert.match(screenDataSource, /selectedYearMonth = monthKey\(new Date\(\)\)/);
+  assert.match(screenDataSource, /buildHomeData\(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth\)/);
+  assert.match(screenDataSource, /buildGroupsListData\(groups, currentUserId, members, currentUserName, selectedYearMonth\)/);
+  assert.match(screenDataSource, /buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth\)/);
+  assert.match(screenDataSource, /buildPickleballOverviewData\(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth\)/);
+  assert.match(screenDataSource, /buildPickleballMembersData\(pickleballState, selectedYearMonth\)/);
+  assert.match(screenDataSource, /buildMemberDetailData\(pickleballState, memberId, selectedYearMonth\)/);
 });
 
 test('GroupDetail uses group-specific treasurer role for normal expense groups', () => {

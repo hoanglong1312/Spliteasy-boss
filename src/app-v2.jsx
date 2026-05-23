@@ -353,9 +353,10 @@ export default function AppV2() {
 
     if (type === 'monthPrev' || type === 'monthNext') {
       const route = stack[stack.length - 1]
+      const currentYearMonth = state.selectedYearMonth || route?.params?.yearMonth || monthKey(new Date())
+      const nextYearMonth = shiftYearMonth(currentYearMonth, type === 'monthNext' ? 1 : -1)
+      await dispatch({ type: 'SET_SELECTED_MONTH', selectedYearMonth: nextYearMonth })
       if (route?.screen === 'pickleball-calendar') {
-        const currentYearMonth = route.params?.yearMonth || monthKey(new Date())
-        const nextYearMonth = shiftYearMonth(currentYearMonth, type === 'monthNext' ? 1 : -1)
         const nextRoute = { screen: 'pickleball-calendar', params: { ...route.params, yearMonth: nextYearMonth } }
         setStack((s) => s.map((item, index) => index === s.length - 1 ? nextRoute : item))
         const groupId = activePickleballGroupId(state)

@@ -210,7 +210,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             if (!window.confirm(`Xóa ${memberMenu.name} khỏi nhóm?`)) return;
             await onAction?.('deleteMember', { memberId: memberMenu.id });
             setMemberMenu(null);
-          }}>Xóa thành viên</ActionButton>
+          }}>Xóa khỏi nhóm</ActionButton>
         </BottomSheet>
       )}
 
@@ -292,9 +292,12 @@ function BalanceRow({ row }) {
 }
 
 function MemberRow({ member, isTreasurer, onOpen, onMore }) {
-  const bankLabel = member.bankName && member.bankAccount
-    ? `${member.bankName} · ${maskAccount(member.bankAccount)}`
-    : 'Chưa có thông tin ngân hàng';
+  const canViewBank = canViewMemberBank(member, isTreasurer);
+  const canCopyBank = canViewBank && member.bankAccount;
+  const hasBank = Boolean(member.bankName && member.bankAccount);
+  const bankLabel = hasBank
+    ? canViewBank ? `${member.bankName} · ${maskAccount(member.bankAccount)}` : 'Đã cập nhật ngân hàng'
+    : 'Chưa cập nhật ngân hàng';
   return (
     <Card
       onClick={() => onOpen?.(member)}
@@ -347,9 +350,10 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
   const balance = Number(member.balance || 0);
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : 'Đang cân bằng';
-  const bankLabel = member.bankName || 'Chưa cập nhật';
-  const accountName = member.bankAccountName || 'Chưa cập nhật';
-  const accountNumber = member.bankAccount || 'Chưa cập nhật';
+  const canViewBank = canViewMemberBank(member, isTreasurer);
+  const bankLabel = canViewBank ? member.bankName || 'Chưa cập nhật' : 'Ẩn với thành viên khác';
+  const accountName = canViewBank ? member.bankAccountName || 'Chưa cập nhật' : 'Ẩn với thành viên khác';
+  const accountNumber = canViewBank ? member.bankAccount || 'Chưa cập nhật' : 'Ẩn với thành viên khác';
 
   return (
     <Screen style={{ paddingBottom: '28px' }}>
@@ -394,13 +398,49 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
         {member.joinDate && <InfoLine label="Ngày tham gia" value={member.joinDate} />}
       </Card>
 
+      <Card style={{ marginTop: 14 }}>
+        <SectionTitle>THÁNG NÀY ĐÃ THANH TOÁN</SectionTitle>
+        {(member.payerTransactions || []).length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            {member.payerTransactions.map(transaction => (
+              <MemberPaidTransactionRow key={transaction.id} transaction={transaction} />
+            ))}
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10 }}>Chưa đứng ra thanh toán khoản nào trong tháng này.</div>
+        )}
+      </Card>
+
       {isTreasurer && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
           <Button variant="brand" style={{ fontSize: 13 }} onClick={onEdit}>Sửa thành viên</Button>
-          <Button variant="danger" style={{ fontSize: 13 }} onClick={onDelete}>Xóa thành viên</Button>
+          <Button variant="danger" style={{ fontSize: 13 }} onClick={onDelete}>Xóa khỏi nhóm</Button>
         </div>
       )}
     </Screen>
+  );
+}
+
+function canViewMemberBank(member, isTreasurer) {
+  return Boolean(isTreasurer || member.isCurrentUser);
+}
+
+function MemberPaidTransactionRow({ transaction }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      padding: '10px 0',
+      borderBottom: `1px solid ${colors.borderSubtle}`,
+    }}>
+      <div style={{ width: 42, color: colors.textSecondary, fontSize: 11, fontWeight: 800 }}>{transaction.date}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{transaction.title}</div>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{transaction.source} · {transaction.status}</div>
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 900, ...type.mono }}>{formatVND(transaction.amount)}</div>
+    </div>
   );
 }
 
@@ -435,6 +475,10 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
   const [selectedCandidateId, setSelectedCandidateId] = useState('');
   const [name, setName] = useState('');
   const selectedCandidate = candidates.find(candidate => String(candidate.id) === String(selectedCandidateId));
+  const candidateCards = candidates.map(candidate => ({
+    ...candidate,
+    selected: selectedCandidateId === String(candidate.id),
+  }));
 
   async function save(e) {
     e.preventDefault();
@@ -456,15 +500,44 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
     <BottomSheet title={title} onClose={onClose}>
       <form onSubmit={save}>
         {candidates.length > 0 && (
-          <CandidateSelect
-            value={selectedCandidateId}
-            candidates={candidates}
-            onChange={(nextId) => {
-              setSelectedCandidateId(nextId);
-              const candidate = candidates.find(item => String(item.id) === String(nextId));
-              if (candidate) setName(candidate.name || '');
-            }}
-          />
+          <div style={{ marginTop: 12 }}>
+            <div style={{
+              fontSize: 9,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '1.2px',
+              color: colors.textSecondary,
+              marginBottom: 8,
+            }}>Thành viên có sẵn</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto', paddingRight: 2 }}>
+              {candidateCards.map(candidate => (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedCandidateId(String(candidate.id));
+                    setName(candidate.name || '');
+                  }}
+                  style={{
+                    width: '100%',
+                    border: `1px solid ${candidate.selected ? colors.brand : colors.borderSubtle}`,
+                    background: candidate.selected ? 'rgba(87,78,250,0.18)' : colors.inputBg,
+                    color: colors.textPrimary,
+                    borderRadius: 12,
+                    padding: 12,
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <div style={{ fontSize: 13, fontWeight: 900 }}>{candidate.name}</div>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+                    {candidate.bankName && candidate.bankAccount ? `${candidate.bankName} · ${maskAccount(candidate.bankAccount)}` : 'Chưa cập nhật ngân hàng'}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         <Field
           label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}

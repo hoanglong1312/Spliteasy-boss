@@ -33,6 +33,7 @@ export function useScreenData() {
     pickle = {},
     _allPickle,
   } = state
+  const selectedYearMonth = state?.selectedYearMonth || monthKey(new Date())
 
   const me = members.find(m => m.id === currentUserId)
   const isTreasurer = me?.role === 'treasurer'
@@ -45,11 +46,11 @@ export function useScreenData() {
 
   const screenData = useMemo(() => {
     const pickleballState = scopedPickleballState(state)
-    const homeData = buildHomeData(state, currentUserId, members, groups, pickle, pickleballState)
-    const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName)
-    const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName)
-    const pickleballOverviewData = buildPickleballOverviewData(pickleballState, pickle, _allPickle, currentUserId, members)
-    const pickleballCalendarData = buildPickleballCalendarData(pickleballState)
+    const homeData = buildHomeData(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth)
+    const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth)
+    const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName, selectedYearMonth)
+    const pickleballOverviewData = buildPickleballOverviewData(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth)
+    const pickleballCalendarData = buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth })
     const profileData = buildProfileData(me, state, pickle)
     const notificationsData = buildNotificationsData(state)
     const approvalQueueData = buildApprovalQueueData(state)
@@ -70,12 +71,12 @@ export function useScreenData() {
       newGroupData: buildNewGroupData(state),
       getGroupDetailData: (groupId) => {
         const group = safeArray(groups).find(g => g.id === groupId) || currentGroup
-        return buildGroupDetailData(group, currentUserId, members, currentUserName)
+        return buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth)
       },
       getSessionDetailData: (sessionId) => buildSessionDetailData(pickleballState, pickle, sessionId, currentUserId, members),
-      getPickleballCalendarData: (params) => buildPickleballCalendarData(pickleballState, params),
-      getPickleballMembersData: () => buildPickleballMembersData(pickleballState),
-      getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId),
+      getPickleballCalendarData: (params) => buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth, ...params }),
+      getPickleballMembersData: () => buildPickleballMembersData(pickleballState, selectedYearMonth),
+      getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId, selectedYearMonth),
       getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
       getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState),
       getPickleballTeamFundData: () => buildPickleballTeamFundData(pickleballState),
@@ -88,7 +89,7 @@ export function useScreenData() {
       getExpenseDetailData: (params) => buildExpenseDetailData(state, params),
       dispatch,
     }
-  }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, me, isTreasurer, isPickleballTreasurer, dispatch])
+  }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, selectedYearMonth, me, isTreasurer, isPickleballTreasurer, dispatch])
 
   useEffect(() => {
     const request = screenData.pickleballCalendarData?.autoGenerateRequest || screenData.pickleballOverviewData?.autoGenerateRequest
@@ -141,10 +142,12 @@ export function useScreenData() {
   return screenData
 }
 
-function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state) {
-  const today = new Date()
+function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state, selectedYearMonth = monthKey(new Date())) {
+  const today = dateFromYearMonth(selectedYearMonth)
   const safeGroups = safeArray(groups).map(safeGroup)
-  const expenseGroups = safeGroups.filter(group => groupKind(group) !== 'pickleball')
+  const expenseGroups = safeGroups
+    .filter(group => groupKind(group) !== 'pickleball')
+    .map(group => groupWithMonthExpenses(group, today))
   const expenseBalance = expenseGroups.reduce((sum, group) => (
     sum + groupNetForMember(group, currentUserId, members, state?.currentUserName)
   ), 0)
@@ -279,6 +282,13 @@ function isSameExpenseMonth(expense, monthDate) {
   return Boolean(expenseMonth && targetMonth && expenseMonth === targetMonth)
 }
 
+function groupWithMonthExpenses(group, monthDate) {
+  return safeGroup({
+    ...group,
+    expenses: safeArray(group?.expenses).filter(expense => isSameExpenseMonth(expense, monthDate)),
+  })
+}
+
 function isExpenseRelatedToMember(expense, memberId) {
   if (!memberId) return false
   const id = String(memberId)
@@ -323,11 +333,13 @@ function buildAddExpenseData(state, params) {
   }
 }
 
-function buildGroupsListData(groups, currentUserId, members, currentUserName) {
+function buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth) {
+  const monthDate = dateFromYearMonth(selectedYearMonth)
   const pickleballGroup = safeArray(groups).find(group => groupKind(group) === 'pickleball')
   const rows = safeArray(groups).map(safeGroup).map(group => {
+    const monthlyGroup = groupWithMonthExpenses(group, monthDate)
     const groupMembers = membersForGroup(group, members)
-    const balance = groupNetForMember(group, currentUserId, members, currentUserName)
+    const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
     const avatars = groupMembers.slice(0, 4).map(m => initials(m))
     const linkedPickleballGroupId = group.linkedPickleballGroupId || group.linked_pickleball_group_id || null
 
@@ -365,15 +377,17 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName) {
   }
 }
 
-function buildGroupDetailData(group, currentUserId, members, currentUserName) {
+function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth) {
   const g = safeGroup(group)
+  const monthDate = dateFromYearMonth(selectedYearMonth)
+  const monthlyGroup = groupWithMonthExpenses(g, monthDate)
   const groupMembers = membersForGroup(g, members)
   const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(g, currentUserId, members, currentUserName)))
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
   const isGroupTreasurer = currentGroupMember?.role === 'treasurer' || String(g.createdBy || g.created_by || '') === String(currentGroupMember?.id || '') || (Boolean(currentGroupMember) && isSoloExpenseGroup)
-  const balanceMap = groupBalanceForMember(g, currentUserId, members, currentUserName)
-  const balance = groupNetForMember(g, currentUserId, members, currentUserName)
-  const activities = safeArray(g.expenses)
+  const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
+  const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
+  const activities = safeArray(monthlyGroup.expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
     .slice(0, 20)
@@ -409,6 +423,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
       joinDate: fullExpenseDate(member.createdAt || member.created_at),
       balance: balanceMap[member.id] || 0,
+      isCurrentUser: String(member.id) === String(currentGroupMember?.id || ''),
+      payerTransactions: buildMemberPayerTransactions(g, member.id, selectedYearMonth),
     })),
     balanceRows: groupMembers
       .map(member => ({
@@ -427,10 +443,10 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName) {
 function buildGroupMemberCandidates(group, members) {
   const currentMembers = membersForGroup(group, members)
   const currentIds = new Set(currentMembers.map(member => String(member.id)))
-  const currentNames = new Set(currentMembers.map(member => normalizeName(member.displayName || member.name)))
-  const seenNames = new Set()
+  const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
+  const seenProfileIds = new Set()
   return safeArray(members)
-    .filter(member => !currentIds.has(String(member.id)) && !currentNames.has(normalizeName(member.displayName || member.name)))
+    .filter(member => !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id)))
     .map(member => ({
       id: member.profileId || member.profile_id || member.id,
       memberId: member.id,
@@ -441,16 +457,32 @@ function buildGroupMemberCandidates(group, members) {
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
     }))
     .filter(member => {
-      const key = normalizeName(member.name)
-      if (!key || seenNames.has(key)) return false
-      seenNames.add(key)
+      const key = String(member.profileId || member.id || '')
+      if (!key || seenProfileIds.has(key)) return false
+      seenProfileIds.add(key)
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
 }
 
-function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members) {
-  const today = new Date()
+function buildMemberPayerTransactions(group, memberId, selectedYearMonth) {
+  const monthDate = dateFromYearMonth(selectedYearMonth)
+  return safeArray(group?.expenses)
+    .filter(expense => isSameExpenseMonth(expense, monthDate))
+    .filter(expense => String(expense.paidBy || expense.paid_by_member_id || '') === String(memberId))
+    .sort((a, b) => parseDateValue(b.date || b.expense_date) - parseDateValue(a.date || a.expense_date))
+    .map(expense => ({
+      id: expense.id,
+      date: formatDayMonth(expense.date || expense.expense_date),
+      title: expense.title || 'Chi tiêu',
+      source: group?.name || 'Nhóm',
+      amount: Number(expense.amount) || 0,
+      status: expense.status || 'approved',
+    }))
+}
+
+function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members, selectedYearMonth) {
+  const today = dateFromYearMonth(selectedYearMonth)
   const currentYearMonth = monthKey(today)
   const currentMonthConfig = safeArray(pickle?.monthlyConfigs).find(
     c => c.yearMonth === currentYearMonth
@@ -928,8 +960,8 @@ function calendarMonthDate(params, fallbackDate) {
   return Number.isNaN(date.getTime()) ? fallbackDate : date
 }
 
-function buildPickleballMembersData(state) {
-  const today = new Date()
+function buildPickleballMembersData(state, selectedYearMonth) {
+  const today = dateFromYearMonth(selectedYearMonth)
   const activeMembers = currentGroupMembers(state).filter(isActiveMember)
   const sessions = getStateMonthSessions(state, today)
   const joinRequests = currentJoinRequests(state)
@@ -971,9 +1003,10 @@ function buildPickleballMembersData(state) {
   }
 }
 
-function buildMemberDetailData(state, memberId) {
+function buildMemberDetailData(state, memberId, selectedYearMonth) {
   const pickle = state?.pickle || {}
-  const sessions = getStateMonthSessions(state, new Date())
+  const monthDate = dateFromYearMonth(selectedYearMonth)
+  const sessions = getStateMonthSessions(state, monthDate)
   const members = currentGroupMembers(state).filter(isActiveMember)
   const member = members.find(row => String(row.id) === String(memberId)) || members[0]
   if (!member) return null
@@ -983,7 +1016,7 @@ function buildMemberDetailData(state, memberId) {
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
-    monthLabel: formatMonthLabel(new Date()),
+    monthLabel: formatMonthLabel(monthDate),
     id: member.id,
     name: member.displayName || member.name || 'Thành viên',
     initial: initials(member),
@@ -993,11 +1026,13 @@ function buildMemberDetailData(state, memberId) {
     type: memberType(member),
     typeLabel: memberType(member) === 'fixed' ? 'Cố định' : 'Vãng lai',
     isTreasurer: member.role === 'treasurer',
+    isCurrentUser: String(member.id) === String(state?.currentUserId || ''),
     joinDate: fullExpenseDate(member.createdAt || member.created_at),
     joinedLabel: monthYearLabel(member.createdAt || member.created_at),
     bankName: member?.bankName || member?.bank_name || '',
     bankAccountName: member?.bankAccountName || member?.bank_account_name || '',
     bankAccount: member?.bankAccount || member?.bank_account || '',
+    payerTransactions: buildMemberPayerTransactions(currentGroup(state), member.id, selectedYearMonth),
     attendance,
     balance,
     rank: calculateMemberRank(attendance.percentage),
@@ -3404,6 +3439,12 @@ function monthKey(value) {
   const date = parseDate(value)
   if (!date) return ''
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function dateFromYearMonth(yearMonth) {
+  const [year, month] = String(yearMonth || monthKey(new Date())).split('-').map(Number)
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return new Date()
+  return new Date(year, month - 1, 1)
 }
 
 function formatFullDate(value) {

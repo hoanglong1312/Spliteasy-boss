@@ -10,6 +10,7 @@ const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank',
 
 export default function MemberDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
+  const canViewBank = Boolean(isTreasurer || d.isCurrentUser);
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(d.name || '');
   const [editBankAccountName, setEditBankAccountName] = useState(d.bankAccountName || '');
@@ -147,18 +148,18 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
         <Card style={{ marginTop: 12 }}>
           <CardTitle>Thông tin</CardTitle>
           <InfoRow label="Ngày tham gia" value={d.joinDate || 'Chưa rõ'} />
-          <InfoRow label="Ngân hàng" value={d.bankName || 'Chưa cập nhật'} />
-          <InfoRow label="Chủ tài khoản" value={d.bankAccountName || 'Chưa cập nhật'} />
+          <InfoRow label="Ngân hàng" value={canViewBank ? d.bankName || 'Chưa cập nhật' : 'Ẩn với thành viên khác'} />
+          <InfoRow label="Chủ tài khoản" value={canViewBank ? d.bankAccountName || 'Chưa cập nhật' : 'Ẩn với thành viên khác'} />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '10px 0' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 700 }}>STK ngân hàng</div>
               <div style={{ fontSize: 13, fontWeight: 800, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {d.bankAccount || 'Chưa cập nhật'}
+                {canViewBank ? d.bankAccount || 'Chưa cập nhật' : 'Ẩn với thành viên khác'}
               </div>
             </div>
-            <button type="button" onClick={() => onAction?.('copyAccount', { account: d.bankAccount })} style={smallButtonStyle()}>
+            {canViewBank && d.bankAccount && <button type="button" onClick={() => onAction?.('copyAccount', { account: d.bankAccount })} style={smallButtonStyle()}>
               Copy
-            </button>
+            </button>}
           </div>
           {isTreasurer && (
             <Button block variant="ghost" style={{ marginTop: 10, fontSize: 13 }} onClick={() => {
@@ -168,6 +169,19 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
               setEditBankAccount(d.bankAccount || '');
               setEditing(true);
             }}>✏️ Sửa</Button>
+          )}
+        </Card>
+
+        <Card style={{ marginTop: 12 }}>
+          <CardTitle>Tháng này đã thanh toán</CardTitle>
+          {(d.payerTransactions || []).length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+              {d.payerTransactions.map(transaction => (
+                <PaidTransactionRow key={transaction.id} transaction={transaction} />
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10 }}>Chưa đứng ra thanh toán khoản nào trong tháng này.</div>
           )}
         </Card>
 
@@ -298,6 +312,19 @@ function InfoRow({ label, value }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 0', borderBottom: `1px solid ${colors.borderSubtle}` }}>
       <span style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 700 }}>{label}</span>
       <span style={{ fontSize: 12, fontWeight: 800, textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
+
+function PaidTransactionRow({ transaction }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 0', borderBottom: `1px solid ${colors.borderSubtle}` }}>
+      <div style={{ width: 40, fontSize: 11, fontWeight: 800, color: colors.textSecondary }}>{transaction.date}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{transaction.title}</div>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{transaction.source} · {transaction.status}</div>
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 900, ...type.mono }}>{formatVND(transaction.amount || 0)}</div>
     </div>
   );
 }

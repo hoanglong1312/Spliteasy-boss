@@ -13,6 +13,12 @@ function safeArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+function monthKey(value) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
 function isDoneStatus(status) {
   return ['completed', 'done', 'closed'].includes(String(status || '').toLowerCase())
 }
@@ -524,6 +530,7 @@ function buildEmptyState() {
   return {
     currentUserId: null,
     currentUserName: null,
+    selectedYearMonth: monthKey(new Date()),
     currentGroupId: null,
     currentGroup: null,
     pickleballGroupId: null,
@@ -1349,6 +1356,7 @@ export function AppProvider({ children }) {
       if (next) {
         const nextState = {
           ...next,
+          selectedYearMonth: stateRef.current.selectedYearMonth || next.selectedYearMonth || monthKey(new Date()),
           toast: stateRef.current.toast || buildEmptyState().toast,
           _pickleRegenInProgress: stateRef.current._pickleRegenInProgress === true,
         }
@@ -1434,6 +1442,17 @@ export function AppProvider({ children }) {
         const next = {
           ...stateRef.current,
           homeMonthError: action.error,
+        }
+        stateRef.current = next
+        setState(next)
+        return next
+      }
+
+      case 'SET_SELECTED_MONTH': {
+        const selectedYearMonth = action.selectedYearMonth || action.yearMonth || monthKey(new Date())
+        const next = {
+          ...stateRef.current,
+          selectedYearMonth,
         }
         stateRef.current = next
         setState(next)
