@@ -66,14 +66,14 @@ test('member deletion is confirmed with the shared in-app sheet before dispatch'
   assert.match(memberListSource, /Thành viên sẽ được chuyển vào danh sách chờ\. Bạn có thể thêm lại sau\./)
   assert.match(memberListSource, />Hủy<\/Button>/)
   assert.match(memberListSource, /variant="danger"[\s\S]*>Xác nhận<\/Button>/)
-  assert.match(memberListSource, /await onAction\?\.\('deleteMember', \{ memberId: deleteConfirmMember\.id \}\)/)
+  assert.match(memberListSource, /await onAction\?\.\('removeMemberToVanglai', \{ memberId: deleteConfirmMember\.id \}\)/)
   assert.doesNotMatch(memberListSource, /window\.confirm\(`Xóa \$\{member\.name\} khỏi nhóm\?`\)/)
 
   assert.match(memberDetailSource, /BottomSheet/)
   assert.match(memberDetailSource, /const \[showDeleteConfirm, setShowDeleteConfirm\] = useState\(false\)/)
   assert.match(memberDetailSource, /title="Xóa thành viên\?"/)
   assert.match(memberDetailSource, /Thành viên sẽ được chuyển vào danh sách chờ\. Bạn có thể thêm lại sau\./)
-  assert.match(memberDetailSource, /await onAction\?\.\('deleteMember', \{ memberId: d\.id \}\)/)
+  assert.match(memberDetailSource, /await onAction\?\.\('removeMemberToVanglai', \{ memberId: d\.id \}\)/)
   assert.doesNotMatch(memberDetailSource, /window\.confirm\(`Xóa \$\{d\.name\} khỏi nhóm\?`\)/)
 })
 

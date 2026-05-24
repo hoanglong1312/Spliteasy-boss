@@ -63,7 +63,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
   }
 
   async function confirmDeleteMember() {
-    await onAction?.('deleteMember', { memberId: d.id });
+    await onAction?.('removeMemberToVanglai', { memberId: d.id });
     setShowDeleteConfirm(false);
     onAction?.('back');
   }

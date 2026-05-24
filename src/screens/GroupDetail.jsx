@@ -22,6 +22,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
+  const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
   const [memberSearch, setMemberSearch] = useState('');
   const visibleMembers = (d.members || []).filter(member => {
     const query = normalizeSearch(memberSearch);
@@ -62,8 +63,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           isTreasurer={isTreasurer}
           onBack={() => setSelectedMember(null)}
           onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
-          onDelete={async () => {
-            await onAction?.('deleteMember', { memberId: selectedMember.id });
+          onDelete={() => {
+            setDeleteConfirmMember(selectedMember);
             setSelectedMember(null);
           }}
         />
@@ -224,10 +225,29 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             await onAction?.('setMemberRole', { memberId: memberMenu.id, role });
             setMemberMenu(null);
           }}>{memberMenu.role === 'treasurer' ? 'Thu quyền thủ quỹ' : 'Cấp quyền thủ quỹ'}</ActionButton>
-          <ActionButton danger onClick={async () => {
-            await onAction?.('deleteMember', { memberId: memberMenu.id });
+          <ActionButton danger onClick={() => {
+            setDeleteConfirmMember(memberMenu);
             setMemberMenu(null);
           }}>Xóa khỏi nhóm</ActionButton>
+        </BottomSheet>
+      )}
+
+      {deleteConfirmMember && isTreasurer && (
+        <BottomSheet title="Xóa khỏi nhóm?" onClose={() => setDeleteConfirmMember(null)}>
+          <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
+            Thành viên sẽ được chuyển vào danh sách vãng lai. Bạn có thể thêm lại sau.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmMember(null)}>Hủy</Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={async () => {
+                await onAction?.('removeMemberToVanglai', { memberId: deleteConfirmMember.id });
+                setDeleteConfirmMember(null);
+              }}
+            >Xác nhận</Button>
+          </div>
         </BottomSheet>
       )}
 

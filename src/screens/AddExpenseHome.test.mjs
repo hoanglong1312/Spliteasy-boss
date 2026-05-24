@@ -98,6 +98,7 @@ test('GroupDetail keeps bank fields only in edit member sheet', () => {
 
 test('GroupDetail member cards open a detail view with edit and delete actions', () => {
   assert.match(groupDetailSource, /const \[selectedMember, setSelectedMember\] = useState\(null\)/);
+  assert.match(groupDetailSource, /const \[deleteConfirmMember, setDeleteConfirmMember\] = useState\(null\)/);
   assert.match(groupDetailSource, /onOpen=\{setSelectedMember\}/);
   assert.match(groupDetailSource, /function MemberDetailPanel\(\{ groupName, member, isTreasurer, onBack, onEdit, onDelete \}\)/);
   assert.match(groupDetailSource, /Chi tiết thành viên/);
@@ -106,13 +107,17 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /onClick=\{\(\) => onOpen\?\.\(member\)\}/);
   assert.match(groupDetailSource, /event\.stopPropagation\(\)/);
   assert.match(groupDetailSource, /onEdit=\{\(\) => \{ setEditingMember\(selectedMember\); setSelectedMember\(null\); \}\}/);
-  assert.match(groupDetailSource, /onDelete=\{async \(\) => \{[\s\S]*deleteMember', \{ memberId: selectedMember\.id \}/);
+  assert.match(groupDetailSource, /onDelete=\{\(\) => \{[\s\S]*setDeleteConfirmMember\(selectedMember\);[\s\S]*setSelectedMember\(null\);[\s\S]*\}\}/);
 });
 
 test('GroupDetail delete member does not depend on native confirm dialogs', () => {
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{selectedMember\.name\} khỏi nhóm\?`\)/);
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{memberMenu\.name\} khỏi nhóm\?`\)/);
-  assert.match(groupDetailSource, /await onAction\?\.\('deleteMember', \{ memberId: memberMenu\.id \}\)/);
+  assert.match(groupDetailSource, /setDeleteConfirmMember\(memberMenu\)/);
+  assert.match(groupDetailSource, /title="Xóa khỏi nhóm\?"/);
+  assert.match(groupDetailSource, /Thành viên sẽ được chuyển vào danh sách vãng lai\. Bạn có thể thêm lại sau\./);
+  assert.match(groupDetailSource, /await onAction\?\.\('removeMemberToVanglai', \{ memberId: deleteConfirmMember\.id \}\)/);
+  assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteMember'/);
 });
 
 test('GroupDetail hides member bank accounts unless treasurer or self', () => {
