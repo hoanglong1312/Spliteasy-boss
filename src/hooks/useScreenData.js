@@ -395,6 +395,10 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
     .slice(0, 20)
     .map(expense => toActivity(expense, members))
+  const pendingExpenses = safeArray(monthlyGroup.expenses)
+    .filter(expense => expense.status === 'pending')
+    .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
+    .map(expense => toActivity(expense, members))
 
   return {
     group: {
@@ -412,6 +416,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     memberCount: groupMembers.length,
     balance,
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
+    currentMemberId: currentGroupMember?.id || null,
+    pendingExpenses,
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
     memberCandidates: buildGroupMemberCandidates(g, members, profiles),
@@ -1669,6 +1675,7 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
 
 function toActivity(expense, members) {
   const splitCount = safeArray(expense.participants).length || safeArray(expense.splits).length
+  const submittedBy = expense.submittedBy || expense.submitted_by_member_id || expense.createdBy || expense.created_by || null
   return {
     id: expense.id,
     icon: expenseIcon(expense),
@@ -1677,6 +1684,8 @@ function toActivity(expense, members) {
     amount: Number(expense.amount) || 0,
     date: expense.date,
     paidBy: expense.paidBy,
+    submittedBy,
+    submittedByName: submittedBy ? memberName(submittedBy, members) : '',
     status: expense.status,
     splits: safeArray(expense.splits),
     sub: `${memberName(expense.paidBy, members)} trả · ${formatDayMonth(expense.date)}`,

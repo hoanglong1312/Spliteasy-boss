@@ -4,6 +4,7 @@ import test from 'node:test'
 import vm from 'node:vm'
 
 const dataSource = readFileSync(new URL('./useScreenData.js', import.meta.url), 'utf8')
+const coreDataSource = readFileSync(new URL('../data.jsx', import.meta.url), 'utf8')
 
 function loadScreenDataBuilders() {
   const source = dataSource
@@ -130,6 +131,54 @@ test('group detail member balances use payer positive and debtors negative signs
     cuong: -30000,
     'minh-anh': -30000,
   })
+})
+
+test('group detail exposes pending expenses for treasurer approval', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    members: ['treasurer', 'member-1'],
+    expenses: [
+      {
+        id: 'pending-1',
+        groupId: 'expense-1',
+        title: 'Sân chờ duyệt',
+        amount: 120000,
+        paidBy: 'member-1',
+        submittedBy: 'member-1',
+        participants: ['treasurer', 'member-1'],
+        status: 'pending',
+        date: '2026-05-24',
+      },
+      {
+        id: 'approved-1',
+        groupId: 'expense-1',
+        title: 'Sân đã duyệt',
+        amount: 90000,
+        paidBy: 'treasurer',
+        submittedBy: 'treasurer',
+        participants: ['treasurer', 'member-1'],
+        status: 'approved',
+        date: '2026-05-23',
+      },
+    ],
+  }
+  const members = [
+    { id: 'treasurer', groupId: 'expense-1', name: 'Thủ quỹ', role: 'treasurer', isActive: true },
+    { id: 'member-1', groupId: 'expense-1', name: 'Minh', role: 'member', isActive: true },
+  ]
+
+  const detail = buildGroupDetailData(group, 'treasurer', members, 'Thủ quỹ', '2026-05')
+
+  assert.equal(detail.currentMemberId, 'treasurer')
+  assert.equal(detail.pendingExpenses.length, 1)
+  assert.equal(detail.pendingExpenses[0].id, 'pending-1')
+  assert.equal(detail.pendingExpenses[0].submittedBy, 'member-1')
+})
+
+test('core balances treat missing legacy status as approved and ignore pending or rejected', () => {
+  assert.match(coreDataSource, /const approvedExpenses = \(g\.expenses \|\| \[\]\)\.filter\(e => !e\.status \|\| e\.status === 'approved'\)/)
 })
 
 test('expense group member candidates use inactive members as pending rows', () => {

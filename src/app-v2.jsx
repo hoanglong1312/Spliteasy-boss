@@ -984,6 +984,55 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'deleteExpense') {
+      const expenseId = payload?.expenseId ?? payload?.id ?? payload
+      if (!expenseId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const participantsResult = await sb.from('expense_participants').delete().eq('expense_id', expenseId)
+      if (participantsResult.error) throw participantsResult.error
+      const expenseResult = await sb.from('expenses').delete().eq('id', expenseId)
+      if (expenseResult.error) throw expenseResult.error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'approveExpense') {
+      const expenseId = payload?.expenseId ?? payload?.id ?? payload
+      const currentMemberId = state.currentGroupMember?.id || state.currentUserId
+      if (!expenseId || !currentMemberId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const now = new Date().toISOString()
+      const { error } = await sb.from('expenses').update({
+        status: 'approved',
+        reviewed_by_member_id: currentMemberId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: now,
+      }).eq('id', expenseId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'rejectExpense') {
+      const expenseId = payload?.expenseId ?? payload?.id ?? payload
+      const currentMemberId = state.currentGroupMember?.id || state.currentUserId
+      if (!expenseId || !currentMemberId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const now = new Date().toISOString()
+      const { error } = await sb.from('expenses').update({
+        status: 'rejected',
+        reviewed_by_member_id: currentMemberId,
+        reviewed_at: new Date().toISOString(),
+        updated_at: now,
+      }).eq('id', expenseId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'viewExpense') {
       setStack((s) => [...s, { screen: 'expense-detail', params: { expenseId: payload.expenseId } }])
       return

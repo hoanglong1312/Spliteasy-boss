@@ -23,7 +23,10 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [memberMenu, setMemberMenu] = useState(null);
   const [selectedMember, setSelectedMember] = useState(null);
   const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
+  const [expenseMenu, setExpenseMenu] = useState(null);
+  const [deleteConfirmExpense, setDeleteConfirmExpense] = useState(null);
   const [memberSearch, setMemberSearch] = useState('');
+  const pendingExpenses = d.pendingExpenses || [];
   const visibleMembers = (d.members || []).filter(member => {
     const query = normalizeSearch(memberSearch);
     if (!query) return true;
@@ -155,14 +158,42 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           onChange={setActiveTab}
         />
 
-        {activeTab === 'activity' && d.activitiesByWeek.map(week => (
-          <React.Fragment key={week.label}>
-            <SectionHeader>{week.label}</SectionHeader>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {week.items.map(it => <ActivityCard key={it.id} item={it} />)}
-            </div>
-          </React.Fragment>
-        ))}
+        {activeTab === 'activity' && (
+          <>
+            {isTreasurer && pendingExpenses.length > 0 && (
+              <section style={{ marginTop: 12 }}>
+                <SectionHeader>CHỜ DUYỆT · {pendingExpenses.length}</SectionHeader>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {pendingExpenses.map(expense => (
+                    <PendingExpenseCard
+                      key={expense.id}
+                      expense={expense}
+                      onApprove={() => onAction?.('approveExpense', { expenseId: expense.id })}
+                      onReject={() => onAction?.('rejectExpense', { expenseId: expense.id })}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {d.activitiesByWeek.map(week => (
+              <React.Fragment key={week.label}>
+                <SectionHeader>{week.label}</SectionHeader>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {week.items.map(it => (
+                    <ActivityCard
+                      key={it.id}
+                      item={it}
+                      isTreasurer={isTreasurer}
+                      currentMemberId={d.currentMemberId}
+                      onAction={onAction}
+                      onMenu={setExpenseMenu}
+                    />
+                  ))}
+                </div>
+              </React.Fragment>
+            ))}
+          </>
+        )}
         {activeTab === 'activity' && d.activitiesByWeek.length === 0 && (
           <EmptyState title="Chưa có chi tiêu" sub="Bấm Thêm chi tiêu để ghi khoản đầu tiên của nhóm này." />
         )}
@@ -229,6 +260,34 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             setDeleteConfirmMember(memberMenu);
             setMemberMenu(null);
           }}>Xóa khỏi nhóm</ActionButton>
+        </BottomSheet>
+      )}
+
+      {expenseMenu && (
+        <BottomSheet title={expenseMenu.title} onClose={() => setExpenseMenu(null)}>
+          <ActionButton onClick={() => {
+            onAction?.('editExpense', { expenseId: expenseMenu.id });
+            setExpenseMenu(null);
+          }}>Sửa chi tiêu</ActionButton>
+          <ActionButton danger onClick={() => {
+            setDeleteConfirmExpense(expenseMenu);
+            setExpenseMenu(null);
+          }}>Xóa chi tiêu</ActionButton>
+        </BottomSheet>
+      )}
+
+      {deleteConfirmExpense && (
+        <BottomSheet title="Xóa chi tiêu?" onClose={() => setDeleteConfirmExpense(null)}>
+          <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+            Chi tiêu sẽ bị xóa khỏi danh sách và số dư của nhóm.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <Button variant="ghost" onClick={() => setDeleteConfirmExpense(null)}>Hủy</Button>
+            <Button variant="danger" onClick={async () => {
+              await onAction?.('deleteExpense', { expenseId: deleteConfirmExpense.id });
+              setDeleteConfirmExpense(null);
+            }}>Xác nhận</Button>
+          </div>
         </BottomSheet>
       )}
 
@@ -697,12 +756,34 @@ function fieldStyle() {
   };
 }
 
-function ActivityCard({ item }) {
+function PendingExpenseCard({ expense, onApprove, onReject }) {
+  return (
+    <ListCard style={{ padding: 14, borderColor: 'rgba(245,158,11,0.35)', background: 'rgba(245,158,11,0.08)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.title}</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
+            {expense.submittedByName || 'Thành viên'} gửi · {formatDayLabel(expense.date)}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 900, marginTop: 8, ...type.mono }}>{formatVND(expense.amount)}</div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 92, flexShrink: 0 }}>
+          <Button variant="primary" style={{ padding: '9px 8px', fontSize: 12, background: '#22c55e', color: '#052e16' }} onClick={onApprove}>Duyệt</Button>
+          <Button variant="danger" style={{ padding: '9px 8px', fontSize: 12 }} onClick={onReject}>Từ chối</Button>
+        </div>
+      </div>
+    </ListCard>
+  );
+}
+
+function ActivityCard({ item, isTreasurer, currentMemberId, onAction, onMenu }) {
   const iconBg = {
     food:  'rgba(245,158,11,0.12)',
     cafe:  'rgba(167,139,250,0.12)',
     veg:   'rgba(52,211,153,0.12)',
   }[item.category] || 'rgba(255,255,255,0.06)';
+  const isOwnPending = item.submittedBy === currentMemberId && item.status === 'pending';
+  const canManage = isTreasurer || isOwnPending;
   return (
     <ListCard style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -717,15 +798,39 @@ function ActivityCard({ item }) {
               <div style={{ fontSize: 13, fontWeight: 700 }}>{item.title}</div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{item.sub}</div>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.3px', ...type.mono }}>{formatVND(item.amount)}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: '-0.3px', ...type.mono }}>{formatVND(item.amount)}</div>
+              {canManage && (
+                <button type="button" aria-label={`Sửa ${item.title}`} onClick={(event) => { event.stopPropagation(); onMenu?.(item); }} style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 10,
+                  border: `1px solid ${colors.borderSubtle}`,
+                  background: colors.inputBg,
+                  color: colors.textSecondary,
+                  fontSize: 18,
+                  lineHeight: 1,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}>⋯</button>
+              )}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             {item.tags.map((t, i) => <Badge key={i} tone={t.tone}>{t.label}</Badge>)}
+            {!isTreasurer && isOwnPending && <Badge tone="warn">Chờ duyệt</Badge>}
           </div>
         </div>
       </div>
     </ListCard>
   );
+}
+
+function formatDayLabel(date) {
+  if (!date) return 'Không rõ ngày';
+  return String(date).slice(8, 10) && String(date).slice(5, 7)
+    ? `${String(date).slice(8, 10)}/${String(date).slice(5, 7)}`
+    : String(date);
 }
 
 const DEMO = {

@@ -119,6 +119,42 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
 })
 
+test('AppV2 handles expense edit delete and approval actions', () => {
+  assert.match(appSource, /if \(type === 'editExpense'\)/)
+  assert.match(appSource, /screen: 'add-expense'[\s\S]*params: \{ expenseId: payload\.expenseId \}/)
+
+  assert.match(appSource, /if \(type === 'deleteExpense'\)/)
+  assert.match(appSource, /\.from\('expense_participants'\)\s*\.delete\(\)\s*\.eq\('expense_id', expenseId\)/)
+  assert.match(appSource, /\.from\('expenses'\)\s*\.delete\(\)\s*\.eq\('id', expenseId\)/)
+  assert.match(appSource, /await dispatch\(\{ type: 'REFRESH' \}\)/)
+
+  assert.match(appSource, /if \(type === 'approveExpense'\)/)
+  assert.match(appSource, /status: 'approved'/)
+  assert.match(appSource, /reviewed_by_member_id: currentMemberId/)
+  assert.match(appSource, /reviewed_at: new Date\(\)\.toISOString\(\)/)
+  assert.match(appSource, /if \(type === 'rejectExpense'\)/)
+  assert.match(appSource, /status: 'rejected'/)
+})
+
+test('GroupDetail renders expense action menu and pending approval UI', () => {
+  const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
+
+  assert.match(groupDetailSource, /pendingExpenses = d\.pendingExpenses \|\| \[\]/)
+  assert.match(groupDetailSource, /CHỜ DUYỆT · \{pendingExpenses\.length\}/)
+  assert.match(groupDetailSource, /function PendingExpenseCard\(\{ expense, onApprove, onReject \}\)/)
+  assert.match(groupDetailSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id \}\)/)
+  assert.match(groupDetailSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id \}\)/)
+
+  assert.match(groupDetailSource, /function ActivityCard\(\{ item, isTreasurer, currentMemberId, onAction, onMenu \}\)/)
+  assert.match(groupDetailSource, /item\.submittedBy === currentMemberId/)
+  assert.match(groupDetailSource, /item\.status === 'pending'/)
+  assert.match(groupDetailSource, /Sửa chi tiêu/)
+  assert.match(groupDetailSource, /Xóa chi tiêu/)
+  assert.match(groupDetailSource, /onAction\?\.\('editExpense', \{ expenseId: expenseMenu\.id \}\)/)
+  assert.match(groupDetailSource, /onAction\?\.\('deleteExpense', \{ expenseId: deleteConfirmExpense\.id \}\)/)
+  assert.match(groupDetailSource, /Chờ duyệt/)
+})
+
 test('AppV2 routes pickleball writes through the dedicated pickleball group context', () => {
   assert.match(appSource, /function activePickleballGroupId\(state\)/)
   assert.match(appSource, /state\?\.pickleballGroupId \|\| state\?\.pickleballGroup\?\.id \|\| state\?\.currentGroupId/)
@@ -136,6 +172,13 @@ test('ticket approval migration allows pending member requests', () => {
   assert.match(migrationSource, /CHECK \(status = ANY \(ARRAY\['unpaid', 'team_fund', 'pending_review'\]\)\)/)
   assert.match(migrationSource, /CREATE POLICY "group members can request tickets"/)
   assert.match(migrationSource, /status = 'pending_review'/)
+})
+
+test('expense approval migration allows rejected review status', () => {
+  const migrationSource = readFileSync(new URL('../supabase/migrations/20260524000001_expense_rejected_status.sql', import.meta.url), 'utf8')
+
+  assert.match(migrationSource, /CHECK \(status IN \('pending', 'approved', 'declined', 'rejected'\)\)/)
+  assert.match(migrationSource, /status IN \('approved', 'declined', 'rejected'\)/)
 })
 
 test('store keeps expense group selection separate from pickleball group selection', () => {
