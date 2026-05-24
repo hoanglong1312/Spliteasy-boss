@@ -145,11 +145,16 @@ test('GroupDetail delete member does not depend on native confirm dialogs', () =
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteMember'/);
 });
 
-test('GroupDetail hides member bank accounts unless treasurer or self', () => {
-  assert.match(groupDetailSource, /function canViewMemberBank\(member, isTreasurer\)/);
-  assert.match(groupDetailSource, /member\.isCurrentUser/);
-  assert.match(groupDetailSource, /const canViewBank = canViewMemberBank\(member, isTreasurer\)/);
-  assert.match(groupDetailSource, /Ẩn với thành viên khác/);
+test('GroupDetail hides member detail bank accounts from non-treasurers', () => {
+  const memberDetailSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberDetailPanel'),
+    groupDetailSource.indexOf('function MemberPaidTransactionRow')
+  );
+  assert.doesNotMatch(memberDetailSource, /canViewMemberBank/);
+  assert.doesNotMatch(memberDetailSource, /Ẩn với thành viên khác/);
+  assert.match(memberDetailSource, /\{isTreasurer && \(\s*<Card style=\{\{ marginTop: 14 \}\}>\s*<SectionTitle>THÔNG TIN THANH TOÁN<\/SectionTitle>/);
+  assert.match(memberDetailSource, /<InfoLine label="Ngân hàng" value=\{member\.bankName \|\| 'Chưa cập nhật'\} \/>/);
+  assert.match(memberDetailSource, /<InfoLine label="STK ngân hàng" value=\{member\.bankAccount \|\| 'Chưa cập nhật'\} \/>/);
   assert.match(screenDataSource, /isCurrentUser: String\(member\.id\) === String\(currentGroupMember\?\.id \|\| ''\)/);
 });
 

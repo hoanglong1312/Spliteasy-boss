@@ -380,10 +380,6 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
   const balance = Number(member.balance || 0);
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : 'Đang cân bằng';
-  const canViewBank = canViewMemberBank(member, isTreasurer);
-  const bankLabel = canViewBank ? member.bankName || 'Chưa cập nhật' : 'Ẩn với thành viên khác';
-  const accountName = canViewBank ? member.bankAccountName || 'Chưa cập nhật' : 'Ẩn với thành viên khác';
-  const accountNumber = canViewBank ? member.bankAccount || 'Chưa cập nhật' : 'Ẩn với thành viên khác';
 
   return (
     <Screen style={{ paddingBottom: '28px' }}>
@@ -420,13 +416,15 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
         </div>
       </Card>
 
-      <Card style={{ marginTop: 14 }}>
-        <SectionTitle>THÔNG TIN THANH TOÁN</SectionTitle>
-        <InfoLine label="Ngân hàng" value={bankLabel} />
-        <InfoLine label="Chủ tài khoản" value={accountName} />
-        <InfoLine label="STK ngân hàng" value={accountNumber} />
-        {member.joinDate && <InfoLine label="Ngày tham gia" value={member.joinDate} />}
-      </Card>
+      {isTreasurer && (
+        <Card style={{ marginTop: 14 }}>
+          <SectionTitle>THÔNG TIN THANH TOÁN</SectionTitle>
+          <InfoLine label="Ngân hàng" value={member.bankName || 'Chưa cập nhật'} />
+          <InfoLine label="Chủ tài khoản" value={member.bankAccountName || 'Chưa cập nhật'} />
+          <InfoLine label="STK ngân hàng" value={member.bankAccount || 'Chưa cập nhật'} />
+          {member.joinDate && <InfoLine label="Ngày tham gia" value={member.joinDate} />}
+        </Card>
+      )}
 
       <Card style={{ marginTop: 14 }}>
         <SectionTitle>THÁNG NÀY ĐÃ THANH TOÁN</SectionTitle>
@@ -449,10 +447,6 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
       )}
     </Screen>
   );
-}
-
-function canViewMemberBank(member, isTreasurer) {
-  return Boolean(isTreasurer || member.isCurrentUser);
 }
 
 function MemberPaidTransactionRow({ transaction }) {
@@ -718,12 +712,6 @@ function fieldStyle() {
     fontFamily: 'inherit',
     outline: 'none',
   };
-}
-
-function maskAccount(value) {
-  const text = String(value || '').replace(/\s+/g, '');
-  if (text.length <= 4) return text;
-  return `${text.slice(0, 4)} •••• ${text.slice(-3)}`;
 }
 
 function ActivityCard({ item }) {
