@@ -197,6 +197,40 @@ test('group detail marks current user as creator when created_by matches profile
   assert.equal(detail.isGroupCreator, true)
 })
 
+test('group detail exposes pickleball classification from name and emoji', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const members = [
+    { id: 'member-1', groupId: 'pickle-1', name: 'Minh', isActive: true, memberType: 'fixed' },
+    { id: 'member-2', groupId: 'expense-1', name: 'An', isActive: true, memberType: 'fixed' },
+  ]
+
+  const pickleballDetail = buildGroupDetailData(
+    { id: 'pickle-1', name: 'Sunday Pickle Club', emoji: '👥', members: ['member-1'], expenses: [] },
+    'member-1',
+    members,
+    'Minh',
+    '2026-05'
+  )
+  const emojiDetail = buildGroupDetailData(
+    { id: 'expense-1', name: 'Nhóm sân', emoji: '🏸', members: ['member-2'], expenses: [] },
+    'member-2',
+    members,
+    'An',
+    '2026-05'
+  )
+  const expenseDetail = buildGroupDetailData(
+    { id: 'expense-1', name: 'Nhóm ăn tối', emoji: '🍜', members: ['member-2'], expenses: [] },
+    'member-2',
+    members,
+    'An',
+    '2026-05'
+  )
+
+  assert.equal(pickleballDetail.isPickleball, true)
+  assert.equal(emojiDetail.isPickleball, true)
+  assert.equal(expenseDetail.isPickleball, false)
+})
+
 test('core balances treat missing legacy status as approved and ignore pending or rejected', () => {
   assert.match(coreDataSource, /const approvedExpenses = \(g\.expenses \|\| \[\]\)\.filter\(e => !e\.status \|\| e\.status === 'approved'\)/)
 })

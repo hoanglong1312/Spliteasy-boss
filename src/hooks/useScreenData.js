@@ -419,6 +419,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     emoji: g.emoji || '👥',
     color: g.color || '#574EFA',
     createdBy: g.createdBy || g.created_by || null,
+    isPickleball: groupKind(g) === 'pickleball',
     isGroupCreator,
     isTreasurer: isGroupTreasurer,
     memberCount: groupMembers.length,

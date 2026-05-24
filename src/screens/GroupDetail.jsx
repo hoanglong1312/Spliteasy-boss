@@ -243,6 +243,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           title="Thêm thành viên"
           groupId={d.id}
           candidates={d.memberCandidates || []}
+          isPickleball={d.isPickleball}
           onClose={closeMemberSheets}
           onAction={onAction}
         />
@@ -295,7 +296,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       {deleteConfirmMember && canManageMembers && (
         <BottomSheet title="Xóa khỏi nhóm?" onClose={() => setDeleteConfirmMember(null)}>
           <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
-            Thành viên sẽ được chuyển vào danh sách vãng lai. Bạn có thể thêm lại sau.
+            {d.isPickleball
+              ? 'Thành viên sẽ được chuyển vào danh sách vãng lai. Bạn có thể thêm lại sau.'
+              : 'Thành viên sẽ được ẩn khỏi danh sách nhóm. Bạn có thể thêm lại sau.'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" onClick={() => setDeleteConfirmMember(null)}>Hủy</Button>
@@ -558,12 +561,19 @@ function InfoLine({ label, value }) {
   );
 }
 
-function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction }) {
+function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false, onClose, onAction }) {
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
-  const [candidateQuery, setCandidateQuery] = useState('');
+  const [inactiveCandidateQuery, setInactiveCandidateQuery] = useState('');
+  const [activeCandidateQuery, setActiveCandidateQuery] = useState('');
   const [name, setName] = useState('');
   const selectedCandidates = candidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
-  const candidateCards = candidates.map(candidate => ({
+  const inactiveCandidates = candidates.filter(candidate => candidate.isInactive);
+  const activeCandidates = candidates.filter(candidate => !candidate.isInactive);
+  const inactiveCandidateCards = inactiveCandidates.map(candidate => ({
+    ...candidate,
+    selected: selectedCandidateIds.includes(String(candidate.id)),
+  }));
+  const activeCandidateCards = activeCandidates.map(candidate => ({
     ...candidate,
     selected: selectedCandidateIds.includes(String(candidate.id)),
   }));
@@ -605,20 +615,38 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
   return (
     <BottomSheet title={title} onClose={onClose}>
       <form onSubmit={save}>
-        <div style={{ marginTop: 12 }}>
-          <MemberPicker
-            aria-label="Thành viên có sẵn"
-            candidates={candidateCards}
-            selectedIds={selectedCandidateIds}
-            query={candidateQuery}
-            onQueryChange={setCandidateQuery}
-            onToggle={toggleCandidate}
-            sectionTitle={memberPickerSectionTitle(candidateCards)}
-            placeholder="Tìm vài ký tự để lọc thành viên"
-            emptyText={candidates.length > 0 ? 'Không có thành viên phù hợp.' : 'Không còn thành viên có sẵn để thêm vào nhóm này.'}
-            tone="groups"
-          />
-        </div>
+        {inactiveCandidateCards.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <MemberPicker
+              aria-label={isPickleball ? 'Danh sách vãng lai' : 'Danh sách chờ thêm lại'}
+              candidates={inactiveCandidateCards}
+              selectedIds={selectedCandidateIds}
+              query={inactiveCandidateQuery}
+              onQueryChange={setInactiveCandidateQuery}
+              onToggle={toggleCandidate}
+              sectionTitle={isPickleball ? 'Danh sách vãng lai' : 'Danh sách chờ thêm lại'}
+              placeholder="Tìm vài ký tự để lọc thành viên"
+              emptyText="Không có thành viên phù hợp."
+              tone="groups"
+            />
+          </div>
+        )}
+        {activeCandidateCards.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <MemberPicker
+              aria-label="Thành viên có sẵn"
+              candidates={activeCandidateCards}
+              selectedIds={selectedCandidateIds}
+              query={activeCandidateQuery}
+              onQueryChange={setActiveCandidateQuery}
+              onToggle={toggleCandidate}
+              sectionTitle="Thành viên có sẵn"
+              placeholder="Tìm vài ký tự để lọc thành viên"
+              emptyText="Không có thành viên phù hợp."
+              tone="groups"
+            />
+          </div>
+        )}
         <Field
           label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
           value={name}
@@ -640,12 +668,6 @@ function normalizeSearch(value) {
     .replace(/Đ/g, 'd')
     .trim()
     .toLowerCase();
-}
-
-function memberPickerSectionTitle(candidates) {
-  return candidates.length > 0 && candidates.every(candidate => (candidate.memberType || candidate.type) === 'casual')
-    ? 'Danh sách vãng lai'
-    : 'Thành viên có sẵn';
 }
 
 function EditMemberEditor({ title, member, onClose, onAction }) {

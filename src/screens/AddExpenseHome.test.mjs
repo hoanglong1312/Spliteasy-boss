@@ -82,13 +82,12 @@ test('GroupDetail member rows show balance inline on the right of the member nam
 });
 
 test('GroupDetail member management adds members without bank fields', () => {
-  assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], onClose, onAction \}\)/);
+  assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], isPickleball = false, onClose, onAction \}\)/);
+  assert.match(groupDetailSource, /<AddMemberEditor[\s\S]*isPickleball=\{d\.isPickleball\}/);
   assert.match(groupDetailSource, /Thành viên có sẵn/);
-  assert.match(groupDetailSource, /candidateCards/);
   assert.match(groupDetailSource, /selectedCandidateIds\.includes\(String\(candidate\.id\)\)/);
   assert.match(groupDetailSource, /placeholder="Tìm vài ký tự để lọc thành viên"/);
   assert.doesNotMatch(groupDetailSource, /\{candidates\.length > 0 && \(/);
-  assert.match(groupDetailSource, /Không còn thành viên có sẵn để thêm vào nhóm này\./);
   assert.match(groupDetailSource, /\.normalize\('NFD'\)/);
   assert.match(groupDetailSource, /selectedCandidates = candidates\.filter\(candidate => selectedCandidateIds\.includes\(String\(candidate\.id\)\)\)/);
   assert.match(groupDetailSource, /for \(const candidate of selectedCandidates\)/);
@@ -118,7 +117,15 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
   assert.match(screenDataSource, /const isPickleballGroup = groupKind\(group\) === 'pickleball'/);
   assert.match(screenDataSource, /isPickleballGroup \? memberType\(member\) === 'casual' : !isActiveMember\(member\)/);
-  assert.match(groupDetailSource, /sectionTitle=\{memberPickerSectionTitle\(candidateCards\)\}/);
+  assert.match(groupDetailSource, /const inactiveCandidates = candidates\.filter\(candidate => candidate\.isInactive\)/);
+  assert.match(groupDetailSource, /const activeCandidates = candidates\.filter\(candidate => !candidate\.isInactive\)/);
+  assert.match(groupDetailSource, /const inactiveCandidateCards = inactiveCandidates\.map\(candidate => \(/);
+  assert.match(groupDetailSource, /const activeCandidateCards = activeCandidates\.map\(candidate => \(/);
+  assert.match(groupDetailSource, /sectionTitle=\{isPickleball \? 'Danh sách vãng lai' : 'Danh sách chờ thêm lại'\}/);
+  assert.match(groupDetailSource, /sectionTitle="Thành viên có sẵn"/);
+  assert.match(groupDetailSource, /const \[inactiveCandidateQuery, setInactiveCandidateQuery\] = useState\(''\)/);
+  assert.match(groupDetailSource, /const \[activeCandidateQuery, setActiveCandidateQuery\] = useState\(''\)/);
+  assert.doesNotMatch(groupDetailSource, /function memberPickerSectionTitle/);
   assert.match(screenDataSource, /!currentProfileIds\.has\(String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
   assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);
@@ -126,7 +133,7 @@ test('GroupDetail member management adds members without bank fields', () => {
 });
 
 test('GroupDetail keeps bank fields in edit member sheet only', () => {
-  assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], onClose, onAction \}\)/);
+  assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], isPickleball = false, onClose, onAction \}\)/);
   const addMemberEditorSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function AddMemberEditor'),
     groupDetailSource.indexOf('function EditMemberEditor')
@@ -173,7 +180,7 @@ test('GroupDetail delete member does not depend on native confirm dialogs', () =
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{memberMenu\.name\} khỏi nhóm\?`\)/);
   assert.match(groupDetailSource, /setDeleteConfirmMember\(memberMenu\)/);
   assert.match(groupDetailSource, /title="Xóa khỏi nhóm\?"/);
-  assert.match(groupDetailSource, /Thành viên sẽ được chuyển vào danh sách vãng lai\. Bạn có thể thêm lại sau\./);
+  assert.match(groupDetailSource, /\{d\.isPickleball\s*\? 'Thành viên sẽ được chuyển vào danh sách vãng lai\. Bạn có thể thêm lại sau\.'\s*: 'Thành viên sẽ được ẩn khỏi danh sách nhóm\. Bạn có thể thêm lại sau\.'\}/);
   assert.match(groupDetailSource, /await onAction\?\.\('removeMemberToVanglai', \{ memberId: deleteConfirmMember\.id \}\)/);
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteMember'/);
 });
