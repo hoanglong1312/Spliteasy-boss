@@ -701,6 +701,7 @@ export function MemberPicker({
   onToggle,
   emptyText = 'Không có thành viên phù hợp.',
   placeholder = 'Tìm vài ký tự để lọc thành viên',
+  sectionTitle = 'Thành viên có sẵn',
   tone = 'finance',
   maxListHeight = 260,
 }) {
@@ -719,7 +720,7 @@ export function MemberPicker({
       borderRadius: 16,
       padding: 14,
     }}>
-      <SectionHeader style={{ marginTop: 0, color: t.accent }}>Thành viên có sẵn</SectionHeader>
+      <SectionHeader style={{ marginTop: 0, color: t.accent }}>{sectionTitle}</SectionHeader>
       <SearchInput
         value={query}
         onChange={event => onQueryChange?.(event.target.value)}

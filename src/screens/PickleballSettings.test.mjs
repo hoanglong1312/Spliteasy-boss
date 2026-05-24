@@ -34,9 +34,9 @@ test('PickleballSettings no longer owns add/delete member management', () => {
   assert.doesNotMatch(settingsSource, /onAction\?\.\('deleteMember'/);
   assert.doesNotMatch(settingsSource, /Xác nhận xóa thành viên/);
   assert.match(appSource, /type === 'addMember'/);
-  assert.match(appSource, /type === 'deleteMember'/);
+  assert.match(appSource, /type === 'removeMemberToVanglai'/);
   assert.match(appSource, /\.from\('members'\)/);
-  assert.match(appSource, /is_active: false/);
+  assert.match(appSource, /member_type: 'casual'/);
 });
 
 test('PickleballSettings edits schedule time and start date before saving', () => {

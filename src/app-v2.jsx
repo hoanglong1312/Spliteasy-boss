@@ -510,14 +510,14 @@ export default function AppV2() {
       return
     }
 
-    if (type === 'deleteMember') {
+    if (type === 'removeMemberToVanglai') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ is_active: false })
+        .update({ member_type: 'casual' })
         .eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
@@ -531,7 +531,7 @@ export default function AppV2() {
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ is_active: true })
+        .update({ member_type: 'fixed' })
         .eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })

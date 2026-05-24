@@ -574,6 +574,7 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
             query={candidateQuery}
             onQueryChange={setCandidateQuery}
             onToggle={toggleCandidate}
+            sectionTitle={memberPickerSectionTitle(candidateCards)}
             placeholder="Tìm vài ký tự để lọc thành viên"
             emptyText={candidates.length > 0 ? 'Không có thành viên phù hợp.' : 'Không còn thành viên có sẵn để thêm vào nhóm này.'}
             tone="groups"
@@ -600,6 +601,12 @@ function normalizeSearch(value) {
     .replace(/Đ/g, 'd')
     .trim()
     .toLowerCase();
+}
+
+function memberPickerSectionTitle(candidates) {
+  return candidates.length > 0 && candidates.every(candidate => (candidate.memberType || candidate.type) === 'casual')
+    ? 'Danh sách vãng lai'
+    : 'Thành viên có sẵn';
 }
 
 function EditMemberEditor({ title, member, onClose, onAction }) {

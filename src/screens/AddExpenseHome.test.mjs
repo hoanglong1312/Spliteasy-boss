@@ -82,7 +82,8 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
-  assert.match(screenDataSource, /\.filter\(isActiveMember\)/);
+  assert.match(screenDataSource, /const casualCurrentMembers = currentMembers\.filter\(member => memberType\(member\) === 'casual'\)/);
+  assert.match(groupDetailSource, /sectionTitle=\{memberPickerSectionTitle\(candidateCards\)\}/);
   assert.match(screenDataSource, /!currentProfileIds\.has\(String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
   assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);
@@ -132,7 +133,7 @@ test('GroupDetail hides member bank accounts unless treasurer or self', () => {
 
 test('Screen data excludes inactive memberships from group member lists', () => {
   assert.match(screenDataSource, /function membersForGroup\(group, members\) \{/);
-  assert.match(screenDataSource, /\.filter\(isActiveMember\)\.filter\(member => \(/);
+  assert.match(screenDataSource, /\.filter\(isActiveMember\)[\s\S]*?\.filter\(member => memberType\(member\) !== 'casual'\)/);
 });
 
 test('GroupDetail member detail shows payer transactions for the selected month', () => {

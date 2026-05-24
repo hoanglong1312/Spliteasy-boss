@@ -441,11 +441,11 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
 }
 
 function buildGroupMemberCandidates(group, members, profiles = []) {
-  const currentMembers = membersForGroup(group, members)
+  const currentMembers = allMembersForGroup(group, members)
   const currentIds = new Set(currentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
-  const inactiveCurrentMembers = currentMembers.filter(member => !isActiveMember(member))
+  const casualCurrentMembers = currentMembers.filter(member => memberType(member) === 'casual')
     .map(member => ({
       id: member.id,
       memberId: member.id,
@@ -454,7 +454,8 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       bankName: member.bankName || member.bank_name || '',
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
-      isInactive: !isActiveMember(member),
+      isInactive: !isActiveMember(member) || memberType(member) === 'casual',
+      memberType: memberType(member),
     }))
   const outsideGroupCandidates = candidateProfilesFromDirectory(members, profiles)
     .filter(member => !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id)))
@@ -474,7 +475,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-  return inactiveCurrentMembers.concat(outsideGroupCandidates)
+  return casualCurrentMembers.concat(outsideGroupCandidates)
 }
 
 function candidateProfilesFromDirectory(members, profiles = []) {
@@ -1971,7 +1972,7 @@ function currentGroupName(state, fallback = 'Nhóm') {
 function currentGroupMembers(state) {
   const group = currentGroup(state)
   const members = safeArray(state?.members)
-  const rows = membersForGroup(group, members)
+  const rows = allMembersForGroup(group, members)
   return rows.length > 0 ? rows : members
 }
 
@@ -3088,8 +3089,14 @@ function memberName(memberId, members) {
 }
 
 function membersForGroup(group, members) {
+  return allMembersForGroup(group, members)
+    .filter(isActiveMember)
+    .filter(member => memberType(member) !== 'casual')
+}
+
+function allMembersForGroup(group, members) {
   const ids = new Set(safeArray(group?.members).map(String))
-  return safeArray(members).filter(isActiveMember).filter(member => (
+  return safeArray(members).filter(member => (
     ids.has(String(member.id)) || String(member.groupId || member.group_id || '') === String(group?.id || '')
   ))
 }

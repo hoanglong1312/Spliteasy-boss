@@ -223,6 +223,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
               query={candidateQuery}
               onQueryChange={setCandidateQuery}
               onToggle={toggleCandidate}
+              sectionTitle={memberPickerSectionTitle(filteredCandidateCards)}
               placeholder="Tìm vài ký tự để lọc thành viên"
               emptyText="Không có thành viên phù hợp."
               tone="pickleball"
@@ -336,6 +337,12 @@ function normalizeSearch(value) {
     .replace(/Đ/g, 'd')
     .trim()
     .toLowerCase();
+}
+
+function memberPickerSectionTitle(candidates) {
+  return candidates.length > 0 && candidates.every(candidate => (candidate.memberType || candidate.type) === 'casual')
+    ? 'Danh sách vãng lai'
+    : 'Thành viên có sẵn';
 }
 
 function maskAccount(value) {
