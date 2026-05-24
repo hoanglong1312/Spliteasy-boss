@@ -13,7 +13,7 @@ const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank',
 
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
-  const [activeTab, setActiveTab] = useState('activity');
+  const [activeTab, setActiveTab] = useState('members');
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
@@ -148,8 +148,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         <SubTabs
           items={[
-            { key: 'activity', label: 'Hoạt động' },
             { key: 'members',  label: `Thành viên · ${d.memberCount}` },
+            { key: 'activity', label: 'Hoạt động' },
           ]}
           active={activeTab}
           onChange={setActiveTab}
@@ -329,12 +329,8 @@ function BalanceRow({ row }) {
 }
 
 function MemberRow({ member, isTreasurer, onOpen, onMore }) {
-  const canViewBank = canViewMemberBank(member, isTreasurer);
-  const canCopyBank = canViewBank && member.bankAccount;
-  const hasBank = Boolean(member.bankName && member.bankAccount);
-  const bankLabel = hasBank
-    ? canViewBank ? `${member.bankName} · ${maskAccount(member.bankAccount)}` : 'Đã cập nhật ngân hàng'
-    : 'Chưa cập nhật ngân hàng';
+  const balance = Number(member.balance || 0);
+  const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   return (
     <Card
       onClick={() => onOpen?.(member)}
@@ -357,12 +353,9 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
             <div style={{ fontSize: 13, fontWeight: 800 }}>{member.name}</div>
             {member.role === 'treasurer' && <Badge tone="warn">THỦ QUỸ</Badge>}
           </div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-            {bankLabel}
+          <div style={{ fontSize: 12, fontWeight: 800, color: balanceTone, marginTop: 3, ...type.mono }}>
+            {balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`}
           </div>
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 800, color: member.balance < 0 ? colors.danger : member.balance > 0 ? '#6ee7b7' : colors.textSecondary, ...type.mono }}>
-          {member.balance === 0 ? '0 đ' : `${member.balance > 0 ? '+' : '-'}${formatVND(Math.abs(member.balance))}`}
         </div>
         {isTreasurer && (
           <button type="button" aria-label={`Sửa ${member.name}`} onClick={(event) => { event.stopPropagation(); onMore?.(member); }} style={{

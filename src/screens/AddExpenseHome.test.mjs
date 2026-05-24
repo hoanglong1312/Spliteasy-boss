@@ -43,6 +43,8 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
   assert.doesNotMatch(groupDetailSource, /\{ key: 'balances', label: 'Số dư' \}/);
   assert.doesNotMatch(groupDetailSource, /activeTab === 'balances'/);
+  assert.match(groupDetailSource, /const \[activeTab, setActiveTab\] = useState\('members'\)/);
+  assert.match(groupDetailSource, /items=\{\[\s*\{ key: 'members',\s+label: `Thành viên · \$\{d\.memberCount\}` \},\s*\{ key: 'activity', label: 'Hoạt động' \},\s*\]\}/);
   assert.match(groupDetailSource, /activeTab === 'members'/);
   assert.match(groupDetailSource, /\+ Thêm thành viên/);
   assert.match(groupDetailSource, /<MemberRow[\s\S]*key=\{member\.id\}[\s\S]*member=\{member\}[\s\S]*onMore=\{setMemberMenu\}/);
@@ -52,6 +54,18 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Tên tài khoản/);
   assert.match(groupDetailSource, /Số tài khoản/);
   assert.match(screenDataSource, /balanceRows: groupMembers/);
+});
+
+test('GroupDetail member rows show balance under the member name instead of bank subtitle', () => {
+  const memberRowSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberRow'),
+    groupDetailSource.indexOf('function MemberDetailPanel')
+  );
+  assert.doesNotMatch(memberRowSource, /const bankLabel/);
+  assert.doesNotMatch(memberRowSource, /Chưa cập nhật ngân hàng/);
+  assert.match(memberRowSource, /const balance = Number\(member\.balance \|\| 0\)/);
+  assert.match(memberRowSource, /const balanceTone = balance < 0 \? colors\.danger : balance > 0 \? '#6ee7b7' : colors\.textSecondary/);
+  assert.match(memberRowSource, /\{balance === 0 \? '0 đ' : `\$\{balance > 0 \? '\+' : '-'\}\$\{formatVND\(Math\.abs\(balance\)\)\}`\}/);
 });
 
 test('GroupDetail member management writes normal group and bank fields', () => {
@@ -135,8 +149,6 @@ test('GroupDetail hides member bank accounts unless treasurer or self', () => {
   assert.match(groupDetailSource, /function canViewMemberBank\(member, isTreasurer\)/);
   assert.match(groupDetailSource, /member\.isCurrentUser/);
   assert.match(groupDetailSource, /const canViewBank = canViewMemberBank\(member, isTreasurer\)/);
-  assert.match(groupDetailSource, /canViewBank \? `\$\{member\.bankName\} · \$\{maskAccount\(member\.bankAccount\)\}` : 'Đã cập nhật ngân hàng'/);
-  assert.match(groupDetailSource, /canViewBank && member\.bankAccount/);
   assert.match(groupDetailSource, /Ẩn với thành viên khác/);
   assert.match(screenDataSource, /isCurrentUser: String\(member\.id\) === String\(currentGroupMember\?\.id \|\| ''\)/);
 });
