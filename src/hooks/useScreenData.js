@@ -445,7 +445,10 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
   const currentIds = new Set(currentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
-  const casualCurrentMembers = currentMembers.filter(member => memberType(member) === 'casual')
+  const isPickleballGroup = groupKind(group) === 'pickleball'
+  const casualCurrentMembers = currentMembers.filter(member => (
+    isPickleballGroup ? memberType(member) === 'casual' : !isActiveMember(member)
+  ))
     .map(member => ({
       id: member.id,
       memberId: member.id,
@@ -454,7 +457,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       bankName: member.bankName || member.bank_name || '',
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
-      isInactive: !isActiveMember(member) || memberType(member) === 'casual',
+      isInactive: !isActiveMember(member) || (isPickleballGroup && memberType(member) === 'casual'),
       memberType: memberType(member),
     }))
   const casualNames = new Set(

@@ -513,11 +513,13 @@ export default function AppV2() {
     if (type === 'removeMemberToVanglai') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
+      const currentGroup = (state.groups || []).find(group => String(group.id) === String(state.currentGroupId))
+      const isPickleballGroup = (currentGroup?.groupType || currentGroup?.group_type || '') === 'pickleball'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ member_type: 'casual' })
+        .update(isPickleballGroup ? { member_type: 'casual' } : { is_active: false })
         .eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
@@ -527,11 +529,13 @@ export default function AppV2() {
     if (type === 'reactivateMember') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
+      const currentGroup = (state.groups || []).find(group => String(group.id) === String(state.currentGroupId))
+      const isPickleballGroup = (currentGroup?.groupType || currentGroup?.group_type || '') === 'pickleball'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ member_type: 'fixed' })
+        .update(isPickleballGroup ? { member_type: 'fixed' } : { is_active: true })
         .eq('id', memberId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })

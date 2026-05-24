@@ -82,7 +82,8 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
-  assert.match(screenDataSource, /const casualCurrentMembers = currentMembers\.filter\(member => memberType\(member\) === 'casual'\)/);
+  assert.match(screenDataSource, /const isPickleballGroup = groupKind\(group\) === 'pickleball'/);
+  assert.match(screenDataSource, /isPickleballGroup \? memberType\(member\) === 'casual' : !isActiveMember\(member\)/);
   assert.match(groupDetailSource, /sectionTitle=\{memberPickerSectionTitle\(candidateCards\)\}/);
   assert.match(screenDataSource, /!currentProfileIds\.has\(String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)/);
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);

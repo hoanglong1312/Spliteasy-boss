@@ -41,6 +41,21 @@ test('group member candidates dedup current casual members against directory row
   assert.equal(candidates[0].memberId, 'pickle-hoang')
 })
 
+test('expense group member candidates use inactive members as pending rows', () => {
+  const { buildGroupMemberCandidates } = loadScreenDataBuilders()
+  const group = { id: 'expense-1', groupType: 'expense', members: ['inactive-an', 'active-binh'] }
+  const members = [
+    { id: 'inactive-an', groupId: 'expense-1', name: 'An', memberType: 'fixed', isActive: false },
+    { id: 'active-binh', groupId: 'expense-1', name: 'Binh', memberType: 'casual', isActive: true },
+  ]
+
+  const candidates = buildGroupMemberCandidates(group, members)
+
+  assert.deepEqual(candidates.map(member => member.name), ['An'])
+  assert.equal(candidates[0].memberId, 'inactive-an')
+  assert.equal(candidates[0].isInactive, true)
+})
+
 test('Pickleball overview reads current-month court fee and current fixed members', () => {
   const overviewMatch = dataSource.match(/function buildPickleballOverviewData[\s\S]*?\n}\n\nfunction buildProfileData/)
   assert.ok(overviewMatch)

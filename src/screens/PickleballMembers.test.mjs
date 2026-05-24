@@ -22,5 +22,6 @@ test('Pickleball member add flow suggests and triggers inactive member reactivat
   assert.match(memberSource, />Thêm lại<\/Button>/);
   assert.match(memberSource, /await onAction\?\.\('reactivateMember', \{ memberId: duplicateMember\.id \}\)/);
   assert.match(appSource, /if \(type === 'reactivateMember'\)/);
-  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(\{ member_type: 'fixed' \}\)[\s\S]*?\.eq\('id', memberId\)/);
+  assert.match(appSource, /const isPickleballGroup = \(currentGroup\?\.groupType \|\| currentGroup\?\.group_type \|\| ''\) === 'pickleball'/);
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)/);
 });

@@ -53,9 +53,11 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /if \(type === 'setMemberType'\)/)
   assert.match(appSource, /member_type: payload\?\.type/)
   assert.match(appSource, /if \(type === 'removeMemberToVanglai'\)/)
-  assert.match(appSource, /\.update\(\{ member_type: 'casual' \}\)/)
+  assert.match(appSource, /const currentGroup = \(state\.groups \|\| \[\]\)\.find\(group => String\(group\.id\) === String\(state\.currentGroupId\)\)/)
+  assert.match(appSource, /const isPickleballGroup = \(currentGroup\?\.groupType \|\| currentGroup\?\.group_type \|\| ''\) === 'pickleball'/)
+  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'casual' \} : \{ is_active: false \}\)/)
   assert.match(appSource, /if \(type === 'reactivateMember'\)/)
-  assert.match(appSource, /\.update\(\{ member_type: 'fixed' \}\)/)
+  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)/)
 })
 
 test('member deletion is confirmed with the shared in-app sheet before dispatch', () => {
