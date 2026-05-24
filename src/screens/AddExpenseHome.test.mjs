@@ -181,8 +181,10 @@ test('GroupDetail delete member does not depend on native confirm dialogs', () =
   assert.match(groupDetailSource, /setDeleteConfirmMember\(memberMenu\)/);
   assert.match(groupDetailSource, /title="Xóa khỏi nhóm\?"/);
   assert.match(groupDetailSource, /\{d\.isPickleball\s*\? 'Thành viên sẽ được chuyển vào danh sách vãng lai\. Bạn có thể thêm lại sau\.'\s*: 'Thành viên sẽ được ẩn khỏi danh sách nhóm\. Bạn có thể thêm lại sau\.'\}/);
-  assert.match(groupDetailSource, /await onAction\?\.\('removeMemberToVanglai', \{ memberId: deleteConfirmMember\.id \}\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('removeMemberToVanglai', \{ memberId: deleteConfirmMember\.id, groupId: d\.id \}\)/);
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteMember'/);
+  assert.match(appSource, /const targetGroupId = payload\?\.groupId \|\| state\.currentGroupId/);
+  assert.match(appSource, /String\(group\.id\) === String\(targetGroupId\)/);
 });
 
 test('GroupDetail hides member detail bank accounts from non-treasurers', () => {

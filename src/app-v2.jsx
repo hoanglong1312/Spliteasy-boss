@@ -513,7 +513,8 @@ export default function AppV2() {
     if (type === 'removeMemberToVanglai') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
-      const currentGroup = (state.groups || []).find(group => String(group.id) === String(state.currentGroupId))
+      const targetGroupId = payload?.groupId || state.currentGroupId
+      const currentGroup = (state.groups || []).find(group => String(group.id) === String(targetGroupId))
       const groupText = `${currentGroup?.name || ''} ${currentGroup?.emoji || ''}`.toLowerCase()
       const isPickleballGroup = groupText.includes('pickle') || groupText.includes('🏓') || groupText.includes('🏸')
       const { token } = getStoredAuth()
@@ -530,7 +531,8 @@ export default function AppV2() {
     if (type === 'reactivateMember') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
-      const currentGroup = (state.groups || []).find(group => String(group.id) === String(state.currentGroupId))
+      const targetGroupId = payload?.groupId || state.currentGroupId
+      const currentGroup = (state.groups || []).find(group => String(group.id) === String(targetGroupId))
       const groupText = `${currentGroup?.name || ''} ${currentGroup?.emoji || ''}`.toLowerCase()
       const isPickleballGroup = groupText.includes('pickle') || groupText.includes('🏓') || groupText.includes('🏸')
       const { token } = getStoredAuth()

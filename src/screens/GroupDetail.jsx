@@ -306,7 +306,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               type="button"
               variant="danger"
               onClick={async () => {
-                await onAction?.('removeMemberToVanglai', { memberId: deleteConfirmMember.id });
+                await onAction?.('removeMemberToVanglai', { memberId: deleteConfirmMember.id, groupId: d.id });
                 setDeleteConfirmMember(null);
               }}
             >Xác nhận</Button>
