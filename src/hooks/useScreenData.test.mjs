@@ -177,6 +177,26 @@ test('group detail exposes pending expenses for treasurer approval', () => {
   assert.equal(detail.pendingExpenses[0].submittedBy, 'member-1')
 })
 
+test('group detail marks current user as creator when created_by matches profile id', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-creator',
+    groupType: 'expense',
+    created_by: 'profile-owner',
+    members: ['member-owner', 'member-friend'],
+    expenses: [],
+  }
+  const members = [
+    { id: 'member-owner', profileId: 'profile-owner', groupId: 'expense-creator', name: 'Owner', role: 'member', isActive: true },
+    { id: 'member-friend', profileId: 'profile-friend', groupId: 'expense-creator', name: 'Friend', role: 'member', isActive: true },
+  ]
+
+  const detail = buildGroupDetailData(group, 'member-owner', members, 'Owner', '2026-05')
+
+  assert.equal(detail.isTreasurer, false)
+  assert.equal(detail.isGroupCreator, true)
+})
+
 test('core balances treat missing legacy status as approved and ignore pending or rejected', () => {
   assert.match(coreDataSource, /const approvedExpenses = \(g\.expenses \|\| \[\]\)\.filter\(e => !e\.status \|\| e\.status === 'approved'\)/)
 })

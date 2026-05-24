@@ -383,6 +383,13 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const monthlyGroup = groupWithMonthExpenses(g, monthDate)
   const groupMembers = membersForGroup(g, members)
   const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(g, currentUserId, members, currentUserName)))
+  const currentMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  const groupCreatorId = g.createdBy || g.created_by || ''
+  const isGroupCreator = Boolean(groupCreatorId) && (
+    String(groupCreatorId) === String(currentGroupMember?.id || '') ||
+    String(groupCreatorId) === String(currentGroupMember?.profileId || currentGroupMember?.profile_id || '') ||
+    String(groupCreatorId) === String(currentMember?.profileId || currentMember?.profile_id || '')
+  )
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
   const isGroupTreasurer = currentGroupMember?.role === 'treasurer' || String(g.createdBy || g.created_by || '') === String(currentGroupMember?.id || '') || (Boolean(currentGroupMember) && isSoloExpenseGroup)
   const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
@@ -412,6 +419,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     emoji: g.emoji || '👥',
     color: g.color || '#574EFA',
     createdBy: g.createdBy || g.created_by || null,
+    isGroupCreator,
     isTreasurer: isGroupTreasurer,
     memberCount: groupMembers.length,
     balance,

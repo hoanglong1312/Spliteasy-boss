@@ -13,6 +13,7 @@ const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank',
 
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
+  const canManageMembers = Boolean(isTreasurer || d.isGroupCreator);
   const [activeTab, setActiveTab] = useState('members');
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
@@ -60,11 +61,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   return (
     <PhoneFrame>
       {selectedMember ? (
-        <MemberDetailPanel
-          groupName={d.name}
-          member={selectedMember}
-          isTreasurer={isTreasurer}
-          onBack={() => setSelectedMember(null)}
+          <MemberDetailPanel
+            groupName={d.name}
+            member={selectedMember}
+            isTreasurer={canManageMembers}
+            onBack={() => setSelectedMember(null)}
           onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
           onDelete={() => {
             setDeleteConfirmMember(selectedMember);
@@ -200,7 +201,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         {activeTab === 'members' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {isTreasurer && (
+            {canManageMembers && (
               <Button variant="ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setAddingMember(true)}>
                 + Thêm thành viên
               </Button>
@@ -214,7 +215,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               <MemberRow
                 key={member.id}
                 member={member}
-                isTreasurer={isTreasurer}
+                isTreasurer={canManageMembers}
                 onOpen={setSelectedMember}
                 onMore={setMemberMenu}
               />
@@ -247,7 +248,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
       )}
 
-      {memberMenu && isTreasurer && (
+      {memberMenu && canManageMembers && (
         <BottomSheet title={memberMenu.name} onClose={() => setMemberMenu(null)}>
           <ActionButton onClick={() => { setEditingMember(memberMenu); setMemberMenu(null); }}>Sửa thành viên</ActionButton>
           <ActionButton onClick={async () => {
@@ -291,7 +292,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         </BottomSheet>
       )}
 
-      {deleteConfirmMember && isTreasurer && (
+      {deleteConfirmMember && canManageMembers && (
         <BottomSheet title="Xóa khỏi nhóm?" onClose={() => setDeleteConfirmMember(null)}>
           <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
             Thành viên sẽ được chuyển vào danh sách vãng lai. Bạn có thể thêm lại sau.

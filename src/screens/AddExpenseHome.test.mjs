@@ -56,6 +56,16 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(screenDataSource, /balanceRows: groupMembers/);
 });
 
+test('GroupDetail lets group creators manage members without treasurer role', () => {
+  assert.match(groupDetailSource, /const canManageMembers = Boolean\(isTreasurer \|\| d\.isGroupCreator\)/);
+  assert.match(groupDetailSource, /<MemberDetailPanel[\s\S]*isTreasurer=\{canManageMembers\}/);
+  assert.match(groupDetailSource, /\{canManageMembers && \(\s*<Button variant="ghost"[\s\S]*\+ Thêm thành viên/);
+  assert.match(groupDetailSource, /<MemberRow[\s\S]*isTreasurer=\{canManageMembers\}/);
+  assert.match(groupDetailSource, /\{memberMenu && canManageMembers && \(/);
+  assert.match(groupDetailSource, /\{deleteConfirmMember && canManageMembers && \(/);
+  assert.match(screenDataSource, /isGroupCreator,/);
+});
+
 test('GroupDetail member rows show balance under the member name instead of bank subtitle', () => {
   const memberRowSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberRow'),
