@@ -68,12 +68,17 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(groupDetailSource, /for \(const candidate of selectedCandidates\)/);
   assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*profileId: candidate\?\.profileId \|\| candidate\?\.id \|\| '',[\s\S]*\}\)/);
   assert.match(groupDetailSource, /Hoặc nhập tên mới/);
-  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*profileId: '',[\s\S]*\}\)/);
+  assert.match(groupDetailSource, /const \[bankAccountName, setBankAccountName\] = useState\(''\)/);
+  assert.match(groupDetailSource, /const \[bankName, setBankName\] = useState\(''\)/);
+  assert.match(groupDetailSource, /const \[bankAccount, setBankAccount\] = useState\(''\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*profileId: '',[\s\S]*bankAccountName: bankAccountName\.trim\(\),[\s\S]*bankName,[\s\S]*bankAccount: bankAccount\.trim\(\),[\s\S]*\}\)/);
   const addMemberEditorSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function AddMemberEditor'),
     groupDetailSource.indexOf('function EditMemberEditor')
   );
-  assert.doesNotMatch(addMemberEditorSource, /Tên tài khoản|Ngân hàng|Số tài khoản/);
+  assert.match(addMemberEditorSource, /Tên tài khoản/);
+  assert.match(addMemberEditorSource, /<BankSelect value=\{bankName\} onChange=\{setBankName\} \/>/);
+  assert.match(addMemberEditorSource, /Số tài khoản/);
   assert.match(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/);
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
@@ -91,7 +96,11 @@ test('GroupDetail member management writes normal group and bank fields', () => 
   assert.match(screenDataSource, /bankAccountName: member\.bankAccountName \|\| member\.bank_account_name \|\| ''/);
 });
 
-test('GroupDetail keeps bank fields only in edit member sheet', () => {
+test('GroupDetail keeps bank fields in add and edit member sheets', () => {
+  assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], onClose, onAction \}\)/);
+  assert.match(groupDetailSource, /<Field label="Tên tài khoản" value=\{bankAccountName\}/);
+  assert.match(groupDetailSource, /<BankSelect value=\{bankName\} onChange=\{setBankName\} \/>/);
+  assert.match(groupDetailSource, /<Field label="Số tài khoản" value=\{bankAccount\}/);
   assert.match(groupDetailSource, /function EditMemberEditor\(\{ title, member, onClose, onAction \}\)/);
   assert.match(groupDetailSource, /<Field label="Tên tài khoản" value=\{bankAccountName\}/);
   assert.match(groupDetailSource, /<BankSelect value=\{bankName\} onChange=\{setBankName\} \/>/);
