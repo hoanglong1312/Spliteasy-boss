@@ -135,6 +135,16 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /onDelete=\{\(\) => \{[\s\S]*setDeleteConfirmMember\(selectedMember\);[\s\S]*setSelectedMember\(null\);[\s\S]*\}\}/);
 });
 
+test('GroupDetail member detail exposes clear treasurer edit access', () => {
+  const memberDetailSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberDetailPanel'),
+    groupDetailSource.indexOf('function MemberPaidTransactionRow')
+  );
+  assert.match(memberDetailSource, /\{isTreasurer && \(/);
+  assert.match(memberDetailSource, /<Button variant="brand" style=\{\{ fontSize: 13 \}\} onClick=\{onEdit\}>Chỉnh sửa thông tin<\/Button>/);
+  assert.doesNotMatch(memberDetailSource, />Sửa thành viên<\/Button>/);
+});
+
 test('GroupDetail delete member does not depend on native confirm dialogs', () => {
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{selectedMember\.name\} khỏi nhóm\?`\)/);
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{memberMenu\.name\} khỏi nhóm\?`\)/);

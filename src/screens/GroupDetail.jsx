@@ -441,7 +441,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
 
       {isTreasurer && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
-          <Button variant="brand" style={{ fontSize: 13 }} onClick={onEdit}>Sửa thành viên</Button>
+          <Button variant="brand" style={{ fontSize: 13 }} onClick={onEdit}>Chỉnh sửa thông tin</Button>
           <Button variant="danger" style={{ fontSize: 13 }} onClick={onDelete}>Xóa khỏi nhóm</Button>
         </div>
       )}
