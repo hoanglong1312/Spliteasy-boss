@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { colors, type, formatVND, radius } from '../tokens';
 import {
   PhoneFrame, Screen, IconButton, Card, Avatar, Badge, Button, Input,
+  BottomSheet,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -16,6 +17,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
   const [editBankAccountName, setEditBankAccountName] = useState(d.bankAccountName || '');
   const [editBankName, setEditBankName] = useState(d.bankName || '');
   const [editBankAccount, setEditBankAccount] = useState(d.bankAccount || '');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!d) {
     return (
@@ -60,9 +62,9 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
     });
   }
 
-  async function deleteMember() {
-    if (!window.confirm(`Xóa ${d.name} khỏi nhóm?`)) return;
+  async function confirmDeleteMember() {
     await onAction?.('deleteMember', { memberId: d.id });
+    setShowDeleteConfirm(false);
     onAction?.('back');
   }
 
@@ -194,7 +196,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
             <Button block variant="ghost" style={{ marginTop: 8, fontSize: 13 }} onClick={toggleRole}>
               👑 {d.role === 'treasurer' ? 'Thu quyền Thủ quỹ' : 'Cấp quyền Thủ quỹ'}
             </Button>
-            <Button block variant="danger" style={{ marginTop: 8, fontSize: 13 }} onClick={deleteMember}>
+            <Button block variant="danger" style={{ marginTop: 8, fontSize: 13 }} onClick={() => setShowDeleteConfirm(true)}>
               🗑 Xoá khỏi nhóm
             </Button>
           </Card>
@@ -256,6 +258,18 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
             </form>
           </div>
         </div>
+      )}
+
+      {showDeleteConfirm && isTreasurer && (
+        <BottomSheet title="Xóa thành viên?" onClose={() => setShowDeleteConfirm(false)}>
+          <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
+            Thành viên sẽ được chuyển vào danh sách chờ. Bạn có thể thêm lại sau.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>Hủy</Button>
+            <Button type="button" variant="danger" onClick={confirmDeleteMember}>Xác nhận</Button>
+          </div>
+        </BottomSheet>
       )}
     </PhoneFrame>
   );

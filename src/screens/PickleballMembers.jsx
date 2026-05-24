@@ -25,6 +25,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const [newMemberType, setNewMemberType] = useState('fixed');
   const [candidateQuery, setCandidateQuery] = useState('');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
+  const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
 
   const fixedMembers = d.fixedMembers || d.members || [];
   const casualMembers = d.casualMembers || d.guests || [];
@@ -108,10 +109,15 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     await onAction?.('setMemberRole', { memberId: member.id, role });
   }
 
-  async function deleteMember(member) {
+  function deleteMember(member) {
     setQuickActionMember(null);
-    if (!window.confirm(`Xóa ${member.name} khỏi nhóm?`)) return;
-    await onAction?.('deleteMember', { memberId: member.id });
+    setDeleteConfirmMember(member);
+  }
+
+  async function confirmDeleteMember() {
+    if (!deleteConfirmMember) return;
+    await onAction?.('deleteMember', { memberId: deleteConfirmMember.id });
+    setDeleteConfirmMember(null);
   }
 
   return (
@@ -238,6 +244,18 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
             />
             <Button block variant="success" style={{ marginTop: 14 }} type="submit">Lưu thay đổi</Button>
           </form>
+        </BottomSheet>
+      )}
+
+      {deleteConfirmMember && isTreasurer && (
+        <BottomSheet title="Xóa thành viên?" onClose={() => setDeleteConfirmMember(null)}>
+          <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
+            Thành viên sẽ được chuyển vào danh sách chờ. Bạn có thể thêm lại sau.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmMember(null)}>Hủy</Button>
+            <Button type="button" variant="danger" onClick={confirmDeleteMember}>Xác nhận</Button>
+          </div>
         </BottomSheet>
       )}
 
