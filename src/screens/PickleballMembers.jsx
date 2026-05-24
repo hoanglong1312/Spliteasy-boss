@@ -23,13 +23,17 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberType, setNewMemberType] = useState('fixed');
+  const [addMemberError, setAddMemberError] = useState('');
   const [candidateQuery, setCandidateQuery] = useState('');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
 
   const fixedMembers = d.fixedMembers || d.members || [];
   const casualMembers = d.casualMembers || d.guests || [];
+  const allMembers = d.allMembers || [];
   const memberCandidates = d.memberCandidates || [];
+  const duplicateMember = findDuplicateMember(newMemberName, allMembers);
+  const duplicateMemberInactive = duplicateMember && !isActiveMember(duplicateMember);
   const selectedCandidates = memberCandidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
   const filteredCandidateCards = memberCandidates.filter(candidate => {
     const normalizedQuery = normalizeSearch(candidateQuery);
@@ -67,6 +71,11 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     e.preventDefault();
     const name = newMemberName.trim();
     if (selectedCandidates.length === 0 && !name) return;
+    if (duplicateMember && isActiveMember(duplicateMember)) {
+      setAddMemberError('Tên này đã tồn tại trong nhóm. Vui lòng dùng tên khác.');
+      return;
+    }
+    if (duplicateMember) return;
     for (const candidate of selectedCandidates) {
       if (candidate.isInactive) {
         await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id });
@@ -89,6 +98,19 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     setCandidateQuery('');
     setSelectedCandidateIds([]);
     setShowAddMember(false);
+  }
+
+  async function reactivateDuplicateMember() {
+    if (!duplicateMemberInactive) return;
+    await onAction?.('reactivateMember', { memberId: duplicateMember.id });
+    setNewMemberName('');
+    setAddMemberError('');
+    setShowAddMember(false);
+  }
+
+  function changeNewMemberName(value) {
+    setNewMemberName(value);
+    setAddMemberError('');
   }
 
   function toggleCandidate(candidateId) {
@@ -209,10 +231,31 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
             <Input
               label={memberCandidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên'}
               value={newMemberName}
-              onChange={e => setNewMemberName(e.target.value)}
+              onChange={e => changeNewMemberName(e.target.value)}
               placeholder="Tên thành viên"
               autoFocus
             />
+            {addMemberError && (
+              <div style={{ fontSize: 12, color: colors.danger, marginTop: 8, lineHeight: 1.4 }}>
+                {addMemberError}
+              </div>
+            )}
+            {duplicateMemberInactive && (
+              <div style={{
+                display: 'grid',
+                gap: 8,
+                padding: 10,
+                marginTop: 10,
+                borderRadius: 12,
+                border: `1px solid ${colors.borderSubtle}`,
+                background: colors.cardSurface,
+              }}>
+                <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+                  Thành viên '{duplicateMember.name}' đang ở trạng thái chờ — bạn có muốn thêm lại không?
+                </div>
+                <Button type="button" variant="success" onClick={reactivateDuplicateMember}>Thêm lại</Button>
+              </div>
+            )}
             <TypeSwitch value={newMemberType} onChange={setNewMemberType} />
             <Button block variant="success" style={{ marginTop: 14 }} type="submit">
               {selectedCandidates.length > 0 ? `Lưu ${selectedCandidates.length + (newMemberName.trim() ? 1 : 0)} thành viên` : 'Lưu thành viên'}
@@ -271,6 +314,18 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 function filterMembers(members, query) {
   if (!query) return members;
   return members.filter(member => String(member.name || '').toLowerCase().includes(query));
+}
+
+function findDuplicateMember(name, members) {
+  const normalizedName = String(name || '').trim().toLowerCase();
+  if (!normalizedName) return null;
+  return members.find(member => (
+    String(member?.name || member?.displayName || '').trim().toLowerCase() === normalizedName
+  )) || null;
+}
+
+function isActiveMember(member) {
+  return member?.isActive !== false && member?.is_active !== false;
 }
 
 function normalizeSearch(value) {

@@ -8,7 +8,7 @@ const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8'
 
 test('available member picker includes inactive members from the current group', () => {
   assert.match(dataSource, /const inactiveCurrentMembers = currentMembers\.filter\(member => !isActiveMember\(member\)\)/);
-  assert.match(dataSource, /return \[\.\.\.inactiveCurrentMembers, \.\.\.outsideGroupCandidates\]/);
+  assert.match(dataSource, /return inactiveCurrentMembers\.concat\(outsideGroupCandidates\)/);
   assert.match(dataSource, /isInactive: !isActiveMember\(member\)/);
 });
 

@@ -474,7 +474,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-  return [...inactiveCurrentMembers, ...outsideGroupCandidates]
+  return inactiveCurrentMembers.concat(outsideGroupCandidates)
 }
 
 function candidateProfilesFromDirectory(members, profiles = []) {
@@ -1009,6 +1009,13 @@ function calendarMonthDate(params, fallbackDate) {
 
 function buildPickleballMembersData(state, selectedYearMonth) {
   const today = dateFromYearMonth(selectedYearMonth)
+  const allMemberRows = currentGroupMembers(state).map(member => ({
+    id: member.id,
+    name: member.displayName || member.name || '',
+    displayName: member.displayName || member.name || '',
+    isActive: isActiveMember(member),
+    is_active: member.is_active,
+  }))
   const activeMembers = currentGroupMembers(state).filter(isActiveMember)
   const sessions = getStateMonthSessions(state, today)
   const joinRequests = currentJoinRequests(state)
@@ -1046,6 +1053,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     guests: casualRows,
     fixedMembers: fixedRows,
     casualMembers: casualRows,
+    allMembers: allMemberRows,
     memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles),
     legacyGuests: buildGuestRows(sessions),
   }
