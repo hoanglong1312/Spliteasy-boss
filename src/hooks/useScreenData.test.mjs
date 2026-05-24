@@ -18,13 +18,53 @@ function loadScreenDataBuilders() {
     Intl,
     console,
     fmtVNDFull: value => `${value}`,
-    groupBalance: () => ({}),
-    groupNet: () => 0,
+    groupBalance,
+    groupNet,
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildGroupMemberCandidates }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildGroupDetailData, buildGroupMemberCandidates }`, context)
   return context.__builders
+}
+
+function splitEqual(amount, ids) {
+  const per = Math.round(amount / ids.length)
+  return ids.map((id, index) => ({
+    memberId: id,
+    amount: index === ids.length - 1 ? amount - per * (ids.length - 1) : per,
+  }))
+}
+
+function getShareMap(expense) {
+  if (expense.splits && expense.splits.length > 0) {
+    return Object.fromEntries(expense.splits.map(split => [split.memberId, split.amount]))
+  }
+  const splits = splitEqual(expense.amount, expense.participants)
+  return Object.fromEntries(splits.map(split => [split.memberId, split.amount]))
+}
+
+function groupBalance(group, memberId) {
+  const balances = {}
+  group.members.forEach(id => {
+    if (id !== memberId) balances[id] = 0
+  })
+  const approvedExpenses = (group.expenses || []).filter(expense => expense.status === 'approved')
+  for (const expense of approvedExpenses) {
+    if (!expense.participants || expense.participants.length === 0) continue
+    const share = getShareMap(expense)
+    if (expense.paidBy === memberId) {
+      for (const id of expense.participants) {
+        if (id !== memberId) balances[id] = (balances[id] || 0) + (share[id] || 0)
+      }
+    } else if (expense.participants.includes(memberId) && group.members.includes(expense.paidBy)) {
+      balances[expense.paidBy] = (balances[expense.paidBy] || 0) - (share[memberId] || 0)
+    }
+  }
+  return balances
+}
+
+function groupNet(group, memberId) {
+  return Object.values(groupBalance(group, memberId)).reduce((sum, amount) => sum + amount, 0)
 }
 
 test('group member candidates dedup current casual members against directory rows by name', () => {
@@ -54,6 +94,42 @@ test('group member candidates exclude active current members by name', () => {
   const candidates = buildGroupMemberCandidates(group, members)
 
   assert.deepEqual(candidates.map(member => member.name), ['An'])
+})
+
+test('group detail member balances use payer positive and debtors negative signs', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    members: ['minh-em', 'cuong', 'minh-anh'],
+    expenses: [
+      {
+        id: 'expense-1',
+        groupId: 'expense-1',
+        title: 'Sân',
+        amount: 90000,
+        paidBy: 'minh-em',
+        participants: ['minh-em', 'cuong', 'minh-anh'],
+        status: 'approved',
+        date: '2026-05-24',
+      },
+    ],
+  }
+  const members = [
+    { id: 'minh-em', groupId: 'expense-1', name: 'Minh Em', isActive: true, memberType: 'fixed' },
+    { id: 'cuong', groupId: 'expense-1', name: 'Cường', isActive: true, memberType: 'fixed' },
+    { id: 'minh-anh', groupId: 'expense-1', name: 'Minh Anh', isActive: true, memberType: 'fixed' },
+  ]
+
+  const detail = buildGroupDetailData(group, 'minh-em', members, 'Minh Em', '2026-05')
+  const balances = Object.fromEntries(detail.members.map(member => [member.id, member.balance]))
+
+  assert.equal(detail.balance, 60000)
+  assert.deepEqual(balances, {
+    'minh-em': 60000,
+    cuong: -30000,
+    'minh-anh': -30000,
+  })
 })
 
 test('expense group member candidates use inactive members as pending rows', () => {

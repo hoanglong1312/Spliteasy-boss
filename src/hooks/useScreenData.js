@@ -387,6 +387,9 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const isGroupTreasurer = currentGroupMember?.role === 'treasurer' || String(g.createdBy || g.created_by || '') === String(currentGroupMember?.id || '') || (Boolean(currentGroupMember) && isSoloExpenseGroup)
   const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
   const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
+  const memberBalanceMap = Object.fromEntries(
+    groupMembers.map(member => [member.id, groupNet(monthlyGroup, member.id)])
+  )
   const activities = safeArray(monthlyGroup.expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -422,7 +425,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
       joinDate: fullExpenseDate(member.createdAt || member.created_at),
-      balance: balanceMap[member.id] || 0,
+      balance: memberBalanceMap[member.id] || 0,
       isCurrentUser: String(member.id) === String(currentGroupMember?.id || ''),
       payerTransactions: buildMemberPayerTransactions(g, member.id, selectedYearMonth),
     })),
@@ -433,7 +436,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         initials: initials(member),
         color: member.color || '#6366f1',
         role: member.role,
-        amount: balanceMap[member.id] || 0,
+        amount: memberBalanceMap[member.id] || 0,
       }))
       .filter(row => row.amount !== 0)
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)),
