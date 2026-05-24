@@ -66,7 +66,7 @@ test('GroupDetail lets group creators manage members without treasurer role', ()
   assert.match(screenDataSource, /isGroupCreator,/);
 });
 
-test('GroupDetail member rows show balance under the member name instead of bank subtitle', () => {
+test('GroupDetail member rows show balance inline on the right of the member name', () => {
   const memberRowSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberRow'),
     groupDetailSource.indexOf('function MemberDetailPanel')
@@ -75,7 +75,10 @@ test('GroupDetail member rows show balance under the member name instead of bank
   assert.doesNotMatch(memberRowSource, /Chưa cập nhật ngân hàng/);
   assert.match(memberRowSource, /const balance = Number\(member\.balance \|\| 0\)/);
   assert.match(memberRowSource, /const balanceTone = balance < 0 \? colors\.danger : balance > 0 \? '#6ee7b7' : colors\.textSecondary/);
-  assert.match(memberRowSource, /\{balance === 0 \? '0 đ' : `\$\{balance > 0 \? '\+' : '-'\}\$\{formatVND\(Math\.abs\(balance\)\)\}`\}/);
+  assert.match(memberRowSource, /const balanceLabel = balance === 0 \? '0 đ' : `\$\{balance > 0 \? '\+' : '-'\}\$\{formatVND\(Math\.abs\(balance\)\)\}`/);
+  assert.match(memberRowSource, /<div style=\{\{ flex: 1, minWidth: 0 \}\}>/);
+  assert.match(memberRowSource, /<div style=\{\{ fontSize: 15, fontWeight: 800, color: balanceTone, \.\.\.type\.mono \}\}>\s*\{balanceLabel\}\s*<\/div>\s*\{isTreasurer && \(/);
+  assert.doesNotMatch(memberRowSource, /marginTop: 3, \.\.\.type\.mono/);
 });
 
 test('GroupDetail member management adds members without bank fields', () => {

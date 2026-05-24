@@ -391,6 +391,7 @@ function BalanceRow({ row }) {
 function MemberRow({ member, isTreasurer, onOpen, onMore }) {
   const balance = Number(member.balance || 0);
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
+  const balanceLabel = balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`;
   return (
     <Card
       onClick={() => onOpen?.(member)}
@@ -408,14 +409,16 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Avatar initial={member.initials} size={42} color={member.color} ring={false} style={{ borderRadius: 14 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{ fontSize: 13, fontWeight: 800 }}>{member.name}</div>
-            {member.role === 'treasurer' && <Badge tone="warn">THỦ QUỸ</Badge>}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 800, color: balanceTone, marginTop: 3, ...type.mono }}>
-            {balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`}
-          </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+          {member.role === 'treasurer' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
+              <Badge tone="warn">THỦ QUỸ</Badge>
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: balanceTone, ...type.mono }}>
+          {balanceLabel}
         </div>
         {isTreasurer && (
           <button type="button" aria-label={`Sửa ${member.name}`} onClick={(event) => { event.stopPropagation(); onMore?.(member); }} style={{
