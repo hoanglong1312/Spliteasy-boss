@@ -463,9 +463,13 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
   const casualNames = new Set(
     casualCurrentMembers.map(member => (member.name || '').toLowerCase().trim()).filter(Boolean)
   )
+  const allCurrentMemberNames = new Set(
+    currentMembers.map(member => (member.displayName || member.name || '').toLowerCase().trim()).filter(Boolean)
+  )
   const outsideGroupCandidates = candidateProfilesFromDirectory(members, profiles)
     .filter(member => {
-      const nameKey = (member.name || '').toLowerCase().trim()
+      const nameKey = (member.name || member.displayName || '').toLowerCase().trim()
+      if (nameKey && allCurrentMemberNames.has(nameKey)) return false
       if (nameKey && casualNames.has(nameKey)) return false
       return !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id))
     })

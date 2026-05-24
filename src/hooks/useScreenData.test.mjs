@@ -41,6 +41,21 @@ test('group member candidates dedup current casual members against directory row
   assert.equal(candidates[0].memberId, 'pickle-hoang')
 })
 
+test('group member candidates exclude active current members by name', () => {
+  const { buildGroupMemberCandidates } = loadScreenDataBuilders()
+  const group = { id: 'expense-1', groupType: 'expense', members: ['group-cuong', 'group-minh'] }
+  const members = [
+    { id: 'group-cuong', groupId: 'expense-1', name: 'Cường', memberType: 'fixed', isActive: true },
+    { id: 'group-minh', groupId: 'expense-1', name: 'Minh', memberType: 'fixed', isActive: true },
+    { id: 'pickle-cuong', groupId: 'pickle-1', name: 'Cường', memberType: 'fixed', isActive: true },
+    { id: 'pickle-an', groupId: 'pickle-1', name: 'An', memberType: 'fixed', isActive: true },
+  ]
+
+  const candidates = buildGroupMemberCandidates(group, members)
+
+  assert.deepEqual(candidates.map(member => member.name), ['An'])
+})
+
 test('expense group member candidates use inactive members as pending rows', () => {
   const { buildGroupMemberCandidates } = loadScreenDataBuilders()
   const group = { id: 'expense-1', groupType: 'expense', members: ['inactive-an', 'active-binh'] }
