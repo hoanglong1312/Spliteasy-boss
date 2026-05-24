@@ -499,19 +499,11 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [candidateQuery, setCandidateQuery] = useState('');
   const [name, setName] = useState('');
-  const [bankAccountName, setBankAccountName] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
   const selectedCandidates = candidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
   const candidateCards = candidates.map(candidate => ({
     ...candidate,
     selected: selectedCandidateIds.includes(String(candidate.id)),
   }));
-  const filteredCandidateCards = candidateCards.filter(candidate => {
-    const query = normalizeSearch(candidateQuery);
-    if (!query) return true;
-    return normalizeSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(query);
-  });
 
   async function save(e) {
     e.preventDefault();
@@ -523,9 +515,6 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
         name: candidate.name,
         profileId: candidate?.profileId || candidate?.id || '',
         type: 'fixed',
-        bankAccountName: candidate?.bankAccountName || '',
-        bankName: candidate?.bankName || '',
-        bankAccount: candidate?.bankAccount || '',
       });
     }
     if (cleanName) {
@@ -534,9 +523,6 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
         name: cleanName,
         profileId: '',
         type: 'fixed',
-        bankAccountName: bankAccountName.trim(),
-        bankName,
-        bankAccount: bankAccount.trim(),
       });
     }
     onClose?.();
@@ -577,9 +563,6 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
           autoFocus
           placeholder="Tên thành viên"
         />
-        <Field label="Tên tài khoản" value={bankAccountName} onChange={setBankAccountName} placeholder="Tên trên tài khoản ngân hàng" />
-        <BankSelect value={bankName} onChange={setBankName} />
-        <Field label="Số tài khoản" value={bankAccount} onChange={setBankAccount} inputMode="numeric" placeholder="Chưa cập nhật" />
         <Button block variant="brand" style={{ marginTop: 14 }} type="submit">{actionLabel}</Button>
       </form>
     </BottomSheet>
