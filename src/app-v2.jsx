@@ -514,7 +514,8 @@ export default function AppV2() {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
       const currentGroup = (state.groups || []).find(group => String(group.id) === String(state.currentGroupId))
-      const isPickleballGroup = (currentGroup?.groupType || currentGroup?.group_type || '') === 'pickleball'
+      const groupText = `${currentGroup?.name || ''} ${currentGroup?.emoji || ''}`.toLowerCase()
+      const isPickleballGroup = groupText.includes('pickle') || groupText.includes('🏓') || groupText.includes('🏸')
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
@@ -530,7 +531,8 @@ export default function AppV2() {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
       const currentGroup = (state.groups || []).find(group => String(group.id) === String(state.currentGroupId))
-      const isPickleballGroup = (currentGroup?.groupType || currentGroup?.group_type || '') === 'pickleball'
+      const groupText = `${currentGroup?.name || ''} ${currentGroup?.emoji || ''}`.toLowerCase()
+      const isPickleballGroup = groupText.includes('pickle') || groupText.includes('🏓') || groupText.includes('🏸')
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
