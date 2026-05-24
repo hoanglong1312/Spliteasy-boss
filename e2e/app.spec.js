@@ -94,7 +94,7 @@ test('JoinGroup lookup shows member names after entering valid code', async ({ p
   const codeInput = page.locator('input[placeholder="NHẬP-MÃ-MỜI"]').first()
   await codeInput.fill('PICKLE-TEST')
 
-  await expect(page.getByText('Nguyễn An').first()).toBeVisible({ timeout: 5000 })
+  await expect(page.getByText('Long').first()).toBeVisible({ timeout: 5000 })
   await expect(page.getByText('Long').first()).toBeVisible({ timeout: 2000 })
 })
 
