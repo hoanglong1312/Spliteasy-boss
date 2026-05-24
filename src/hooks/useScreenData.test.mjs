@@ -1,8 +1,45 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import vm from 'node:vm'
 
 const dataSource = readFileSync(new URL('./useScreenData.js', import.meta.url), 'utf8')
+
+function loadScreenDataBuilders() {
+  const source = dataSource
+    .replace(/import \{ useEffect, useMemo, useRef \} from 'react'\n/, '')
+    .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
+    .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
+    .replace('export function useScreenData', 'function useScreenData')
+
+  const context = {
+    Date,
+    Math,
+    Intl,
+    console,
+    fmtVNDFull: value => `${value}`,
+    groupBalance: () => ({}),
+    groupNet: () => 0,
+    pickleSummary: () => ({ memberOwes: {} }),
+    recentActivity: () => [],
+  }
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildGroupMemberCandidates }`, context)
+  return context.__builders
+}
+
+test('group member candidates dedup current casual members against directory rows by name', () => {
+  const { buildGroupMemberCandidates } = loadScreenDataBuilders()
+  const group = { id: 'pickle-1', groupType: 'pickleball', members: ['pickle-hoang'] }
+  const members = [
+    { id: 'pickle-hoang', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', profileId: null },
+    { id: 'expense-hoang', groupId: 'expense-1', name: 'Hoàng Em', memberType: 'fixed', profileId: null },
+  ]
+
+  const candidates = buildGroupMemberCandidates(group, members)
+
+  assert.deepEqual(candidates.map(member => member.name), ['Hoàng Em'])
+  assert.equal(candidates[0].memberId, 'pickle-hoang')
+})
 
 test('Pickleball overview reads current-month court fee and current fixed members', () => {
   const overviewMatch = dataSource.match(/function buildPickleballOverviewData[\s\S]*?\n}\n\nfunction buildProfileData/)
