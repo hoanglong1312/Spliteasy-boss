@@ -583,6 +583,10 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
     const cleanName = name.trim();
     if (selectedCandidates.length === 0 && !cleanName) return;
     for (const candidate of selectedCandidates) {
+      if (candidate.isInactive) {
+        await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId });
+        continue;
+      }
       await onAction?.('addMember', {
         groupId,
         name: candidate.name,

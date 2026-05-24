@@ -478,8 +478,9 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       isInactive: !isActiveMember(member) || (isPickleballGroup && memberType(member) === 'casual'),
       memberType: memberType(member),
     }))
+  const dedupedCasualCurrentMembers = dedupeMemberRowsByProfileOrName(casualCurrentMembers)
   const casualNames = new Set(
-    casualCurrentMembers.map(member => (member.name || '').toLowerCase().trim()).filter(Boolean)
+    dedupedCasualCurrentMembers.map(member => (member.name || '').toLowerCase().trim()).filter(Boolean)
   )
   const allCurrentMemberNames = new Set(
     currentMembers.map(member => (member.displayName || member.name || '').toLowerCase().trim()).filter(Boolean)
@@ -507,7 +508,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-  return casualCurrentMembers.concat(outsideGroupCandidates)
+  return dedupedCasualCurrentMembers.concat(outsideGroupCandidates)
 }
 
 function candidateProfilesFromDirectory(members, profiles = []) {
@@ -1054,7 +1055,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
   const joinRequests = currentJoinRequests(state)
   const totalSessions = sessions.length || 1
   const fixedMembers = activeMembers.filter(member => memberType(member) === 'fixed')
-  const casualMembers = activeMembers.filter(member => memberType(member) === 'casual')
+  const casualMembers = dedupeMemberRowsByProfileOrName(activeMembers.filter(member => memberType(member) === 'casual'))
   const joinRequestRows = joinRequests.map(request => {
     const created = parseDate(request.createdAt || request.created_at)
     return {
@@ -1856,6 +1857,16 @@ function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
     bankAccount: member.bankAccount || member.bank_account || '',
     color: member.color,
   }
+}
+
+function dedupeMemberRowsByProfileOrName(members) {
+  const seen = new Set()
+  return safeArray(members).filter(member => {
+    const key = String(member?.profileId || member?.profile_id || normalizeName(member?.displayName || member?.name) || member?.id || '')
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 function buildMemberAttendance(sessions, memberId, members = []) {

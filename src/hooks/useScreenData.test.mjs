@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildGroupDetailData, buildGroupMemberCandidates }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildGroupDetailData, buildGroupMemberCandidates, buildPickleballMembersData }`, context)
   return context.__builders
 }
 
@@ -80,6 +80,21 @@ test('group member candidates dedup current casual members against directory row
 
   assert.deepEqual(candidates.map(member => member.name), ['Hoàng Em'])
   assert.equal(candidates[0].memberId, 'pickle-hoang')
+})
+
+test('group member candidates collapse duplicate current casual rows by name', () => {
+  const { buildGroupMemberCandidates } = loadScreenDataBuilders()
+  const group = { id: 'pickle-1', groupType: 'pickleball', members: ['pickle-tuan-old', 'pickle-tuan-new'] }
+  const members = [
+    { id: 'pickle-tuan-old', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', profileId: 'profile-tuan' },
+    { id: 'pickle-tuan-new', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', profileId: 'profile-tuan' },
+    { id: 'pickle-hoang-em', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', profileId: 'profile-hoang-em' },
+  ]
+
+  const candidates = buildGroupMemberCandidates(group, members)
+
+  assert.deepEqual(candidates.map(member => member.name), ['Tuấn', 'Hoàng Em'])
+  assert.equal(candidates[0].memberId, 'pickle-tuan-old')
 })
 
 test('group member candidates exclude active current members by name', () => {
@@ -280,12 +295,33 @@ test('Pickleball members data exposes fixed/casual rows with rank metadata', () 
 
   const membersSource = membersMatch[0]
   assert.match(membersSource, /const fixedMembers = activeMembers\.filter\(member => memberType\(member\) === 'fixed'\)/)
-  assert.match(membersSource, /const casualMembers = activeMembers\.filter\(member => memberType\(member\) === 'casual'\)/)
+  assert.match(membersSource, /const casualMembers = dedupeMemberRowsByProfileOrName\(activeMembers\.filter\(member => memberType\(member\) === 'casual'\)\)/)
   assert.match(membersSource, /type: memberType\(member\)/)
   assert.match(membersSource, /fixedMembers: fixedRows/)
   assert.match(membersSource, /casualMembers: casualRows/)
   assert.match(dataSource, /progressPct/)
   assert.match(dataSource, /rank: calculateMemberRank\(progressPct\)/)
+})
+
+test('Pickleball members data collapses duplicate casual rows by shared profile', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', name: 'Virgo Pickleball 246', members: ['fixed-minh', 'casual-tuan-old', 'casual-tuan-new', 'casual-hoang'] },
+    groups: [{ id: 'pickle-1', name: 'Virgo Pickleball 246', members: ['fixed-minh', 'casual-tuan-old', 'casual-tuan-new', 'casual-hoang'] }],
+    members: [
+      { id: 'fixed-minh', groupId: 'pickle-1', name: 'Minh', memberType: 'fixed', isActive: true },
+      { id: 'casual-tuan-old', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', profileId: 'profile-tuan', isActive: true },
+      { id: 'casual-tuan-new', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', profileId: 'profile-tuan', isActive: true },
+      { id: 'casual-hoang', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', profileId: 'profile-hoang', isActive: true },
+    ],
+    sessions: [],
+  }
+
+  const data = buildPickleballMembersData(state, '2026-05')
+
+  assert.deepEqual(data.guests.map(member => member.name), ['Tuấn', 'Hoàng Em'])
+  assert.equal(data.stats.guests, 2)
 })
 
 test('Member detail data includes attendance rank and casual court-fee logic', () => {
