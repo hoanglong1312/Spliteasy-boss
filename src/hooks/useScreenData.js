@@ -445,7 +445,18 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
   const currentIds = new Set(currentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
-  return candidateProfilesFromDirectory(members, profiles)
+  const inactiveCurrentMembers = currentMembers.filter(member => !isActiveMember(member))
+    .map(member => ({
+      id: member.id,
+      memberId: member.id,
+      profileId: member.profileId || member.profile_id || '',
+      name: member.displayName || member.name || '',
+      bankName: member.bankName || member.bank_name || '',
+      bankAccount: member.bankAccount || member.bank_account || '',
+      bankAccountName: member.bankAccountName || member.bank_account_name || '',
+      isInactive: !isActiveMember(member),
+    }))
+  const outsideGroupCandidates = candidateProfilesFromDirectory(members, profiles)
     .filter(member => !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id)))
     .map(member => ({
       id: member.profileId || member.profile_id || member.id,
@@ -463,6 +474,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+  return [...inactiveCurrentMembers, ...outsideGroupCandidates]
 }
 
 function candidateProfilesFromDirectory(members, profiles = []) {

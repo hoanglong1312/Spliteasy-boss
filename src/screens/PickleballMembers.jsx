@@ -68,6 +68,10 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     const name = newMemberName.trim();
     if (selectedCandidates.length === 0 && !name) return;
     for (const candidate of selectedCandidates) {
+      if (candidate.isInactive) {
+        await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id });
+        continue;
+      }
       await onAction?.('addMember', {
         name: candidate.name,
         profileId: candidate?.profileId || candidate?.id || '',
@@ -192,7 +196,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
         <BottomSheet title="Thêm thành viên" onClose={() => setShowAddMember(false)}>
           <form onSubmit={saveNewMember}>
             <MemberPicker
-              candidates={filteredCandidateCards.length === memberCandidates.length ? memberCandidates : memberCandidates}
+              candidates={filteredCandidateCards}
               selectedIds={selectedCandidateIds}
               query={candidateQuery}
               onQueryChange={setCandidateQuery}
