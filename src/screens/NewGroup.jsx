@@ -160,7 +160,7 @@ export default function NewGroup({ data, onAction }) {
           <>
             <SectionHeader>Thêm thành viên có sẵn</SectionHeader>
             <MemberPicker
-              candidates={profileOptions}
+              candidates={filteredProfileOptions}
               selectedIds={selectedProfileIds}
               query={profileQuery}
               onQueryChange={setProfileQuery}

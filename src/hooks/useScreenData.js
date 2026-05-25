@@ -1429,15 +1429,16 @@ function buildProfileOptions(state = {}) {
 }
 
 function dedupeProfilesFromMembers(members, profiles = []) {
-  const byProfile = new Map()
+  const byIdentity = new Map()
   const profilesById = new Map(safeArray(profiles).map(profile => [String(profile.id), profile]))
   safeArray(members).filter(isActiveMember).forEach(member => {
-    const key = String(member.profileId || member.profile_id || member.id || '')
-    if (!key || byProfile.has(key)) return
-    const profile = profilesById.get(key) || {}
-    byProfile.set(key, {
+    const profile = profilesById.get(String(member.profileId || member.profile_id || '')) || {}
+    const name = profile.name || member.displayName || member.name || ''
+    const key = normalizeName(name) || String(member.profileId || member.profile_id || member.id || '')
+    if (!key || byIdentity.has(key)) return
+    byIdentity.set(key, {
       id: member.profileId || member.profile_id || member.id,
-      name: profile.name || member.displayName || member.name,
+      name,
       initials: initials(profile.name ? profile : member),
       color: profile.color || member.color,
       bankName: profile.bankName || profile.bank_name || member.bankName || member.bank_name,
@@ -1445,7 +1446,7 @@ function dedupeProfilesFromMembers(members, profiles = []) {
       bankAccountName: profile.bankAccountName || profile.bank_account_name || member.bankAccountName || member.bank_account_name,
     })
   })
-  return [...byProfile.values()]
+  return [...byIdentity.values()]
 }
 
 function buildSettleAllData(state) {

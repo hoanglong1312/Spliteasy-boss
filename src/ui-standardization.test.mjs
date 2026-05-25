@@ -49,7 +49,7 @@ test('group and pickleball member sheets use the same searchable multi-select pi
 test('new group uses shared module hero and scrollable existing-profile picker', () => {
   assert.match(newGroupSource, /ModuleHero/)
   assert.match(newGroupSource, /MemberPicker/)
-  assert.match(newGroupSource, /candidates=\{profileOptions\}/)
+  assert.match(newGroupSource, /candidates=\{filteredProfileOptions\}/)
   assert.match(newGroupSource, /selectedIds=\{selectedProfileIds\}/)
   assert.match(newGroupSource, /onQueryChange=\{setProfileQuery\}/)
   assert.match(newGroupSource, /profileIds: selectedProfileIds/)

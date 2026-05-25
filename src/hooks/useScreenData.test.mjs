@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildPickleballMembersData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildNewGroupData, buildPickleballMembersData }`, context)
   return context.__builders
 }
 
@@ -217,6 +217,29 @@ test('add expense data does not fall back to pickleball members for an empty exp
 
   assert.deepEqual(data.members, [])
   assert.equal(data.memberCount, 0)
+})
+
+test('new group profile options collapse duplicate member identities by normalized name', () => {
+  const { buildNewGroupData } = loadScreenDataBuilders()
+  const state = {
+    profiles: [
+      { id: 'profile-minh-anh-a', name: 'Minh Anh' },
+      { id: 'profile-minh-anh-b', name: 'Minh Anh' },
+      { id: 'profile-tuan-a', name: 'Tuấn' },
+      { id: 'profile-tuan-b', name: 'Tuấn' },
+    ],
+    members: [
+      { id: 'member-minh-anh-a', profileId: 'profile-minh-anh-a', name: 'Minh Anh', isActive: true },
+      { id: 'member-minh-anh-b', profileId: 'profile-minh-anh-b', name: 'Minh Anh', isActive: true },
+      { id: 'member-tuan-a', profileId: 'profile-tuan-a', name: 'Tuấn', isActive: true },
+      { id: 'member-tuan-b', profileId: 'profile-tuan-b', name: 'Tuấn', isActive: true },
+      { id: 'member-viet-anh', profileId: 'profile-viet-anh', name: 'Việt Anh', isActive: true },
+    ],
+  }
+
+  const data = buildNewGroupData(state)
+
+  assert.deepEqual(Array.from(data.profileOptions, profile => profile.name), ['Minh Anh', 'Tuấn', 'Việt Anh'])
 })
 
 test('group detail member balances use payer positive and debtors negative signs', () => {
