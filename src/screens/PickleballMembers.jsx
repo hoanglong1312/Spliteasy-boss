@@ -340,8 +340,8 @@ function normalizeSearch(value) {
 }
 
 function memberPickerSectionTitle(candidates) {
-  return candidates.length > 0 && candidates.every(candidate => (candidate.memberType || candidate.type) === 'casual')
-    ? 'Danh sách vãng lai'
+  return candidates.length > 0 && candidates.every(candidate => candidate.isInactive)
+    ? 'Danh sách chờ thêm lại'
     : 'Thành viên có sẵn';
 }
 

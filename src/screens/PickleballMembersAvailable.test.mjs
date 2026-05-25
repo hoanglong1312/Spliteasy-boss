@@ -7,11 +7,10 @@ const groupDetailSource = readFileSync(new URL('./GroupDetail.jsx', import.meta.
 const dataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 
-test('available member picker includes casual members from the current group', () => {
-  assert.match(dataSource, /const isPickleballGroup = groupKind\(group\) === 'pickleball'/);
-  assert.match(dataSource, /isPickleballGroup \? \(!isActiveMember\(member\) \|\| memberType\(member\) === 'casual'\) : !isActiveMember\(member\)/);
-  assert.match(dataSource, /return dedupedCasualCurrentMembers\.concat\(outsideGroupCandidates\)/);
-  assert.match(dataSource, /isInactive: !isActiveMember\(member\) \|\| \(isPickleballGroup && memberType\(member\) === 'casual'\)/);
+test('available member picker includes inactive members from the current group', () => {
+  assert.match(dataSource, /!isActiveMember\(member\)/);
+  assert.match(dataSource, /return dedupedInactiveCurrentMembers\.concat\(outsideGroupCandidates\)/);
+  assert.match(dataSource, /isInactive: !isActiveMember\(member\)/);
   assert.match(dataSource, /memberType: memberType\(member\)/);
 });
 

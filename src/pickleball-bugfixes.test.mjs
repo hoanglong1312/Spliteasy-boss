@@ -407,7 +407,7 @@ test('pickleball members data exposes existing profile candidates outside the cl
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {
     currentGroupId: 'club',
-    currentGroup: { id: 'club', name: 'CLB' },
+    currentGroup: { id: 'club', name: 'CLB', type: 'pickleball' },
     profiles: [
       { id: 'p1', name: 'Long' },
       { id: 'p2', name: 'Tiến' },
@@ -442,6 +442,26 @@ test('pickleball members data ignores stale member ids from other groups', () =>
 
   assert.deepEqual(data.members.map(member => member.id), ['pickle-minh-anh'])
   assert.deepEqual(data.allMembers.map(member => member.id), ['pickle-minh-anh'])
+})
+
+test('pickleball member candidates include inactive rows instead of active casual rows', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'club',
+    currentGroup: { id: 'club', name: 'CLB', type: 'pickleball' },
+    members: [
+      { id: 'fixed-active', groupId: 'club', profileId: 'p1', name: 'Cố Định', memberType: 'fixed', isActive: true },
+      { id: 'casual-active', groupId: 'club', profileId: 'p2', name: 'Vãng Lai', memberType: 'casual', isActive: true },
+      { id: 'fixed-inactive', groupId: 'club', profileId: 'p3', name: 'Đã Xóa', memberType: 'fixed', isActive: false },
+      { id: 'casual-inactive', groupId: 'club', profileId: 'p4', name: 'Đã Ẩn', memberType: 'casual', isActive: false },
+    ],
+    pickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state)
+
+  assert.deepEqual(data.memberCandidates.map(member => member.id), ['fixed-inactive', 'casual-inactive'])
+  assert.deepEqual(data.memberCandidates.map(member => member.isInactive), [true, true])
 })
 
 test('settings screen no longer renders venue selection', () => {

@@ -68,11 +68,11 @@ function groupNet(group, memberId) {
   return Object.values(groupBalance(group, memberId)).reduce((sum, amount) => sum + amount, 0)
 }
 
-test('group member candidates dedup current casual members against directory rows by name', () => {
+test('group member candidates dedup inactive current members against directory rows by name', () => {
   const { buildGroupMemberCandidates } = loadScreenDataBuilders()
   const group = { id: 'pickle-1', groupType: 'pickleball', members: ['pickle-hoang'] }
   const members = [
-    { id: 'pickle-hoang', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', profileId: null },
+    { id: 'pickle-hoang', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'fixed', isActive: false, profileId: null },
     { id: 'expense-hoang', groupId: 'expense-1', name: 'Hoàng Em', memberType: 'fixed', profileId: null },
   ]
 
@@ -82,13 +82,13 @@ test('group member candidates dedup current casual members against directory row
   assert.equal(candidates[0].memberId, 'pickle-hoang')
 })
 
-test('group member candidates collapse duplicate current casual rows by name', () => {
+test('group member candidates collapse duplicate inactive current rows by name', () => {
   const { buildGroupMemberCandidates } = loadScreenDataBuilders()
   const group = { id: 'pickle-1', groupType: 'pickleball', members: ['pickle-tuan-old', 'pickle-tuan-new'] }
   const members = [
-    { id: 'pickle-tuan-old', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', profileId: 'profile-tuan' },
-    { id: 'pickle-tuan-new', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', profileId: 'profile-tuan' },
-    { id: 'pickle-hoang-em', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', profileId: 'profile-hoang-em' },
+    { id: 'pickle-tuan-old', groupId: 'pickle-1', name: 'Tuấn', memberType: 'fixed', isActive: false, profileId: 'profile-tuan' },
+    { id: 'pickle-tuan-new', groupId: 'pickle-1', name: 'Tuấn', memberType: 'casual', isActive: false, profileId: 'profile-tuan' },
+    { id: 'pickle-hoang-em', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', isActive: false, profileId: 'profile-hoang-em' },
   ]
 
   const candidates = buildGroupMemberCandidates(group, members)

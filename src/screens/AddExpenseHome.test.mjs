@@ -115,13 +115,12 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
-  assert.match(screenDataSource, /const isPickleballGroup = groupKind\(group\) === 'pickleball'/);
-  assert.match(screenDataSource, /isPickleballGroup \? \(!isActiveMember\(member\) \|\| memberType\(member\) === 'casual'\) : !isActiveMember\(member\)/);
+  assert.match(screenDataSource, /!isActiveMember\(member\)/);
   assert.match(groupDetailSource, /const inactiveCandidates = candidates\.filter\(candidate => candidate\.isInactive\)/);
   assert.match(groupDetailSource, /const activeCandidates = candidates\.filter\(candidate => !candidate\.isInactive\)/);
   assert.match(groupDetailSource, /const inactiveCandidateCards = inactiveCandidates\.map\(candidate => \(/);
   assert.match(groupDetailSource, /const activeCandidateCards = activeCandidates\.map\(candidate => \(/);
-  assert.match(groupDetailSource, /sectionTitle=\{isPickleball \? 'Danh sách vãng lai' : 'Danh sách chờ thêm lại'\}/);
+  assert.match(groupDetailSource, /sectionTitle="Danh sách chờ thêm lại"/);
   assert.match(groupDetailSource, /sectionTitle="Thành viên có sẵn"/);
   assert.match(groupDetailSource, /const \[inactiveCandidateQuery, setInactiveCandidateQuery\] = useState\(''\)/);
   assert.match(groupDetailSource, /const \[activeCandidateQuery, setActiveCandidateQuery\] = useState\(''\)/);

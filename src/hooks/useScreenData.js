@@ -463,9 +463,8 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
   const currentIds = new Set(currentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
-  const isPickleballGroup = groupKind(group) === 'pickleball'
-  const casualCurrentMembers = currentMembers.filter(member => (
-    isPickleballGroup ? (!isActiveMember(member) || memberType(member) === 'casual') : !isActiveMember(member)
+  const inactiveCurrentMembers = currentMembers.filter(member => (
+    !isActiveMember(member)
   ))
     .map(member => ({
       id: member.id,
@@ -475,12 +474,12 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       bankName: member.bankName || member.bank_name || '',
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
-      isInactive: !isActiveMember(member) || (isPickleballGroup && memberType(member) === 'casual'),
+      isInactive: !isActiveMember(member),
       memberType: memberType(member),
     }))
-  const dedupedCasualCurrentMembers = dedupeMemberRowsByProfileOrName(casualCurrentMembers)
-  const casualNames = new Set(
-    dedupedCasualCurrentMembers.map(member => (member.name || '').toLowerCase().trim()).filter(Boolean)
+  const dedupedInactiveCurrentMembers = dedupeMemberRowsByProfileOrName(inactiveCurrentMembers)
+  const inactiveNames = new Set(
+    dedupedInactiveCurrentMembers.map(member => (member.name || '').toLowerCase().trim()).filter(Boolean)
   )
   const allCurrentMemberNames = new Set(
     currentMembers.map(member => (member.displayName || member.name || '').toLowerCase().trim()).filter(Boolean)
@@ -489,7 +488,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
     .filter(member => {
       const nameKey = (member.name || member.displayName || '').toLowerCase().trim()
       if (nameKey && allCurrentMemberNames.has(nameKey)) return false
-      if (nameKey && casualNames.has(nameKey)) return false
+      if (nameKey && inactiveNames.has(nameKey)) return false
       return !currentIds.has(String(member.id)) && !currentProfileIds.has(String(member.profileId || member.profile_id || member.id))
     })
     .map(member => ({
@@ -508,7 +507,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
       return true
     })
     .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
-  return dedupedCasualCurrentMembers.concat(outsideGroupCandidates)
+  return dedupedInactiveCurrentMembers.concat(outsideGroupCandidates)
 }
 
 function candidateProfilesFromDirectory(members, profiles = []) {

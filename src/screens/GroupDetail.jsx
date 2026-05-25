@@ -620,13 +620,13 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
         {inactiveCandidateCards.length > 0 && (
           <div style={{ marginTop: 12 }}>
             <MemberPicker
-              aria-label={isPickleball ? 'Danh sách vãng lai' : 'Danh sách chờ thêm lại'}
+              aria-label="Danh sách chờ thêm lại"
               candidates={inactiveCandidateCards}
               selectedIds={selectedCandidateIds}
               query={inactiveCandidateQuery}
               onQueryChange={setInactiveCandidateQuery}
               onToggle={toggleCandidate}
-              sectionTitle={isPickleball ? 'Danh sách vãng lai' : 'Danh sách chờ thêm lại'}
+              sectionTitle="Danh sách chờ thêm lại"
               placeholder="Tìm vài ký tự để lọc thành viên"
               emptyText="Không có thành viên phù hợp."
               tone="groups"
