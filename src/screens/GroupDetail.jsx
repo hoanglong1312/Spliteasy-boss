@@ -633,22 +633,21 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
             />
           </div>
         )}
-        {activeCandidateCards.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <MemberPicker
-              aria-label="Thành viên có sẵn"
-              candidates={activeCandidateCards}
-              selectedIds={selectedCandidateIds}
-              query={activeCandidateQuery}
-              onQueryChange={setActiveCandidateQuery}
-              onToggle={toggleCandidate}
-              sectionTitle="Thành viên có sẵn"
-              placeholder="Tìm vài ký tự để lọc thành viên"
-              emptyText="Không có thành viên phù hợp."
-              tone="groups"
-            />
-          </div>
-        )}
+        <div style={{ marginTop: 12 }}>
+          <MemberPicker
+            aria-label="Thành viên có sẵn"
+            candidates={activeCandidateCards}
+            selectedIds={selectedCandidateIds}
+            query={activeCandidateQuery}
+            onQueryChange={setActiveCandidateQuery}
+            onToggle={toggleCandidate}
+            sectionTitle="Thành viên có sẵn"
+            placeholder="Tìm vài ký tự để lọc thành viên"
+            emptyText="Không có thành viên phù hợp."
+            tone="groups"
+            maxListHeight={220}
+          />
+        </div>
         <Field
           label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
           value={name}

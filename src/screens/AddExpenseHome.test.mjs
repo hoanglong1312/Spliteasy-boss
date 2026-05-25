@@ -122,6 +122,8 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(groupDetailSource, /const activeCandidateCards = activeCandidates\.map\(candidate => \(/);
   assert.match(groupDetailSource, /sectionTitle="Danh sách chờ thêm lại"/);
   assert.match(groupDetailSource, /sectionTitle="Thành viên có sẵn"/);
+  assert.doesNotMatch(addMemberEditorSource, /\{activeCandidateCards\.length > 0 &&/);
+  assert.match(addMemberEditorSource, /<MemberPicker[\s\S]*sectionTitle="Thành viên có sẵn"[\s\S]*maxListHeight=\{220\}/);
   assert.match(groupDetailSource, /const \[inactiveCandidateQuery, setInactiveCandidateQuery\] = useState\(''\)/);
   assert.match(groupDetailSource, /const \[activeCandidateQuery, setActiveCandidateQuery\] = useState\(''\)/);
   assert.doesNotMatch(groupDetailSource, /function memberPickerSectionTitle/);
