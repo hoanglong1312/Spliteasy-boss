@@ -506,10 +506,12 @@ export default function AppV2() {
       if (!memberId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const { error } = await sb
+      let request = sb
         .from('members')
         .update({ member_type: payload?.type })
         .eq('id', memberId)
+      if (payload?.groupId) request = request.eq('group_id', payload.groupId)
+      const { error } = await request
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
       return
@@ -537,12 +539,14 @@ export default function AppV2() {
       const targetGroupId = payload?.groupId || state.currentGroupId
       const currentGroup = (state.groups || []).find(group => String(group.id) === String(targetGroupId))
       const isPickleballGroup = isPickleballActionGroup(currentGroup)
+      if (!isPickleballGroup) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update(isPickleballGroup ? { member_type: 'casual' } : { is_active: false })
+        .update({ member_type: 'casual' })
         .eq('id', memberId)
+        .eq('group_id', targetGroupId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
       return
@@ -560,6 +564,7 @@ export default function AppV2() {
         .from('members')
         .update(isPickleballGroup ? { member_type: 'fixed' } : { is_active: true })
         .eq('id', memberId)
+        .eq('group_id', targetGroupId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
       return

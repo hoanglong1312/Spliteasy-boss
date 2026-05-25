@@ -20,9 +20,9 @@ test('Pickleball member add flow suggests and triggers inactive member reactivat
   assert.match(memberSource, /const duplicateMemberInactive = duplicateMember && !isActiveMember\(duplicateMember\)/);
   assert.match(memberSource, /Thành viên '\{duplicateMember\.name\}' đang ở trạng thái chờ — bạn có muốn thêm lại không\?/);
   assert.match(memberSource, />Thêm lại<\/Button>/);
-  assert.match(memberSource, /await onAction\?\.\('reactivateMember', \{ memberId: duplicateMember\.id \}\)/);
+  assert.match(memberSource, /await onAction\?\.\('reactivateMember', \{ memberId: duplicateMember\.id, groupId: d\.groupId \}\)/);
   assert.match(appSource, /if \(type === 'reactivateMember'\)/);
   assert.match(appSource, /const isPickleballGroup = isPickleballActionGroup\(currentGroup\)/);
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/);
-  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)/);
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
 });

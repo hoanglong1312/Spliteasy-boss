@@ -78,7 +78,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     if (duplicateMember) return;
     for (const candidate of selectedCandidates) {
       if (candidate.isInactive) {
-        await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id });
+        await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId: d.groupId });
         continue;
       }
       await onAction?.('addMember', {
@@ -102,7 +102,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 
   async function reactivateDuplicateMember() {
     if (!duplicateMemberInactive) return;
-    await onAction?.('reactivateMember', { memberId: duplicateMember.id });
+    await onAction?.('reactivateMember', { memberId: duplicateMember.id, groupId: d.groupId });
     setNewMemberName('');
     setAddMemberError('');
     setShowAddMember(false);
@@ -123,7 +123,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   async function changeType(member) {
     const type = member.type === 'casual' ? 'fixed' : 'casual';
     setQuickActionMember(null);
-    await onAction?.('setMemberType', { memberId: member.id, type });
+    await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId });
   }
 
   async function changeRole(member) {

@@ -48,6 +48,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
     await onAction?.('setMemberType', {
       memberId: d.id,
       type: d.type === 'casual' ? 'fixed' : 'casual',
+      groupId: d.groupId,
     });
   }
 

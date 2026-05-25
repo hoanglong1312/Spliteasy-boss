@@ -17,11 +17,11 @@ test('available member picker includes casual members from the current group', (
 
 test('selecting an inactive available member reactivates instead of creating a duplicate member', () => {
   assert.match(memberSource, /if \(candidate\.isInactive\)/);
-  assert.match(memberSource, /await onAction\?\.\('reactivateMember', \{ memberId: candidate\.memberId \|\| candidate\.id \}\)/);
+  assert.match(memberSource, /await onAction\?\.\('reactivateMember', \{ memberId: candidate\.memberId \|\| candidate\.id, groupId: d\.groupId \}\)/);
   assert.match(groupDetailSource, /if \(candidate\.isInactive\)/);
   assert.match(groupDetailSource, /await onAction\?\.\('reactivateMember', \{ memberId: candidate\.memberId \|\| candidate\.id, groupId \}\)/);
   assert.match(appSource, /if \(type === 'reactivateMember'\)/);
   assert.match(appSource, /const isPickleballGroup = isPickleballActionGroup\(currentGroup\)/);
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/);
-  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)/);
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
 });

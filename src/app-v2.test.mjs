@@ -53,6 +53,7 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /role: payload\?\.role/)
   assert.match(appSource, /if \(type === 'setMemberType'\)/)
   assert.match(appSource, /member_type: payload\?\.type/)
+  assert.match(appSource, /if \(payload\?\.groupId\) request = request\.eq\('group_id', payload\.groupId\)/)
   assert.match(appSource, /if \(type === 'removeMemberToVanglai'\)/)
   assert.match(appSource, /const targetGroupId = payload\?\.groupId \|\| state\.currentGroupId/)
   assert.match(appSource, /const currentGroup = \(state\.groups \|\| \[\]\)\.find\(group => String\(group\.id\) === String\(targetGroupId\)\)/)
@@ -61,9 +62,10 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /const explicit = String\(group\?\.type \|\| group\?\.kind \|\| group\?\.groupType \|\| group\?\.group_type \|\| ''\)\.toLowerCase\(\)/)
   assert.match(appSource, /return explicit === 'pickleball'/)
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/)
-  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'casual' \} : \{ is_active: false \}\)/)
+  assert.match(appSource, /if \(!isPickleballGroup\) return/)
+  assert.match(appSource, /\.update\(\{ member_type: 'casual' \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
   assert.match(appSource, /if \(type === 'reactivateMember'\)/)
-  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)/)
+  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
 })
 
 test('member deletion is confirmed with the shared in-app sheet before dispatch', () => {
