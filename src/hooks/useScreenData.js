@@ -2023,7 +2023,7 @@ function currentGroupMembers(state) {
   const group = currentGroup(state)
   const members = safeArray(state?.members)
   const rows = allMembersForGroup(group, members)
-  return rows.length > 0 ? rows : members
+  return group?.id ? rows : members
 }
 
 function getAllSessions(state) {

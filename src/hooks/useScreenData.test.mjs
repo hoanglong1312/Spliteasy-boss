@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildGroupDetailData, buildGroupMemberCandidates, buildPickleballMembersData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildPickleballMembersData }`, context)
   return context.__builders
 }
 
@@ -110,6 +110,27 @@ test('group member candidates exclude active current members by name', () => {
   const candidates = buildGroupMemberCandidates(group, members)
 
   assert.deepEqual(candidates.map(member => member.name), ['An'])
+})
+
+test('add expense data does not fall back to pickleball members for an empty expense group', () => {
+  const { buildAddExpenseData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'expense-owner',
+    currentGroupId: 'expense-1',
+    currentGroup: { id: 'expense-1', groupType: 'expense', name: 'Ăn uống', members: [] },
+    groups: [
+      { id: 'expense-1', groupType: 'expense', name: 'Ăn uống', members: [] },
+      { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball', members: ['pickle-minh-anh'] },
+    ],
+    members: [
+      { id: 'pickle-minh-anh', groupId: 'pickle-1', profileId: 'profile-minh-anh', name: 'Minh Anh', memberType: 'fixed', isActive: true },
+    ],
+  }
+
+  const data = buildAddExpenseData(state, { groupId: 'expense-1' })
+
+  assert.deepEqual(data.members, [])
+  assert.equal(data.memberCount, 0)
 })
 
 test('group detail member balances use payer positive and debtors negative signs', () => {
