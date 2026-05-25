@@ -115,11 +115,11 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
   assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles, \{ mode: 'expense' \}\)/);
   assert.match(screenDataSource, /const mode = options\.mode \|\| groupKind\(group\)/);
-  assert.match(screenDataSource, /const blockingCurrentMembers = mode === 'pickleball'[\s\S]*?: currentMembers\.filter\(member => memberType\(member\) !== 'casual'\)/);
+  assert.match(screenDataSource, /const blockingCurrentMembers = mode === 'pickleball'[\s\S]*?: currentMembers\.filter\(isExpenseActiveMember\)/);
   assert.match(screenDataSource, /const currentProfileIds = new Set\(blockingCurrentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
-  assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
-  assert.match(screenDataSource, /!isActiveMember\(member\)/);
+  assert.match(screenDataSource, /function isExpenseActiveMember\(member\)/);
+  assert.match(screenDataSource, /!isExpenseActiveMember\(member\)/);
   assert.match(groupDetailSource, /const inactiveCandidates = candidates\.filter\(candidate => candidate\.isInactive\)/);
   assert.match(groupDetailSource, /const activeCandidates = candidates\.filter\(candidate => !candidate\.isInactive\)/);
   assert.match(groupDetailSource, /const inactiveCandidateCards = inactiveCandidates\.map\(candidate => \(/);
@@ -189,7 +189,12 @@ test('GroupDetail delete member does not depend on native confirm dialogs', () =
   assert.match(groupDetailSource, /await onAction\?\.\('removeMemberFromGroup', \{ memberId: deleteConfirmMember\.id, groupId: d\.id \}\)/);
   assert.doesNotMatch(groupDetailSource, /d\.isPickleball \? 'removeMemberToVanglai'/);
   assert.match(appSource, /if \(type === 'removeMemberFromGroup'\)/);
-  assert.match(appSource, /\.update\(\{ is_active: false \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
+  assert.match(appSource, /\.update\(\{ expense_active: false \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
+  const removeExpenseBlock = appSource.slice(
+    appSource.indexOf("if (type === 'removeMemberFromGroup')"),
+    appSource.indexOf("if (type === 'removePickleballMember')")
+  );
+  assert.doesNotMatch(removeExpenseBlock, /\.update\(\{ is_active: false \}\)/);
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteMember'/);
   assert.match(appSource, /const targetGroupId = payload\?\.groupId \|\| state\.currentGroupId/);
   assert.match(appSource, /String\(group\.id\) === String\(targetGroupId\)/);
@@ -210,7 +215,7 @@ test('GroupDetail hides member detail bank accounts from non-treasurers', () => 
 
 test('Screen data excludes inactive memberships from group member lists', () => {
   assert.match(screenDataSource, /function membersForGroup\(group, members\) \{/);
-  assert.match(screenDataSource, /\.filter\(isActiveMember\)[\s\S]*?\.filter\(member => memberType\(member\) !== 'casual'\)/);
+  assert.match(screenDataSource, /return allMembersForGroup\(group, members\)[\s\S]*?\.filter\(isExpenseActiveMember\)/);
 });
 
 test('GroupDetail member detail shows payer transactions for the selected month', () => {

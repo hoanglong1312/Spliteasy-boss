@@ -587,6 +587,7 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
       }
       await onAction?.('addExpenseGroupMember', {
         groupId,
+        memberId: candidate.memberId || candidate.id,
         name: candidate.name,
         profileId: candidate?.profileId || candidate?.id || '',
         type: 'fixed',

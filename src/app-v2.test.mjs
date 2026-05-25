@@ -68,7 +68,7 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /if \(!isPickleballGroup\) return/)
   assert.match(appSource, /\.update\(\{ is_active: false \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
   assert.match(appSource, /if \(type === 'reactivateMember'\)/)
-  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
+  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ expense_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
 })
 
 test('member deletion is confirmed with the shared in-app sheet before dispatch', () => {

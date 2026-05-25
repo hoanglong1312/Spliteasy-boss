@@ -8,9 +8,9 @@ const dataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 
 test('available member picker includes inactive members from the current group', () => {
-  assert.match(dataSource, /!isActiveMember\(member\)/);
+  assert.match(dataSource, /mode === 'pickleball' \? !isActiveMember\(member\) : !isExpenseActiveMember\(member\)/);
   assert.match(dataSource, /return dedupedInactiveCurrentMembers\.concat\(outsideGroupCandidates\)/);
-  assert.match(dataSource, /isInactive: !isActiveMember\(member\)/);
+  assert.match(dataSource, /isInactive: mode === 'pickleball' \? !isActiveMember\(member\) : !isExpenseActiveMember\(member\)/);
   assert.match(dataSource, /memberType: memberType\(member\)/);
 });
 
@@ -22,5 +22,5 @@ test('selecting an inactive available member reactivates instead of creating a d
   assert.match(appSource, /if \(type === 'reactivateMember'\)/);
   assert.match(appSource, /const isPickleballGroup = isPickleballActionGroup\(currentGroup\)/);
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/);
-  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ expense_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
 });

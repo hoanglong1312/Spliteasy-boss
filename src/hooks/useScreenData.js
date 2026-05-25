@@ -463,12 +463,12 @@ function buildGroupMemberCandidates(group, members, profiles = [], options = {})
   const mode = options.mode || groupKind(group)
   const blockingCurrentMembers = mode === 'pickleball'
     ? currentMembers
-    : currentMembers.filter(member => memberType(member) !== 'casual')
+    : currentMembers.filter(isExpenseActiveMember)
   const currentIds = new Set(blockingCurrentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(blockingCurrentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
   const inactiveCurrentMembers = currentMembers.filter(member => (
-    !isActiveMember(member)
+    mode === 'pickleball' ? !isActiveMember(member) : !isExpenseActiveMember(member)
   ))
     .map(member => ({
       id: member.id,
@@ -478,7 +478,7 @@ function buildGroupMemberCandidates(group, members, profiles = [], options = {})
       bankName: member.bankName || member.bank_name || '',
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
-      isInactive: !isActiveMember(member),
+      isInactive: mode === 'pickleball' ? !isActiveMember(member) : !isExpenseActiveMember(member),
       memberType: memberType(member),
     }))
   const dedupedInactiveCurrentMembers = dedupeMemberRowsByProfileOrName(inactiveCurrentMembers)
@@ -2005,6 +2005,13 @@ function isActiveMember(member) {
   return member?.isActive !== false && member?.is_active !== false
 }
 
+function isExpenseActiveMember(member) {
+  if ('expenseActive' in (member || {}) || 'expense_active' in (member || {})) {
+    return member?.expenseActive !== false && member?.expense_active !== false
+  }
+  return memberType(member) !== 'casual'
+}
+
 function currentGroup(state) {
   return safeGroup(state?.currentGroup || safeArray(state?.groups)[0])
 }
@@ -3143,8 +3150,7 @@ function memberName(memberId, members) {
 
 function membersForGroup(group, members) {
   return allMembersForGroup(group, members)
-    .filter(isActiveMember)
-    .filter(member => memberType(member) !== 'casual')
+    .filter(isExpenseActiveMember)
 }
 
 function allMembersForGroup(group, members) {

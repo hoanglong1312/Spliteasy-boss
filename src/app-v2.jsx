@@ -382,6 +382,20 @@ export default function AppV2() {
       const name = String(payload?.name || '').trim()
       const groupId = payload?.groupId
       if (!name || !groupId) return null
+      const memberId = payload?.memberId || payload?.member_id
+      const existingMember = safeArray(state?.members).find(member => String(member.id) === String(memberId || ''))
+      if (existingMember && String(existingMember.groupId || existingMember.group_id || '') === String(groupId)) {
+        const { token } = getStoredAuth()
+        const sb = createSupabase(token)
+        const { error } = await sb
+          .from('members')
+          .update({ expense_active: true })
+          .eq('id', existingMember.id)
+          .eq('group_id', groupId)
+        if (error) throw error
+        await dispatch({ type: 'REFRESH' })
+        return
+      }
       return dispatch({
         type: 'ADD_MEMBER',
         groupId,
@@ -389,6 +403,7 @@ export default function AppV2() {
           name,
           profileId: payload?.profileId || payload?.profile_id,
           member_type: 'fixed',
+          expense_active: true,
           bank_account: payload?.bankAccount ?? payload?.bank_account,
           bank_name: payload?.bankName ?? payload?.bank_name,
           bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
@@ -563,7 +578,7 @@ export default function AppV2() {
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ is_active: false })
+        .update({ expense_active: false })
         .eq('id', memberId)
         .eq('group_id', targetGroupId)
       if (error) throw error
@@ -600,7 +615,7 @@ export default function AppV2() {
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update(isPickleballGroup ? { member_type: 'fixed', is_active: true } : { is_active: true })
+        .update(isPickleballGroup ? { member_type: 'fixed', is_active: true } : { expense_active: true })
         .eq('id', memberId)
         .eq('group_id', targetGroupId)
       if (error) throw error

@@ -24,10 +24,16 @@ CREATE TRIGGER profiles_updated_at
 ALTER TABLE public.members
   ADD COLUMN IF NOT EXISTS profile_id uuid,
   ADD COLUMN IF NOT EXISTS member_type text DEFAULT 'fixed',
+  ADD COLUMN IF NOT EXISTS expense_active boolean DEFAULT true,
   ADD COLUMN IF NOT EXISTS bank_name text,
   ADD COLUMN IF NOT EXISTS bank_account text,
   ADD COLUMN IF NOT EXISTS bank_account_name text,
   ADD COLUMN IF NOT EXISTS pin_hash text;
+
+UPDATE public.members
+SET expense_active = false
+WHERE member_type IN ('casual', 'guest', 'vanglai', 'vãng lai')
+  AND expense_active IS DISTINCT FROM false;
 
 DO $$
 BEGIN

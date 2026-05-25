@@ -14,6 +14,8 @@ const migrationSource = readFileSync(new URL('../supabase/migrations/20260523000
 test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TABLE IF NOT EXISTS public\.profiles/)
   assert.match(migrationSource, /ALTER TABLE public\.members[\s\S]*ADD COLUMN IF NOT EXISTS profile_id uuid/)
+  assert.match(migrationSource, /ADD COLUMN IF NOT EXISTS expense_active boolean DEFAULT true/)
+  assert.match(migrationSource, /UPDATE public\.members[\s\S]*SET expense_active = false[\s\S]*member_type IN \('casual', 'guest', 'vanglai', 'vãng lai'\)/)
   assert.match(migrationSource, /REFERENCES public\.profiles\(id\)/)
   assert.match(migrationSource, /INSERT INTO public\.profiles/)
   assert.match(migrationSource, /UPDATE public\.members m[\s\S]*SET profile_id = p\.id/)
