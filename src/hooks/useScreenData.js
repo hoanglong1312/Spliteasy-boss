@@ -412,11 +412,13 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
       id: g.id,
       name: g.name || 'Nhóm',
       emoji: g.emoji || '👥',
+      description: g.description || '',
       color: g.color || '#574EFA',
     },
     id: g.id,
     name: g.name || 'Nhóm',
     emoji: g.emoji || '👥',
+    description: g.description || '',
     color: g.color || '#574EFA',
     createdBy: g.createdBy || g.created_by || null,
     isPickleball: groupKind(g) === 'pickleball',
@@ -1404,7 +1406,7 @@ function buildNewGroupData(state = {}) {
     emoji: '🏸',
     description: '',
     requiresApproval: true,
-    emojiOptions: ['🏸', '🏓', '⚽', '🏀', '🎯', '🎲', '💰', '👥'],
+    emojiOptions: ['🏸', '🏓', '⚽', '🏀', '🎯', '🎲', '💰', '👥', '🍜', '🥘', '☕', '🍺', '✈️', '🚗', '🏖', '🏨'],
     profileOptions: buildProfileOptions(state),
   }
 }

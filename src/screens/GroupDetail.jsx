@@ -10,6 +10,11 @@ import {
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
+const GROUP_EMOJI_OPTIONS = [
+  '🍜','🥘','☕','🍺','✈️','🚗',
+  '🏖','🏨','🎮','🎵','💼','🏠',
+  '🎯','🎲','💰','👥','🏓','🏸',
+];
 
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
@@ -20,6 +25,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [editingGroup, setEditingGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupEmoji, setGroupEmoji] = useState(d.emoji || '👥');
+  const [groupDescription, setGroupDescription] = useState(d.description || '');
   const [addingMember, setAddingMember] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
@@ -49,6 +55,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       id: d.id,
       name,
       emoji: groupEmoji || '👥',
+      description: groupDescription.trim(),
       color: d.color || '#574EFA',
     });
     setEditingGroup(false);
@@ -237,7 +244,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         <BottomSheet title="Sửa thông tin nhóm" onClose={() => setEditingGroup(false)}>
           <form onSubmit={saveGroup}>
             <Field label="Tên nhóm" value={groupName} onChange={setGroupName} autoFocus />
-            <Field label="Biểu tượng" value={groupEmoji} onChange={setGroupEmoji} maxLength={2} />
+            <EmojiPicker value={groupEmoji} onChange={setGroupEmoji} />
+            <TextArea label="Mô tả nhóm" value={groupDescription} onChange={setGroupDescription} placeholder="Ví dụ: Ăn uống sau giờ chơi, đi du lịch, cafe..." />
             <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu nhóm</Button>
           </form>
         </BottomSheet>
@@ -408,13 +416,14 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
       }}
       style={{
         cursor: 'pointer',
-        background: 'linear-gradient(135deg, rgba(37,99,235,0.28), rgba(20,184,166,0.14))',
-        border: '1px solid rgba(96,165,250,0.35)',
+        padding: '11px 12px',
+        background: 'rgba(255,255,255,0.035)',
+        border: '1px solid rgba(251,191,36,0.20)',
         boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <Avatar initial={member.initials} size={42} color={member.color} ring={false} style={{ borderRadius: 14 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Avatar initial={member.initials} size={34} color={member.color} ring={false} style={{ borderRadius: 12 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
           {member.role === 'treasurer' && (
@@ -752,6 +761,81 @@ function Field({ label, value, onChange, autoFocus, maxLength, inputMode, placeh
         style={fieldStyle()}
       />
     </label>
+  );
+}
+
+function TextArea({ label, value, onChange, placeholder }) {
+  return (
+    <label style={{ display: 'block', marginTop: 12 }}>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '1.2px',
+        color: colors.textSecondary,
+        marginBottom: 6,
+      }}>{label}</div>
+      <textarea
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        style={{
+          ...fieldStyle(),
+          resize: 'vertical',
+          minHeight: 82,
+          lineHeight: 1.45,
+        }}
+      />
+    </label>
+  );
+}
+
+function EmojiPicker({ value, options = GROUP_EMOJI_OPTIONS, onChange }) {
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{
+        fontSize: 9,
+        fontWeight: 700,
+        textTransform: 'uppercase',
+        letterSpacing: '1.2px',
+        color: colors.textSecondary,
+        marginBottom: 6,
+      }}>Chọn biểu tượng</div>
+      <div style={{
+        display: 'flex',
+        gap: 8,
+        overflowX: 'auto',
+        padding: '2px 0 4px',
+        scrollbarWidth: 'none',
+      }}>
+        {options.map(icon => {
+          const active = icon === value;
+          return (
+            <button
+              key={icon}
+              type="button"
+              onClick={() => onChange(icon)}
+              style={{
+                width: 40,
+                height: 40,
+                flex: '0 0 auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 12,
+                background: active ? 'rgba(251,191,36,0.16)' : colors.inputBg,
+                border: active ? '2px solid rgba(251,191,36,0.62)' : `1px solid ${colors.borderSubtle}`,
+                color: colors.textPrimary,
+                fontSize: 20,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+              }}
+            >{icon}</button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

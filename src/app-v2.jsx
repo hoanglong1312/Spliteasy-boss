@@ -484,6 +484,7 @@ export default function AppV2() {
           id: group.id,
           name: String(group.name).trim(),
           emoji: group.emoji || '👥',
+          description: group.description || '',
           color: group.color || '#574EFA',
         },
       })

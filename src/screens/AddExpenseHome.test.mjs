@@ -76,6 +76,19 @@ test('GroupDetail hero balances amount on the right', () => {
   assert.match(heroBalanceSource, /textAlign: 'right'/);
 });
 
+test('GroupDetail edit sheet uses an icon picker and saves group description', () => {
+  assert.match(groupDetailSource, /const GROUP_EMOJI_OPTIONS = \[/);
+  assert.match(groupDetailSource, /const \[groupDescription, setGroupDescription\] = useState\(d\.description \|\| ''\)/);
+  assert.match(groupDetailSource, /description: groupDescription\.trim\(\)/);
+  assert.match(groupDetailSource, /function EmojiPicker\(\{ value, options = GROUP_EMOJI_OPTIONS, onChange \}\)/);
+  assert.match(groupDetailSource, /<EmojiPicker value=\{groupEmoji\} onChange=\{setGroupEmoji\} \/>/);
+  assert.match(groupDetailSource, /<TextArea label="Mô tả nhóm" value=\{groupDescription\} onChange=\{setGroupDescription\}/);
+  assert.doesNotMatch(groupDetailSource, /<Field label="Biểu tượng"/);
+  assert.match(appSource, /description: group\.description \|\| '',/);
+  assert.match(storeSource, /description: action\.group\.description \|\| '',/);
+  assert.match(screenDataSource, /description: g\.description \|\| '',/);
+});
+
 test('GroupDetail member rows show balance inline on the right of the member name', () => {
   const memberRowSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberRow'),
@@ -114,6 +127,7 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.doesNotMatch(addMemberEditorSource, /<BankSelect/);
   assert.doesNotMatch(addMemberEditorSource, /Số tài khoản/);
   assert.match(addMemberEditorSource, /await onAction\?\.\('addExpenseGroupMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*profileId: '',[\s\S]*type: 'fixed',[\s\S]*\}\)/);
+  assert.doesNotMatch(addMemberEditorSource, /onAction\?\.\('addPickleballMember'/);
   assert.doesNotMatch(addMemberEditorSource, /onAction\?\.\('addMember'/);
   assert.doesNotMatch(addMemberEditorSource, /bankAccountName: bankAccountName\.trim\(\)/);
   assert.doesNotMatch(addMemberEditorSource, /bankName,/);
@@ -145,6 +159,19 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(screenDataSource, /bankName: member\.bankName \|\| member\.bank_name \|\| ''/);
   assert.match(screenDataSource, /bankAccount: member\.bankAccount \|\| member\.bank_account \|\| ''/);
   assert.match(screenDataSource, /bankAccountName: member\.bankAccountName \|\| member\.bank_account_name \|\| ''/);
+});
+
+test('GroupDetail member rows are compact and visually distinct from pickleball cards', () => {
+  const memberRowSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberRow'),
+    groupDetailSource.indexOf('function MemberDetailPanel')
+  );
+  assert.match(memberRowSource, /padding: '11px 12px'/);
+  assert.match(memberRowSource, /background: 'rgba\(255,255,255,0\.035\)'/);
+  assert.match(memberRowSource, /border: '1px solid rgba\(251,191,36,0\.20\)'/);
+  assert.match(memberRowSource, /<Avatar initial=\{member\.initials\} size=\{34\}/);
+  assert.doesNotMatch(memberRowSource, /rgba\(37,99,235,0\.28\)/);
+  assert.doesNotMatch(memberRowSource, /rgba\(96,165,250,0\.35\)/);
 });
 
 test('GroupDetail keeps bank fields in edit member sheet only', () => {

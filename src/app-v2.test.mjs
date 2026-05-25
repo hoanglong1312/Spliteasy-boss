@@ -73,6 +73,13 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ expense_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
 })
 
+test('AppV2 edit group preserves descriptions for expense group settings', () => {
+  assert.match(appSource, /if \(type === 'editGroup'\)/)
+  assert.match(appSource, /description: group\.description \|\| '',/)
+  assert.match(storeSource, /case 'EDIT_GROUP':/)
+  assert.match(storeSource, /description: action\.group\.description \|\| '',/)
+})
+
 test('member deletion is confirmed with the shared in-app sheet before dispatch', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   const memberDetailSource = readFileSync(new URL('./screens/MemberDetail.jsx', import.meta.url), 'utf8')

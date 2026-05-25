@@ -1832,6 +1832,7 @@ export function AppProvider({ children }) {
         await sb.from('groups').update({
           name: action.group.name,
           emoji: action.group.emoji,
+          description: action.group.description || '',
           color: action.group.color,
         }).eq('id', action.group.id)
         await refresh()
@@ -1998,6 +1999,7 @@ export function AppProvider({ children }) {
           .update({
             created_by: joined.member_id,
             emoji: group.emoji || '🎯',
+            description: group.description || '',
             color: group.color || '#574EFA',
           })
           .eq('id', joined.group_id || newGroupId)
