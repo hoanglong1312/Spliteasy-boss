@@ -712,6 +712,19 @@ export function MemberPicker({
     return normalizePickerSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(normalizedQuery);
   });
   const selected = candidates.filter(candidate => selectedIds.includes(String(candidate.id)));
+  const hasVisibleCandidates = visible.length > 0;
+
+  function selectVisibleCandidates() {
+    visible
+      .filter(candidate => !selectedIds.includes(String(candidate.id)))
+      .forEach(candidate => onToggle?.(candidate.id));
+  }
+
+  function clearVisibleCandidates() {
+    visible
+      .filter(candidate => selectedIds.includes(String(candidate.id)))
+      .forEach(candidate => onToggle?.(candidate.id));
+  }
 
   return (
     <div style={{
@@ -727,6 +740,16 @@ export function MemberPicker({
         placeholder={placeholder}
         style={{ marginBottom: 10 }}
       />
+      {hasVisibleCandidates && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+          <button type="button" onClick={selectVisibleCandidates} style={pickerActionStyle(t)}>
+            Chọn tất cả
+          </button>
+          <button type="button" onClick={clearVisibleCandidates} style={pickerActionStyle(t)}>
+            Bỏ chọn
+          </button>
+        </div>
+      )}
       {selected.length > 0 && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
           {selected.map(candidate => (
@@ -792,6 +815,20 @@ export function MemberPicker({
       </div>
     </div>
   );
+}
+
+function pickerActionStyle(t) {
+  return {
+    border: `1px solid ${colors.borderSubtle}`,
+    borderRadius: 10,
+    background: colors.inputBg,
+    color: t.accent,
+    padding: '9px 10px',
+    fontSize: 11,
+    fontWeight: 900,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  };
 }
 
 function normalizePickerSearch(value) {

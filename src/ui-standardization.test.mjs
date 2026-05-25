@@ -29,6 +29,10 @@ test('shared visual primitives exist for Pickleball-style module screens', () =>
   assert.match(primitivesSource, /selectedIds\.includes\(String\(candidate\.id\)\)/)
   assert.match(primitivesSource, /maxHeight: maxListHeight/)
   assert.match(primitivesSource, /emptyText/)
+  assert.match(primitivesSource, /function selectVisibleCandidates\(\)/)
+  assert.match(primitivesSource, /function clearVisibleCandidates\(\)/)
+  assert.match(primitivesSource, />\s*Chọn tất cả\s*<\/button>/)
+  assert.match(primitivesSource, />\s*Bỏ chọn\s*<\/button>/)
 })
 
 test('group and pickleball member sheets use the same searchable multi-select picker', () => {
