@@ -142,7 +142,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 
   async function confirmDeleteMember() {
     if (!deleteConfirmMember) return;
-    await onAction?.('removeMemberToVanglai', { memberId: deleteConfirmMember.id });
+    await onAction?.('removeMemberToVanglai', { memberId: deleteConfirmMember.id, groupId: data.groupId });
     setDeleteConfirmMember(null);
   }
 

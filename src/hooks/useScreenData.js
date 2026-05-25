@@ -667,6 +667,7 @@ function buildPickleballTeamFundData(state) {
   }))
 
   return {
+    groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
     currentYearMonth,
@@ -997,6 +998,7 @@ function buildPickleballCalendarData(state, params = {}) {
     .filter(member => member.id && member.name)
 
   return {
+    groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(monthDate),
     selectedSessionDay: selectedSession ? Number(String(selectedSession.date).slice(-2)) : Number(String(selectedDate).slice(-2)) || (isCurrentMonth ? today.getDate() : 1),
@@ -1070,6 +1072,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
   const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, fixedMembers))
 
   return {
+    groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
     stats: {
@@ -1105,6 +1108,7 @@ function buildMemberDetailData(state, memberId, selectedYearMonth) {
   const balance = buildMemberMonthBalance(state, pickle, sessions, member.id)
 
   return {
+    groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(monthDate),
     id: member.id,
