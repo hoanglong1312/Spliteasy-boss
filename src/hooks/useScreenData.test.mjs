@@ -322,6 +322,103 @@ test('group detail exposes pending expenses for treasurer approval', () => {
   assert.equal(detail.pendingExpenses[0].submittedBy, 'member-1')
 })
 
+test('group detail member transactions include participant shares and payer advances for the selected month', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    name: 'Ăn uống',
+    members: ['minh', 'tuan', 'an'],
+    expenses: [
+      {
+        id: 'dinner',
+        groupId: 'expense-1',
+        title: 'Ăn tối',
+        category: 'food',
+        amount: 90000,
+        paidBy: 'minh',
+        participants: ['minh', 'tuan', 'an'],
+        splits: [
+          { memberId: 'minh', amount: 30000 },
+          { memberId: 'tuan', amount: 30000 },
+          { memberId: 'an', amount: 30000 },
+        ],
+        status: 'approved',
+        date: '2026-05-12',
+      },
+      {
+        id: 'coffee',
+        groupId: 'expense-1',
+        title: 'Cafe',
+        category: 'cafe',
+        amount: 60000,
+        paidBy: 'tuan',
+        participants: ['minh', 'tuan'],
+        status: 'approved',
+        date: '2026-05-13',
+      },
+      {
+        id: 'old-month',
+        groupId: 'expense-1',
+        title: 'Tháng cũ',
+        amount: 60000,
+        paidBy: 'minh',
+        participants: ['minh', 'tuan'],
+        status: 'approved',
+        date: '2026-04-20',
+      },
+    ],
+  }
+  const members = [
+    { id: 'minh', groupId: 'expense-1', name: 'Minh', role: 'treasurer', isActive: true },
+    { id: 'tuan', groupId: 'expense-1', name: 'Tuấn', isActive: true },
+    { id: 'an', groupId: 'expense-1', name: 'An', isActive: true },
+  ]
+
+  const detail = buildGroupDetailData(group, 'minh', members, 'Minh', '2026-05')
+  const minh = detail.members.find(member => member.id === 'minh')
+  const tuan = detail.members.find(member => member.id === 'tuan')
+
+  assert.equal(minh.memberTransactionSummary.owes, 30000)
+  assert.equal(minh.memberTransactionSummary.advanced, 60000)
+  assert.equal(minh.memberTransactionSummary.net, 30000)
+  assert.deepEqual(minh.memberTransactions.map(row => [row.id, row.role, row.paidAmount, row.shareAmount, row.netAmount]), [
+    ['coffee', 'participant', 0, 30000, -30000],
+    ['dinner', 'payer', 90000, 30000, 60000],
+  ])
+  assert.equal(tuan.memberTransactionSummary.owes, 30000)
+  assert.equal(tuan.memberTransactionSummary.advanced, 30000)
+  assert.equal(tuan.memberTransactionSummary.net, 0)
+  assert.deepEqual(tuan.memberTransactions.map(row => [row.id, row.role, row.paidAmount, row.shareAmount, row.netAmount]), [
+    ['coffee', 'payer', 60000, 30000, 30000],
+    ['dinner', 'participant', 0, 30000, -30000],
+  ])
+})
+
+test('group detail exposes treasurer payment target for member bill QR', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    name: 'Ăn uống',
+    members: ['minh', 'tuan'],
+    expenses: [],
+  }
+  const members = [
+    { id: 'minh', groupId: 'expense-1', name: 'Minh', role: 'treasurer', bankName: 'VCB', bankAccount: '123', bankAccountName: 'MINH', isActive: true },
+    { id: 'tuan', groupId: 'expense-1', name: 'Tuấn', isActive: true },
+  ]
+
+  const detail = buildGroupDetailData(group, 'minh', members, 'Minh', '2026-05')
+
+  assert.equal(detail.paymentTarget.memberId, 'minh')
+  assert.equal(detail.paymentTarget.name, 'Minh')
+  assert.equal(detail.paymentTarget.bankName, 'VCB')
+  assert.equal(detail.paymentTarget.bankAccount, '123')
+  assert.equal(detail.paymentTarget.bankAccountName, 'MINH')
+  assert.equal(detail.members.find(member => member.id === 'tuan').paymentTarget.bankAccount, '123')
+})
+
 test('group detail marks current user as creator when created_by matches profile id', () => {
   const { buildGroupDetailData } = loadScreenDataBuilders()
   const group = {

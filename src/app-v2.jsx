@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
@@ -28,6 +28,7 @@ import Notifications from './screens/Notifications'
 import ApprovalQueue from './screens/ApprovalQueue'
 import Settings from './screens/Settings'
 import SettlementPeriod from './screens/SettlementPeriod'
+import MemberBillShare from './screens/MemberBillShare'
 
 const PIN_UNLOCK_KEY = 'spliteasy_pin_unlocked'
 
@@ -67,8 +68,17 @@ function findDuplicatePickleballMemberForType(state, currentMember, groupId, tar
   )) || null
 }
 
+function publicBillTokenFromLocation() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  return params.get('bill') || ''
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
+  const [publicBillToken] = useState(() => publicBillTokenFromLocation())
+  const [publicBillData, setPublicBillData] = useState(null)
+  const [publicBillLoading, setPublicBillLoading] = useState(Boolean(publicBillToken))
   const groups = state.groups || []
   const members = state.members || []
   const {
@@ -114,6 +124,21 @@ export default function AppV2() {
   })
   const [pinError, setPinError] = useState('')
   const [pinInput, setPinInput] = useState('')
+
+  useEffect(() => {
+    if (!publicBillToken) return
+    let alive = true
+    async function loadPublicBill() {
+      setPublicBillLoading(true)
+      const sb = createSupabase()
+      const { data, error } = await sb.rpc('get_member_bill_share', { p_token: publicBillToken })
+      if (!alive) return
+      setPublicBillData(error ? { error: 'invalid_token' } : data)
+      setPublicBillLoading(false)
+    }
+    loadPublicBill()
+    return () => { alive = false }
+  }, [publicBillToken])
 
   function submitPin(value = pinInput) {
     const stored = localStorage.getItem('spliteasy_pin')
@@ -842,6 +867,26 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'createMemberBillShare') {
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('create_member_bill_share_token', {
+        p_group_id: payload?.groupId,
+        p_member_id: payload?.memberId,
+      })
+      if (error || data?.error) {
+        console.error('[app] createMemberBillShare:', error || data)
+        dispatch({ type: 'SHOW_TOAST', message: 'Không tạo được link chia sẻ.' })
+        return
+      }
+      const shareToken = data?.token || data
+      const url = `${window.location.origin}${window.location.pathname}?bill=${encodeURIComponent(shareToken)}`
+      if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã tạo link và sao chép.' })
+      return
+    }
+
     if (type === 'confirm') {
       console.log('confirm payload', payload)
       const route = stack[stack.length - 1]
@@ -1381,6 +1426,14 @@ export default function AppV2() {
     }
 
     console.log('onAction', type, payload)
+  }
+
+  if (publicBillToken) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+        <MemberBillShare data={publicBillData} loading={publicBillLoading} />
+      </div>
+    )
   }
 
   if (!state.currentUserId) {

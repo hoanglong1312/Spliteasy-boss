@@ -8,6 +8,7 @@ import {
   ModuleHero, ActionButton, SearchInput, SectionHeader, StatGrid, ListCard, BottomSheet,
   MemberPicker, Stat,
 } from '../primitives';
+import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
 const GROUP_EMOJI_OPTIONS = [
@@ -73,6 +74,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             groupName={d.name}
             member={selectedMember}
             isTreasurer={canManageMembers}
+            onAction={onAction}
             onBack={() => setSelectedMember(null)}
           onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
           onDelete={() => {
@@ -465,8 +467,39 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
   );
 }
 
-function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onDelete }) {
+function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, onEdit, onDelete }) {
+  const [transactionSearch, setTransactionSearch] = useState('');
+  const [transactionFilter, setTransactionFilter] = useState('all');
+  const [billQrOpen, setBillQrOpen] = useState(false);
   const balance = Number(member.balance || 0);
+  const summary = member.memberTransactionSummary || { owes: 0, advanced: 0, net: 0 };
+  const transactions = member.memberTransactions || [];
+  const visibleTransactions = transactions.filter(transaction => {
+    const query = normalizeSearch(transactionSearch);
+    const searchable = normalizeSearch(`${transaction.title} ${transaction.category} ${transaction.paidByName} ${transaction.status}`);
+    const matchesSearch = !query || searchable.includes(query);
+    const net = Number(transaction.netAmount || 0);
+    const matchesFilter =
+      transactionFilter === 'all' ||
+      (transactionFilter === 'owes' && net < 0) ||
+      (transactionFilter === 'advanced' && net > 0) ||
+      (transactionFilter === 'settled' && net === 0);
+    return matchesSearch && matchesFilter;
+  });
+  const paymentTarget = member.paymentTarget || {};
+  const debtAmount = Math.max(0, Number(summary.owes || 0));
+  const selectedBank = resolveBank(paymentTarget.bankName);
+  const qrBankId = selectedBank?.id || paymentTarget.bankName || '';
+  const canGenerateQr = Boolean(qrBankId && paymentTarget.bankAccount && paymentTarget.bankAccountName && debtAmount > 0);
+  const [billYear, billMonth] = String(member.currentYearMonth || '').split('-');
+  const qrDescription = `${member.name} - ${groupName} - Thang ${billMonth || new Date().getMonth() + 1}/${billYear || new Date().getFullYear()}`;
+  const qrUrl = canGenerateQr ? generateQRUrl({
+    bankId: qrBankId,
+    account: paymentTarget.bankAccount,
+    accountName: paymentTarget.bankAccountName,
+    amount: debtAmount,
+    description: qrDescription,
+  }) : '';
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : 'Đang cân bằng';
 
@@ -505,6 +538,15 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
         </div>
       </Card>
 
+      <Card style={{ marginTop: 14 }}>
+        <SectionTitle>TỔNG QUAN GIAO DỊCH</SectionTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
+          <MiniBillStat label="Cần trả" value={summary.owes} tone={colors.danger} />
+          <MiniBillStat label="Đã ứng" value={summary.advanced} tone="#6ee7b7" />
+          <MiniBillStat label="Net" value={summary.net} tone={summary.net < 0 ? colors.danger : summary.net > 0 ? '#6ee7b7' : colors.textSecondary} signed />
+        </div>
+      </Card>
+
       {isTreasurer && (
         <Card style={{ marginTop: 14 }}>
           <SectionTitle>THÔNG TIN THANH TOÁN</SectionTitle>
@@ -516,17 +558,47 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
       )}
 
       <Card style={{ marginTop: 14 }}>
-        <SectionTitle>THÁNG NÀY ĐÃ THANH TOÁN</SectionTitle>
-        {(member.payerTransactions || []).length > 0 ? (
+        <SectionTitle>GIAO DỊCH LIÊN QUAN</SectionTitle>
+        <SearchInput
+          value={transactionSearch}
+          onChange={event => setTransactionSearch(event.target.value)}
+          placeholder="Tìm giao dịch, loại chi phí, người trả..."
+          style={{ marginTop: 12 }}
+        />
+        <SubTabs
+          items={[
+            { key: 'all', label: 'Tất cả' },
+            { key: 'owes', label: 'Cần trả' },
+            { key: 'advanced', label: 'Đã ứng' },
+            { key: 'settled', label: 'Cân bằng' },
+          ]}
+          active={transactionFilter}
+          onChange={setTransactionFilter}
+          style={{ marginTop: 10, marginBottom: 8 }}
+        />
+        {visibleTransactions.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-            {member.payerTransactions.map(transaction => (
-              <MemberPaidTransactionRow key={transaction.id} transaction={transaction} />
+            {visibleTransactions.map(transaction => (
+              <MemberTransactionRow
+                key={transaction.id}
+                transaction={transaction}
+                onOpen={() => onAction?.('expenseDetail', { expenseId: transaction.id })}
+              />
             ))}
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10 }}>Chưa đứng ra thanh toán khoản nào trong tháng này.</div>
+          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10 }}>Không có giao dịch phù hợp trong tháng này.</div>
         )}
       </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+        <Button
+          variant="muted"
+          style={{ fontSize: 13 }}
+          onClick={() => onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id })}
+        >Chia sẻ link</Button>
+        <Button variant="success" style={{ fontSize: 13 }} onClick={() => setBillQrOpen(true)}>Tạo QR thanh toán</Button>
+      </div>
 
       {isTreasurer && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
@@ -534,27 +606,76 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onBack, onEdit, onD
           <Button variant="danger" style={{ fontSize: 13 }} onClick={onDelete}>Xóa khỏi nhóm</Button>
         </div>
       )}
+
+      {billQrOpen && (
+        <BottomSheet title="QR thanh toán" onClose={() => setBillQrOpen(false)}>
+          {canGenerateQr ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+              <img src={qrUrl} alt="QR thanh toán" style={{ width: 220, height: 220, borderRadius: 12, background: 'white' }} />
+              <div style={{ fontSize: 24, fontWeight: 900, color: colors.danger, ...type.mono }}>{formatVND(debtAmount)}</div>
+              <div style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{paymentTarget.bankAccountName} · {paymentTarget.bankAccount}</div>
+              <div style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{qrDescription}</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+                Cập nhật thông tin thanh toán của thủ quỹ và đảm bảo thành viên đang có số tiền cần trả.
+              </div>
+              <Button variant="brand" onClick={() => onAction?.('settings')}>Cập nhật thông tin thanh toán</Button>
+            </div>
+          )}
+        </BottomSheet>
+      )}
     </Screen>
   );
 }
 
-function MemberPaidTransactionRow({ transaction }) {
+function MiniBillStat({ label, value, tone, signed = false }) {
+  const amount = Number(value || 0);
+  const prefix = signed && amount > 0 ? '+' : signed && amount < 0 ? '-' : '';
   return (
-    <div style={{
+    <div style={{ padding: 10, borderRadius: 12, background: colors.inputBg, border: `1px solid ${colors.borderSubtle}` }}>
+      <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 800 }}>{label}</div>
+      <div style={{ marginTop: 5, fontSize: 13, fontWeight: 900, color: tone, ...type.mono }}>{prefix}{formatVND(Math.abs(amount))}</div>
+    </div>
+  );
+}
+
+function MemberTransactionRow({ transaction, onOpen }) {
+  const net = Number(transaction.netAmount || 0);
+  const tone = net < 0 ? colors.danger : net > 0 ? '#6ee7b7' : colors.textSecondary;
+  const label = net < 0 ? `-${formatVND(Math.abs(net))}` : net > 0 ? `+${formatVND(net)}` : '0 đ';
+  return (
+    <button type="button" onClick={onOpen} style={{
+      width: '100%',
       display: 'flex',
       alignItems: 'center',
       gap: 10,
       padding: '10px 0',
       borderBottom: `1px solid ${colors.borderSubtle}`,
+      borderTop: 'none',
+      borderLeft: 'none',
+      borderRight: 'none',
+      background: 'transparent',
+      color: colors.textPrimary,
+      fontFamily: 'inherit',
+      textAlign: 'left',
+      cursor: 'pointer',
     }}>
       <div style={{ width: 42, color: colors.textSecondary, fontSize: 11, fontWeight: 800 }}>{transaction.date}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{transaction.title}</div>
-        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{transaction.source} · {transaction.status}</div>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+          {transaction.role === 'payer' ? 'Đã ứng' : 'Cần trả'} · {transaction.paidByName} trả · {transaction.status}
+        </div>
       </div>
-      <div style={{ fontSize: 13, fontWeight: 900, ...type.mono }}>{formatVND(transaction.amount)}</div>
-    </div>
+      <div style={{ fontSize: 13, fontWeight: 900, color: tone, ...type.mono }}>{label}</div>
+    </button>
   );
+}
+
+function MemberPaidTransactionRow({ transaction }) {
+  return <MemberTransactionRow transaction={transaction} />;
 }
 
 function SectionTitle({ children }) {
@@ -695,6 +816,15 @@ function normalizeSearch(value) {
     .replace(/Đ/g, 'd')
     .trim()
     .toLowerCase();
+}
+
+function resolveBank(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return BANK_LIST.find(bank => (
+    bank.id.toLowerCase() === normalized ||
+    bank.shortName.toLowerCase() === normalized ||
+    bank.name.toLowerCase() === normalized
+  )) || null;
 }
 
 function EditMemberEditor({ title, member, onClose, onAction }) {

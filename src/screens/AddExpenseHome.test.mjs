@@ -199,7 +199,7 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /const \[selectedMember, setSelectedMember\] = useState\(null\)/);
   assert.match(groupDetailSource, /const \[deleteConfirmMember, setDeleteConfirmMember\] = useState\(null\)/);
   assert.match(groupDetailSource, /onOpen=\{setSelectedMember\}/);
-  assert.match(groupDetailSource, /function MemberDetailPanel\(\{ groupName, member, isTreasurer, onBack, onEdit, onDelete \}\)/);
+  assert.match(groupDetailSource, /function MemberDetailPanel\(\{ groupName, member, isTreasurer, onAction, onBack, onEdit, onDelete \}\)/);
   assert.match(groupDetailSource, /Chi tiết thành viên/);
   assert.match(groupDetailSource, /SỐ DƯ TRONG NHÓM/);
   assert.match(groupDetailSource, /THÔNG TIN THANH TOÁN/);
@@ -258,11 +258,37 @@ test('Screen data excludes inactive memberships from group member lists', () => 
 });
 
 test('GroupDetail member detail shows payer transactions for the selected month', () => {
-  assert.match(screenDataSource, /payerTransactions: buildMemberPayerTransactions\(g, member\.id, selectedYearMonth\)/);
-  assert.match(screenDataSource, /function buildMemberPayerTransactions\(group, memberId, selectedYearMonth\)/);
-  assert.match(groupDetailSource, /THÁNG NÀY ĐÃ THANH TOÁN/);
-  assert.match(groupDetailSource, /member\.payerTransactions/);
-  assert.match(groupDetailSource, /function MemberPaidTransactionRow\(\{ transaction \}\)/);
+  assert.match(screenDataSource, /const memberTransactions = buildMemberTransactions\(g, member\.id, selectedYearMonth, groupMembers\)/);
+  assert.match(screenDataSource, /function buildMemberTransactions\(group, memberId, selectedYearMonth, members = \[\]\)/);
+  assert.match(screenDataSource, /memberTransactionSummary: summarizeMemberTransactions\(memberTransactions\)/);
+  assert.match(groupDetailSource, /GIAO DỊCH LIÊN QUAN/);
+  assert.match(groupDetailSource, /member\.memberTransactions/);
+  assert.match(groupDetailSource, /transactionFilter/);
+  assert.match(groupDetailSource, /placeholder="Tìm giao dịch/);
+  assert.match(groupDetailSource, /function MemberTransactionRow\(\{ transaction, onOpen \}\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('expenseDetail', \{ expenseId: transaction\.id \}\)/);
+  assert.doesNotMatch(screenDataSource, /payerTransactions: buildMemberPayerTransactions/);
+  assert.doesNotMatch(groupDetailSource, /member\.payerTransactions/);
+});
+
+test('GroupDetail member detail exposes share link and member bill VietQR actions', () => {
+  assert.match(groupDetailSource, /import \{ BANK_LIST, generateQRUrl \} from '\.\.\/lib\/vietqr\.js'/);
+  assert.match(groupDetailSource, /const \[billQrOpen, setBillQrOpen\] = useState\(false\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('createMemberBillShare'/);
+  assert.match(groupDetailSource, /Tạo QR thanh toán/);
+  assert.match(groupDetailSource, /generateQRUrl\(\{/);
+  assert.match(groupDetailSource, /member\.paymentTarget/);
+  assert.match(groupDetailSource, /Cập nhật thông tin thanh toán/);
+});
+
+test('App supports public member bill tokens without requiring login', () => {
+  assert.match(appSource, /import MemberBillShare from '\.\/screens\/MemberBillShare'/);
+  assert.match(appSource, /useState\(\(\) => publicBillTokenFromLocation\(\)\)/);
+  assert.match(appSource, /\.rpc\('get_member_bill_share'/);
+  assert.match(appSource, /if \(publicBillToken\)/);
+  assert.match(appSource, /<MemberBillShare data=\{publicBillData\}/);
+  assert.match(appSource, /if \(type === 'createMemberBillShare'\)/);
+  assert.match(appSource, /\.rpc\('create_member_bill_share_token'/);
 });
 
 test('App uses one selectedYearMonth across home, groups, group detail, and pickleball screens', () => {

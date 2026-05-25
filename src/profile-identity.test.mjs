@@ -11,6 +11,7 @@ const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const newGroupSource = readFileSync(new URL('./screens/NewGroup.jsx', import.meta.url), 'utf8')
 const migrationSource = readFileSync(new URL('../supabase/migrations/20260523000001_profiles_identity.sql', import.meta.url), 'utf8')
 const expenseGroupRpcMigration = readFileSync(new URL('../supabase/migrations/20260525000003_expense_group_member_rpcs.sql', import.meta.url), 'utf8')
+const memberBillShareMigration = readFileSync(new URL('../supabase/migrations/20260526000001_member_bill_share_tokens.sql', import.meta.url), 'utf8')
 
 test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TABLE IF NOT EXISTS public\.profiles/)
@@ -24,6 +25,21 @@ test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TRIGGER members_ensure_profile/)
   assert.match(migrationSource, /CREATE POLICY profiles_select/)
   assert.match(migrationSource, /CREATE POLICY profiles_update/)
+})
+
+test('member bill share migration creates scoped expiring public tokens', () => {
+  assert.match(memberBillShareMigration, /CREATE TABLE IF NOT EXISTS public\.member_bill_share_tokens/)
+  assert.match(memberBillShareMigration, /token text NOT NULL UNIQUE/)
+  assert.match(memberBillShareMigration, /group_id uuid NOT NULL REFERENCES public\.groups\(id\)/)
+  assert.match(memberBillShareMigration, /member_id uuid NOT NULL REFERENCES public\.members\(id\)/)
+  assert.match(memberBillShareMigration, /expires_at timestamptz NOT NULL/)
+  assert.match(memberBillShareMigration, /created_by uuid REFERENCES public\.members\(id\)/)
+  assert.match(memberBillShareMigration, /CREATE OR REPLACE FUNCTION public\.create_member_bill_share_token/)
+  assert.match(memberBillShareMigration, /CREATE OR REPLACE FUNCTION public\.get_member_bill_share/)
+  assert.match(memberBillShareMigration, /WHERE mbst\.token = p_token[\s\S]*mbst\.expires_at > now\(\)/)
+  assert.match(memberBillShareMigration, /jsonb_build_object\([\s\S]*'groupId', v_share\.group_id[\s\S]*'memberId', v_share\.member_id/)
+  assert.match(memberBillShareMigration, /REVOKE ALL ON public\.member_bill_share_tokens FROM anon/)
+  assert.match(memberBillShareMigration, /GRANT EXECUTE ON FUNCTION public\.get_member_bill_share\(text\) TO anon/)
 })
 
 test('store fetches profiles and merges profile fields into members', () => {

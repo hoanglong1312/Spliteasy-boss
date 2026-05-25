@@ -397,6 +397,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const memberBalanceMap = Object.fromEntries(
     groupMembers.map(member => [member.id, groupNet(monthlyGroup, member.id)])
   )
+  const paymentTarget = buildGroupPaymentTarget(g, groupMembers)
   const activities = safeArray(monthlyGroup.expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -420,6 +421,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     emoji: g.emoji || '👥',
     description: g.description || '',
     color: g.color || '#574EFA',
+    monthLabel: formatMonthLabel(monthDate),
+    currentYearMonth: monthKey(monthDate),
     createdBy: g.createdBy || g.created_by || null,
     isPickleball: groupKind(g) === 'pickleball',
     isGroupCreator,
@@ -432,20 +435,29 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
     memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense' }),
-    members: groupMembers.map(member => ({
-      id: member.id,
-      name: member.displayName || member.name,
-      initials: initials(member),
-      color: member.color || '#6366f1',
-      role: member.role,
-      bankName: member.bankName || member.bank_name || '',
-      bankAccount: member.bankAccount || member.bank_account || '',
-      bankAccountName: member.bankAccountName || member.bank_account_name || '',
-      joinDate: fullExpenseDate(member.createdAt || member.created_at),
-      balance: memberBalanceMap[member.id] || 0,
-      isCurrentUser: String(member.id) === String(currentGroupMember?.id || ''),
-      payerTransactions: buildMemberPayerTransactions(g, member.id, selectedYearMonth),
-    })),
+    paymentTarget,
+    members: groupMembers.map(member => {
+      const memberTransactions = buildMemberTransactions(g, member.id, selectedYearMonth, groupMembers)
+      return {
+        id: member.id,
+        groupId: g.id,
+        monthLabel: formatMonthLabel(monthDate),
+        currentYearMonth: monthKey(monthDate),
+        name: member.displayName || member.name,
+        initials: initials(member),
+        color: member.color || '#6366f1',
+        role: member.role,
+        bankName: member.bankName || member.bank_name || '',
+        bankAccount: member.bankAccount || member.bank_account || '',
+        bankAccountName: member.bankAccountName || member.bank_account_name || '',
+        joinDate: fullExpenseDate(member.createdAt || member.created_at),
+        balance: memberBalanceMap[member.id] || 0,
+        isCurrentUser: String(member.id) === String(currentGroupMember?.id || ''),
+        memberTransactions,
+        memberTransactionSummary: summarizeMemberTransactions(memberTransactions),
+        paymentTarget,
+      }
+    }),
     balanceRows: groupMembers
       .map(member => ({
         id: member.id,
@@ -558,20 +570,83 @@ function candidateProfilesFromDirectory(members, profiles = []) {
   return rows.filter(row => row && row.name)
 }
 
-function buildMemberPayerTransactions(group, memberId, selectedYearMonth) {
+function buildMemberTransactions(group, memberId, selectedYearMonth, members = []) {
   const monthDate = dateFromYearMonth(selectedYearMonth)
   return safeArray(group?.expenses)
     .filter(expense => isSameExpenseMonth(expense, monthDate))
-    .filter(expense => String(expense.paidBy || expense.paid_by_member_id || '') === String(memberId))
+    .filter(expense => isExpenseRelatedToMember(normalizeExpenseForMemberBill(expense), memberId))
     .sort((a, b) => parseDateValue(b.date || b.expense_date) - parseDateValue(a.date || a.expense_date))
-    .map(expense => ({
-      id: expense.id,
-      date: formatDayMonth(expense.date || expense.expense_date),
-      title: expense.title || 'Chi tiêu',
-      source: group?.name || 'Nhóm',
-      amount: Number(expense.amount) || 0,
-      status: expense.status || 'approved',
-    }))
+    .map(expense => {
+      const normalized = normalizeExpenseForMemberBill(expense)
+      const paidBy = normalized.paidBy
+      const paidAmount = String(paidBy || '') === String(memberId) ? normalized.amount : 0
+      const shareAmount = memberShareAmount(normalized, memberId)
+      const netAmount = paidAmount - shareAmount
+      return {
+        id: expense.id,
+        date: formatDayMonth(expense.date || expense.expense_date),
+        rawDate: expense.date || expense.expense_date,
+        title: expense.title || 'Chi tiêu',
+        category: expense.category || expense.cat || '',
+        status: expense.status || 'approved',
+        paidBy,
+        paidByName: memberName(paidBy, members),
+        role: paidAmount > 0 ? 'payer' : 'participant',
+        paidAmount,
+        shareAmount,
+        netAmount,
+      }
+    })
+}
+
+function normalizeExpenseForMemberBill(expense) {
+  return {
+    ...expense,
+    amount: Number(expense?.amount) || 0,
+    paidBy: expense?.paidBy || expense?.paid_by_member_id,
+    participants: safeArray(expense?.participants),
+    splits: safeArray(expense?.splits).map(split => ({
+      memberId: split.memberId || split.member_id,
+      amount: Number(split.amount ?? split.share_amount ?? split.share ?? 0) || 0,
+    })).filter(split => split.memberId),
+  }
+}
+
+function memberShareAmount(expense, memberId) {
+  const split = safeArray(expense?.splits).find(row => String(row.memberId || row.member_id) === String(memberId))
+  if (split) return Number(split.amount ?? split.share_amount ?? split.share ?? 0) || 0
+  const participants = safeArray(expense?.participants)
+  const index = participants.findIndex(id => String(id) === String(memberId))
+  if (index < 0 || participants.length === 0) return 0
+  const amount = Number(expense?.amount) || 0
+  const per = Math.round(amount / participants.length)
+  return index === participants.length - 1 ? amount - per * (participants.length - 1) : per
+}
+
+function summarizeMemberTransactions(transactions) {
+  const rows = safeArray(transactions)
+  const owes = rows.reduce((sum, row) => sum + Math.max(0, -Number(row.netAmount || 0)), 0)
+  const advanced = rows.reduce((sum, row) => sum + Math.max(0, Number(row.netAmount || 0)), 0)
+  return {
+    owes,
+    advanced,
+    net: advanced - owes,
+  }
+}
+
+function buildGroupPaymentTarget(group, members) {
+  const groupCreatorId = group?.createdBy || group?.created_by
+  const treasurer = safeArray(members).find(member => member?.role === 'treasurer')
+    || safeArray(members).find(member => String(member?.id || '') === String(groupCreatorId || ''))
+    || safeArray(members)[0]
+    || null
+  return {
+    memberId: treasurer?.id || '',
+    name: treasurer?.displayName || treasurer?.name || '',
+    bankName: treasurer?.bankName || treasurer?.bank_name || '',
+    bankAccount: treasurer?.bankAccount || treasurer?.bank_account || '',
+    bankAccountName: treasurer?.bankAccountName || treasurer?.bank_account_name || '',
+  }
 }
 
 function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members, selectedYearMonth) {
@@ -1138,7 +1213,7 @@ function buildMemberDetailData(state, memberId, selectedYearMonth) {
     bankName: member?.bankName || member?.bank_name || '',
     bankAccountName: member?.bankAccountName || member?.bank_account_name || '',
     bankAccount: member?.bankAccount || member?.bank_account || '',
-    payerTransactions: buildMemberPayerTransactions(currentGroup(state), member.id, selectedYearMonth),
+    payerTransactions: buildMemberTransactions(currentGroup(state), member.id, selectedYearMonth, members),
     attendance,
     balance,
     rank: calculateMemberRank(attendance.percentage),
