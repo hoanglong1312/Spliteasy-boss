@@ -36,7 +36,7 @@ test('PickleballSettings no longer owns add/delete member management', () => {
   assert.match(appSource, /type === 'addMember'/);
   assert.match(appSource, /type === 'removeMemberToVanglai'/);
   assert.match(appSource, /\.from\('members'\)/);
-  assert.match(appSource, /member_type: 'casual'/);
+  assert.match(appSource, /is_active: false/);
 });
 
 test('PickleballSettings edits schedule time and start date before saving', () => {

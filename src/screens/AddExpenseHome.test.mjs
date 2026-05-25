@@ -116,7 +116,7 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
   assert.match(screenDataSource, /const isPickleballGroup = groupKind\(group\) === 'pickleball'/);
-  assert.match(screenDataSource, /isPickleballGroup \? memberType\(member\) === 'casual' : !isActiveMember\(member\)/);
+  assert.match(screenDataSource, /isPickleballGroup \? \(!isActiveMember\(member\) \|\| memberType\(member\) === 'casual'\) : !isActiveMember\(member\)/);
   assert.match(groupDetailSource, /const inactiveCandidates = candidates\.filter\(candidate => candidate\.isInactive\)/);
   assert.match(groupDetailSource, /const activeCandidates = candidates\.filter\(candidate => !candidate\.isInactive\)/);
   assert.match(groupDetailSource, /const inactiveCandidateCards = inactiveCandidates\.map\(candidate => \(/);
@@ -180,7 +180,7 @@ test('GroupDetail delete member does not depend on native confirm dialogs', () =
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{memberMenu\.name\} khỏi nhóm\?`\)/);
   assert.match(groupDetailSource, /setDeleteConfirmMember\(memberMenu\)/);
   assert.match(groupDetailSource, /title="Xóa khỏi nhóm\?"/);
-  assert.match(groupDetailSource, /\{d\.isPickleball\s*\? 'Thành viên sẽ được chuyển vào danh sách vãng lai\. Bạn có thể thêm lại sau\.'\s*: 'Thành viên sẽ được ẩn khỏi danh sách nhóm\. Bạn có thể thêm lại sau\.'\}/);
+  assert.match(groupDetailSource, /Thành viên sẽ được ẩn khỏi danh sách nhóm\. Bạn có thể thêm lại sau\./);
   assert.match(groupDetailSource, /await onAction\?\.\(d\.isPickleball \? 'removeMemberToVanglai' : 'removeMemberFromGroup', \{ memberId: deleteConfirmMember\.id, groupId: d\.id \}\)/);
   assert.match(appSource, /if \(type === 'removeMemberFromGroup'\)/);
   assert.match(appSource, /\.update\(\{ is_active: false \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);

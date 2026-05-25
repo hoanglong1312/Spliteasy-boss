@@ -465,7 +465,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
   const seenProfileIds = new Set()
   const isPickleballGroup = groupKind(group) === 'pickleball'
   const casualCurrentMembers = currentMembers.filter(member => (
-    isPickleballGroup ? memberType(member) === 'casual' : !isActiveMember(member)
+    isPickleballGroup ? (!isActiveMember(member) || memberType(member) === 'casual') : !isActiveMember(member)
   ))
     .map(member => ({
       id: member.id,
@@ -3146,9 +3146,12 @@ function membersForGroup(group, members) {
 
 function allMembersForGroup(group, members) {
   const ids = new Set(safeArray(group?.members).map(String))
-  return safeArray(members).filter(member => (
-    ids.has(String(member.id)) || String(member.groupId || member.group_id || '') === String(group?.id || '')
-  ))
+  const groupId = group?.id
+  return safeArray(members).filter(member => {
+    const memberGroupId = member.groupId || member.group_id || ''
+    if (groupId && memberGroupId) return String(memberGroupId) === String(groupId)
+    return ids.has(String(member.id))
+  })
 }
 
 function memberIdForGroup(group, currentUserId, members, currentUserName) {

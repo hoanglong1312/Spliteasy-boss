@@ -296,9 +296,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       {deleteConfirmMember && canManageMembers && (
         <BottomSheet title="Xóa khỏi nhóm?" onClose={() => setDeleteConfirmMember(null)}>
           <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
-            {d.isPickleball
-              ? 'Thành viên sẽ được chuyển vào danh sách vãng lai. Bạn có thể thêm lại sau.'
-              : 'Thành viên sẽ được ẩn khỏi danh sách nhóm. Bạn có thể thêm lại sau.'}
+            Thành viên sẽ được ẩn khỏi danh sách nhóm. Bạn có thể thêm lại sau.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" onClick={() => setDeleteConfirmMember(null)}>Hủy</Button>

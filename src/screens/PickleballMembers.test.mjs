@@ -24,5 +24,5 @@ test('Pickleball member add flow suggests and triggers inactive member reactivat
   assert.match(appSource, /if \(type === 'reactivateMember'\)/);
   assert.match(appSource, /const isPickleballGroup = isPickleballActionGroup\(currentGroup\)/);
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/);
-  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed' \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
+  assert.match(appSource, /\.from\('members'\)[\s\S]*?\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
 });

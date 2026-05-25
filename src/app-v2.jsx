@@ -544,7 +544,7 @@ export default function AppV2() {
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update({ member_type: 'casual' })
+        .update({ is_active: false })
         .eq('id', memberId)
         .eq('group_id', targetGroupId)
       if (error) throw error
@@ -562,7 +562,7 @@ export default function AppV2() {
       const sb = createSupabase(token)
       const { error } = await sb
         .from('members')
-        .update(isPickleballGroup ? { member_type: 'fixed' } : { is_active: true })
+        .update(isPickleballGroup ? { member_type: 'fixed', is_active: true } : { is_active: true })
         .eq('id', memberId)
         .eq('group_id', targetGroupId)
       if (error) throw error

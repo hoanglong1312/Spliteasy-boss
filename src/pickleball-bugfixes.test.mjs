@@ -426,6 +426,24 @@ test('pickleball members data exposes existing profile candidates outside the cl
   assert.deepEqual(data.memberCandidates.map(member => member.name), ['Tiến'])
 })
 
+test('pickleball members data ignores stale member ids from other groups', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'club',
+    currentGroup: { id: 'club', name: 'CLB', members: ['expense-minh-anh'] },
+    members: [
+      { id: 'expense-minh-anh', groupId: 'food', profileId: 'p1', name: 'Minh Anh', memberType: 'fixed', isActive: true },
+      { id: 'pickle-minh-anh', groupId: 'club', profileId: 'p1', name: 'Minh Anh', memberType: 'fixed', isActive: true },
+    ],
+    pickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state)
+
+  assert.deepEqual(data.members.map(member => member.id), ['pickle-minh-anh'])
+  assert.deepEqual(data.allMembers.map(member => member.id), ['pickle-minh-anh'])
+})
+
 test('settings screen no longer renders venue selection', () => {
   assert.doesNotMatch(settingsSource, /<FieldLabel>Địa điểm<\/FieldLabel>/)
   assert.doesNotMatch(settingsSource, /d\.defaultVenue/)

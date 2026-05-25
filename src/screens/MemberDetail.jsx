@@ -264,7 +264,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
       {showDeleteConfirm && isTreasurer && (
         <BottomSheet title="Xóa thành viên?" onClose={() => setShowDeleteConfirm(false)}>
           <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
-            Thành viên sẽ được chuyển vào danh sách chờ. Bạn có thể thêm lại sau.
+            Thành viên sẽ được ẩn khỏi danh sách nhóm. Bạn có thể thêm lại sau.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>Hủy</Button>
