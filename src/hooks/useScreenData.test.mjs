@@ -181,6 +181,23 @@ test('pickleball members do not render one active profile in both fixed and casu
   assert.equal(data.stats.total, 1)
 })
 
+test('pickleball member candidates exclude inactive duplicates when the profile is already casual', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'club',
+    currentGroup: { id: 'club', name: 'CLB', type: 'pickleball' },
+    members: [
+      { id: 'hoang-em-fixed', groupId: 'club', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'fixed', isActive: false },
+      { id: 'hoang-em-casual', groupId: 'club', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'casual', isActive: true },
+    ],
+    pickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state)
+
+  assert.deepEqual(data.memberCandidates.map(member => member.name), [])
+})
+
 test('add expense data does not fall back to pickleball members for an empty expense group', () => {
   const { buildAddExpenseData } = loadScreenDataBuilders()
   const state = {

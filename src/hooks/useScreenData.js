@@ -466,9 +466,16 @@ function buildGroupMemberCandidates(group, members, profiles = [], options = {})
     : currentMembers.filter(isExpenseActiveMember)
   const currentIds = new Set(blockingCurrentMembers.map(member => String(member.id)))
   const currentProfileIds = new Set(blockingCurrentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
+  const activeCurrentKeys = new Set(
+    currentMembers
+      .filter(member => mode === 'pickleball' ? isActiveMember(member) : isExpenseActiveMember(member))
+      .map(memberIdentityKey)
+      .filter(Boolean)
+  )
   const seenProfileIds = new Set()
   const inactiveCurrentMembers = currentMembers.filter(member => (
-    mode === 'pickleball' ? !isActiveMember(member) : !isExpenseActiveMember(member)
+    (mode === 'pickleball' ? !isActiveMember(member) : !isExpenseActiveMember(member)) &&
+    !activeCurrentKeys.has(memberIdentityKey(member))
   ))
     .map(member => ({
       id: member.id,
@@ -1869,11 +1876,15 @@ function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
 function dedupeMemberRowsByProfileOrName(members) {
   const seen = new Set()
   return safeArray(members).filter(member => {
-    const key = String(member?.profileId || member?.profile_id || normalizeName(member?.displayName || member?.name) || member?.id || '')
+    const key = memberIdentityKey(member) || String(member?.id || '')
     if (!key || seen.has(key)) return false
     seen.add(key)
     return true
   })
+}
+
+function memberIdentityKey(member) {
+  return String(member?.profileId || member?.profile_id || normalizeName(member?.displayName || member?.name) || '').trim()
 }
 
 function buildMemberAttendance(sessions, memberId, members = []) {
