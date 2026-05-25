@@ -91,7 +91,7 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(groupDetailSource, /\.normalize\('NFD'\)/);
   assert.match(groupDetailSource, /selectedCandidates = candidates\.filter\(candidate => selectedCandidateIds\.includes\(String\(candidate\.id\)\)\)/);
   assert.match(groupDetailSource, /for \(const candidate of selectedCandidates\)/);
-  assert.match(groupDetailSource, /await onAction\?\.\('addMember', \{[\s\S]*profileId: candidate\?\.profileId \|\| candidate\?\.id \|\| '',[\s\S]*\}\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('addExpenseGroupMember', \{[\s\S]*groupId,[\s\S]*profileId: candidate\?\.profileId \|\| candidate\?\.id \|\| '',[\s\S]*\}\)/);
   assert.match(groupDetailSource, /Hoặc nhập tên mới/);
   const addMemberEditorSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function AddMemberEditor'),
@@ -103,11 +103,13 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.doesNotMatch(addMemberEditorSource, /Tên tài khoản/);
   assert.doesNotMatch(addMemberEditorSource, /<BankSelect/);
   assert.doesNotMatch(addMemberEditorSource, /Số tài khoản/);
-  assert.match(addMemberEditorSource, /await onAction\?\.\('addMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*profileId: '',[\s\S]*type: 'fixed',[\s\S]*\}\)/);
+  assert.match(addMemberEditorSource, /await onAction\?\.\('addExpenseGroupMember', \{[\s\S]*groupId,[\s\S]*name: cleanName,[\s\S]*profileId: '',[\s\S]*type: 'fixed',[\s\S]*\}\)/);
+  assert.doesNotMatch(addMemberEditorSource, /onAction\?\.\('addMember'/);
   assert.doesNotMatch(addMemberEditorSource, /bankAccountName: bankAccountName\.trim\(\)/);
   assert.doesNotMatch(addMemberEditorSource, /bankName,/);
   assert.doesNotMatch(addMemberEditorSource, /bankAccount: bankAccount\.trim\(\)/);
-  assert.match(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/);
+  assert.match(appSource, /if \(type === 'addExpenseGroupMember'\)/);
+  assert.doesNotMatch(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/);
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);

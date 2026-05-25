@@ -378,12 +378,50 @@ export default function AppV2() {
       return
     }
 
-    if (type === 'addMember') {
+    if (type === 'addExpenseGroupMember') {
       const name = String(payload?.name || '').trim()
-      if (!name) return null
+      const groupId = payload?.groupId
+      if (!name || !groupId) return null
       return dispatch({
         type: 'ADD_MEMBER',
-        groupId: payload?.groupId || activePickleballGroupId(state),
+        groupId,
+        member: {
+          name,
+          profileId: payload?.profileId || payload?.profile_id,
+          member_type: 'fixed',
+          bank_account: payload?.bankAccount ?? payload?.bank_account,
+          bank_name: payload?.bankName ?? payload?.bank_name,
+          bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
+        },
+      })
+    }
+
+    if (type === 'addPickleballMember') {
+      const name = String(payload?.name || '').trim()
+      if (!name) return null
+      const groupId = payload?.groupId || activePickleballGroupId(state)
+      if (!groupId) return null
+      return dispatch({
+        type: 'ADD_MEMBER',
+        groupId,
+        member: {
+          name,
+          profileId: payload?.profileId || payload?.profile_id,
+          member_type: payload?.type || payload?.memberType || 'fixed',
+          bank_account: payload?.bankAccount ?? payload?.bank_account,
+          bank_name: payload?.bankName ?? payload?.bank_name,
+          bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
+        },
+      })
+    }
+
+    if (type === 'addMember') {
+      const name = String(payload?.name || '').trim()
+      const groupId = payload?.groupId
+      if (!name || !groupId) return null
+      return dispatch({
+        type: 'ADD_MEMBER',
+        groupId,
         member: {
           name,
           profileId: payload?.profileId || payload?.profile_id,
@@ -533,7 +571,7 @@ export default function AppV2() {
       return
     }
 
-    if (type === 'removeMemberToVanglai') {
+    if (type === 'removePickleballMember') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
       const targetGroupId = payload?.groupId || state.currentGroupId

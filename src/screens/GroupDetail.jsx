@@ -585,7 +585,7 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
         await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId });
         continue;
       }
-      await onAction?.('addMember', {
+      await onAction?.('addExpenseGroupMember', {
         groupId,
         name: candidate.name,
         profileId: candidate?.profileId || candidate?.id || '',
@@ -593,7 +593,7 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
       });
     }
     if (cleanName) {
-      await onAction?.('addMember', {
+      await onAction?.('addExpenseGroupMember', {
         groupId,
         name: cleanName,
         profileId: '',

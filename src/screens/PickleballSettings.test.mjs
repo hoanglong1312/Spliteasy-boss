@@ -33,8 +33,8 @@ test('PickleballSettings no longer owns add/delete member management', () => {
   assert.doesNotMatch(settingsSource, /onAction\?\.\('addMember'/);
   assert.doesNotMatch(settingsSource, /onAction\?\.\('deleteMember'/);
   assert.doesNotMatch(settingsSource, /Xác nhận xóa thành viên/);
-  assert.match(appSource, /type === 'addMember'/);
-  assert.match(appSource, /type === 'removeMemberToVanglai'/);
+  assert.match(appSource, /type === 'addPickleballMember'/);
+  assert.match(appSource, /type === 'removePickleballMember'/);
   assert.match(appSource, /\.from\('members'\)/);
   assert.match(appSource, /is_active: false/);
 });

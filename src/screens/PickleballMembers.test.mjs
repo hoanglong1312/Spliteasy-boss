@@ -14,6 +14,8 @@ test('Pickleball member add flow validates typed names against active and inacti
   assert.match(memberSource, /Tên này đã tồn tại trong nhóm\. Vui lòng dùng tên khác\./);
   assert.match(memberSource, /const duplicateMember = findDuplicateMember\(newMemberName, allMembers\)/);
   assert.match(memberSource, /if \(duplicateMember && isActiveMember\(duplicateMember\)\)/);
+  assert.match(memberSource, /await onAction\?\.\('addPickleballMember'/);
+  assert.doesNotMatch(memberSource, /onAction\?\.\('addMember'/);
 });
 
 test('Pickleball member add flow suggests and triggers inactive member reactivation', () => {

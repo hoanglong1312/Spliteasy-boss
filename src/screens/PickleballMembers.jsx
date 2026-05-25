@@ -81,7 +81,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
         await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId: d.groupId });
         continue;
       }
-      await onAction?.('addMember', {
+      await onAction?.('addPickleballMember', {
+        groupId: d.groupId,
         name: candidate.name,
         profileId: candidate?.profileId || candidate?.id || '',
         type: newMemberType,
@@ -91,7 +92,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
       });
     }
     if (name) {
-      await onAction?.('addMember', { name, profileId: '', type: newMemberType });
+      await onAction?.('addPickleballMember', { groupId: d.groupId, name, profileId: '', type: newMemberType });
     }
     setNewMemberName('');
     setNewMemberType('fixed');
@@ -142,7 +143,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 
   async function confirmDeleteMember() {
     if (!deleteConfirmMember) return;
-    await onAction?.('removeMemberToVanglai', { memberId: deleteConfirmMember.id, groupId: data.groupId });
+    await onAction?.('removePickleballMember', { memberId: deleteConfirmMember.id, groupId: data.groupId });
     setDeleteConfirmMember(null);
   }
 
