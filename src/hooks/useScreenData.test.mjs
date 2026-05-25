@@ -112,6 +112,34 @@ test('group member candidates exclude active current members by name', () => {
   assert.deepEqual(candidates.map(member => member.name), ['An'])
 })
 
+test('expense group member candidates include active casual rows from the same linked pickleball group', () => {
+  const { buildGroupMemberCandidates } = loadScreenDataBuilders()
+  const group = { id: 'shared-1', groupType: 'expense', members: ['expense-long', 'pickle-hoang-em'] }
+  const members = [
+    { id: 'expense-long', groupId: 'shared-1', profileId: 'profile-long', name: 'Long', memberType: 'fixed', isActive: true },
+    { id: 'pickle-hoang-em', groupId: 'shared-1', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'casual', isActive: true },
+  ]
+
+  const candidates = buildGroupMemberCandidates(group, members)
+
+  assert.deepEqual(candidates.map(member => member.name), ['Hoàng Em'])
+  assert.equal(candidates[0].memberId, 'pickle-hoang-em')
+  assert.equal(candidates[0].profileId, 'profile-hoang-em')
+})
+
+test('group detail member candidates use expense add-member rules for pickleball-linked expense screens', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = { id: 'shared-1', type: 'pickleball', name: 'Virgo Pickleball 246', members: ['expense-long', 'pickle-hoang-em'], expenses: [] }
+  const members = [
+    { id: 'expense-long', groupId: 'shared-1', profileId: 'profile-long', name: 'Long', memberType: 'fixed', isActive: true },
+    { id: 'pickle-hoang-em', groupId: 'shared-1', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'casual', isActive: true },
+  ]
+
+  const detail = buildGroupDetailData(group, 'expense-long', members, 'Long', '2026-05')
+
+  assert.deepEqual(detail.memberCandidates.map(member => member.name), ['Hoàng Em'])
+})
+
 test('add expense data does not fall back to pickleball members for an empty expense group', () => {
   const { buildAddExpenseData } = loadScreenDataBuilders()
   const state = {
@@ -271,7 +299,7 @@ test('core balances treat missing legacy status as approved and ignore pending o
   assert.match(coreDataSource, /const approvedExpenses = \(g\.expenses \|\| \[\]\)\.filter\(e => !e\.status \|\| e\.status === 'approved'\)/)
 })
 
-test('expense group member candidates use inactive members as pending rows', () => {
+test('expense group member candidates use inactive rows and active casual rows as pending rows', () => {
   const { buildGroupMemberCandidates } = loadScreenDataBuilders()
   const group = { id: 'expense-1', groupType: 'expense', members: ['inactive-an', 'active-binh'] }
   const members = [
@@ -281,9 +309,26 @@ test('expense group member candidates use inactive members as pending rows', () 
 
   const candidates = buildGroupMemberCandidates(group, members)
 
-  assert.deepEqual(candidates.map(member => member.name), ['An'])
+  assert.deepEqual(candidates.map(member => member.name), ['An', 'Binh'])
   assert.equal(candidates[0].memberId, 'inactive-an')
   assert.equal(candidates[0].isInactive, true)
+  assert.equal(candidates[1].memberId, 'active-binh')
+  assert.equal(candidates[1].isInactive, undefined)
+})
+
+test('expense group member candidates include active casual pickleball profiles outside the expense group', () => {
+  const { buildGroupMemberCandidates } = loadScreenDataBuilders()
+  const group = { id: 'expense-1', groupType: 'expense', members: ['expense-long'] }
+  const members = [
+    { id: 'expense-long', groupId: 'expense-1', profileId: 'profile-long', name: 'Long', memberType: 'fixed', isActive: true },
+    { id: 'pickle-hoang-em', groupId: 'pickle-1', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'casual', isActive: true },
+  ]
+
+  const candidates = buildGroupMemberCandidates(group, members)
+
+  assert.deepEqual(candidates.map(member => member.name), ['Hoàng Em'])
+  assert.equal(candidates[0].memberId, 'pickle-hoang-em')
+  assert.equal(candidates[0].profileId, 'profile-hoang-em')
 })
 
 test('Pickleball overview reads current-month court fee and current fixed members', () => {

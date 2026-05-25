@@ -304,7 +304,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               type="button"
               variant="danger"
               onClick={async () => {
-                await onAction?.(d.isPickleball ? 'removeMemberToVanglai' : 'removeMemberFromGroup', { memberId: deleteConfirmMember.id, groupId: d.id });
+                await onAction?.('removeMemberFromGroup', { memberId: deleteConfirmMember.id, groupId: d.id });
                 setDeleteConfirmMember(null);
               }}
             >Xác nhận</Button>

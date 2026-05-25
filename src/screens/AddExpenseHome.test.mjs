@@ -111,8 +111,10 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);
   assert.match(screenDataSource, /color: g\.color \|\| '#574EFA'/);
-  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles\)/);
-  assert.match(screenDataSource, /const currentProfileIds = new Set\(currentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
+  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles, \{ mode: 'expense' \}\)/);
+  assert.match(screenDataSource, /const mode = options\.mode \|\| groupKind\(group\)/);
+  assert.match(screenDataSource, /const blockingCurrentMembers = mode === 'pickleball'[\s\S]*?: currentMembers\.filter\(member => memberType\(member\) !== 'casual'\)/);
+  assert.match(screenDataSource, /const currentProfileIds = new Set\(blockingCurrentMembers\.map\(member => String\(member\.profileId \|\| member\.profile_id \|\| member\.id\)\)\)/);
   assert.match(screenDataSource, /function candidateProfilesFromDirectory\(members, profiles = \[\]\)/);
   assert.match(screenDataSource, /const hasInactiveRows = memberRows\.some\(member => !isActiveMember\(member\)\)/);
   assert.match(screenDataSource, /!isActiveMember\(member\)/);
@@ -182,7 +184,8 @@ test('GroupDetail delete member does not depend on native confirm dialogs', () =
   assert.match(groupDetailSource, /setDeleteConfirmMember\(memberMenu\)/);
   assert.match(groupDetailSource, /title="Xóa khỏi nhóm\?"/);
   assert.match(groupDetailSource, /Thành viên sẽ được ẩn khỏi danh sách nhóm\. Bạn có thể thêm lại sau\./);
-  assert.match(groupDetailSource, /await onAction\?\.\(d\.isPickleball \? 'removeMemberToVanglai' : 'removeMemberFromGroup', \{ memberId: deleteConfirmMember\.id, groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /await onAction\?\.\('removeMemberFromGroup', \{ memberId: deleteConfirmMember\.id, groupId: d\.id \}\)/);
+  assert.doesNotMatch(groupDetailSource, /d\.isPickleball \? 'removeMemberToVanglai'/);
   assert.match(appSource, /if \(type === 'removeMemberFromGroup'\)/);
   assert.match(appSource, /\.update\(\{ is_active: false \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteMember'/);

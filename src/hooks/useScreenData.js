@@ -429,7 +429,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     pendingExpenses,
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
-    memberCandidates: buildGroupMemberCandidates(g, members, profiles),
+    memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense' }),
     members: groupMembers.map(member => ({
       id: member.id,
       name: member.displayName || member.name,
@@ -458,10 +458,14 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   }
 }
 
-function buildGroupMemberCandidates(group, members, profiles = []) {
+function buildGroupMemberCandidates(group, members, profiles = [], options = {}) {
   const currentMembers = allMembersForGroup(group, members)
-  const currentIds = new Set(currentMembers.map(member => String(member.id)))
-  const currentProfileIds = new Set(currentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
+  const mode = options.mode || groupKind(group)
+  const blockingCurrentMembers = mode === 'pickleball'
+    ? currentMembers
+    : currentMembers.filter(member => memberType(member) !== 'casual')
+  const currentIds = new Set(blockingCurrentMembers.map(member => String(member.id)))
+  const currentProfileIds = new Set(blockingCurrentMembers.map(member => String(member.profileId || member.profile_id || member.id)))
   const seenProfileIds = new Set()
   const inactiveCurrentMembers = currentMembers.filter(member => (
     !isActiveMember(member)
@@ -482,7 +486,7 @@ function buildGroupMemberCandidates(group, members, profiles = []) {
     dedupedInactiveCurrentMembers.map(member => (member.name || '').toLowerCase().trim()).filter(Boolean)
   )
   const allCurrentMemberNames = new Set(
-    currentMembers.map(member => (member.displayName || member.name || '').toLowerCase().trim()).filter(Boolean)
+    blockingCurrentMembers.map(member => (member.displayName || member.name || '').toLowerCase().trim()).filter(Boolean)
   )
   const outsideGroupCandidates = candidateProfilesFromDirectory(members, profiles)
     .filter(member => {

@@ -75,7 +75,7 @@ test('primary money screens share hero, search, section, and list primitives', (
 test('group detail data receives profile directory without free state references', () => {
   assert.match(screenDataSource, /function buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = \[\]\)/)
   assert.match(screenDataSource, /buildGroupDetailData\(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles\)/)
-  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles\)/)
+  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles, \{ mode: 'expense' \}\)/)
   const buildGroupDetailBlock = screenDataSource.slice(
     screenDataSource.indexOf('function buildGroupDetailData'),
     screenDataSource.indexOf('function buildGroupMemberCandidates')
