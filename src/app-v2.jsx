@@ -35,6 +35,11 @@ function profilePhotoStorageKey(memberId) {
   return `spliteasy_profile_photo_${memberId || 'me'}`
 }
 
+function isPickleballActionGroup(group) {
+  const explicit = String(group?.type || group?.kind || group?.groupType || group?.group_type || '').toLowerCase()
+  return explicit === 'pickleball'
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const groups = state.groups || []
@@ -515,8 +520,7 @@ export default function AppV2() {
       if (!memberId) return
       const targetGroupId = payload?.groupId || state.currentGroupId
       const currentGroup = (state.groups || []).find(group => String(group.id) === String(targetGroupId))
-      const groupText = `${currentGroup?.name || ''} ${currentGroup?.emoji || ''}`.toLowerCase()
-      const isPickleballGroup = groupText.includes('pickle') || groupText.includes('🏓') || groupText.includes('🏸')
+      const isPickleballGroup = isPickleballActionGroup(currentGroup)
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
@@ -533,8 +537,7 @@ export default function AppV2() {
       if (!memberId) return
       const targetGroupId = payload?.groupId || state.currentGroupId
       const currentGroup = (state.groups || []).find(group => String(group.id) === String(targetGroupId))
-      const groupText = `${currentGroup?.name || ''} ${currentGroup?.emoji || ''}`.toLowerCase()
-      const isPickleballGroup = groupText.includes('pickle') || groupText.includes('🏓') || groupText.includes('🏸')
+      const isPickleballGroup = isPickleballActionGroup(currentGroup)
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const { error } = await sb
