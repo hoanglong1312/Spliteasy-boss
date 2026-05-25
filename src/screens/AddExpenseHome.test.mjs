@@ -40,6 +40,7 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Mã mời thành viên/);
   assert.match(groupDetailSource, /Xóa nhóm/);
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
+  assert.match(groupDetailSource, /action=\{<div[\s\S]*\{d\.emoji \|\| '👥'\}/);
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
   assert.doesNotMatch(groupDetailSource, /\{ key: 'balances', label: 'Số dư' \}/);
   assert.doesNotMatch(groupDetailSource, /activeTab === 'balances'/);
@@ -133,6 +134,7 @@ test('GroupDetail member management adds members without bank fields', () => {
   assert.doesNotMatch(addMemberEditorSource, /bankName,/);
   assert.doesNotMatch(addMemberEditorSource, /bankAccount: bankAccount\.trim\(\)/);
   assert.match(appSource, /if \(type === 'addExpenseGroupMember'\)/);
+  assert.match(appSource, /\.rpc\('add_expense_group_member'/);
   assert.doesNotMatch(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/);
   assert.match(appSource, /bank_account: payload\?\.bankAccount \?\? payload\?\.bank_account/);
   assert.match(appSource, /bank_account_name: payload\?\.bankAccountName \?\? payload\?\.bank_account_name/);

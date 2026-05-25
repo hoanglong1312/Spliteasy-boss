@@ -76,8 +76,22 @@ test('AppV2 wires member detail route and member management updates', () => {
 test('AppV2 edit group preserves descriptions for expense group settings', () => {
   assert.match(appSource, /if \(type === 'editGroup'\)/)
   assert.match(appSource, /description: group\.description \|\| '',/)
+  assert.match(appSource, /\.rpc\('edit_expense_group'/)
   assert.match(storeSource, /case 'EDIT_GROUP':/)
   assert.match(storeSource, /description: action\.group\.description \|\| '',/)
+})
+
+test('AppV2 uses expense-group RPCs for normal member edits instead of pickleball writes', () => {
+  assert.match(appSource, /if \(type === 'addExpenseGroupMember'\)/)
+  assert.match(appSource, /\.rpc\('add_expense_group_member'/)
+  assert.match(appSource, /p_member_id: memberId \|\| null/)
+  assert.match(appSource, /p_profile_id: payload\?\.profileId \|\| payload\?\.profile_id \|\| null/)
+  const addExpenseBlock = appSource.slice(
+    appSource.indexOf("if (type === 'addExpenseGroupMember')"),
+    appSource.indexOf("if (type === 'addPickleballMember')")
+  )
+  assert.doesNotMatch(addExpenseBlock, /type: 'ADD_MEMBER'/)
+  assert.doesNotMatch(addExpenseBlock, /activePickleballGroupId/)
 })
 
 test('member deletion is confirmed with the shared in-app sheet before dispatch', () => {

@@ -114,6 +114,17 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           eyebrow="CHI TIÊU NHÓM"
           title={d.name}
           subtitle={`${d.memberCount || (d.members || []).length} thành viên · ${d.monthLabel || 'Tháng này'}`}
+          action={<div style={{
+            width: 46,
+            height: 46,
+            borderRadius: 14,
+            background: 'rgba(251,191,36,0.14)',
+            border: '1px solid rgba(251,191,36,0.28)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 24,
+          }}>{d.emoji || '👥'}</div>}
           style={{ cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 8 }}>

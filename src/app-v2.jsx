@@ -410,32 +410,20 @@ export default function AppV2() {
       const groupId = payload?.groupId
       if (!name || !groupId) return null
       const memberId = payload?.memberId || payload?.member_id
-      const existingMember = safeArray(state?.members).find(member => String(member.id) === String(memberId || ''))
-      if (existingMember && String(existingMember.groupId || existingMember.group_id || '') === String(groupId)) {
-        const { token } = getStoredAuth()
-        const sb = createSupabase(token)
-        const { error } = await sb
-          .from('members')
-          .update({ expense_active: true })
-          .eq('id', existingMember.id)
-          .eq('group_id', groupId)
-        if (error) throw error
-        await dispatch({ type: 'REFRESH' })
-        return
-      }
-      return dispatch({
-        type: 'ADD_MEMBER',
-        groupId,
-        member: {
-          name,
-          profileId: payload?.profileId || payload?.profile_id,
-          member_type: 'fixed',
-          expense_active: true,
-          bank_account: payload?.bankAccount ?? payload?.bank_account,
-          bank_name: payload?.bankName ?? payload?.bank_name,
-          bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
-        },
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb.rpc('add_expense_group_member', {
+        p_group_id: groupId,
+        p_member_id: memberId || null,
+        p_name: name,
+        p_profile_id: payload?.profileId || payload?.profile_id || null,
+        p_bank_name: payload?.bankName ?? payload?.bank_name ?? null,
+        p_bank_account: payload?.bankAccount ?? payload?.bank_account ?? null,
+        p_bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name ?? null,
       })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
     }
 
     if (type === 'addPickleballMember') {
@@ -478,16 +466,17 @@ export default function AppV2() {
     if (type === 'editGroup') {
       const group = payload?.group || payload
       if (!group?.id || !String(group?.name || '').trim()) return
-      await dispatch({
-        type: 'EDIT_GROUP',
-        group: {
-          id: group.id,
-          name: String(group.name).trim(),
-          emoji: group.emoji || '👥',
-          description: group.description || '',
-          color: group.color || '#574EFA',
-        },
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb.rpc('edit_expense_group', {
+        p_group_id: group.id,
+        p_name: String(group.name).trim(),
+        p_emoji: group.emoji || '👥',
+        p_description: group.description || '',
+        p_color: group.color || '#574EFA',
       })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
       return
     }
 
