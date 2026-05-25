@@ -94,6 +94,19 @@ test('AppV2 uses expense-group RPCs for normal member edits instead of picklebal
   assert.doesNotMatch(addExpenseBlock, /activePickleballGroupId/)
 })
 
+test('AppV2 saves normal expense-group expenses through profile-aware RPCs', () => {
+  const saveBlock = appSource.slice(
+    appSource.indexOf("if (type === 'save' || type === 'saveExpense')"),
+    appSource.indexOf("if (type === 'confirmPeriod')")
+  )
+  assert.match(saveBlock, /\.rpc\('create_expense_group_expense'/)
+  assert.match(saveBlock, /p_group_id: groupId/)
+  assert.match(saveBlock, /p_paid_by_member_id: expense\.paidBy/)
+  assert.match(saveBlock, /p_participant_ids: expense\.participants/)
+  assert.match(saveBlock, /await dispatch\(\{ type: 'REFRESH' \}\)/)
+  assert.match(saveBlock, /throw error \|\| new Error\(data\.error\)/)
+})
+
 test('member deletion is confirmed with the shared in-app sheet before dispatch', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   const memberDetailSource = readFileSync(new URL('./screens/MemberDetail.jsx', import.meta.url), 'utf8')

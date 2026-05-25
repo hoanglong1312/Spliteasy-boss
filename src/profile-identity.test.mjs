@@ -12,6 +12,7 @@ const newGroupSource = readFileSync(new URL('./screens/NewGroup.jsx', import.met
 const migrationSource = readFileSync(new URL('../supabase/migrations/20260523000001_profiles_identity.sql', import.meta.url), 'utf8')
 const expenseGroupRpcMigration = readFileSync(new URL('../supabase/migrations/20260525000003_expense_group_member_rpcs.sql', import.meta.url), 'utf8')
 const memberBillShareMigration = readFileSync(new URL('../supabase/migrations/20260526000001_member_bill_share_tokens.sql', import.meta.url), 'utf8')
+const expenseGroupExpenseRpcMigration = readFileSync(new URL('../supabase/migrations/20260526000002_expense_group_expense_rpcs.sql', import.meta.url), 'utf8')
 
 test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TABLE IF NOT EXISTS public\.profiles/)
@@ -40,6 +41,16 @@ test('member bill share migration creates scoped expiring public tokens', () => 
   assert.match(memberBillShareMigration, /jsonb_build_object\([\s\S]*'groupId', v_share\.group_id[\s\S]*'memberId', v_share\.member_id/)
   assert.match(memberBillShareMigration, /REVOKE ALL ON public\.member_bill_share_tokens FROM anon/)
   assert.match(memberBillShareMigration, /GRANT EXECUTE ON FUNCTION public\.get_member_bill_share\(text\) TO anon/)
+})
+
+test('expense group expense RPC saves expenses through the current profile membership', () => {
+  assert.match(expenseGroupExpenseRpcMigration, /CREATE OR REPLACE FUNCTION public\.create_expense_group_expense/)
+  assert.match(expenseGroupExpenseRpcMigration, /public\.is_member_of_expense_group\(p_group_id\)/)
+  assert.match(expenseGroupExpenseRpcMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)
+  assert.match(expenseGroupExpenseRpcMigration, /submitted_by_member_id[\s\S]*v_actor_member_id/)
+  assert.match(expenseGroupExpenseRpcMigration, /paid_by_member_id[\s\S]*p_paid_by_member_id/)
+  assert.match(expenseGroupExpenseRpcMigration, /INSERT INTO public\.expense_participants/)
+  assert.match(expenseGroupExpenseRpcMigration, /GRANT EXECUTE ON FUNCTION public\.create_expense_group_expense/)
 })
 
 test('store fetches profiles and merges profile fields into members', () => {
