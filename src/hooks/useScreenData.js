@@ -1055,7 +1055,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     isActive: isActiveMember(member),
     is_active: member.is_active,
   }))
-  const activeMembers = currentGroupMembers(state).filter(isActiveMember)
+  const activeMembers = dedupeMemberRowsByProfileOrName(currentGroupMembers(state).filter(isActiveMember))
   const sessions = getStateMonthSessions(state, today)
   const joinRequests = currentJoinRequests(state)
   const totalSessions = sessions.length || 1

@@ -163,6 +163,24 @@ test('expense membership state is independent from pickleball active state', () 
   assert.deepEqual(pickleballData.fixedMembers.map(member => member.name), ['Long', 'Tiến Anh'])
 })
 
+test('pickleball members do not render one active profile in both fixed and casual sections', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'club',
+    currentGroup: { id: 'club', name: 'CLB', type: 'pickleball' },
+    members: [
+      { id: 'hoang-em-fixed', groupId: 'club', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'fixed', isActive: true },
+      { id: 'hoang-em-casual', groupId: 'club', profileId: 'profile-hoang-em', name: 'Hoàng Em', memberType: 'casual', isActive: true },
+    ],
+    pickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state)
+
+  assert.deepEqual([...data.fixedMembers, ...data.casualMembers].map(member => member.name), ['Hoàng Em'])
+  assert.equal(data.stats.total, 1)
+})
+
 test('add expense data does not fall back to pickleball members for an empty expense group', () => {
   const { buildAddExpenseData } = loadScreenDataBuilders()
   const state = {

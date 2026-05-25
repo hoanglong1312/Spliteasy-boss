@@ -40,6 +40,33 @@ function isPickleballActionGroup(group) {
   return explicit === 'pickleball'
 }
 
+function normalizeMemberType(value) {
+  const raw = String(value || '').toLowerCase()
+  return ['casual', 'guest', 'vanglai', 'vãng lai'].includes(raw) ? 'casual' : 'fixed'
+}
+
+function normalizeMemberName(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function memberIdentityKey(member) {
+  return String(member?.profileId || member?.profile_id || normalizeMemberName(member?.displayName || member?.name) || '').trim().toLowerCase()
+}
+
+function findDuplicatePickleballMemberForType(state, currentMember, groupId, targetType) {
+  const key = memberIdentityKey(currentMember)
+  if (!key || !groupId || !targetType) return null
+  const normalizedTargetType = normalizeMemberType(targetType)
+  return safeArray(state?.members).find(member => (
+    String(member?.id || '') !== String(currentMember?.id || '') &&
+    String(member?.groupId || member?.group_id || '') === String(groupId) &&
+    member?.isActive !== false &&
+    member?.is_active !== false &&
+    normalizeMemberType(member?.memberType || member?.member_type) === normalizedTargetType &&
+    memberIdentityKey(member) === key
+  )) || null
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const groups = state.groups || []
@@ -557,11 +584,27 @@ export default function AppV2() {
     if (type === 'setMemberType') {
       const memberId = payload?.memberId
       if (!memberId) return
+      const targetType = payload?.type
+      const targetGroupId = payload?.groupId || state.currentGroupId
+      const currentMember = safeArray(state?.members).find(item => String(item.id) === String(memberId))
+      const currentGroup = safeArray(state?.groups).find(group => String(group.id) === String(targetGroupId))
+      const isPickleballGroup = isPickleballActionGroup(currentGroup)
+      const duplicateTargetMember = isPickleballGroup
+        ? findDuplicatePickleballMemberForType(state, currentMember, targetGroupId, targetType)
+        : null
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
+      if (duplicateTargetMember) {
+        const { error: duplicateError } = await sb
+          .from('members')
+          .update({ is_active: false })
+          .eq('id', duplicateTargetMember.id)
+          .eq('group_id', targetGroupId)
+        if (duplicateError) throw duplicateError
+      }
       let request = sb
         .from('members')
-        .update({ member_type: payload?.type })
+        .update({ member_type: targetType, is_active: true })
         .eq('id', memberId)
       if (payload?.groupId) request = request.eq('group_id', payload.groupId)
       const { error } = await request

@@ -55,6 +55,8 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /if \(type === 'addExpenseGroupMember'\)/)
   assert.match(appSource, /if \(type === 'addPickleballMember'\)/)
   assert.match(appSource, /member_type: payload\?\.type/)
+  assert.match(appSource, /const duplicateTargetMember = isPickleballGroup[\s\S]*?findDuplicatePickleballMemberForType\(state, currentMember, targetGroupId, targetType\)/)
+  assert.match(appSource, /\.update\(\{ is_active: false \}\)[\s\S]*?\.eq\('id', duplicateTargetMember\.id\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
   assert.doesNotMatch(appSource, /groupId: payload\?\.groupId \|\| activePickleballGroupId\(state\)/)
   assert.match(appSource, /if \(payload\?\.groupId\) request = request\.eq\('group_id', payload\.groupId\)/)
   assert.match(appSource, /if \(type === 'removePickleballMember'\)/)
