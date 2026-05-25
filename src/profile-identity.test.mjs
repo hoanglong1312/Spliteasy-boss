@@ -10,6 +10,7 @@ const settingsSource = readFileSync(new URL('./screens/Settings.jsx', import.met
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const newGroupSource = readFileSync(new URL('./screens/NewGroup.jsx', import.meta.url), 'utf8')
 const migrationSource = readFileSync(new URL('../supabase/migrations/20260523000001_profiles_identity.sql', import.meta.url), 'utf8')
+const expenseGroupRpcMigration = readFileSync(new URL('../supabase/migrations/20260525000003_expense_group_member_rpcs.sql', import.meta.url), 'utf8')
 
 test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TABLE IF NOT EXISTS public\.profiles/)
@@ -122,4 +123,12 @@ test('groups list can highlight the one expense group linked to pickleball profi
   assert.match(groupsListSource, /const linked = g\.isLinkedPickleballExpenseGroup/)
   assert.match(groupsListSource, /Liên kết Pickleball/)
   assert.match(groupsListSource, /Dùng chung danh bạ với/)
+})
+
+test('expense group RPCs authorize the same profile across duplicate group memberships', () => {
+  assert.match(expenseGroupRpcMigration, /WITH current_actor AS/)
+  assert.match(expenseGroupRpcMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)
+  assert.match(expenseGroupRpcMigration, /lower\(m\.name\) = lower\(actor\.name\)/)
+  assert.match(expenseGroupRpcMigration, /g\.linked_pickleball_group_id IS NOT NULL/)
+  assert.match(expenseGroupRpcMigration, /coalesce\(g\.emoji, ''\) NOT IN \('🏓', '🏸'\)/)
 })
