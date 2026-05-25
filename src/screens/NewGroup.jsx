@@ -2,13 +2,14 @@
 // Props: data { name, emoji, description, requiresApproval, emojiOptions[] }
 
 import React, { useState } from 'react';
-import { colors, type, radius } from '../tokens';
-import { PhoneFrame, Screen, IconButton, Card, Button, Badge, ModuleHero, MemberPicker, SectionHeader, SearchInput } from '../primitives';
+import { colors, type } from '../tokens';
+import { PhoneFrame, Screen, IconButton, Button, Badge, ModuleHero, MemberPicker, SectionHeader } from '../primitives';
 
 const DEFAULT_EMOJIS = [
   '🏓','⚽','🏀','🎾','🏸','🏐',
-  '🍜','☕','🍺','🎮','🎵','🏖',
-  '💼','🏠','📚','🎂','🌿','🎁',
+  '🍜','🥘','☕','🍺','✈️','🚗',
+  '🏖','🏨','🎮','🎵','💼','🏠',
+  '📚','🎂','🌿','🎁',
 ];
 
 export default function NewGroup({ data, onAction }) {
@@ -105,24 +106,29 @@ export default function NewGroup({ data, onAction }) {
 
         {/* Emoji picker */}
         <Label>Chọn biểu tượng</Label>
-        <Card style={{ padding: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 8 }}>
-            {(d.emojiOptions || DEFAULT_EMOJIS).map((em) => {
-              const active = em === emoji;
-              return (
-                <button key={em} onClick={() => setEmoji(em)} style={{
-                  aspectRatio: '1',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: 10,
-                  background: active ? 'rgba(52,211,153,0.18)' : 'rgba(255,255,255,0.04)',
-                  border: active ? `2px solid ${colors.pickleball}` : `1px solid ${colors.borderSubtle}`,
-                  fontSize: 22, cursor: 'pointer', fontFamily: 'inherit',
-                  boxShadow: active ? '0 0 12px rgba(52,211,153,0.2)' : 'none',
-                }}>{em}</button>
-              );
-            })}
-          </div>
-        </Card>
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          overflowX: 'auto',
+          padding: '4px 0 2px',
+          scrollbarWidth: 'none',
+        }}>
+          {(d.emojiOptions || DEFAULT_EMOJIS).map((em) => {
+            const active = em === emoji;
+            return (
+              <button key={em} onClick={() => setEmoji(em)} style={{
+                width: 44, height: 44,
+                flex: '0 0 auto',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: 12,
+                background: active ? 'rgba(52,211,153,0.18)' : 'rgba(255,255,255,0.04)',
+                border: active ? `2px solid ${colors.pickleball}` : `1px solid ${colors.borderSubtle}`,
+                fontSize: 20, cursor: 'pointer', fontFamily: 'inherit',
+                boxShadow: active ? '0 0 12px rgba(52,211,153,0.2)' : 'none',
+              }}>{em}</button>
+            );
+          })}
+        </div>
 
         {/* Description */}
         <div style={{

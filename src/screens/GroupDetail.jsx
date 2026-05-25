@@ -14,6 +14,7 @@ const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank',
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const canManageMembers = Boolean(isTreasurer || d.isGroupCreator);
+  const canAddMembers = true;
   const [activeTab, setActiveTab] = useState('members');
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
@@ -108,14 +109,18 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           subtitle={`${d.memberCount || (d.members || []).length} thành viên · ${d.monthLabel || 'Tháng này'}`}
           style={{ cursor: 'pointer' }}
         >
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
-          <div style={{ ...type.amountLg, marginTop: 6, ...type.mono }}>{formatVND(d.balance)}</div>
-          <div style={{
-            display: 'inline-flex', gap: 6, marginTop: 10, padding: '5px 10px',
-            borderRadius: 100, background: 'rgba(248,113,113,0.18)',
-            border: '1px solid rgba(248,113,113,0.3)', color: '#fca5a5',
-            fontSize: 11, fontWeight: 600,
-          }}>{d.balanceLabel}</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 8 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
+              <div style={{
+                display: 'inline-flex', gap: 6, marginTop: 10, padding: '5px 10px',
+                borderRadius: 100, background: 'rgba(248,113,113,0.18)',
+                border: '1px solid rgba(248,113,113,0.3)', color: '#fca5a5',
+                fontSize: 11, fontWeight: 600,
+              }}>{d.balanceLabel}</div>
+            </div>
+            <div style={{ ...type.amountLg, ...type.mono, textAlign: 'right', lineHeight: 1 }}>{formatVND(d.balance)}</div>
+          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
@@ -201,7 +206,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         {activeTab === 'members' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {canManageMembers && (
+            {canAddMembers && (
               <Button variant="ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setAddingMember(true)}>
                 + Thêm thành viên
               </Button>

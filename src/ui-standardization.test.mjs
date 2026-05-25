@@ -53,6 +53,12 @@ test('new group uses shared module hero and scrollable existing-profile picker',
   assert.match(newGroupSource, /selectedIds=\{selectedProfileIds\}/)
   assert.match(newGroupSource, /onQueryChange=\{setProfileQuery\}/)
   assert.match(newGroupSource, /profileIds: selectedProfileIds/)
+  assert.match(newGroupSource, /'🍜','🥘'/)
+  assert.match(newGroupSource, /'✈️','🚗'/)
+  assert.match(newGroupSource, /'🏖','🏨'/)
+  assert.match(newGroupSource, /overflowX: 'auto'/)
+  assert.match(newGroupSource, /width: 44, height: 44/)
+  assert.doesNotMatch(newGroupSource, /gridTemplateColumns: 'repeat\(6, 1fr\)'/)
 })
 
 test('primary money screens share hero, search, section, and list primitives', () => {

@@ -58,12 +58,22 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
 
 test('GroupDetail lets group creators manage members without treasurer role', () => {
   assert.match(groupDetailSource, /const canManageMembers = Boolean\(isTreasurer \|\| d\.isGroupCreator\)/);
+  assert.match(groupDetailSource, /const canAddMembers = true/);
   assert.match(groupDetailSource, /<MemberDetailPanel[\s\S]*isTreasurer=\{canManageMembers\}/);
-  assert.match(groupDetailSource, /\{canManageMembers && \(\s*<Button variant="ghost"[\s\S]*\+ Thêm thành viên/);
+  assert.match(groupDetailSource, /\{canAddMembers && \(\s*<Button variant="ghost"[\s\S]*\+ Thêm thành viên/);
   assert.match(groupDetailSource, /<MemberRow[\s\S]*isTreasurer=\{canManageMembers\}/);
   assert.match(groupDetailSource, /\{memberMenu && canManageMembers && \(/);
   assert.match(groupDetailSource, /\{deleteConfirmMember && canManageMembers && \(/);
   assert.match(screenDataSource, /isGroupCreator,/);
+});
+
+test('GroupDetail hero balances amount on the right', () => {
+  const heroBalanceSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('<ModuleHero'),
+    groupDetailSource.indexOf('<StatGrid')
+  );
+  assert.match(heroBalanceSource, /display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between'/);
+  assert.match(heroBalanceSource, /textAlign: 'right'/);
 });
 
 test('GroupDetail member rows show balance inline on the right of the member name', () => {
