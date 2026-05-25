@@ -515,6 +515,22 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'removeMemberFromGroup') {
+      const memberId = payload?.memberId ?? payload
+      const targetGroupId = payload?.groupId || state.currentGroupId
+      if (!memberId || !targetGroupId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { error } = await sb
+        .from('members')
+        .update({ is_active: false })
+        .eq('id', memberId)
+        .eq('group_id', targetGroupId)
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'removeMemberToVanglai') {
       const memberId = payload?.memberId ?? payload
       if (!memberId) return
