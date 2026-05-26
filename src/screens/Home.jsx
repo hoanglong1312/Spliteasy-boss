@@ -80,7 +80,7 @@ export default function Home({ data, isTreasurer, onAction }) {
           </div>
         </ModuleHero>
 
-        <SourceBreakdown sources={d.sourceBreakdown || []} />
+        <SourceBreakdown sources={d.sourceBreakdown || []} onAction={onAction} />
 
         {/* Today session - only treasurer sees attendance card */}
         {isTreasurer && d.todaySession && (
@@ -205,7 +205,7 @@ export default function Home({ data, isTreasurer, onAction }) {
   );
 }
 
-function SourceBreakdown({ sources }) {
+function SourceBreakdown({ sources, onAction }) {
   if (!safeArray(sources).length) return null;
   const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
   return (
@@ -216,19 +216,42 @@ function SourceBreakdown({ sources }) {
           const amount = Number(source.amount) || 0;
           const isPickleball = source.sourceType === 'pickleball';
           const isNegative = amount < 0;
+          const openSource = () => {
+            if (isPickleball) {
+              onAction?.('tab', 'pickleball');
+              return;
+            }
+            onAction?.('open', source.sourceId);
+          };
           return (
-            <div key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`} style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '11px 0',
-              borderBottom: index === sources.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)',
-            }}>
+            <button
+              key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`}
+              type="button"
+              aria-label={`Mở ${source.sourceLabel}`}
+              onClick={openSource}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '11px 10px',
+                marginTop: index === 0 ? 0 : 4,
+                background: isPickleball ? 'rgba(52,211,153,0.10)' : 'transparent',
+                border: isPickleball ? '1px solid rgba(52,211,153,0.26)' : '1px solid transparent',
+                borderRadius: 12,
+                borderBottom: isPickleball ? '1px solid rgba(52,211,153,0.26)' : index === sources.length - 1 ? '1px solid transparent' : '1px solid rgba(255,255,255,0.05)',
+                boxShadow: isPickleball ? '0 10px 24px rgba(16,185,129,0.10)' : 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}>
               <div style={{
                 width: 34,
                 height: 34,
                 borderRadius: 10,
-                background: isPickleball ? 'rgba(52,211,153,0.12)' : 'rgba(99,102,241,0.12)',
+                background: isPickleball ? 'rgba(52,211,153,0.18)' : 'rgba(99,102,241,0.12)',
+                border: isPickleball ? '1px solid rgba(52,211,153,0.34)' : '1px solid transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -249,7 +272,8 @@ function SourceBreakdown({ sources }) {
                 color: isNegative ? colors.danger : colors.success,
                 ...type.mono,
               }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
-            </div>
+              <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
+            </button>
           );
         })}
         <div style={{

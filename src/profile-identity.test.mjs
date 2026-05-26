@@ -143,11 +143,13 @@ test('home renders source breakdown for the current profile', () => {
   assert.match(screenDataSource, /currentProfileId: profileIdForMember\(currentUserId, members\)/)
   assert.match(screenDataSource, /sourceBreakdown: currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\)/)
   assert.match(screenDataSource, /function currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\) \{/)
-  assert.match(homeSource, /<SourceBreakdown sources=\{d\.sourceBreakdown \|\| \[\]\} \/>/)
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources \}\) \{/)
+  assert.match(homeSource, /<SourceBreakdown sources=\{d\.sourceBreakdown \|\| \[\]\} onAction=\{onAction\} \/>/)
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, onAction \}\) \{/)
   assert.match(homeSource, /Theo nguồn tiền/)
   assert.match(homeSource, /source\.sourceLabel/)
   assert.match(homeSource, /source\.sourceType === 'pickleball'/)
+  assert.match(homeSource, /onAction\?\.\('tab', 'pickleball'\)/)
+  assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/)
 })
 
 test('monthly close renders one profile bill with source breakdown rows', () => {

@@ -451,6 +451,25 @@ test('Home expense rows open expense detail instead of edit form', () => {
   assert.doesNotMatch(homeSource, />Sửa<\/button>/);
 });
 
+test('Home source breakdown rows open their related module', () => {
+  assert.match(homeSource, /<SourceBreakdown sources=\{d\.sourceBreakdown \|\| \[\]\} onAction=\{onAction\} \/>/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, onAction \}\)/);
+  assert.match(homeSource, /const openSource = \(\) => \{/);
+  assert.match(homeSource, /if \(isPickleball\) \{\s*onAction\?\.\('tab', 'pickleball'\)/);
+  assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/);
+  assert.match(homeSource, /<button[\s\S]*type="button"[\s\S]*aria-label=\{`Mở \$\{source\.sourceLabel\}`\}[\s\S]*onClick=\{openSource\}/);
+});
+
+test('Home source breakdown highlights pickleball rows', () => {
+  const sourceBreakdownSource = homeSource.slice(
+    homeSource.indexOf('function SourceBreakdown'),
+    homeSource.indexOf('function safeArray')
+  );
+  assert.match(sourceBreakdownSource, /background: isPickleball \? 'rgba\(52,211,153,0\.10\)' : 'transparent'/);
+  assert.match(sourceBreakdownSource, /border: isPickleball \? '1px solid rgba\(52,211,153,0\.26\)' : '1px solid transparent'/);
+  assert.match(sourceBreakdownSource, /boxShadow: isPickleball \? '0 10px 24px rgba\(16,185,129,0\.10\)' : 'none'/);
+});
+
 test('App routes AddExpense with current member data and existing expense data', () => {
   assert.match(screenDataSource, /getAddExpenseData: \(params\) => buildAddExpenseData\(state, params\)/);
   assert.match(screenDataSource, /const requestedGroupId = normalizeId\(params, 'groupId'\)/);
