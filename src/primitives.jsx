@@ -713,6 +713,7 @@ export function MemberPicker({
   });
   const selected = candidates.filter(candidate => selectedIds.includes(String(candidate.id)));
   const hasVisibleCandidates = visible.length > 0;
+  const allVisibleSelected = hasVisibleCandidates && visible.every(candidate => selectedIds.includes(String(candidate.id)));
 
   function selectVisibleCandidates() {
     visible
@@ -741,12 +742,13 @@ export function MemberPicker({
         style={{ marginBottom: 10 }}
       />
       {hasVisibleCandidates && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-          <button type="button" onClick={selectVisibleCandidates} style={pickerActionStyle(t)}>
-            Chọn tất cả
-          </button>
-          <button type="button" onClick={clearVisibleCandidates} style={pickerActionStyle(t)}>
-            Bỏ chọn
+        <div style={{ marginBottom: 10 }}>
+          <button
+            type="button"
+            onClick={() => allVisibleSelected ? clearVisibleCandidates() : selectVisibleCandidates()}
+            style={{ ...pickerActionStyle(t), width: '100%' }}
+          >
+            {allVisibleSelected ? 'Bỏ chọn' : 'Chọn tất cả'}
           </button>
         </div>
       )}

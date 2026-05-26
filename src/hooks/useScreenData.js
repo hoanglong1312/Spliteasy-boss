@@ -1585,10 +1585,20 @@ function buildJoinGroupData(state) {
 function buildNewGroupData(state = {}) {
   return {
     name: '',
-    emoji: '🏸',
+    emoji: '🍜',
+    groupType: 'food',
     description: '',
     requiresApproval: true,
-    emojiOptions: ['🏸', '🏓', '⚽', '🏀', '🎯', '🎲', '💰', '👥', '🍜', '🥘', '☕', '🍺', '✈️', '🚗', '🏖', '🏨'],
+    groupTypeOptions: [
+      { key: 'food', label: 'Ăn uống', emoji: '🍜', hint: 'Nhà hàng, cà phê' },
+      { key: 'travel', label: 'Du lịch', emoji: '✈️', hint: 'Đi chơi, nghỉ dưỡng' },
+      { key: 'expense', label: 'Chi tiêu', emoji: '💰', hint: 'Quỹ chung, mua sắm' },
+      { key: 'sport', label: 'Thể thao', emoji: '🏓', hint: 'Pickleball, bóng đá' },
+      { key: 'home', label: 'Gia đình', emoji: '🏠', hint: 'Nhà cửa, sinh hoạt' },
+      { key: 'party', label: 'Tiệc', emoji: '🎂', hint: 'Sinh nhật, gặp mặt' },
+      { key: 'work', label: 'Công việc', emoji: '💼', hint: 'Team, dự án' },
+      { key: 'other', label: 'Khác', emoji: '🎯', hint: 'Nhóm linh hoạt' },
+    ],
     profileOptions: buildProfileOptions(state),
   }
 }

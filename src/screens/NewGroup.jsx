@@ -1,21 +1,29 @@
 // Spliteasy Boss — Tạo nhóm mới
-// Props: data { name, emoji, description, requiresApproval, emojiOptions[] }
+// Props: data { name, emoji, description, requiresApproval, groupTypeOptions[] }
 
 import React, { useState } from 'react';
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Button, Badge, ModuleHero, MemberPicker, SectionHeader } from '../primitives';
 
-const DEFAULT_EMOJIS = [
-  '🏓','⚽','🏀','🎾','🏸','🏐',
-  '🍜','🥘','☕','🍺','✈️','🚗',
-  '🏖','🏨','🎮','🎵','💼','🏠',
-  '📚','🎂','🌿','🎁',
+const GROUP_TYPES = [
+  { key: 'food', label: 'Ăn uống', emoji: '🍜', hint: 'Nhà hàng, cà phê' },
+  { key: 'travel', label: 'Du lịch', emoji: '✈️', hint: 'Đi chơi, nghỉ dưỡng' },
+  { key: 'expense', label: 'Chi tiêu', emoji: '💰', hint: 'Quỹ chung, mua sắm' },
+  { key: 'sport', label: 'Thể thao', emoji: '🏓', hint: 'Pickleball, bóng đá' },
+  { key: 'home', label: 'Gia đình', emoji: '🏠', hint: 'Nhà cửa, sinh hoạt' },
+  { key: 'party', label: 'Tiệc', emoji: '🎂', hint: 'Sinh nhật, gặp mặt' },
+  { key: 'work', label: 'Công việc', emoji: '💼', hint: 'Team, dự án' },
+  { key: 'other', label: 'Khác', emoji: '🎯', hint: 'Nhóm linh hoạt' },
 ];
 
 export default function NewGroup({ data, onAction }) {
   const d = data || DEMO;
+  const groupTypeOptions = d.groupTypeOptions || GROUP_TYPES;
+  const initialGroupType = groupTypeOptions.find(option => option.key === d.groupType)
+    || groupTypeOptions.find(option => option.emoji === d.emoji)
+    || groupTypeOptions[0];
   const [name, setName] = useState(d.name);
-  const [emoji, setEmoji] = useState(d.emoji);
+  const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
   const [description, setDescription] = useState(d.description);
   const [requiresApproval, setRequiresApproval] = useState(d.requiresApproval);
   const [selectedProfileIds, setSelectedProfileIds] = useState([]);
@@ -27,6 +35,8 @@ export default function NewGroup({ data, onAction }) {
     return normalizeSearch(`${profile.name} ${profile.bankName} ${profile.bankAccount}`).includes(query);
   });
   const pickerListConstraint = { maxHeight: 360 };
+  const selectedGroupType = groupTypeOptions.find(option => option.key === groupTypeKey) || groupTypeOptions[0];
+  const emoji = selectedGroupType.emoji;
 
   function toggleProfile(profileId) {
     setSelectedProfileIds(current => (
@@ -37,7 +47,7 @@ export default function NewGroup({ data, onAction }) {
   }
 
   function createPayload() {
-    return { name, emoji, description, requiresApproval, profileIds: selectedProfileIds };
+    return { name, emoji, groupType: selectedGroupType.key, description, requiresApproval, profileIds: selectedProfileIds };
   }
 
   return (
@@ -104,8 +114,8 @@ export default function NewGroup({ data, onAction }) {
           }}>{name.length}/40</span>
         </div>
 
-        {/* Emoji picker */}
-        <Label>Chọn biểu tượng</Label>
+        {/* Group type picker */}
+        <Label>Chọn loại nhóm</Label>
         <div style={{
           display: 'flex',
           gap: 8,
@@ -113,19 +123,31 @@ export default function NewGroup({ data, onAction }) {
           padding: '4px 0 2px',
           scrollbarWidth: 'none',
         }}>
-          {(d.emojiOptions || DEFAULT_EMOJIS).map((em) => {
-            const active = em === emoji;
+          {groupTypeOptions.map((option) => {
+            const active = option.key === selectedGroupType.key;
             return (
-              <button key={em} onClick={() => setEmoji(em)} style={{
-                width: 44, height: 44,
+              <button key={option.key} onClick={() => setGroupTypeKey(option.key)} style={{
+                minWidth: 96,
                 flex: '0 0 auto',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                display: 'grid',
+                gridTemplateColumns: '24px minmax(0, 1fr)',
+                alignItems: 'center',
+                gap: 8,
                 borderRadius: 12,
+                padding: '10px 12px',
                 background: active ? 'rgba(52,211,153,0.18)' : 'rgba(255,255,255,0.04)',
                 border: active ? `2px solid ${colors.pickleball}` : `1px solid ${colors.borderSubtle}`,
-                fontSize: 20, cursor: 'pointer', fontFamily: 'inherit',
+                color: active ? '#d1fae5' : colors.textSecondary,
+                cursor: 'pointer', fontFamily: 'inherit',
                 boxShadow: active ? '0 0 12px rgba(52,211,153,0.2)' : 'none',
-              }}>{em}</button>
+                textAlign: 'left',
+              }}>
+                <span style={{ fontSize: 20, lineHeight: 1 }}>{option.emoji}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}>{option.label}</span>
+                  <span style={{ display: 'block', fontSize: 9, color: colors.textMuted, marginTop: 2, whiteSpace: 'nowrap' }}>{option.hint}</span>
+                </span>
+              </button>
             );
           })}
         </div>
@@ -259,9 +281,10 @@ function Toggle({ on, onChange }) {
 }
 
 const DEMO = {
-  name: 'Pickleball T2-4-6',
-  emoji: '🏓',
-  description: 'Nhóm chơi cố định lịch tuần',
+  name: 'Ăn uống cuối tuần',
+  emoji: '🍜',
+  groupType: 'food',
+  description: 'Nhóm ăn uống, cà phê',
   requiresApproval: true,
-  emojiOptions: DEFAULT_EMOJIS,
+  groupTypeOptions: GROUP_TYPES,
 };

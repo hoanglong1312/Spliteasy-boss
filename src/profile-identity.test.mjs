@@ -139,6 +139,7 @@ test('ADD_MEMBER can link an existing profile or create a new profile first', ()
 test('new group flow can include existing profiles', () => {
   assert.match(screenDataSource, /function buildNewGroupData\(state = \{\}\)/)
   assert.match(screenDataSource, /profileOptions: buildProfileOptions\(state\)/)
+  assert.match(screenDataSource, /groupTypeOptions: \[/)
   assert.match(screenDataSource, /dedupeProfilesFromMembers\(safeArray\(state\?\.members\), profiles\)/)
   assert.match(screenDataSource, /\.filter\(isActiveMember\)/)
   assert.match(newGroupSource, /const \[selectedProfileIds, setSelectedProfileIds\] = useState/)
