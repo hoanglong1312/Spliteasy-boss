@@ -576,3 +576,13 @@ test('ExpenseDetail hides edit and delete actions unless permission flags are tr
   assert.match(expenseDetailSource, /\{d\.canEdit === true && \(/);
   assert.match(expenseDetailSource, /\{d\.canDelete === true && \(/);
 });
+
+test('ExpenseDetail deletes the opened expense and shows receipt images', () => {
+  assert.match(screenDataSource, /groupId: group\.id/);
+  assert.match(screenDataSource, /receiptImages: safeArray\(expense\.receiptImages \|\| expense\.receipt_images\)/);
+  assert.match(expenseDetailSource, /const receiptImages = d\.receiptImages \|\| \[\]/);
+  assert.match(expenseDetailSource, /Ảnh hóa đơn/);
+  assert.match(expenseDetailSource, /receiptImages\.map\(image =>/);
+  assert.match(expenseDetailSource, /src=\{image\.url\}/);
+  assert.match(expenseDetailSource, /onAction\?\.\('deleteExpense', \{ expenseId: d\.expenseId \|\| d\.id, groupId: d\.groupId, returnToPrevious: true \}\)/);
+});

@@ -203,8 +203,10 @@ test('AppV2 handles expense edit delete and approval actions', () => {
   assert.match(appSource, /screen: 'add-expense'[\s\S]*params: \{ expenseId: payload\.expenseId \}/)
 
   assert.match(appSource, /if \(type === 'deleteExpense'\)/)
-  assert.match(appSource, /\.from\('expense_participants'\)\s*\.delete\(\)\s*\.eq\('expense_id', expenseId\)/)
-  assert.match(appSource, /\.from\('expenses'\)\s*\.delete\(\)\s*\.eq\('id', expenseId\)/)
+  assert.match(appSource, /const groupId = payload\?\.groupId \|\| expenseGroupId\(state, expenseId\)/)
+  assert.match(appSource, /\.rpc\('delete_expense_group_expense'/)
+  assert.match(appSource, /p_expense_id: expenseId/)
+  assert.match(appSource, /p_group_id: groupId/)
   assert.match(appSource, /await dispatch\(\{ type: 'REFRESH' \}\)/)
 
   assert.match(appSource, /if \(type === 'approveExpense'\)/)

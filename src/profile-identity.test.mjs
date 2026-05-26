@@ -81,6 +81,18 @@ test('delete expense group RPC resolves the actor inside the target group profil
   assert.match(expenseGroupRoleRpcMigration, /GRANT EXECUTE ON FUNCTION public\.delete_expense_group\(uuid\) TO anon/)
 })
 
+test('delete expense RPC resolves the actor inside the target expense group profile', () => {
+  assert.match(expenseGroupRoleRpcMigration, /CREATE OR REPLACE FUNCTION public\.delete_expense_group_expense/)
+  assert.match(expenseGroupRoleRpcMigration, /p_expense_id uuid/)
+  assert.match(expenseGroupRoleRpcMigration, /p_group_id uuid/)
+  assert.match(expenseGroupRoleRpcMigration, /WITH current_actor AS \(/)
+  assert.match(expenseGroupRoleRpcMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)
+  assert.match(expenseGroupRoleRpcMigration, /public\.is_expense_group_admin\(p_group_id, v_actor_member_id\)/)
+  assert.match(expenseGroupRoleRpcMigration, /DELETE FROM public\.expense_participants/)
+  assert.match(expenseGroupRoleRpcMigration, /DELETE FROM public\.expenses/)
+  assert.match(expenseGroupRoleRpcMigration, /GRANT EXECUTE ON FUNCTION public\.delete_expense_group_expense\(uuid, uuid\) TO anon/)
+})
+
 test('set expense group member role RPC resolves the actor inside the target group profile', () => {
   assert.match(expenseGroupRoleRpcMigration, /CREATE OR REPLACE FUNCTION public\.set_expense_group_member_role/)
   assert.match(expenseGroupRoleRpcMigration, /p_role NOT IN \('member', 'treasurer'\)/)

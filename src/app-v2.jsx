@@ -1191,14 +1191,19 @@ export default function AppV2() {
 
     if (type === 'deleteExpense') {
       const expenseId = payload?.expenseId ?? payload?.id ?? payload
-      if (!expenseId) return
+      const groupId = payload?.groupId || expenseGroupId(state, expenseId)
+      if (!expenseId || !groupId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const participantsResult = await sb.from('expense_participants').delete().eq('expense_id', expenseId)
-      if (participantsResult.error) throw participantsResult.error
-      const expenseResult = await sb.from('expenses').delete().eq('id', expenseId)
-      if (expenseResult.error) throw expenseResult.error
+      const { data, error } = await sb.rpc('delete_expense_group_expense', {
+        p_expense_id: expenseId,
+        p_group_id: groupId,
+      })
+      if (error || data?.error) throw error || new Error(data.error)
       await dispatch({ type: 'REFRESH' })
+      if (payload?.returnToPrevious) {
+        setStack((s) => s.slice(0, -1))
+      }
       return
     }
 

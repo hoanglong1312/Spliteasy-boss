@@ -22,6 +22,7 @@ export default function ExpenseDetail({ data, onAction }) {
   const d = data || DEMO;
   const status = STATUS_PALETTE[d.status] || STATUS_PALETTE.pending;
   const myOwed = d.splits.find((s) => s.tag === 'owe' && s.isMe);
+  const receiptImages = d.receiptImages || [];
 
   return (
     <PhoneFrame>
@@ -159,6 +160,35 @@ export default function ExpenseDetail({ data, onAction }) {
           </>
         )}
 
+        {receiptImages.length > 0 && (
+          <>
+            <SectionLabel>Ảnh hóa đơn</SectionLabel>
+            <Card style={{ padding: 10 }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: receiptImages.length === 1 ? '1fr' : '1fr 1fr',
+                gap: 8,
+              }}>
+                {receiptImages.map(image => (
+                  <img
+                    key={image.id || image.url}
+                    src={image.url}
+                    alt={image.name || 'Ảnh hóa đơn'}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '4 / 3',
+                      objectFit: 'cover',
+                      borderRadius: 12,
+                      border: `1px solid ${colors.borderSubtle}`,
+                      background: 'rgba(255,255,255,0.04)',
+                    }}
+                  />
+                ))}
+              </div>
+            </Card>
+          </>
+        )}
+
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           {d.canEdit === true && (
@@ -167,7 +197,7 @@ export default function ExpenseDetail({ data, onAction }) {
             </Button>
           )}
           {d.canDelete === true && (
-            <Button block variant="danger" style={{ fontSize: 12 }} onClick={() => onAction?.('delete')}>
+            <Button block variant="danger" style={{ fontSize: 12 }} onClick={() => onAction?.('deleteExpense', { expenseId: d.expenseId || d.id, groupId: d.groupId, returnToPrevious: true })}>
               🗑 Xóa
             </Button>
           )}

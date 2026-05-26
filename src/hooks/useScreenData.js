@@ -1809,6 +1809,7 @@ function buildExpenseDetailData(state, params) {
   return {
     id: expense.id,
     expenseId: expense.id,
+    groupId: group.id,
     groupName: group.name || 'Nhóm',
     category: {
       icon: expenseIcon(expense),
@@ -1825,6 +1826,7 @@ function buildExpenseDetailData(state, params) {
     },
     splits,
     note: expense.note || expense.description || expense.declineReason || '',
+    receiptImages: safeArray(expense.receiptImages || expense.receipt_images),
     canEdit,
     canDelete: role === 'treasurer',
     expense,
