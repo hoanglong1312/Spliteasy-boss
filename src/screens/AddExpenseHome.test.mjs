@@ -378,11 +378,13 @@ test('Home activity list filters by title, status, and category', () => {
   assert.doesNotMatch(homeSource, /function MiniStat/);
 });
 
-test('Home hides monthly member balances and gates attendance card to treasurers', () => {
+test('Home hides monthly member balances and does not render attendance shortcut', () => {
   assert.match(homeSource, /<Screen style=\{\{ paddingBottom: '72px' \}\}>/);
   assert.match(homeSource, /export default function Home\(\{ data, isTreasurer, onAction \}\)/);
   assert.doesNotMatch(homeSource, /<PaymentBalanceSection balances=\{d\.memberBalances \|\| \[\]\} onAction=\{onAction\} \/>/);
-  assert.match(homeSource, /\{isTreasurer && d\.todaySession && \(/);
+  assert.doesNotMatch(homeSource, /isTreasurer && d\.todaySession/);
+  assert.doesNotMatch(homeSource, /onAction\?\.\('attend', d\.todaySession\.id\)/);
+  assert.doesNotMatch(homeSource, /Điểm danh Buổi/);
   assert.match(screenDataSource, /memberBalances: buildHomeMemberBalances\(pickleballState, pickle, today\)/);
   assert.match(screenDataSource, /function buildHomeMemberBalances\(state, pickle, monthDate\)/);
   assert.match(screenDataSource, /buildMemberMonthBalance\(state, pickle, monthSessions, member\.id\)/);

@@ -82,29 +82,6 @@ export default function Home({ data, isTreasurer, onAction }) {
 
         <SourceBreakdown sources={d.sourceBreakdown || []} onAction={onAction} />
 
-        {/* Today session - only treasurer sees attendance card */}
-        {isTreasurer && d.todaySession && (
-          <Card accent="pickleball" style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
-            onClick={() => onAction?.('attend', d.todaySession.id)}>
-            <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: 'rgba(52,211,153,0.12)',
-              border: '1px solid rgba(52,211,153,0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-            }}>🏸</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#6ee7b7', textTransform: 'uppercase' }}>
-                {d.todaySession.timeLabel}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: 700, marginTop: 3 }}>
-                Điểm danh Buổi #{d.todaySession.number} · {d.todaySession.dateLabel}
-              </div>
-              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{d.todaySession.venue}</div>
-            </div>
-            <div style={{ color: colors.brandLight, fontSize: 18 }}>›</div>
-          </Card>
-        )}
-
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
         <SearchInput
           value={filterText}
