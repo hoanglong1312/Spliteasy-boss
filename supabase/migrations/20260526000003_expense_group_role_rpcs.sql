@@ -144,6 +144,78 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.set_expense_group_member_role(
+  p_group_id uuid,
+  p_member_id uuid,
+  p_role text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_actor_member_id uuid;
+  v_is_admin boolean;
+BEGIN
+  IF p_role NOT IN ('member', 'treasurer') THEN
+    RETURN jsonb_build_object('error', 'invalid_member_role');
+  END IF;
+
+  WITH current_actor AS (
+    SELECT id, profile_id, name
+    FROM public.members
+    WHERE id = public.get_current_member_id()
+      AND is_active IS NOT FALSE
+    LIMIT 1
+  )
+  SELECT m.id
+  INTO v_actor_member_id
+  FROM public.members m
+  JOIN current_actor actor ON (
+    m.id = actor.id
+    OR (actor.profile_id IS NOT NULL AND m.profile_id = actor.profile_id)
+    OR lower(m.name) = lower(actor.name)
+  )
+  JOIN public.groups g ON g.id = m.group_id
+  WHERE m.group_id = p_group_id
+    AND m.is_active IS NOT FALSE
+    AND m.expense_active IS DISTINCT FROM false
+    AND (
+      g.linked_pickleball_group_id IS NOT NULL
+      OR (
+        lower(coalesce(g.name, '')) NOT LIKE '%pickle%'
+        AND coalesce(g.emoji, '') NOT IN ('🏓', '🏸')
+      )
+    )
+  ORDER BY (m.id = actor.id) DESC, m.created_at DESC
+  LIMIT 1;
+
+  IF v_actor_member_id IS NULL THEN
+    RETURN jsonb_build_object('error', 'expense_group_actor_not_found');
+  END IF;
+
+  v_is_admin := public.is_expense_group_admin(p_group_id, v_actor_member_id);
+
+  IF NOT v_is_admin THEN
+    RETURN jsonb_build_object('error', 'expense_group_role_permission_denied');
+  END IF;
+
+  UPDATE public.members
+  SET role = p_role
+  WHERE id = p_member_id
+    AND group_id = p_group_id
+    AND is_active IS NOT FALSE
+    AND expense_active IS DISTINCT FROM false;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error', 'expense_group_member_not_found');
+  END IF;
+
+  RETURN jsonb_build_object('id', p_member_id, 'role', p_role);
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.create_expense_group_expense(
   p_group_id uuid,
   p_title text,
@@ -430,5 +502,6 @@ $$;
 GRANT EXECUTE ON FUNCTION public.is_expense_group_admin(uuid, uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.create_group(text, text, text[]) TO anon;
 GRANT EXECUTE ON FUNCTION public.delete_expense_group(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.set_expense_group_member_role(uuid, uuid, text) TO anon;
 GRANT EXECUTE ON FUNCTION public.create_expense_group_expense(uuid, text, numeric, uuid, text, text, date, uuid[], jsonb) TO anon;
 GRANT EXECUTE ON FUNCTION public.update_expense_group_expense(uuid, uuid, text, numeric, uuid, text, text, date, uuid[], jsonb) TO anon;

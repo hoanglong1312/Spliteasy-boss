@@ -61,6 +61,12 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Sửa thành viên/);
   assert.match(groupDetailSource, /Cấp quyền thủ quỹ/);
   assert.match(groupDetailSource, /Xóa khỏi nhóm/);
+  assert.match(groupDetailSource, />✏️ Sửa thành viên<\/ActionButton>/);
+  assert.match(groupDetailSource, /\{memberMenu\.role === 'treasurer' \? '💳 Thu quyền thủ quỹ' : '💳 Cấp quyền thủ quỹ'\}/);
+  assert.match(groupDetailSource, />🗑️ Xóa khỏi nhóm<\/ActionButton>/);
+  assert.match(groupDetailSource, /onAction\?\.\('setMemberRole', \{ memberId: memberMenu\.id, groupId: d\.id, role \}\)/);
+  assert.doesNotMatch(groupDetailSource, /RolePill icon="👑" label="Trưởng nhóm"/);
+  assert.doesNotMatch(groupDetailSource, /Trưởng nhóm/);
   assert.match(groupDetailSource, /Tên tài khoản/);
   assert.match(groupDetailSource, /Số tài khoản/);
   assert.match(screenDataSource, /balanceRows: groupMembers/);

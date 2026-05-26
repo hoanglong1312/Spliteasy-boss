@@ -74,7 +74,7 @@ test('completed pickleball sessions lock attendance and cost editing', () => {
 
 test('member management confirms role changes and edits full bank information', () => {
   assert.match(memberDetailSource, /window\.confirm\(role === 'treasurer'/)
-  assert.match(memberDetailSource, /onAction\?\.\('setMemberRole', \{\s*memberId: d\.id,\s*role/)
+  assert.match(memberDetailSource, /onAction\?\.\('setMemberRole', \{\s*memberId: d\.id,\s*groupId: d\.groupId,\s*role/)
   assert.match(memberDetailSource, /Họ và tên đầy đủ/)
   assert.match(memberDetailSource, /bankAccountName/)
   assert.match(memberDetailSource, /Ngân hàng/)

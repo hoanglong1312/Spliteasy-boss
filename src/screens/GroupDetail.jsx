@@ -294,17 +294,17 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
       {memberMenu && canManageMembers && (
         <BottomSheet title={memberMenu.name} onClose={() => setMemberMenu(null)}>
-          <ActionButton onClick={() => { setEditingMember(memberMenu); setMemberMenu(null); }}>Sửa thành viên</ActionButton>
+          <ActionButton onClick={() => { setEditingMember(memberMenu); setMemberMenu(null); }}>✏️ Sửa thành viên</ActionButton>
           <ActionButton onClick={async () => {
             const role = memberMenu.role === 'treasurer' ? 'member' : 'treasurer';
             if (!window.confirm(role === 'treasurer' ? `Cấp quyền thủ quỹ cho ${memberMenu.name}?` : `Thu quyền thủ quỹ của ${memberMenu.name}?`)) return;
-            await onAction?.('setMemberRole', { memberId: memberMenu.id, role });
+            await onAction?.('setMemberRole', { memberId: memberMenu.id, groupId: d.id, role });
             setMemberMenu(null);
-          }}>{memberMenu.role === 'treasurer' ? 'Thu quyền thủ quỹ' : 'Cấp quyền thủ quỹ'}</ActionButton>
+          }}>{memberMenu.role === 'treasurer' ? '💳 Thu quyền thủ quỹ' : '💳 Cấp quyền thủ quỹ'}</ActionButton>
           <ActionButton danger onClick={() => {
             setDeleteConfirmMember(memberMenu);
             setMemberMenu(null);
-          }}>Xóa khỏi nhóm</ActionButton>
+          }}>🗑️ Xóa khỏi nhóm</ActionButton>
         </BottomSheet>
       )}
 
@@ -456,9 +456,8 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
         <Avatar initial={member.initials} size={34} color={member.color} ring={false} style={{ borderRadius: 12 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
-          {(member.isGroupCreator || member.role === 'treasurer') && (
+          {member.role === 'treasurer' && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
-              {member.isGroupCreator && <RolePill icon="👑" label="Trưởng nhóm" />}
               {member.role === 'treasurer' && <RolePill icon="💳" label="Thủ quỹ" />}
             </div>
           )}

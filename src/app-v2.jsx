@@ -591,13 +591,23 @@ export default function AppV2() {
     if (type === 'setMemberRole') {
       const memberId = payload?.memberId
       if (!memberId) return
+      const member = safeArray(state?.members).find(item => String(item.id) === String(memberId))
+      const groupId = payload?.groupId || member?.group_id || member?.groupId
+      const currentGroup = safeArray(state?.groups).find(group => String(group.id) === String(groupId))
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const { error } = await sb
-        .from('members')
-        .update({ role: payload?.role })
-        .eq('id', memberId)
-      if (error) throw error
+      const request = isPickleballActionGroup(currentGroup)
+        ? sb
+          .from('members')
+          .update({ role: payload?.role })
+          .eq('id', memberId)
+        : sb.rpc('set_expense_group_member_role', {
+          p_group_id: groupId,
+          p_member_id: memberId,
+          p_role: payload?.role,
+        })
+      const { data, error } = await request
+      if (error || data?.error) throw error || new Error(data.error)
       await dispatch({ type: 'REFRESH' })
       return
     }

@@ -133,7 +133,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     if (!window.confirm(role === 'treasurer'
       ? `Cấp quyền Thủ quỹ cho ${member.name}?`
       : `Thu quyền Thủ quỹ của ${member.name}?`)) return;
-    await onAction?.('setMemberRole', { memberId: member.id, role });
+    await onAction?.('setMemberRole', { memberId: member.id, groupId: d.groupId, role });
   }
 
   function deleteMember(member) {

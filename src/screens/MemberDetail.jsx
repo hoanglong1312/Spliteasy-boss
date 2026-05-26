@@ -59,6 +59,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
       : `Thu quyền Thủ quỹ của ${d.name}?`)) return;
     await onAction?.('setMemberRole', {
       memberId: d.id,
+      groupId: d.groupId,
       role,
     });
   }

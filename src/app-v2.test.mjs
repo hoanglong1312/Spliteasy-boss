@@ -73,6 +73,20 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ expense_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
 })
 
+test('AppV2 uses the profile-aware role RPC for expense groups', () => {
+  const roleBlock = appSource.slice(
+    appSource.indexOf("if (type === 'setMemberRole')"),
+    appSource.indexOf("if (type === 'setMemberType')")
+  )
+  assert.match(roleBlock, /const groupId = payload\?\.groupId \|\| member\?\.group_id \|\| member\?\.groupId/)
+  assert.match(roleBlock, /isPickleballActionGroup\(currentGroup\)/)
+  assert.match(roleBlock, /\.rpc\('set_expense_group_member_role'/)
+  assert.match(roleBlock, /p_group_id: groupId/)
+  assert.match(roleBlock, /p_member_id: memberId/)
+  assert.match(roleBlock, /p_role: payload\?\.role/)
+  assert.match(roleBlock, /\.from\('members'\)[\s\S]*\.update\(\{ role: payload\?\.role \}\)[\s\S]*\.eq\('id', memberId\)/)
+})
+
 test('AppV2 edit group preserves descriptions for expense group settings', () => {
   assert.match(appSource, /if \(type === 'editGroup'\)/)
   assert.match(appSource, /description: group\.description \|\| '',/)
