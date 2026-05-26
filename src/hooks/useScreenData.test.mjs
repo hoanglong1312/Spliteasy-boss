@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildNewGroupData, buildPickleballMembersData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildHomeData, buildNewGroupData, buildPickleballMembersData }`, context)
   return context.__builders
 }
 
@@ -471,6 +471,45 @@ test('group detail exposes pending expenses for treasurer approval', () => {
   assert.equal(detail.pendingExpenses.length, 1)
   assert.equal(detail.pendingExpenses[0].id, 'pending-1')
   assert.equal(detail.pendingExpenses[0].submittedBy, 'member-1')
+})
+
+test('home pending approvals include only groups the current user can review', () => {
+  const { buildHomeData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'cuong-expense',
+    currentUserName: 'Cường',
+    groups: [
+      {
+        id: 'member-group',
+        name: 'Nhóm thường',
+        groupType: 'expense',
+        members: ['cuong-expense', 'long-expense'],
+        expenses: [
+          { id: 'pending-member', title: 'Member gửi', amount: 100000, status: 'pending', date: '2026-05-20', submittedBy: 'cuong-expense' },
+        ],
+      },
+      {
+        id: 'treasurer-group',
+        name: 'Nhóm thủ quỹ',
+        groupType: 'expense',
+        members: ['cuong-treasurer', 'long-treasurer'],
+        expenses: [
+          { id: 'pending-reviewable', title: 'Cần duyệt', amount: 200000, status: 'pending', date: '2026-05-21', submittedBy: 'long-treasurer' },
+        ],
+      },
+    ],
+    members: [
+      { id: 'cuong-expense', groupId: 'member-group', name: 'Cường', role: 'member', isActive: true, profileId: 'profile-cuong' },
+      { id: 'long-expense', groupId: 'member-group', name: 'Long', role: 'treasurer', isActive: true, profileId: 'profile-long' },
+      { id: 'cuong-treasurer', groupId: 'treasurer-group', name: 'Cường', role: 'treasurer', isActive: true, profileId: 'profile-cuong' },
+      { id: 'long-treasurer', groupId: 'treasurer-group', name: 'Long', role: 'member', isActive: true, profileId: 'profile-long' },
+    ],
+    currentGroup: null,
+  }
+
+  const home = buildHomeData(state, state.currentUserId, state.members, state.groups, {}, state, '2026-05')
+
+  assert.deepEqual(home.pendingExpenses.map(expense => expense.id), ['pending-reviewable'])
 })
 
 test('group detail member transactions include participant shares and payer advances for the selected month', () => {

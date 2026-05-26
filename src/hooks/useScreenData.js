@@ -198,7 +198,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     expenses: buildHomeExpenses(expenseGroups, currentUserId, members, state?.currentUserName, today),
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
-    pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members),
+    pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
     sourceBreakdown: currentProfileSourceBreakdown(sourceBalances, currentUserId, members),
     profileBreakdown: aggregateBalancesByProfile(sourceBalances, members),
   }
@@ -284,9 +284,11 @@ function buildHomeExpenses(groups, currentUserId, members, currentUserName, mont
   })
 }
 
-function buildPendingExpenseApprovals(groups, members) {
-  return safeArray(groups).flatMap(group => (
-    safeArray(group.expenses)
+function buildPendingExpenseApprovals(groups, members, currentUserId, currentUserName) {
+  return safeArray(groups)
+    .filter(group => canReviewPendingExpensesForGroup(group, members, currentUserId, currentUserName))
+    .flatMap(group => (
+      safeArray(group.expenses)
       .filter(expense => String(expense.status || '').toLowerCase() === 'pending')
       .map(expense => {
         const submittedBy = expense.submittedBy || expense.submitted_by_member_id || expense.createdBy || expense.created_by || null
@@ -301,8 +303,19 @@ function buildPendingExpenseApprovals(groups, members) {
           submittedByName: submittedBy ? memberName(submittedBy, members) : '',
         }
       })
-  ))
+    ))
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
+}
+
+function canReviewPendingExpensesForGroup(group, members, currentUserId, currentUserName) {
+  const groupMembers = membersForGroup(group, members)
+  const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(group, currentUserId, members, currentUserName)))
+  const currentMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  return Boolean(
+    isMemberGroupCreator(group, currentGroupMember) ||
+    isMemberGroupCreator(group, currentMember) ||
+    currentGroupMember?.role === 'treasurer'
+  )
 }
 
 function normalizeHomeSplit(split) {

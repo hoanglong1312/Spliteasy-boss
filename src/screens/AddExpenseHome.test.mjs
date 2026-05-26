@@ -412,8 +412,10 @@ test('Home activity list filters by title, status, and category', () => {
 });
 
 test('Home renders a consolidated pending expense approval zone', () => {
-  assert.match(screenDataSource, /pendingExpenses: buildPendingExpenseApprovals\(expenseGroups, members\)/);
-  assert.match(screenDataSource, /function buildPendingExpenseApprovals\(groups, members\)/);
+  assert.match(screenDataSource, /pendingExpenses: buildPendingExpenseApprovals\(expenseGroups, members, currentUserId, state\?\.currentUserName\)/);
+  assert.match(screenDataSource, /function buildPendingExpenseApprovals\(groups, members, currentUserId, currentUserName\)/);
+  assert.match(screenDataSource, /filter\(group => canReviewPendingExpensesForGroup\(group, members, currentUserId, currentUserName\)\)/);
+  assert.match(screenDataSource, /function canReviewPendingExpensesForGroup\(group, members, currentUserId, currentUserName\)/);
   assert.match(homeSource, /const pendingExpenses = d\.pendingExpenses \|\| \[\]/);
   assert.match(homeSource, /<PendingApprovalZone expenses=\{pendingExpenses\} onAction=\{onAction\} \/>/);
   assert.match(homeSource, /function PendingApprovalZone\(\{ expenses, onAction \}\)/);
@@ -423,6 +425,13 @@ test('Home renders a consolidated pending expense approval zone', () => {
   assert.match(homeSource, /\{expanded && \(/);
   assert.match(homeSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id, groupId: expense\.groupId \}\)/);
   assert.match(homeSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id, groupId: expense\.groupId \}\)/);
+});
+
+test('Home hero review chip is an explicit settle-all action', () => {
+  assert.match(homeSource, /<button[\s\S]*aria-label=\{isNeg \? `Xem \$\{d\.owedTo\} quỹ cần kiểm tra` : 'Xem chi tiết quỹ'\}/);
+  assert.match(homeSource, /onClick=\{\(event\) => \{ event\.stopPropagation\(\); onAction\?\.\('settleAll'\); \}\}/);
+  assert.match(homeSource, /Xem \{d\.owedTo\} quỹ cần kiểm tra/);
+  assert.doesNotMatch(homeSource, /<span style=\{\{ width: 6, height: 6/);
 });
 
 test('GroupDetail no longer shows treasurer pending approval alert outside activity', () => {

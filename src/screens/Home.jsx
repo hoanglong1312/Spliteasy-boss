@@ -64,17 +64,22 @@ export default function Home({ data, isTreasurer, onAction }) {
           style={{ cursor: 'pointer' }}
           onClick={() => onAction?.('settleAll')}
         >
-          <div style={{
+          <button
+            type="button"
+            aria-label={isNeg ? `Xem ${d.owedTo} quỹ cần kiểm tra` : 'Xem chi tiết quỹ'}
+            onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}
+            style={{
             display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
             padding: '5px 10px', borderRadius: 100,
             background: isNeg ? 'rgba(248,113,113,0.15)' : 'rgba(52,211,153,0.15)',
             border: `1px solid ${isNeg ? 'rgba(248,113,113,0.25)' : 'rgba(52,211,153,0.25)'}`,
             fontSize: 11, fontWeight: 600,
             color: isNeg ? '#fca5a5' : '#6ee7b7',
+            fontFamily: 'inherit',
+            cursor: 'pointer',
           }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: isNeg ? colors.danger : colors.success, boxShadow: `0 0 8px ${isNeg ? 'rgba(248,113,113,0.6)' : 'rgba(52,211,153,0.6)'}` }} />
-            {isNeg ? `${d.owedTo} quỹ cần kiểm tra` : d.totalBalance > 0 ? 'Ấn để xem quỹ nào cần bù' : 'Không có khoản cần xử lý'}
-          </div>
+            {isNeg ? <>Xem {d.owedTo} quỹ cần kiểm tra</> : d.totalBalance > 0 ? 'Xem quỹ cần bù' : 'Chi tiết quỹ'}
+          </button>
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('addExpense'); }}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}>Chi tiết quỹ</Button>
