@@ -711,7 +711,6 @@ export function MemberPicker({
     if (!normalizedQuery) return true;
     return normalizePickerSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(normalizedQuery);
   });
-  const selected = candidates.filter(candidate => selectedIds.includes(String(candidate.id)));
   const hasVisibleCandidates = visible.length > 0;
   const allVisibleSelected = hasVisibleCandidates && visible.every(candidate => selectedIds.includes(String(candidate.id)));
 
@@ -750,23 +749,6 @@ export function MemberPicker({
           >
             {allVisibleSelected ? 'Bỏ chọn' : 'Chọn tất cả'}
           </button>
-        </div>
-      )}
-      {selected.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-          {selected.map(candidate => (
-            <button key={candidate.id} type="button" onClick={() => onToggle?.(candidate.id)} style={{
-              border: `1px solid ${t.accent}`,
-              borderRadius: 999,
-              background: t.soft,
-              color: t.accent,
-              padding: '6px 9px',
-              fontSize: 11,
-              fontWeight: 900,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-            }}>{candidate.name} ×</button>
-          ))}
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: maxListHeight, overflowY: 'auto', paddingRight: 2 }}>

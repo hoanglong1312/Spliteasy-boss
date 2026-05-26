@@ -34,6 +34,9 @@ test('shared visual primitives exist for Pickleball-style module screens', () =>
   assert.match(primitivesSource, /const allVisibleSelected = hasVisibleCandidates && visible\.every/)
   assert.match(primitivesSource, /allVisibleSelected \? clearVisibleCandidates\(\) : selectVisibleCandidates\(\)/)
   assert.match(primitivesSource, /\{allVisibleSelected \? 'Bỏ chọn' : 'Chọn tất cả'\}/)
+  assert.doesNotMatch(primitivesSource, /const selected = candidates\.filter/)
+  assert.doesNotMatch(primitivesSource, /\{selected\.length > 0 && \(/)
+  assert.doesNotMatch(primitivesSource, /\{candidate\.name\} ×/)
   assert.doesNotMatch(primitivesSource, /gridTemplateColumns: '1fr 1fr'[\s\S]*?>\s*Bỏ chọn\s*<\/button>/)
 })
 
