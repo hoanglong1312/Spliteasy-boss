@@ -274,7 +274,7 @@ test('groups list shows expense groups instead of opening pickleball as an expen
   const { buildGroupsListData } = loadScreenDataBuilders()
   const groups = [
     { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball 246', emoji: '🏸', members: ['pickle-long'] },
-    { id: 'expense-1', groupType: 'expense', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', emoji: '✈️', members: ['expense-long'] },
+    { id: 'expense-1', groupType: 'expense', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', emoji: '✈️', description: 'Quỹ ăn uống sau buổi đánh', members: ['expense-long'] },
   ]
   const members = [
     { id: 'pickle-long', groupId: 'pickle-1', name: 'Long', isActive: true, expenseActive: true },
@@ -285,8 +285,25 @@ test('groups list shows expense groups instead of opening pickleball as an expen
 
   assert.deepEqual(data.groups.map(group => group.name), ['Chi tiêu Virgo 246'])
   assert.equal(data.groups[0].groupTypeLabel, 'Du lịch')
+  assert.equal(data.groups[0].description, 'Quỹ ăn uống sau buổi đánh')
   assert.equal(data.groups[0].linkedPickleballLabel, 'Liên kết Pickleball')
   assert.equal(data.activeCount, 1)
+})
+
+test('linked pickleball expense groups stay visible after choosing a sport icon', () => {
+  const { buildGroupsListData } = loadScreenDataBuilders()
+  const groups = [
+    { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball 246', emoji: '🏸', members: ['pickle-long'] },
+    { id: 'expense-1', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', emoji: '🏸', members: ['expense-long'] },
+  ]
+  const members = [
+    { id: 'expense-long', groupId: 'expense-1', name: 'Long', isActive: true, expenseActive: true },
+  ]
+
+  const data = buildGroupsListData(groups, 'expense-long', members, 'Long', '2026-05')
+
+  assert.deepEqual(data.groups.map(group => group.id), ['expense-1'])
+  assert.equal(data.groups[0].isLinkedPickleballExpenseGroup, true)
 })
 
 test('edit expense data keeps saved receipt images for update forms', () => {

@@ -439,6 +439,7 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
       kind: groupKind(group),
       emoji: group.emoji || '👥',
       name: group.name || 'Nhóm',
+      description: group.description || '',
       groupTypeLabel: groupTypeLabel(group),
       isLinkedPickleballExpenseGroup: Boolean(linkedPickleballGroupId),
       linkedPickleballLabel: 'Liên kết Pickleball',
@@ -3442,6 +3443,7 @@ function normalizeName(value) {
 }
 
 function groupKind(group) {
+  if (group?.linkedPickleballGroupId || group?.linked_pickleball_group_id) return 'groups'
   const explicit = String(group?.type || group?.kind || group?.groupType || group?.group_type || '').toLowerCase()
   if (explicit === 'pickleball') return 'pickleball'
   if (explicit === 'expense') return 'groups'

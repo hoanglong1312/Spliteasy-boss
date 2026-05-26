@@ -249,6 +249,8 @@ test('GroupsList separates group metadata from balance and renders zero balance 
   assert.match(groupCardSource, /const groupTypeLabel = g\.groupTypeLabel \|\| groupTypeLabelFor\(g\)/);
   assert.match(groupCardSource, /const metaItems = \[groupTypeLabel, `\$\{g\.memberCount\} thành viên`\]/);
   assert.match(groupCardSource, /g\.linkedPickleballLabel \|\| 'Liên kết Pickleball'/);
+  assert.match(groupCardSource, /\{g\.description && \(/);
+  assert.match(groupCardSource, /\{g\.description\}/);
   assert.match(groupCardSource, /padding: '14px 14px'/);
   assert.match(groupCardSource, /gridTemplateColumns: '42px minmax\(0, 1fr\) auto'/);
   assert.match(groupCardSource, /gridTemplateColumns: isPickleballGroup \? '1fr' : 'auto 1fr'/);

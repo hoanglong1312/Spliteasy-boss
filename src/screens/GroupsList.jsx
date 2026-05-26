@@ -181,6 +181,16 @@ function GroupCard({ g, onClick }) {
               minWidth: 0,
             }}>{metaItems.join(' · ')}</span>
           </div>
+          {g.description && (
+            <div style={{
+              fontSize: 10,
+              color: colors.textMuted,
+              marginTop: 5,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>{g.description}</div>
+          )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 74 }}>
           <div style={{
