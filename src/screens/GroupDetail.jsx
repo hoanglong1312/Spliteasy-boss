@@ -996,6 +996,7 @@ function Field({ label, value, onChange, autoFocus, maxLength, inputMode, placeh
       <input
         value={value}
         onChange={event => onChange(event.target.value)}
+        onInput={event => onChange(event.target.value)}
         autoFocus={autoFocus}
         maxLength={maxLength}
         inputMode={inputMode}
@@ -1020,6 +1021,7 @@ function TextArea({ label, value, onChange, placeholder }) {
       <textarea
         value={value}
         onChange={event => onChange(event.target.value)}
+        onInput={event => onChange(event.target.value)}
         placeholder={placeholder}
         rows={3}
         style={{

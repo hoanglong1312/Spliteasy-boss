@@ -143,6 +143,7 @@ test('GroupDetail edit sheet uses group type picker and saves matching icon and 
   assert.match(groupDetailSource, /function GroupTypePicker\(\{ value, options, onChange \}\)/);
   assert.match(groupDetailSource, /<GroupTypePicker value=\{groupTypeKey\} options=\{groupTypeOptions\} onChange=\{setGroupTypeKey\} \/>/);
   assert.match(groupDetailSource, /<TextArea label="Mô tả nhóm" value=\{groupDescription\} onChange=\{setGroupDescription\} placeholder=\{selectedGroupType\.descriptionPlaceholder\}/);
+  assert.match(groupDetailSource, /onInput=\{event => onChange\(event\.target\.value\)\}/);
   assert.doesNotMatch(groupDetailSource, /<Field label="Biểu tượng"/);
   assert.doesNotMatch(groupDetailSource, /function EmojiPicker/);
   assert.match(appSource, /description: group\.description \|\| '',/);
