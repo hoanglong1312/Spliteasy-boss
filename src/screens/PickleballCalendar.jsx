@@ -20,9 +20,10 @@ const CELL_STATE = {
   upcoming: { bg: 'rgba(255,255,255,0.02)', border: 'rgba(99,102,241,0.35)', dashed: true, color: colors.brandLight },
   moved:    { bg: 'rgba(255,255,255,0.02)', border: 'transparent',                color: '#334155', lineThrough: true },
   ticket:   { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.38)',       color: '#fde68a' },
+  ticketOther: { bg: 'rgba(251,191,36,0.055)', border: 'rgba(251,191,36,0.18)',    color: '#fef3c7' },
 };
 
-const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8', ticket: '#fbbf24' };
+const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8', ticket: '#fbbf24', ticketOther: 'rgba(251,191,36,0.55)' };
 const ATTENDANCE_CHIP_SIZE = 34;
 
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
@@ -200,16 +201,16 @@ function CalendarCell({ day, selected, onClick }) {
     }}>
       {day.n}
       {dot && <span style={{ width: 5, height: 5, borderRadius: '50%', background: dot, marginTop: 3 }} />}
-      {day.hasTicket && day.state !== 'ticket' && (
+      {day.hasTicket && !['ticket', 'ticketOther'].includes(day.state) && (
         <span style={{
           position: 'absolute',
           right: 4,
           bottom: 4,
-          width: 6,
-          height: 6,
+          width: day.hasCurrentUserTicket ? 6 : 5,
+          height: day.hasCurrentUserTicket ? 6 : 5,
           borderRadius: '50%',
-          background: '#fbbf24',
-          boxShadow: '0 0 0 2px rgba(251,191,36,0.18)',
+          background: day.hasCurrentUserTicket ? '#fbbf24' : 'rgba(251,191,36,0.55)',
+          boxShadow: day.hasCurrentUserTicket ? '0 0 0 2px rgba(251,191,36,0.18)' : 'none',
         }} />
       )}
     </button>

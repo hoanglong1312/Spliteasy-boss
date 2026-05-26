@@ -295,6 +295,40 @@ test('calendar current-user status falls back to matching current name when prof
   assert.equal(data.selectedSession.personalCostNote, 'Bạn có mặt trong buổi này')
 })
 
+test('calendar marks ticket-only days lighter when current member is not in the ticket', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'cuong-expense',
+    currentUserName: 'Cường',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'cuong-expense', groupId: 'expense-1', name: 'Cường', profileId: 'profile-cuong', memberType: 'fixed' },
+      { id: 'cuong-pickle', groupId: 'g1', name: 'Cường', profileId: 'profile-cuong', memberType: 'fixed' },
+      { id: 'long-pickle', groupId: 'g1', name: 'Long', profileId: 'profile-long', memberType: 'fixed' },
+      { id: 'minh-pickle', groupId: 'g1', name: 'Minh Em', profileId: 'profile-minh', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [],
+      externalTickets: [
+        { id: 'mine', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-16', status: 'unpaid', totalAmount: 100000, memberIds: ['cuong-pickle', 'minh-pickle'], advancerId: 'minh-pickle' },
+        { id: 'other', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-17', status: 'team_fund', totalAmount: 100000, memberIds: ['long-pickle', 'minh-pickle'] },
+      ],
+      monthlyConfigs: [],
+    },
+    _allPickle: { sessions: [], sessionItems: [], externalTickets: [] },
+  }
+
+  const data = buildPickleballCalendarData(state, { yearMonth: '2026-05' })
+  const mineDay = data.days.find(day => day.date === '2026-05-16')
+  const otherDay = data.days.find(day => day.date === '2026-05-17')
+
+  assert.equal(mineDay.state, 'ticket')
+  assert.equal(mineDay.hasCurrentUserTicket, true)
+  assert.equal(otherDay.state, 'ticketOther')
+  assert.equal(otherDay.hasCurrentUserTicket, false)
+})
+
 test('calendar data exposes active casual members for guest quick-select', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {

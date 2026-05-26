@@ -2276,11 +2276,13 @@ function buildCalendarDays(monthDate, sessionsByDay, state, ticketsByDate = new 
     const inMonth = date.getMonth() === month
     const session = inMonth ? sessionsByDay.get(date.getDate()) : null
     const tickets = inMonth ? ticketsByDate.get(dateKey(date)) || [] : []
+    const hasCurrentUserTicket = tickets.some(ticket => ticketIncludesCurrentUser(state, ticket))
     return {
       n: date.getDate(),
       date: dateKey(date),
       sessionId: session?.id,
       hasTicket: tickets.length > 0,
+      hasCurrentUserTicket,
       ticketIds: tickets.map(ticket => ticket.id),
       state: inMonth ? calendarCellState(date, session, state, tickets) : 'faded',
     }
@@ -2381,7 +2383,9 @@ function staleReplacementSessionsForMonth(state, date, sessions = getAllSessions
 }
 
 function calendarCellState(date, session, state, tickets = []) {
-  if (!session && tickets.length > 0) return 'ticket'
+  if (!session && tickets.length > 0) {
+    return tickets.some(ticket => ticketIncludesCurrentUser(state, ticket)) ? 'ticket' : 'ticketOther'
+  }
   if (!session) return isToday(date) ? 'today' : 'normal'
   const normalizedStatus = String(session?.status || '').toLowerCase()
   if (['moved', 'cancelled', 'canceled'].includes(normalizedStatus)) return 'moved'
@@ -2392,6 +2396,26 @@ function calendarCellState(date, session, state, tickets = []) {
   const presentIds = effectiveSessionMemberIds(session, groupMembers)
   if (!state?.currentUserId) return presentIds.length > 0 ? 'attended' : 'missed'
   return sessionIncludesCurrentUser(state, presentIds, groupMembers) ? 'attended' : 'missed'
+}
+
+function ticketIncludesCurrentUser(state, ticket) {
+  const currentUserId = state?.currentUserId
+  if (!currentUserId) return false
+  const ticketIds = new Set(ticketMemberIds(ticket).map(String))
+  if (ticketIds.has(String(currentUserId))) return true
+
+  const allMembers = safeArray(state?.members)
+  const groupMembers = currentGroupMembers(state)
+  const currentProfileId = profileIdForMember(currentUserId, allMembers)
+  if (memberIdsForProfile(currentProfileId, groupMembers).some(memberId => ticketIds.has(String(memberId)))) return true
+
+  const currentMember = allMembers.find(member => String(member.id || member.member_id) === String(currentUserId))
+  const currentName = currentMember?.displayName || currentMember?.name || state?.currentUserName
+  if (!currentName) return false
+  return groupMembers.some(member => (
+    ticketIds.has(String(member.id || member.member_id)) &&
+    sameName(member.displayName || member.name, currentName)
+  ))
 }
 
 function toCalendarSessionDetail(state, session, allSessions, today) {
