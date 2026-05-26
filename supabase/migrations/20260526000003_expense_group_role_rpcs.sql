@@ -431,7 +431,7 @@ BEGIN
 
   IF NOT v_is_admin AND NOT (
     v_existing.submitted_by_member_id = v_actor_member_id
-    AND v_existing.status = 'pending'
+    AND v_existing.status IN ('pending', 'rejected', 'declined')
   ) THEN
     RETURN jsonb_build_object('error', 'expense_update_permission_denied');
   END IF;
@@ -474,9 +474,9 @@ BEGIN
     expense_date = coalesce(p_expense_date, CURRENT_DATE),
     receipt_images = coalesce(p_receipt_images, '[]'::jsonb),
     paid_by_member_id = p_paid_by_member_id,
-    status = CASE WHEN v_is_admin THEN 'approved' ELSE status END,
-    reviewed_by_member_id = CASE WHEN v_is_admin THEN v_actor_member_id ELSE reviewed_by_member_id END,
-    reviewed_at = CASE WHEN v_is_admin THEN now() ELSE reviewed_at END
+    status = CASE WHEN v_is_admin THEN 'approved' ELSE 'pending' END,
+    reviewed_by_member_id = CASE WHEN v_is_admin THEN v_actor_member_id ELSE NULL END,
+    reviewed_at = CASE WHEN v_is_admin THEN now() ELSE NULL END
   WHERE id = p_expense_id;
 
   DELETE FROM public.expense_participants
@@ -616,7 +616,12 @@ BEGIN
     RETURN jsonb_build_object('error', 'expense_group_actor_not_found');
   END IF;
 
-  IF NOT public.is_expense_group_admin(p_group_id, v_actor_member_id) THEN
+  IF NOT public.is_expense_group_admin(p_group_id, v_actor_member_id)
+    AND NOT (
+      v_existing.submitted_by_member_id = v_actor_member_id
+      AND v_existing.status IN ('pending', 'rejected', 'declined')
+    )
+  THEN
     RETURN jsonb_build_object('error', 'expense_delete_permission_denied');
   END IF;
 

@@ -568,8 +568,11 @@ test('ExpenseDetail data includes permission flags from current user role and su
   assert.match(screenDataSource, /getExpenseDetailData: \(params\) => buildExpenseDetailData\(state, params\)/);
   assert.match(screenDataSource, /const currentUserId = state\?\.currentUserId/);
   assert.match(screenDataSource, /const role = safeArray\(state\?\.members\)\.find\(member => String\(member\.id\) === String\(currentUserId\)\)\?\.role/);
-  assert.match(screenDataSource, /const canEdit = role === 'treasurer' \|\| \(String\(expense\.submitted_by_member_id \|\| ''\) === String\(currentUserId\) && String\(expense\.status \|\| ''\)\.toLowerCase\(\) === 'pending'\)/);
-  assert.match(screenDataSource, /canDelete: role === 'treasurer'/);
+  assert.match(screenDataSource, /const reviewStatus = String\(expense\.status \|\| ''\)\.toLowerCase\(\)/);
+  assert.match(screenDataSource, /const canSubmitterRevise = isCurrentSubmitter && \['pending', 'rejected', 'declined'\]\.includes\(reviewStatus\)/);
+  assert.match(screenDataSource, /const canEdit = role === 'treasurer' \|\| canSubmitterRevise/);
+  assert.match(screenDataSource, /canDelete: role === 'treasurer' \|\| canSubmitterRevise/);
+  assert.match(screenDataSource, /status: reviewStatus === 'rejected' \|\| reviewStatus === 'declined' \? 'rejected'/);
 });
 
 test('ExpenseDetail hides edit and delete actions unless permission flags are true', () => {
@@ -581,8 +584,18 @@ test('ExpenseDetail deletes the opened expense and shows receipt images', () => 
   assert.match(screenDataSource, /groupId: group\.id/);
   assert.match(screenDataSource, /receiptImages: safeArray\(expense\.receiptImages \|\| expense\.receipt_images\)/);
   assert.match(expenseDetailSource, /const receiptImages = d\.receiptImages \|\| \[\]/);
+  assert.match(expenseDetailSource, /const \[showDeleteConfirm, setShowDeleteConfirm\] = useState\(false\)/);
   assert.match(expenseDetailSource, /Ảnh hóa đơn/);
   assert.match(expenseDetailSource, /receiptImages\.map\(image =>/);
   assert.match(expenseDetailSource, /src=\{image\.url\}/);
+  assert.match(expenseDetailSource, /title="Xóa chi tiêu\?"/);
+  assert.match(expenseDetailSource, /setShowDeleteConfirm\(true\)/);
   assert.match(expenseDetailSource, /onAction\?\.\('deleteExpense', \{ expenseId: d\.expenseId \|\| d\.id, groupId: d\.groupId, returnToPrevious: true \}\)/);
+});
+
+test('ExpenseDetail removes direct payment action and shows rejected status', () => {
+  assert.match(expenseDetailSource, /rejected: \{ bg:/);
+  assert.match(expenseDetailSource, /Đã từ chối/);
+  assert.doesNotMatch(expenseDetailSource, /payNow/);
+  assert.doesNotMatch(expenseDetailSource, /Thanh toán \{formatVND/);
 });

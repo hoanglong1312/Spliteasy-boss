@@ -1,15 +1,16 @@
 // Spliteasy Boss — Chi tiết chi tiêu
 // Props: data { id, groupName, category, title, amount, status, dateLabel, payer, splits[], note }
 
-import React from 'react';
+import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, IconButton, Card, Hero, Button, Avatar, SectionLabel,
+  PhoneFrame, Screen, IconButton, Card, Hero, Button, Avatar, SectionLabel, BottomSheet,
 } from '../primitives';
 
 const STATUS_PALETTE = {
   pending: { bg: 'rgba(251,191,36,0.15)', border: 'rgba(251,191,36,0.3)', color: '#fcd34d', label: '⏳ Đang chờ chia' },
   settled: { bg: 'rgba(52,211,153,0.15)', border: 'rgba(52,211,153,0.3)', color: '#6ee7b7', label: '✓ Đã chia' },
+  rejected: { bg: 'rgba(248,113,113,0.15)', border: 'rgba(248,113,113,0.3)', color: '#fca5a5', label: '✕ Đã từ chối' },
 };
 
 const SPLIT_TAG = {
@@ -21,8 +22,8 @@ const SPLIT_TAG = {
 export default function ExpenseDetail({ data, onAction }) {
   const d = data || DEMO;
   const status = STATUS_PALETTE[d.status] || STATUS_PALETTE.pending;
-  const myOwed = d.splits.find((s) => s.tag === 'owe' && s.isMe);
   const receiptImages = d.receiptImages || [];
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <PhoneFrame>
@@ -197,17 +198,29 @@ export default function ExpenseDetail({ data, onAction }) {
             </Button>
           )}
           {d.canDelete === true && (
-            <Button block variant="danger" style={{ fontSize: 12 }} onClick={() => onAction?.('deleteExpense', { expenseId: d.expenseId || d.id, groupId: d.groupId, returnToPrevious: true })}>
+            <Button block variant="danger" style={{ fontSize: 12 }} onClick={() => setShowDeleteConfirm(true)}>
               🗑 Xóa
             </Button>
           )}
         </div>
 
-        {myOwed && (
-          <Button block variant="brand" style={{ marginTop: 8 }}
-            onClick={() => onAction?.('payNow', { to: d.payer.name, amount: Math.abs(myOwed.amount) })}>
-            ⚡ Thanh toán {formatVND(Math.abs(myOwed.amount))} cho {d.payer.name.split(' ')[0]}
-          </Button>
+        {showDeleteConfirm && d.canDelete === true && (
+          <BottomSheet title="Xóa chi tiêu?" onClose={() => setShowDeleteConfirm(false)}>
+            <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginBottom: 14 }}>
+              Chi tiêu này sẽ bị xóa khỏi nhóm và không còn tính vào chốt sổ tháng.
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button type="button" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>Hủy</Button>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={async () => {
+                  await onAction?.('deleteExpense', { expenseId: d.expenseId || d.id, groupId: d.groupId, returnToPrevious: true });
+                  setShowDeleteConfirm(false);
+                }}
+              >Xóa</Button>
+            </div>
+          </BottomSheet>
         )}
       </Screen>
     </PhoneFrame>

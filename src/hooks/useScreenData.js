@@ -1802,7 +1802,10 @@ function buildExpenseDetailData(state, params) {
   const members = currentGroupMembers({ ...state, currentGroup: group })
   const currentUserId = state?.currentUserId
   const role = safeArray(state?.members).find(member => String(member.id) === String(currentUserId))?.role
-  const canEdit = role === 'treasurer' || (String(expense.submitted_by_member_id || '') === String(currentUserId) && String(expense.status || '').toLowerCase() === 'pending')
+  const reviewStatus = String(expense.status || '').toLowerCase()
+  const isCurrentSubmitter = String(expense.submitted_by_member_id || '') === String(currentUserId)
+  const canSubmitterRevise = isCurrentSubmitter && ['pending', 'rejected', 'declined'].includes(reviewStatus)
+  const canEdit = role === 'treasurer' || canSubmitterRevise
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
   const splits = expenseSplits(expense, members, payer, currentUserId)
 
@@ -1817,7 +1820,7 @@ function buildExpenseDetailData(state, params) {
     },
     title: expense.title || 'Chi tiêu',
     amount: Number(expense.amount) || 0,
-    status: isDoneStatus(expense.status) || String(expense.status || '').toLowerCase() === 'approved' ? 'settled' : 'pending',
+    status: reviewStatus === 'rejected' || reviewStatus === 'declined' ? 'rejected' : isDoneStatus(expense.status) || reviewStatus === 'approved' ? 'settled' : 'pending',
     dateLabel: fullExpenseDate(expense.date || expense.expense_date),
     payer: {
       id: payer?.id || expense.paidBy || expense.paid_by_member_id,
@@ -1828,7 +1831,7 @@ function buildExpenseDetailData(state, params) {
     note: expense.note || expense.description || expense.declineReason || '',
     receiptImages: safeArray(expense.receiptImages || expense.receipt_images),
     canEdit,
-    canDelete: role === 'treasurer',
+    canDelete: role === 'treasurer' || canSubmitterRevise,
     expense,
   }
 }

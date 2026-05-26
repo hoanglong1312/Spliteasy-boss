@@ -61,6 +61,9 @@ test('expense group expense RPC auto-approves creator and treasurer submissions'
   assert.match(expenseGroupRoleRpcMigration, /g\.created_by = p_member_id/)
   assert.match(expenseGroupRoleRpcMigration, /g\.created_by = m\.profile_id/)
   assert.match(expenseGroupRoleRpcMigration, /public\.is_expense_group_admin\(p_group_id, v_actor_member_id\)/)
+  assert.match(expenseGroupRoleRpcMigration, /v_existing\.submitted_by_member_id = v_actor_member_id[\s\S]*AND v_existing\.status IN \('pending', 'rejected', 'declined'\)/)
+  assert.match(expenseGroupRoleRpcMigration, /status = CASE[\s\S]*WHEN v_is_admin THEN 'approved'[\s\S]*ELSE 'pending'/)
+  assert.match(expenseGroupRoleRpcMigration, /reviewed_by_member_id = CASE[\s\S]*WHEN v_is_admin THEN v_actor_member_id[\s\S]*ELSE NULL/)
   assert.match(expenseGroupRoleRpcMigration, /THEN 'approved'/)
 })
 
@@ -88,6 +91,7 @@ test('delete expense RPC resolves the actor inside the target expense group prof
   assert.match(expenseGroupRoleRpcMigration, /WITH current_actor AS \(/)
   assert.match(expenseGroupRoleRpcMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)
   assert.match(expenseGroupRoleRpcMigration, /public\.is_expense_group_admin\(p_group_id, v_actor_member_id\)/)
+  assert.match(expenseGroupRoleRpcMigration, /v_existing\.submitted_by_member_id = v_actor_member_id[\s\S]*v_existing\.status IN \('pending', 'rejected', 'declined'\)/)
   assert.match(expenseGroupRoleRpcMigration, /DELETE FROM public\.expense_participants/)
   assert.match(expenseGroupRoleRpcMigration, /DELETE FROM public\.expenses/)
   assert.match(expenseGroupRoleRpcMigration, /GRANT EXECUTE ON FUNCTION public\.delete_expense_group_expense\(uuid, uuid\) TO anon/)
