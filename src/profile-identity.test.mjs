@@ -209,12 +209,15 @@ test('groups list can highlight the one expense group linked to pickleball profi
   assert.match(screenDataSource, /isLinkedPickleballExpenseGroup: Boolean\(linkedPickleballGroupId\)/)
   assert.match(screenDataSource, /linkedPickleballGroupName/)
   assert.match(storeSource, /linkedPickleballGroupId: group\.linked_pickleball_group_id \|\| null/)
+  assert.match(groupsListSource, /function isPickleballLikeGroup\(g\) \{/)
+  assert.match(groupsListSource, /return g\?\.kind === 'pickleball' \|\| Boolean\(g\?\.isLinkedPickleballExpenseGroup\)/)
   assert.match(groupsListSource, /const linked = g\.isLinkedPickleballExpenseGroup/)
-  assert.match(groupsListSource, /const isPickleballGroup = g\.kind === 'pickleball' \|\| linked/)
+  assert.match(groupsListSource, /const isPickleballGroup = isPickleballLikeGroup\(g\)/)
   assert.match(groupsListSource, /background: isPickleballGroup \? 'linear-gradient\(145deg, rgba\(6,95,70,0\.30\), rgba\(15,23,42,0\.95\)\)' : undefined/)
   assert.match(groupsListSource, /borderColor: isPickleballGroup \? 'rgba\(52,211,153,0\.72\)' : undefined/)
   assert.match(groupsListSource, /Liên kết Pickleball/)
-  assert.match(groupsListSource, /Dùng chung danh bạ với/)
+  assert.doesNotMatch(groupsListSource, /Danh bạ chung/)
+  assert.doesNotMatch(groupsListSource, /Dùng chung danh bạ với/)
 })
 
 test('RLS group id helper includes same-profile expense groups for pickleball members', () => {
