@@ -81,6 +81,20 @@ test('AppV2 edit group preserves descriptions for expense group settings', () =>
   assert.match(storeSource, /description: action\.group\.description \|\| '',/)
 })
 
+test('AppV2 deletes expense groups through the profile-aware RPC', () => {
+  const deleteGroupBlock = appSource.slice(
+    appSource.indexOf("if (type === 'deleteGroup')"),
+    appSource.indexOf("if (type === 'editMember')")
+  )
+  assert.match(deleteGroupBlock, /\.rpc\('delete_expense_group'/)
+  assert.match(deleteGroupBlock, /p_group_id: groupId/)
+  assert.match(deleteGroupBlock, /throw error \|\| new Error\(data\.error\)/)
+  assert.match(deleteGroupBlock, /await dispatch\(\{ type: 'REFRESH' \}\)/)
+  assert.doesNotMatch(deleteGroupBlock, /type: 'DELETE_GROUP'/)
+  assert.match(storeSource, /case 'DELETE_GROUP':[\s\S]*\.rpc\('delete_expense_group'/)
+  assert.doesNotMatch(storeSource, /case 'DELETE_GROUP':[\s\S]*\.from\('groups'\)[\s\S]*deleted_at: new Date\(\)\.toISOString\(\)/)
+})
+
 test('AppV2 uses expense-group RPCs for normal member edits instead of pickleball writes', () => {
   assert.match(appSource, /if \(type === 'addExpenseGroupMember'\)/)
   assert.match(appSource, /\.rpc\('add_expense_group_member'/)

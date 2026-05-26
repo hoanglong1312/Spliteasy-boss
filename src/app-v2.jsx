@@ -508,7 +508,13 @@ export default function AppV2() {
     if (type === 'deleteGroup') {
       const groupId = payload?.groupId || payload?.id || payload
       if (!groupId) return
-      await dispatch({ type: 'DELETE_GROUP', groupId })
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('delete_expense_group', {
+        p_group_id: groupId,
+      })
+      if (error || data?.error) throw error || new Error(data.error)
+      await dispatch({ type: 'REFRESH' })
       setStack((s) => s.slice(0, -1))
       return
     }

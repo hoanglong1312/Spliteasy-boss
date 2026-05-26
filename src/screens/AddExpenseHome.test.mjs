@@ -46,6 +46,11 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
   assert.match(groupDetailSource, /action=\{<div[\s\S]*\{d\.emoji \|\| '👥'\}/);
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /const \[deleteConfirmGroup, setDeleteConfirmGroup\] = useState\(false\)/);
+  assert.match(groupDetailSource, /<BottomSheet title="Xóa nhóm\?"/);
+  assert.match(groupDetailSource, /Dữ liệu nhóm sẽ được ẩn khỏi danh sách nhóm/);
+  assert.match(groupDetailSource, /setDeleteConfirmGroup\(true\)/);
+  assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa nhóm \$\{d\.name\}/);
   assert.doesNotMatch(groupDetailSource, /\{ key: 'balances', label: 'Số dư' \}/);
   assert.doesNotMatch(groupDetailSource, /activeTab === 'balances'/);
   assert.match(groupDetailSource, /const \[activeTab, setActiveTab\] = useState\('members'\)/);

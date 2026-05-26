@@ -27,6 +27,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupEmoji, setGroupEmoji] = useState(d.emoji || '👥');
   const [groupDescription, setGroupDescription] = useState(d.description || '');
+  const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
@@ -63,8 +64,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   }
 
   async function deleteGroup() {
-    if (!window.confirm(`Xóa nhóm ${d.name}? Dữ liệu sẽ được ẩn khỏi danh sách nhóm.`)) return;
     await onAction?.('deleteGroup', { groupId: d.id });
+    setDeleteConfirmGroup(false);
   }
 
   return (
@@ -105,7 +106,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               }}>
                 <MenuItem onClick={() => { setMenuOpen(false); setEditingGroup(true); }}>Sửa thông tin nhóm</MenuItem>
                 <MenuItem onClick={() => { setMenuOpen(false); onAction?.('join', { groupId: d.id }); }}>Mã mời thành viên</MenuItem>
-                {isTreasurer && <MenuItem danger onClick={() => { setMenuOpen(false); deleteGroup(); }}>Xóa nhóm</MenuItem>}
+                {isTreasurer && <MenuItem danger onClick={() => { setMenuOpen(false); setDeleteConfirmGroup(true); }}>Xóa nhóm</MenuItem>}
               </Card>
             )}
           </div>
@@ -277,6 +278,18 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           onClose={closeMemberSheets}
           onAction={onAction}
         />
+      )}
+
+      {deleteConfirmGroup && (
+        <BottomSheet title="Xóa nhóm?" onClose={() => setDeleteConfirmGroup(false)}>
+          <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
+            Dữ liệu nhóm sẽ được ẩn khỏi danh sách nhóm. Các giao dịch cũ không bị xóa khỏi DB.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmGroup(false)}>Hủy</Button>
+            <Button type="button" variant="danger" onClick={deleteGroup}>Xác nhận</Button>
+          </div>
+        </BottomSheet>
       )}
 
       {memberMenu && canManageMembers && (

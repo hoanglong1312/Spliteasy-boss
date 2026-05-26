@@ -1858,13 +1858,13 @@ export function AppProvider({ children }) {
         if (!sb) return
         const groupId = action.groupId || action.group_id
         if (!groupId) return
-        const { error } = await sb
-          .from('groups')
-          .update({ deleted_at: new Date().toISOString() })
-          .eq('id', groupId)
-        if (error) {
-          console.error('[store] DELETE_GROUP:', error)
-          throw error
+        const { data, error } = await sb.rpc('delete_expense_group', {
+          p_group_id: groupId,
+        })
+        if (error || data?.error) {
+          const err = error || new Error(data.error)
+          console.error('[store] DELETE_GROUP:', err)
+          throw err
         }
         await refresh()
         break
