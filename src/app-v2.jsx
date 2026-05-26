@@ -923,12 +923,25 @@ export default function AppV2() {
           participants: payload.participants || [],
           splitMode: payload.splitMode,
         }
+        const { token } = getStoredAuth()
+        if (!token) throw new Error('Chưa đăng nhập. Vui lòng tham gia nhóm trước.')
+        const sb = createSupabase(token)
         if (payload.expenseId) {
-          await dispatch({ type: 'EDIT_EXPENSE', groupId, expense, isTreasurer })
+          const { data, error } = await sb.rpc('update_expense_group_expense', {
+            p_expense_id: expense.id,
+            p_group_id: groupId,
+            p_title: expense.title,
+            p_amount: expense.amount,
+            p_paid_by_member_id: expense.paidBy,
+            p_category: expense.category,
+            p_notes: expense.notes || null,
+            p_expense_date: expense.date,
+            p_participant_ids: expense.participants,
+            p_receipt_images: expense.receiptImages,
+          })
+          if (error || data?.error) throw error || new Error(data.error)
+          await dispatch({ type: 'REFRESH' })
         } else {
-          const { token } = getStoredAuth()
-          if (!token) throw new Error('Chưa đăng nhập. Vui lòng tham gia nhóm trước.')
-          const sb = createSupabase(token)
           const { data, error } = await sb.rpc('create_expense_group_expense', {
             p_group_id: groupId,
             p_title: expense.title,
@@ -938,6 +951,7 @@ export default function AppV2() {
             p_notes: expense.notes || null,
             p_expense_date: expense.date,
             p_participant_ids: expense.participants,
+            p_receipt_images: expense.receiptImages,
           })
           if (error || data?.error) throw error || new Error(data.error)
           await dispatch({ type: 'REFRESH' })

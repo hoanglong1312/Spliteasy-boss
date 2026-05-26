@@ -302,9 +302,9 @@ function buildAddExpenseData(state, params) {
   const expense = expenseId ? findExpense(state, expenseId) : null
   const requestedGroupId = normalizeId(params, 'groupId')
   const requestedGroup = requestedGroupId ? safeArray(state?.groups).find(item => String(item.id) === String(requestedGroupId)) : null
-  const group = expense ? groupForExpense(state, expense) || requestedGroup || currentGroup(state) : requestedGroup || currentGroup(state)
+  const group = expense ? groupForExpense(state, expense) || resolveExpenseGroupContext(state, requestedGroup) : resolveExpenseGroupContext(state, requestedGroup)
   const currentMember = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
-  const members = currentGroupMembers({ ...state, currentGroup: group, currentGroupId: group?.id || state?.currentGroupId })
+  const members = membersForGroup(group, safeArray(state?.members))
     .map(member => ({
       id: member.id,
       name: member.displayName || member.name,
@@ -329,14 +329,28 @@ function buildAddExpenseData(state, params) {
       notes: expense.notes || expense.note || expense.description || '',
       date: expense.date || expense.expense_date || '',
       participants: safeArray(expense.participants),
+      receiptImages: safeArray(expense.receiptImages || expense.receipt_images),
     } : null,
   }
+}
+
+function resolveExpenseGroupContext(state, requestedGroup = null) {
+  const groups = safeArray(state?.groups).map(safeGroup)
+  const candidate = requestedGroup || currentGroup(state)
+  if (candidate && groupKind(candidate) !== 'pickleball') return candidate
+  const pickleballId = candidate?.id || state?.pickleballGroupId || state?.pickleballGroup?.id
+  const linkedGroup = groups.find(group => (
+    groupKind(group) !== 'pickleball' &&
+    String(group.linkedPickleballGroupId || group.linked_pickleball_group_id || '') === String(pickleballId || '')
+  ))
+  if (linkedGroup) return linkedGroup
+  return groups.find(group => groupKind(group) !== 'pickleball') || candidate || safeGroup(null)
 }
 
 function buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth) {
   const monthDate = dateFromYearMonth(selectedYearMonth)
   const pickleballGroup = safeArray(groups).find(group => groupKind(group) === 'pickleball')
-  const rows = safeArray(groups).map(safeGroup).map(group => {
+  const rows = safeArray(groups).map(safeGroup).filter(group => groupKind(group) !== 'pickleball').map(group => {
     const monthlyGroup = groupWithMonthExpenses(group, monthDate)
     const groupMembers = membersForGroup(group, members)
     const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
@@ -377,6 +391,15 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
   }
 }
 
+function isMemberGroupCreator(group, member) {
+  const creatorId = group?.createdBy || group?.created_by || ''
+  if (!creatorId || !member) return false
+  return (
+    String(creatorId) === String(member.id || '') ||
+    String(creatorId) === String(member.profileId || member.profile_id || '')
+  )
+}
+
 function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = []) {
   const g = safeGroup(group)
   const monthDate = dateFromYearMonth(selectedYearMonth)
@@ -384,14 +407,9 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const groupMembers = membersForGroup(g, members)
   const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(g, currentUserId, members, currentUserName)))
   const currentMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
-  const groupCreatorId = g.createdBy || g.created_by || ''
-  const isGroupCreator = Boolean(groupCreatorId) && (
-    String(groupCreatorId) === String(currentGroupMember?.id || '') ||
-    String(groupCreatorId) === String(currentGroupMember?.profileId || currentGroupMember?.profile_id || '') ||
-    String(groupCreatorId) === String(currentMember?.profileId || currentMember?.profile_id || '')
-  )
+  const isGroupCreator = isMemberGroupCreator(g, currentGroupMember) || isMemberGroupCreator(g, currentMember)
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
-  const isGroupTreasurer = currentGroupMember?.role === 'treasurer' || String(g.createdBy || g.created_by || '') === String(currentGroupMember?.id || '') || (Boolean(currentGroupMember) && isSoloExpenseGroup)
+  const isGroupTreasurer = Boolean(isGroupCreator || currentGroupMember?.role === 'treasurer' || (Boolean(currentGroupMember) && isSoloExpenseGroup))
   const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
   const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
   const memberBalanceMap = Object.fromEntries(
@@ -447,6 +465,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         initials: initials(member),
         color: member.color || '#6366f1',
         role: member.role,
+        isGroupCreator: isMemberGroupCreator(g, member),
         bankName: member.bankName || member.bank_name || '',
         bankAccount: member.bankAccount || member.bank_account || '',
         bankAccountName: member.bankAccountName || member.bank_account_name || '',
@@ -465,6 +484,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         initials: initials(member),
         color: member.color || '#6366f1',
         role: member.role,
+        isGroupCreator: isMemberGroupCreator(g, member),
         amount: memberBalanceMap[member.id] || 0,
       }))
       .filter(row => row.amount !== 0)
@@ -2095,6 +2115,7 @@ function isActiveMember(member) {
 }
 
 function isExpenseActiveMember(member) {
+  if (!isActiveMember(member)) return false
   if ('expenseActive' in (member || {}) || 'expense_active' in (member || {})) {
     return member?.expenseActive !== false && member?.expense_active !== false
   }

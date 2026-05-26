@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildNewGroupData, buildPickleballMembersData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildNewGroupData, buildPickleballMembersData }`, context)
   return context.__builders
 }
 
@@ -217,6 +217,111 @@ test('add expense data does not fall back to pickleball members for an empty exp
 
   assert.deepEqual(data.members, [])
   assert.equal(data.memberCount, 0)
+})
+
+test('add expense data uses active expense-group members like group detail', () => {
+  const { buildAddExpenseData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'long',
+    currentGroupId: 'expense-1',
+    currentGroup: {
+      id: 'expense-1',
+      groupType: 'expense',
+      name: 'Ăn uống',
+      members: ['long', 'minh-anh', 'hoang-em-inactive'],
+      expenses: [],
+    },
+    groups: [],
+    members: [
+      { id: 'long', groupId: 'expense-1', name: 'Long', isActive: true, expenseActive: true },
+      { id: 'minh-anh', groupId: 'expense-1', name: 'Minh Anh', isActive: true, expenseActive: true },
+      { id: 'hoang-em-inactive', groupId: 'expense-1', name: 'Hoàng Em', isActive: true, expenseActive: false },
+      { id: 'cuong-inactive', groupId: 'expense-1', name: 'Cường', isActive: false, expenseActive: true },
+    ],
+  }
+
+  const data = buildAddExpenseData(state, { groupId: 'expense-1' })
+
+  assert.deepEqual(data.members.map(member => member.name), ['Long', 'Minh Anh'])
+  assert.equal(data.memberCount, 2)
+})
+
+test('add expense data resolves a pickleball context to its linked expense group', () => {
+  const { buildAddExpenseData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'pickle-long',
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball 246', members: ['pickle-long'] },
+    groups: [
+      { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball 246', members: ['pickle-long'] },
+      { id: 'expense-1', groupType: 'expense', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', members: ['expense-long', 'expense-minh'] },
+    ],
+    members: [
+      { id: 'pickle-long', groupId: 'pickle-1', profileId: 'profile-long', name: 'Long', isActive: true, expenseActive: true },
+      { id: 'expense-long', groupId: 'expense-1', profileId: 'profile-long', name: 'Long', isActive: true, expenseActive: true },
+      { id: 'expense-minh', groupId: 'expense-1', profileId: 'profile-minh', name: 'Minh', isActive: true, expenseActive: true },
+    ],
+  }
+
+  const data = buildAddExpenseData(state, { groupId: 'pickle-1' })
+
+  assert.equal(data.groupId, 'expense-1')
+  assert.equal(data.groupName, 'Chi tiêu Virgo 246')
+  assert.deepEqual(data.members.map(member => member.id), ['expense-long', 'expense-minh'])
+})
+
+test('groups list shows expense groups instead of opening pickleball as an expense group', () => {
+  const { buildGroupsListData } = loadScreenDataBuilders()
+  const groups = [
+    { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball 246', emoji: '🏸', members: ['pickle-long'] },
+    { id: 'expense-1', groupType: 'expense', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', members: ['expense-long'] },
+  ]
+  const members = [
+    { id: 'pickle-long', groupId: 'pickle-1', name: 'Long', isActive: true, expenseActive: true },
+    { id: 'expense-long', groupId: 'expense-1', name: 'Long', isActive: true, expenseActive: true },
+  ]
+
+  const data = buildGroupsListData(groups, 'expense-long', members, 'Long', '2026-05')
+
+  assert.deepEqual(data.groups.map(group => group.name), ['Chi tiêu Virgo 246'])
+  assert.equal(data.activeCount, 1)
+})
+
+test('edit expense data keeps saved receipt images for update forms', () => {
+  const { buildAddExpenseData } = loadScreenDataBuilders()
+  const receiptImages = [
+    { id: 'receipt-1', name: 'hoa-don.jpg', url: 'data:image/jpeg;base64,abc123' },
+  ]
+  const state = {
+    currentUserId: 'long',
+    currentGroupId: 'expense-1',
+    currentGroup: {
+      id: 'expense-1',
+      groupType: 'expense',
+      name: 'Ăn uống',
+      members: ['long', 'minh-anh'],
+      expenses: [{
+        id: 'expense-1',
+        groupId: 'expense-1',
+        title: 'Ăn tối',
+        amount: 240000,
+        paidBy: 'long',
+        participants: ['long', 'minh-anh'],
+        receiptImages,
+        status: 'approved',
+        date: '2026-05-26',
+      }],
+    },
+    groups: [],
+    members: [
+      { id: 'long', groupId: 'expense-1', name: 'Long', isActive: true },
+      { id: 'minh-anh', groupId: 'expense-1', name: 'Minh Anh', isActive: true },
+    ],
+  }
+
+  const data = buildAddExpenseData(state, { expenseId: 'expense-1' })
+
+  assert.deepEqual(data.editExpense.receiptImages, receiptImages)
 })
 
 test('new group profile options collapse duplicate member identities by normalized name', () => {
@@ -435,7 +540,7 @@ test('group detail marks current user as creator when created_by matches profile
 
   const detail = buildGroupDetailData(group, 'member-owner', members, 'Owner', '2026-05')
 
-  assert.equal(detail.isTreasurer, false)
+  assert.equal(detail.isTreasurer, true)
   assert.equal(detail.isGroupCreator, true)
 })
 

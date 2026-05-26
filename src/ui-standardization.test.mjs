@@ -92,3 +92,17 @@ test('group detail data receives profile directory without free state references
   )
   assert.doesNotMatch(buildGroupDetailBlock, /state\?\./)
 })
+
+test('group detail distinguishes creator and treasurer roles in member rows', () => {
+  const buildGroupDetailBlock = screenDataSource.slice(
+    screenDataSource.indexOf('function buildGroupDetailData'),
+    screenDataSource.indexOf('function buildGroupMemberCandidates')
+  )
+  assert.match(buildGroupDetailBlock, /const isGroupTreasurer = Boolean\(isGroupCreator \|\|/)
+  assert.match(buildGroupDetailBlock, /isGroupCreator: isMemberGroupCreator\(g, member\)/)
+  assert.match(groupDetailSource, /member\.isGroupCreator &&/)
+  assert.match(groupDetailSource, /👑/)
+  assert.match(groupDetailSource, /Trưởng nhóm/)
+  assert.match(groupDetailSource, /💳/)
+  assert.match(groupDetailSource, /Thủ quỹ/)
+})

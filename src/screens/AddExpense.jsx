@@ -210,20 +210,18 @@ export default function AddExpense({ data, onAction }) {
 
           <ReceiptImages
             images={receiptImages}
-            onAdd={(files) => {
-              const nextImages = Array.from(files || [])
+            onAdd={async (files) => {
+              const nextImages = await Promise.all(Array.from(files || [])
                 .filter(file => file.type.startsWith('image/'))
-                .map(file => ({
+                .map(async file => ({
                   id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
                   name: file.name,
-                  url: URL.createObjectURL(file),
-                }));
+                  url: await readImageDataUrl(file),
+                })));
               setReceiptImages(items => [...items, ...nextImages]);
             }}
             onRemove={(imageId) => {
               setReceiptImages(items => {
-                const removed = items.find(image => image.id === imageId);
-                if (removed?.url?.startsWith('blob:')) URL.revokeObjectURL(removed.url);
                 return items.filter(image => image.id !== imageId);
               });
             }}
@@ -342,6 +340,15 @@ function FieldLabel({ children }) {
       margin: '14px 0 6px',
     }}>{children}</div>
   );
+}
+
+function readImageDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('read_image_failed'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function SelectField({ children }) {

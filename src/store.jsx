@@ -507,6 +507,17 @@ function memberInsertRow(groupId, member, role) {
   return row
 }
 
+function normalizeReceiptImages(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 async function ensureProfileForMember(sb, member) {
   if (member?.profileId || member?.profile_id) return member.profileId || member.profile_id
   const parts = memberNameParts(member?.name)
@@ -929,6 +940,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     date: e.expense_date,
     status: e.status,
     notes: e.notes || '',
+    receiptImages: normalizeReceiptImages(e.receipt_images),
+    receipt_images: normalizeReceiptImages(e.receipt_images),
     declineReason: e.decline_reason,
     submittedBy: e.submitted_by_member_id,
     submitted_by_member_id: e.submitted_by_member_id,
@@ -1626,6 +1639,7 @@ export function AppProvider({ children }) {
             paid_by_member_id: expense.paidBy,
             submitted_by_member_id: state.currentUserId,
             expense_date: expense.date || new Date().toISOString().slice(0, 10),
+            receipt_images: normalizeReceiptImages(expense.receiptImages),
             pickle_session_id: expense.pickleSessionId || null,
             ...statusFields,
           })
@@ -1663,6 +1677,7 @@ export function AppProvider({ children }) {
           notes: expense.notes || null,
           paid_by_member_id: expense.paidBy,
           expense_date: expense.date,
+          receipt_images: normalizeReceiptImages(expense.receiptImages),
         }).eq('id', expense.id)
         await sb.from('expense_participants').delete().eq('expense_id', expense.id)
         if (expense.participants?.length > 0) {

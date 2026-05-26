@@ -13,6 +13,8 @@ const migrationSource = readFileSync(new URL('../supabase/migrations/20260523000
 const expenseGroupRpcMigration = readFileSync(new URL('../supabase/migrations/20260525000003_expense_group_member_rpcs.sql', import.meta.url), 'utf8')
 const memberBillShareMigration = readFileSync(new URL('../supabase/migrations/20260526000001_member_bill_share_tokens.sql', import.meta.url), 'utf8')
 const expenseGroupExpenseRpcMigration = readFileSync(new URL('../supabase/migrations/20260526000002_expense_group_expense_rpcs.sql', import.meta.url), 'utf8')
+const expenseGroupRoleRpcMigration = readFileSync(new URL('../supabase/migrations/20260526000003_expense_group_role_rpcs.sql', import.meta.url), 'utf8')
+const profileGroupIdsMigration = readFileSync(new URL('../supabase/migrations/20260526000004_profile_group_ids.sql', import.meta.url), 'utf8')
 
 test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TABLE IF NOT EXISTS public\.profiles/)
@@ -51,6 +53,15 @@ test('expense group expense RPC saves expenses through the current profile membe
   assert.match(expenseGroupExpenseRpcMigration, /paid_by_member_id[\s\S]*p_paid_by_member_id/)
   assert.match(expenseGroupExpenseRpcMigration, /INSERT INTO public\.expense_participants/)
   assert.match(expenseGroupExpenseRpcMigration, /GRANT EXECUTE ON FUNCTION public\.create_expense_group_expense/)
+})
+
+test('expense group expense RPC auto-approves creator and treasurer submissions', () => {
+  assert.match(expenseGroupRoleRpcMigration, /CREATE OR REPLACE FUNCTION public\.is_expense_group_admin/)
+  assert.match(expenseGroupRoleRpcMigration, /m\.role = 'treasurer'/)
+  assert.match(expenseGroupRoleRpcMigration, /g\.created_by = p_member_id/)
+  assert.match(expenseGroupRoleRpcMigration, /g\.created_by = m\.profile_id/)
+  assert.match(expenseGroupRoleRpcMigration, /public\.is_expense_group_admin\(p_group_id, v_actor_member_id\)/)
+  assert.match(expenseGroupRoleRpcMigration, /THEN 'approved'/)
 })
 
 test('store fetches profiles and merges profile fields into members', () => {
@@ -150,6 +161,16 @@ test('groups list can highlight the one expense group linked to pickleball profi
   assert.match(groupsListSource, /const linked = g\.isLinkedPickleballExpenseGroup/)
   assert.match(groupsListSource, /Liên kết Pickleball/)
   assert.match(groupsListSource, /Dùng chung danh bạ với/)
+})
+
+test('RLS group id helper includes same-profile expense groups for pickleball members', () => {
+  assert.match(profileGroupIdsMigration, /CREATE OR REPLACE FUNCTION public\.get_my_group_ids\(\)/)
+  assert.match(profileGroupIdsMigration, /current_actor AS/)
+  assert.match(profileGroupIdsMigration, /SELECT id, group_id, profile_id, name/)
+  assert.match(profileGroupIdsMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)
+  assert.match(profileGroupIdsMigration, /lower\(m\.name\) = lower\(actor\.name\)/)
+  assert.match(profileGroupIdsMigration, /g\.linked_pickleball_group_id = actor\.group_id/)
+  assert.match(profileGroupIdsMigration, /m\.is_active IS NOT FALSE/)
 })
 
 test('expense group RPCs authorize the same profile across duplicate group memberships', () => {

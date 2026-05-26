@@ -175,6 +175,10 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
 
+        {isTreasurer && pendingExpenses.length > 0 && (
+          <ReviewAlert count={pendingExpenses.length} onClick={() => setActiveTab('activity')} />
+        )}
+
         <SubTabs
           items={[
             { key: 'members',  label: `Thành viên · ${d.memberCount}` },
@@ -296,11 +300,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           <ActionButton onClick={() => {
             onAction?.('editExpense', { expenseId: expenseMenu.id });
             setExpenseMenu(null);
-          }}>Sửa chi tiêu</ActionButton>
+          }}>✏️ Sửa chi tiêu</ActionButton>
           <ActionButton danger onClick={() => {
             setDeleteConfirmExpense(expenseMenu);
             setExpenseMenu(null);
-          }}>Xóa chi tiêu</ActionButton>
+          }}>🗑️ Xóa chi tiêu</ActionButton>
         </BottomSheet>
       )}
 
@@ -439,9 +443,10 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
         <Avatar initial={member.initials} size={34} color={member.color} ring={false} style={{ borderRadius: 12 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
-          {member.role === 'treasurer' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5 }}>
-              <Badge tone="warn">THỦ QUỸ</Badge>
+          {(member.isGroupCreator || member.role === 'treasurer') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
+              {member.isGroupCreator && <RolePill icon="👑" label="Trưởng nhóm" />}
+              {member.role === 'treasurer' && <RolePill icon="💳" label="Thủ quỹ" />}
             </div>
           )}
         </div>
@@ -464,6 +469,28 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
         )}
       </div>
     </Card>
+  );
+}
+
+function RolePill({ icon, label }) {
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
+      padding: '3px 6px',
+      borderRadius: 999,
+      background: 'rgba(251,191,36,0.12)',
+      border: '1px solid rgba(251,191,36,0.24)',
+      color: '#fcd34d',
+      fontSize: 9,
+      fontWeight: 800,
+      lineHeight: 1,
+      whiteSpace: 'nowrap',
+    }}>
+      <span style={{ fontSize: 10 }}>{icon}</span>
+      {label}
+    </span>
   );
 }
 
@@ -1031,6 +1058,33 @@ function PendingExpenseCard({ expense, onApprove, onReject }) {
         </div>
       </div>
     </ListCard>
+  );
+}
+
+function ReviewAlert({ count, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: '100%',
+      marginTop: 12,
+      padding: '12px 14px',
+      borderRadius: 14,
+      border: '1px solid rgba(245,158,11,0.35)',
+      background: 'rgba(245,158,11,0.10)',
+      color: '#fcd34d',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      textAlign: 'left',
+    }}>
+      <span style={{ fontSize: 18 }}>⏳</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 12, fontWeight: 900 }}>Cần duyệt · {count} chi tiêu</span>
+        <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Bấm để mở danh sách chờ duyệt</span>
+      </span>
+      <span style={{ color: colors.textMuted, fontSize: 18 }}>›</span>
+    </button>
   );
 }
 

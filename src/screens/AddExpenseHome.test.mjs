@@ -28,8 +28,12 @@ test('AddExpense uses scroll date picker and supports receipt image previews', (
   assert.match(addExpenseSource, /setDatePickerOpen\(true\)/);
   assert.match(addExpenseSource, /function ReceiptImages\(\{ images, onAdd, onRemove \}\)/);
   assert.match(addExpenseSource, /accept="image\/\*"/);
-  assert.match(addExpenseSource, /URL\.createObjectURL\(file\)/);
+  assert.match(addExpenseSource, /readImageDataUrl\(file\)/);
+  assert.match(addExpenseSource, /reader\.readAsDataURL\(file\)/);
   assert.match(addExpenseSource, /receiptImages/);
+  assert.match(appSource, /p_receipt_images: expense\.receiptImages/);
+  assert.match(storeSource, /receiptImages: normalizeReceiptImages\(e\.receipt_images\)/);
+  assert.match(storeSource, /receipt_images: normalizeReceiptImages\(expense\.receiptImages\)/);
 });
 
 test('GroupDetail menu, balances, and members tabs render real group data', () => {
@@ -306,8 +310,9 @@ test('App uses one selectedYearMonth across home, groups, group detail, and pick
 
 test('GroupDetail uses group-specific treasurer role for normal expense groups', () => {
   assert.match(screenDataSource, /const currentGroupMember = groupMembers\.find\(member => String\(member\.id\) === String\(memberIdForGroup\(g, currentUserId, members, currentUserName\)\)\)/);
+  assert.match(screenDataSource, /const isGroupCreator = isMemberGroupCreator\(g, currentGroupMember\) \|\| isMemberGroupCreator\(g, currentMember\)/);
   assert.match(screenDataSource, /const isSoloExpenseGroup = groupMembers\.length === 1 && groupKind\(g\) !== 'pickleball'/);
-  assert.match(screenDataSource, /const isGroupTreasurer = currentGroupMember\?\.role === 'treasurer' \|\| String\(g\.createdBy \|\| g\.created_by \|\| ''\) === String\(currentGroupMember\?\.id \|\| ''\) \|\| \(Boolean\(currentGroupMember\) && isSoloExpenseGroup\)/);
+  assert.match(screenDataSource, /const isGroupTreasurer = Boolean\(isGroupCreator \|\| currentGroupMember\?\.role === 'treasurer' \|\| \(Boolean\(currentGroupMember\) && isSoloExpenseGroup\)\)/);
   assert.match(screenDataSource, /isTreasurer: isGroupTreasurer/);
   assert.match(appSource, /const detailData = route\.params\?\.groupId \? getGroupDetailData\(route\.params\.groupId\) : groupDetailData/);
   assert.match(appSource, /<GroupDetail data=\{detailData\} isTreasurer=\{detailData\?\.isTreasurer \?\? isTreasurer\} onAction=\{handle\} \/>/);
@@ -434,7 +439,7 @@ test('App routes AddExpense with current member data and existing expense data',
   assert.match(appSource, /type === 'editExpense'/);
   assert.match(appSource, /screen: 'add-expense', params: \{ expenseId: payload\.expenseId \}/);
   assert.match(appSource, /<AddExpense data=\{getAddExpenseData\(route\.params\)\} onAction=\{handle\} \/>/);
-  assert.match(appSource, /type: 'EDIT_EXPENSE'/);
+  assert.match(appSource, /\.rpc\('update_expense_group_expense'/);
 });
 
 test('App routes Home viewExpense actions to ExpenseDetail', () => {
