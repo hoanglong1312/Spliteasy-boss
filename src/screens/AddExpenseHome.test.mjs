@@ -13,11 +13,27 @@ const storeSource = readFileSync(new URL('../store.jsx', import.meta.url), 'utf8
 
 test('AddExpense defaults to the logged-in member and submits edit expense ids', () => {
   assert.match(addExpenseSource, /const editExpense = d\.editExpense/);
-  assert.match(addExpenseSource, /useState\(\(\) => editExpense\?\.paidBy \?\? d\.currentMemberId \?\? ''\)/);
+  assert.match(addExpenseSource, /useState\(\(\) => editExpense\?\.paidBy \?\? selectedGroup\.currentMemberId \?\? selectedMembers\[0\]\?\.id \?\? ''\)/);
   assert.match(addExpenseSource, /<h1[\s\S]*\{editExpense \? 'Sửa chi tiêu' : 'Thêm chi tiêu'\}/);
   assert.match(addExpenseSource, /expenseId: editExpense\?\.id/);
-  assert.match(addExpenseSource, /Chia trong nhóm · \{d\.memberCount \|\| \(d\.members \|\| \[\]\)\.length\} thành viên/);
-  assert.match(addExpenseSource, /\{d\.groupEmoji \|\| '👥'\}/);
+  assert.match(addExpenseSource, /Chia trong nhóm · \{selectedGroup\.memberCount \|\| \(selectedGroup\.members \|\| \[\]\)\.length\} thành viên/);
+  assert.match(addExpenseSource, /\{selectedGroup\.emoji \|\| selectedGroup\.groupEmoji \|\| '👥'\}/);
+});
+
+test('AddExpense lets new expenses switch between expense groups without using pickleball groups', () => {
+  assert.match(addExpenseSource, /const groupOptions = d\.groupOptions \|\| \[/);
+  assert.match(addExpenseSource, /const \[selectedGroupId, setSelectedGroupId\] = useState\(\(\) => editExpense\?\.groupId \|\| d\.groupId \|\| groupOptions\[0\]\?\.id \|\| ''\)/);
+  assert.match(addExpenseSource, /const selectedGroup = groupOptions\.find\(group => String\(group\.id\) === String\(selectedGroupId\)\) \|\| groupOptions\[0\] \|\| d/);
+  assert.match(addExpenseSource, /onChange=\{event => setSelectedGroupId\(event\.target\.value\)\}/);
+  assert.match(addExpenseSource, /groupId: editExpense\?\.groupId \|\| selectedGroup\.id/);
+  assert.match(screenDataSource, /groupOptions: expenseGroups\.map\(group => buildAddExpenseGroupOption\(state, group\)\)/);
+  assert.match(screenDataSource, /const expenseGroups = safeArray\(state\?\.groups\)[\s\S]*groupKind\(group\) !== 'pickleball'/);
+});
+
+test('AddExpense empty amount keeps the zero placeholder visually centered', () => {
+  assert.match(addExpenseSource, /const amountInputWidth = amount \? 220 : 54/);
+  assert.match(addExpenseSource, /width: amountInputWidth/);
+  assert.match(addExpenseSource, /textAlign: amount \? 'right' : 'center'/);
 });
 
 test('AddExpense uses scroll date picker and supports receipt image previews', () => {
@@ -501,7 +517,7 @@ test('App routes AddExpense with current member data and existing expense data',
   assert.match(screenDataSource, /const requestedGroupId = normalizeId\(params, 'groupId'\)/);
   assert.match(screenDataSource, /const requestedGroup = requestedGroupId \? safeArray\(state\?\.groups\)\.find/);
   assert.match(screenDataSource, /memberCount: members\.length/);
-  assert.match(screenDataSource, /currentMemberId: state\?\.currentUserId/);
+  assert.match(screenDataSource, /currentMemberId: selectedGroup\.currentMemberId \|\| state\?\.currentUserId/);
   assert.match(screenDataSource, /currentMemberName: currentMember\?\.displayName \|\| currentMember\?\.name \|\| state\?\.currentUserName/);
   assert.match(screenDataSource, /editExpense: expense \? \{/);
   assert.match(appSource, /type === 'editExpense'/);

@@ -316,23 +316,23 @@ function buildAddExpenseData(state, params) {
   const expense = expenseId ? findExpense(state, expenseId) : null
   const requestedGroupId = normalizeId(params, 'groupId')
   const requestedGroup = requestedGroupId ? safeArray(state?.groups).find(item => String(item.id) === String(requestedGroupId)) : null
+  const expenseGroups = safeArray(state?.groups)
+    .map(safeGroup)
+    .filter(group => groupKind(group) !== 'pickleball')
   const group = expense ? groupForExpense(state, expense) || resolveExpenseGroupContext(state, requestedGroup) : resolveExpenseGroupContext(state, requestedGroup)
   const currentMember = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
-  const members = membersForGroup(group, safeArray(state?.members))
-    .map(member => ({
-      id: member.id,
-      name: member.displayName || member.name,
-      initial: member.initial || member.initials || initials(member),
-    }))
+  const selectedGroup = buildAddExpenseGroupOption(state, group)
+  const members = selectedGroup.members
 
   return {
-    groupId: group?.id || state?.currentGroupId,
-    groupName: group?.name || 'Nhóm',
-    groupEmoji: group?.emoji || '👥',
+    groupId: selectedGroup.id || state?.currentGroupId,
+    groupName: selectedGroup.name || 'Nhóm',
+    groupEmoji: selectedGroup.emoji || '👥',
     memberCount: members.length,
-    currentMemberId: state?.currentUserId,
+    currentMemberId: selectedGroup.currentMemberId || state?.currentUserId,
     currentMemberName: currentMember?.displayName || currentMember?.name || state?.currentUserName,
     members,
+    groupOptions: expenseGroups.map(group => buildAddExpenseGroupOption(state, group)),
     editExpense: expense ? {
       id: expense.id,
       groupId: expense.groupId || expense.group_id || group?.id,
@@ -345,6 +345,24 @@ function buildAddExpenseData(state, params) {
       participants: safeArray(expense.participants),
       receiptImages: safeArray(expense.receiptImages || expense.receipt_images),
     } : null,
+  }
+}
+
+function buildAddExpenseGroupOption(state, group) {
+  const safe = safeGroup(group)
+  const members = membersForGroup(safe, safeArray(state?.members))
+    .map(member => ({
+      id: member.id,
+      name: member.displayName || member.name,
+      initial: member.initial || member.initials || initials(member),
+    }))
+  return {
+    id: safe.id,
+    name: safe.name || 'Nhóm',
+    emoji: safe.emoji || '👥',
+    memberCount: members.length,
+    currentMemberId: memberIdForGroup(safe, state?.currentUserId, safeArray(state?.members), state?.currentUserName),
+    members,
   }
 }
 

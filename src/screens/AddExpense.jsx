@@ -16,9 +16,22 @@ const CATEGORY_OPTIONS = [
 export default function AddExpense({ data, onAction }) {
   const d = data || DEMO;
   const editExpense = d.editExpense;
+  const groupOptions = d.groupOptions || [{
+    id: d.groupId,
+    name: d.groupName,
+    groupName: d.groupName,
+    emoji: d.groupEmoji,
+    groupEmoji: d.groupEmoji,
+    memberCount: d.memberCount,
+    currentMemberId: d.currentMemberId,
+    members: d.members || [],
+  }];
+  const [selectedGroupId, setSelectedGroupId] = useState(() => editExpense?.groupId || d.groupId || groupOptions[0]?.id || '');
+  const selectedGroup = groupOptions.find(group => String(group.id) === String(selectedGroupId)) || groupOptions[0] || d;
+  const selectedMembers = selectedGroup.members || [];
   const [title, setTitle] = useState(() => editExpense?.title ?? '');
   const [amount, setAmount] = useState(() => editExpense?.amount != null ? String(editExpense.amount) : '');
-  const [paidBy, setPaidBy] = useState(() => editExpense?.paidBy ?? d.currentMemberId ?? '');
+  const [paidBy, setPaidBy] = useState(() => editExpense?.paidBy ?? selectedGroup.currentMemberId ?? selectedMembers[0]?.id ?? '');
   const [category, setCategory] = useState(() => editExpense?.category ?? 'general');
   const [dateLabel, setDateLabel] = useState(() => editExpense?.date ? dateLabelFromValue(editExpense.date) : todayLabel());
   const [datePickerOpen, setDatePickerOpen] = useState(false);
@@ -26,7 +39,7 @@ export default function AddExpense({ data, onAction }) {
   const [receiptImages, setReceiptImages] = useState(() => editExpense?.receiptImages || []);
   const [participants, setParticipants] = useState(() => {
     const selected = new Set((editExpense?.participants || []).map(id => String(id)));
-    return (d.members || []).map(m => ({
+    return selectedMembers.map(m => ({
       ...m,
       included: editExpense ? selected.has(String(m.id)) : true,
     }));
@@ -34,12 +47,20 @@ export default function AddExpense({ data, onAction }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
+  useEffect(() => {
+    if (editExpense) return;
+    const nextMembers = selectedGroup.members || [];
+    setPaidBy(selectedGroup.currentMemberId || nextMembers[0]?.id || '');
+    setParticipants(nextMembers.map(member => ({ ...member, included: true })));
+  }, [editExpense, selectedGroupId]);
+
   const activeCount = participants.filter(p => p.included).length;
   const amountNumber = Number(amount) || 0;
   const perPerson = activeCount > 0 ? Math.round(amountNumber / activeCount) : 0;
-  const paidByMember = (d.members || []).find(m => String(m.id) === String(paidBy)) || d.members?.[0];
+  const paidByMember = selectedMembers.find(m => String(m.id) === String(paidBy)) || selectedMembers[0];
   const selectedCategory = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
   const allSelected = activeCount === participants.length && participants.length > 0;
+  const amountInputWidth = amount ? 220 : 54;
 
   return (
     <div style={{
@@ -82,7 +103,7 @@ export default function AddExpense({ data, onAction }) {
             <div style={{
               fontSize: 11, fontWeight: 700, color: colors.brandLight,
               letterSpacing: '1px', textTransform: 'uppercase',
-            }}>{editExpense ? 'Sửa chi tiêu' : 'Chi tiêu mới'} · {d.groupName}</div>
+            }}>{editExpense ? 'Sửa chi tiêu' : 'Chi tiêu mới'} · {selectedGroup.name || selectedGroup.groupName}</div>
             <button onClick={() => onAction?.('close')} style={{
               fontSize: 20, color: colors.textMuted, background: 'none', border: 'none', cursor: 'pointer',
             }}>✕</button>
@@ -97,6 +118,7 @@ export default function AddExpense({ data, onAction }) {
             background: 'rgba(255,255,255,0.04)',
             border: `1px solid ${colors.borderSubtle}`,
             marginTop: 10,
+            position: 'relative',
           }}>
             <div style={{
               width: 34,
@@ -107,13 +129,30 @@ export default function AddExpense({ data, onAction }) {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 18,
-            }}>{d.groupEmoji || '👥'}</div>
+            }}>{selectedGroup.emoji || selectedGroup.groupEmoji || '👥'}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.groupName}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedGroup.name || selectedGroup.groupName}</div>
               <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
-                Chia trong nhóm · {d.memberCount || (d.members || []).length} thành viên
+                Chia trong nhóm · {selectedGroup.memberCount || (selectedGroup.members || []).length} thành viên
               </div>
             </div>
+            <select
+              value={selectedGroupId}
+              onChange={event => setSelectedGroupId(event.target.value)}
+              disabled={Boolean(editExpense)}
+              aria-label="Chọn nhóm chi tiêu"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                opacity: 0,
+                cursor: editExpense ? 'default' : 'pointer',
+              }}
+            >
+              {groupOptions.map(group => (
+                <option key={group.id} value={group.id}>{group.name || group.groupName}</option>
+              ))}
+            </select>
+            <span style={{ color: colors.textMuted, fontSize: 18 }}>›</span>
           </div>
 
           {/* Amount focal */}
@@ -137,7 +176,7 @@ export default function AddExpense({ data, onAction }) {
                 type="text"
                 inputMode="numeric"
                 style={{
-                  width: 220,
+                  width: amountInputWidth,
                   background: 'transparent',
                   border: 'none',
                   outline: 'none',
@@ -145,7 +184,7 @@ export default function AddExpense({ data, onAction }) {
                   fontSize: 38,
                   fontWeight: 900,
                   letterSpacing: '-1.5px',
-                  textAlign: 'right',
+                  textAlign: amount ? 'right' : 'center',
                   fontFamily: 'inherit',
                 }}
               />
@@ -170,7 +209,7 @@ export default function AddExpense({ data, onAction }) {
                   onChange={e => setPaidBy(e.target.value)}
                   style={selectStyle}
                 >
-                  {(d.members || []).map(m => (
+                  {selectedMembers.map(m => (
                     <option key={m.id} value={m.id}>{m.name}</option>
                   ))}
                 </select>
@@ -300,7 +339,7 @@ export default function AddExpense({ data, onAction }) {
               try {
                 await onAction?.('save', {
                   expenseId: editExpense?.id,
-                  groupId: editExpense?.groupId || d.groupId,
+                  groupId: editExpense?.groupId || selectedGroup.id,
                   title: title.trim(),
                   amount: Number(amount),
                   paidBy,
