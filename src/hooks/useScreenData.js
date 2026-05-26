@@ -397,7 +397,7 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
     filters: [
       { key: 'all', label: `Tất cả · ${rows.length}` },
       { key: 'owed', label: `Còn nợ · ${owed}` },
-      { key: 'balanced', label: `Cân bằng · ${balanced}` },
+      { key: 'balanced', label: `0 · ${balanced}` },
       { key: 'closed', label: 'Đã chốt' },
     ],
     groups: rows,

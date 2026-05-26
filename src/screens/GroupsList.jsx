@@ -60,32 +60,54 @@ export default function GroupsList({ data, onAction }) {
 
 function GroupCard({ g, onClick }) {
   const accentMap = { pickleball: 'pickleball', food: 'groups', cafe: 'finance', trip: 'finance' };
+  const linked = g.isLinkedPickleballExpenseGroup;
+  const isPickleballGroup = g.kind === 'pickleball' || linked;
   const iconBg = {
     pickleball: { bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.25)' },
     food:       { bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.25)' },
     cafe:       { bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.25)' },
-  }[g.kind] || { bg: 'rgba(255,255,255,0.04)', border: colors.borderSubtle };
-
-  const linked = g.isLinkedPickleballExpenseGroup;
+  }[isPickleballGroup ? 'pickleball' : g.kind] || { bg: 'rgba(255,255,255,0.04)', border: colors.borderSubtle };
+  const balanceLabel = g.balance === 0 ? '0' : formatVNDShort(g.balance);
 
   return (
-    <ListCard accent={accentMap[g.kind]} style={{
+    <ListCard accent={isPickleballGroup ? 'pickleball' : accentMap[g.kind]} style={{
       padding: '18px 16px',
       cursor: 'pointer',
-      borderColor: linked ? 'rgba(52,211,153,0.55)' : undefined,
-      boxShadow: linked ? '0 0 0 1px rgba(52,211,153,0.12), 0 14px 36px rgba(16,185,129,0.08)' : undefined,
+      background: isPickleballGroup ? 'linear-gradient(145deg, rgba(6,95,70,0.30), rgba(15,23,42,0.95))' : undefined,
+      borderColor: isPickleballGroup ? 'rgba(52,211,153,0.72)' : undefined,
+      boxShadow: isPickleballGroup ? '0 0 0 1px rgba(52,211,153,0.16), 0 16px 40px rgba(16,185,129,0.12)' : undefined,
     }} onClick={onClick}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
         <div style={{
           width: 48, height: 48, borderRadius: 14,
           background: iconBg.bg, border: `1px solid ${iconBg.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+          flexShrink: 0,
         }}>{g.emoji}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700 }}>{g.name}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-            <Badge tone={g.kind === 'pickleball' || linked ? 'success' : 'muted'}>{g.kind === 'pickleball' ? 'Pickleball' : linked ? 'Liên kết Pickleball' : 'Chi tiêu'}</Badge>
-            <span style={{ display: 'inline-flex' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.25, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {g.name}
+            </div>
+            <div style={{ textAlign: 'right', minWidth: 76, flexShrink: 0 }}>
+              <div style={{
+                fontSize: 9, fontWeight: 700, color: colors.textSecondary,
+                textTransform: 'uppercase', letterSpacing: '1px',
+              }}>Số dư</div>
+              <div style={{
+                fontSize: 15, fontWeight: 800, marginTop: 2, ...type.mono,
+                color: g.balance === 0 ? colors.textSecondary : g.balance < 0 ? colors.danger : '#6ee7b7',
+              }}>
+                {balanceLabel}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+            <Badge tone={isPickleballGroup ? 'success' : 'muted'}>{g.kind === 'pickleball' ? 'Pickleball' : linked ? 'Liên kết Pickleball' : 'Chi tiêu'}</Badge>
+            <span style={{ fontSize: 11, color: colors.textSecondary }}>{g.memberCount} thành viên</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9 }}>
+            <span style={{ display: 'inline-flex', minWidth: 0 }}>
               {g.members.slice(0, 4).map((m, i) => (
                 <span key={i} style={{ marginLeft: i === 0 ? 0 : -8 }}>
                   <Avatar initial={m} size={24} />
@@ -97,25 +119,12 @@ function GroupCard({ g, onClick }) {
                 </span>
               )}
             </span>
-            <span style={{ fontSize: 11, color: colors.textSecondary }}>{g.memberCount} thành viên</span>
           </div>
           {linked && (
-            <div style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 700, marginTop: 7 }}>
+            <div style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 700, marginTop: 9, lineHeight: 1.25 }}>
               Dùng chung danh bạ với {g.linkedPickleballGroupName}
             </div>
           )}
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{
-            fontSize: 9, fontWeight: 700, color: colors.textSecondary,
-            textTransform: 'uppercase', letterSpacing: '1px',
-          }}>Số dư</div>
-          <div style={{
-            fontSize: 15, fontWeight: 800, marginTop: 2, ...type.mono,
-            color: g.balance === 0 ? '#6ee7b7' : g.balance < 0 ? colors.danger : '#6ee7b7',
-          }}>
-            {g.balance === 0 ? 'Cân bằng' : formatVNDShort(g.balance)}
-          </div>
         </div>
       </div>
     </ListCard>
@@ -148,7 +157,7 @@ const DEMO = {
   filters: [
     { key: 'all',     label: 'Tất cả · 3' },
     { key: 'owed',    label: 'Còn nợ · 2' },
-    { key: 'balanced',label: 'Cân bằng · 1' },
+    { key: 'balanced',label: '0 · 1' },
     { key: 'closed',  label: 'Đã chốt' },
   ],
   groups: [

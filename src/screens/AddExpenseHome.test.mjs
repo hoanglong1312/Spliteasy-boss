@@ -203,6 +203,18 @@ test('GroupDetail member rows are compact and visually distinct from pickleball 
   assert.doesNotMatch(memberRowSource, /rgba\(96,165,250,0\.35\)/);
 });
 
+test('GroupsList separates group metadata from balance and renders zero balance as 0', () => {
+  const groupCardSource = groupDetailSource && homeSource
+    ? readFileSync(new URL('./GroupsList.jsx', import.meta.url), 'utf8')
+    : '';
+  assert.match(groupCardSource, /const balanceLabel = g\.balance === 0 \? '0' : formatVNDShort\(g\.balance\)/);
+  assert.doesNotMatch(groupCardSource, /\{g\.balance === 0 \? 'Cân bằng' : formatVNDShort\(g\.balance\)\}/);
+  assert.match(groupCardSource, /<div style=\{\{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 \}\}>/);
+  assert.match(groupCardSource, /<div style=\{\{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' \}\}>/);
+  assert.match(groupCardSource, /<div style=\{\{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 9 \}\}>/);
+  assert.match(groupCardSource, /minWidth: 76/);
+});
+
 test('GroupDetail keeps bank fields in edit member sheet only', () => {
   assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], isPickleball = false, onClose, onAction \}\)/);
   const addMemberEditorSource = groupDetailSource.slice(
