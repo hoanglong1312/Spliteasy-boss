@@ -34,6 +34,7 @@ DECLARE
   v_name text;
   v_member_id uuid;
   v_creator_id uuid;
+  v_actor_profile_id uuid;
 BEGIN
   IF trim(coalesce(p_name, '')) = '' THEN
     RETURN json_build_object('error', 'name_required');
@@ -51,13 +52,21 @@ BEGIN
   VALUES (trim(p_name), p_invite_code)
   RETURNING id INTO v_group_id;
 
+  SELECT profile_id
+  INTO v_actor_profile_id
+  FROM public.members
+  WHERE id = public.get_current_member_id()
+    AND is_active IS NOT FALSE
+  LIMIT 1;
+
   FOREACH v_name IN ARRAY coalesce(p_member_names, ARRAY[]::text[]) LOOP
     IF trim(coalesce(v_name, '')) <> '' THEN
-      INSERT INTO public.members (group_id, name, role)
+      INSERT INTO public.members (group_id, name, role, profile_id)
       VALUES (
         v_group_id,
         trim(v_name),
-        CASE WHEN v_creator_id IS NULL THEN 'treasurer' ELSE 'member' END
+        CASE WHEN v_creator_id IS NULL THEN 'treasurer' ELSE 'member' END,
+        CASE WHEN v_creator_id IS NULL THEN v_actor_profile_id ELSE NULL END
       )
       RETURNING id INTO v_member_id;
 

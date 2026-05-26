@@ -64,6 +64,13 @@ test('expense group expense RPC auto-approves creator and treasurer submissions'
   assert.match(expenseGroupRoleRpcMigration, /THEN 'approved'/)
 })
 
+test('create group keeps the creator on the current profile identity', () => {
+  assert.match(expenseGroupRoleRpcMigration, /v_actor_profile_id uuid/)
+  assert.match(expenseGroupRoleRpcMigration, /SELECT profile_id[\s\S]*INTO v_actor_profile_id/)
+  assert.match(expenseGroupRoleRpcMigration, /INSERT INTO public\.members \(group_id, name, role, profile_id\)/)
+  assert.match(expenseGroupRoleRpcMigration, /CASE WHEN v_creator_id IS NULL THEN v_actor_profile_id ELSE NULL END/)
+})
+
 test('store fetches profiles and merges profile fields into members', () => {
   assert.match(storeSource, /profiles:\s*\[\]/)
   assert.match(storeSource, /prR/)
