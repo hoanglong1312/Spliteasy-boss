@@ -217,6 +217,84 @@ test('calendar attendance count follows fixed members and ignores casual attenda
   assert.equal(data.selectedSession.attendance.total, 2)
 })
 
+test('calendar current-user status follows shared profile identity across member rows', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'profile-cuong',
+    currentUserName: 'Cường',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm-cuong', profileId: 'profile-cuong', groupId: 'g1', name: 'Cường', memberType: 'fixed' },
+      { id: 'm-long', profileId: 'profile-long', groupId: 'g1', name: 'Long', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 's-profile',
+          sourceTable: 'pickle_sessions',
+          groupId: 'g1',
+          date: '2026-05-20',
+          status: 'completed',
+          attendanceRecords: [
+            { sessionId: 's-profile', memberId: 'm-cuong', status: 'present' },
+            { sessionId: 's-profile', memberId: 'm-long', status: 'absent' },
+          ],
+        },
+      ],
+      fixedMembers: ['m-cuong', 'm-long'],
+      monthlyConfigs: [],
+    },
+    _allPickle: { sessions: [], sessionItems: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+  const day = data.days.find(row => row.date === '2026-05-20')
+
+  assert.equal(day.state, 'attended')
+  assert.equal(data.selectedSession.currentUserPresent, true)
+  assert.equal(data.selectedSession.personalCostNote, 'Bạn có mặt trong buổi này')
+})
+
+test('calendar current-user status falls back to matching current name when profile id is missing', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'expense-cuong',
+    currentUserName: 'Cường',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm-cuong', groupId: 'g1', name: 'Cường', memberType: 'fixed' },
+      { id: 'm-long', groupId: 'g1', name: 'Long', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 's-name',
+          sourceTable: 'pickle_sessions',
+          groupId: 'g1',
+          date: '2026-05-20',
+          status: 'completed',
+          attendanceRecords: [
+            { sessionId: 's-name', memberId: 'm-cuong', status: 'present' },
+            { sessionId: 's-name', memberId: 'm-long', status: 'absent' },
+          ],
+        },
+      ],
+      fixedMembers: ['m-cuong', 'm-long'],
+      monthlyConfigs: [],
+    },
+    _allPickle: { sessions: [], sessionItems: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+  const day = data.days.find(row => row.date === '2026-05-20')
+
+  assert.equal(day.state, 'attended')
+  assert.equal(data.selectedSession.currentUserPresent, true)
+  assert.equal(data.selectedSession.personalCostNote, 'Bạn có mặt trong buổi này')
+})
+
 test('calendar data exposes active casual members for guest quick-select', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {

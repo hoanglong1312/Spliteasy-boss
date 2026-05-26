@@ -2329,9 +2329,10 @@ function calendarCellState(date, session, state, tickets = []) {
   if (['scheduled', 'upcoming'].includes(normalizedStatus)) return 'upcoming'
   if (dateKey(date) > dateKey(new Date())) return 'upcoming'
 
-  const presentIds = effectiveSessionMemberIds(session, currentGroupMembers(state).filter(isActiveMember))
+  const groupMembers = currentGroupMembers(state).filter(isActiveMember)
+  const presentIds = effectiveSessionMemberIds(session, groupMembers)
   if (!state?.currentUserId) return presentIds.length > 0 ? 'attended' : 'missed'
-  return presentIds.some(id => String(id) === String(state.currentUserId)) ? 'attended' : 'missed'
+  return sessionIncludesCurrentUser(state, presentIds, groupMembers) ? 'attended' : 'missed'
 }
 
 function toCalendarSessionDetail(state, session, allSessions, today) {
@@ -2375,7 +2376,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const completed = isDoneStatus(session?.status)
   const moved = isMovedSession(session)
   const locked = completed || moved
-  const currentUserPresent = presentSet.has(String(state?.currentUserId || ''))
+  const currentUserPresent = sessionIncludesCurrentUser(state, presentIds, groupMembers)
   const currentUserTotal = currentUserPresent ? courtPerPerson + waterPerPerson + extrasPerPerson : 0
 
   return {
@@ -3498,6 +3499,22 @@ function effectiveSessionMemberIds(session, members = []) {
   }
   absentIds.forEach(memberId => presentIds.delete(memberId))
   return Array.from(presentIds)
+}
+
+function sessionIncludesCurrentUser(state, memberIds, members = currentGroupMembers(state)) {
+  const currentUserId = state?.currentUserId
+  if (!currentUserId) return false
+  const presentIds = new Set(safeArray(memberIds).map(String))
+  if (presentIds.has(String(currentUserId))) return true
+  const currentProfileId = profileIdForMember(currentUserId, members)
+  if (memberIdsForProfile(currentProfileId, members).some(memberId => presentIds.has(String(memberId)))) return true
+  const currentMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  const currentName = currentMember?.displayName || currentMember?.name || state?.currentUserName
+  if (!currentName) return false
+  return safeArray(members).some(member => (
+    presentIds.has(String(member.id || member.member_id)) &&
+    sameName(member.displayName || member.name, currentName)
+  ))
 }
 
 function sessionGuests(session) {
