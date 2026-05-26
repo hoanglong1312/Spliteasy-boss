@@ -274,7 +274,7 @@ test('groups list shows expense groups instead of opening pickleball as an expen
   const { buildGroupsListData } = loadScreenDataBuilders()
   const groups = [
     { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball 246', emoji: '🏸', members: ['pickle-long'] },
-    { id: 'expense-1', groupType: 'expense', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', members: ['expense-long'] },
+    { id: 'expense-1', groupType: 'expense', linkedPickleballGroupId: 'pickle-1', name: 'Chi tiêu Virgo 246', emoji: '✈️', members: ['expense-long'] },
   ]
   const members = [
     { id: 'pickle-long', groupId: 'pickle-1', name: 'Long', isActive: true, expenseActive: true },
@@ -284,6 +284,8 @@ test('groups list shows expense groups instead of opening pickleball as an expen
   const data = buildGroupsListData(groups, 'expense-long', members, 'Long', '2026-05')
 
   assert.deepEqual(data.groups.map(group => group.name), ['Chi tiêu Virgo 246'])
+  assert.equal(data.groups[0].groupTypeLabel, 'Du lịch')
+  assert.equal(data.groups[0].linkedPickleballLabel, 'Liên kết Pickleball')
   assert.equal(data.activeCount, 1)
 })
 

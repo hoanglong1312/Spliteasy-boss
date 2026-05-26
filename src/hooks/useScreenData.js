@@ -24,6 +24,16 @@ const FALLBACK_AVATAR_COLORS = [
   'linear-gradient(135deg, #c084fc, #9333ea)',
   'linear-gradient(135deg, #2dd4bf, #0891b2)',
 ]
+const GROUP_TYPE_LABELS = [
+  { key: 'food', label: 'Ăn uống', emojis: ['🍜', '🥘', '🍺'] },
+  { key: 'travel', label: 'Du lịch', emojis: ['✈️', '🚗', '🏖', '🏖️', '🏨'] },
+  { key: 'expense', label: 'Chi tiêu', emojis: ['💰', '🧾'] },
+  { key: 'sport', label: 'Thể thao', emojis: ['🏓', '🏸'] },
+  { key: 'home', label: 'Gia đình', emojis: ['🏠'] },
+  { key: 'party', label: 'Tiệc', emojis: ['🎂', '🎲'] },
+  { key: 'work', label: 'Công việc', emojis: ['💼'] },
+  { key: 'other', label: 'Khác', emojis: ['🎯', '👥'] },
+]
 
 function profilePhotoStorageKey(memberId) {
   return `spliteasy_profile_photo_${memberId || 'me'}`
@@ -429,7 +439,9 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
       kind: groupKind(group),
       emoji: group.emoji || '👥',
       name: group.name || 'Nhóm',
+      groupTypeLabel: groupTypeLabel(group),
       isLinkedPickleballExpenseGroup: Boolean(linkedPickleballGroupId),
+      linkedPickleballLabel: 'Liên kết Pickleball',
       linkedPickleballGroupId,
       linkedPickleballGroupName: linkedPickleballGroupId && String(linkedPickleballGroupId) === String(pickleballGroup?.id)
         ? pickleballGroup.name
@@ -3439,6 +3451,16 @@ function groupKind(group) {
   if (text.includes('ăn') || text.includes('trưa') || text.includes('food') || text.includes('🍜')) return 'food'
   if (text.includes('du lịch') || text.includes('trip')) return 'trip'
   return 'groups'
+}
+
+function groupTypeLabel(group) {
+  const emoji = String(group?.emoji || '')
+  const byEmoji = GROUP_TYPE_LABELS.find(type => type.emojis.includes(emoji))
+  if (byEmoji) return byEmoji.label
+  const explicit = String(group?.groupType || group?.group_type || group?.type || group?.kind || '').toLowerCase()
+  const byKey = GROUP_TYPE_LABELS.find(type => type.key === explicit)
+  if (byKey) return byKey.label
+  return groupKind(group) === 'pickleball' ? 'Pickleball' : 'Chi tiêu'
 }
 
 function expenseCategory(expense) {

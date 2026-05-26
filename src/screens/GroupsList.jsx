@@ -8,6 +8,41 @@ import {
   SectionHeader, ModuleHero, SearchInput, ListCard,
 } from '../primitives';
 
+const GROUP_TYPE_LABELS = {
+  food: 'Ăn uống',
+  travel: 'Du lịch',
+  expense: 'Chi tiêu',
+  sport: 'Thể thao',
+  home: 'Gia đình',
+  party: 'Tiệc',
+  work: 'Công việc',
+  other: 'Khác',
+  groups: 'Chi tiêu',
+  cafe: 'Ăn uống',
+  trip: 'Du lịch',
+  pickleball: 'Pickleball',
+};
+const GROUP_TYPE_EMOJI_LABELS = {
+  '🍜': 'Ăn uống',
+  '🥘': 'Ăn uống',
+  '🍺': 'Ăn uống',
+  '✈️': 'Du lịch',
+  '🚗': 'Du lịch',
+  '🏖': 'Du lịch',
+  '🏖️': 'Du lịch',
+  '🏨': 'Du lịch',
+  '💰': 'Chi tiêu',
+  '🧾': 'Chi tiêu',
+  '🏓': 'Thể thao',
+  '🏸': 'Thể thao',
+  '🏠': 'Gia đình',
+  '🎂': 'Tiệc',
+  '🎲': 'Tiệc',
+  '💼': 'Công việc',
+  '🎯': 'Khác',
+  '👥': 'Khác',
+};
+
 export default function GroupsList({ data, onAction }) {
   const d = data || DEMO;
   const [search, setSearch] = useState('');
@@ -89,6 +124,8 @@ function GroupCard({ g, onClick }) {
   const accentMap = { pickleball: 'pickleball', food: 'groups', cafe: 'finance', trip: 'finance' };
   const linked = g.isLinkedPickleballExpenseGroup;
   const isPickleballGroup = isPickleballLikeGroup(g);
+  const groupTypeLabel = g.groupTypeLabel || groupTypeLabelFor(g);
+  const metaItems = [groupTypeLabel, `${g.memberCount} thành viên`];
   const iconBg = {
     pickleball: { bg: 'rgba(52,211,153,0.12)',  border: 'rgba(52,211,153,0.25)' },
     food:       { bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.25)' },
@@ -118,9 +155,31 @@ function GroupCard({ g, onClick }) {
           }}>
             {g.name}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 7, minWidth: 0 }}>
-            <Badge tone={isPickleballGroup ? 'success' : 'muted'}>{g.kind === 'pickleball' ? 'Pickleball' : linked ? 'Liên kết Pickleball' : 'Chi tiêu'}</Badge>
-            <span style={{ fontSize: 11, color: colors.textSecondary, whiteSpace: 'nowrap' }}>{g.memberCount} thành viên</span>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isPickleballGroup ? '1fr' : 'auto 1fr',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 7,
+            minWidth: 0,
+          }}>
+            {linked && (
+              <Badge tone="success" style={{
+                justifySelf: 'start',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>{g.linkedPickleballLabel || 'Liên kết Pickleball'}</Badge>
+            )}
+            <span style={{
+              fontSize: 11,
+              color: colors.textSecondary,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              minWidth: 0,
+            }}>{metaItems.join(' · ')}</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, minWidth: 74 }}>
@@ -146,6 +205,10 @@ function GroupCard({ g, onClick }) {
       </div>
     </ListCard>
   );
+}
+
+function groupTypeLabelFor(g) {
+  return GROUP_TYPE_EMOJI_LABELS[g?.emoji] || GROUP_TYPE_LABELS[g?.groupType] || GROUP_TYPE_LABELS[g?.kind] || 'Chi tiêu';
 }
 
 function ArchivedCard({ g }) {
