@@ -526,6 +526,15 @@ test('Home expense rows open expense detail instead of edit form', () => {
   assert.doesNotMatch(homeSource, />Sửa<\/button>/);
 });
 
+test('GroupDetail activity cards open expense detail for members', () => {
+  assert.match(groupDetailSource, /function ActivityCard\(\{ item, isTreasurer, currentMemberId, onAction, onMenu \}\)/);
+  assert.match(groupDetailSource, /role="button"/);
+  assert.match(groupDetailSource, /tabIndex=\{0\}/);
+  assert.match(groupDetailSource, /onClick=\{\(\) => onAction\?\.\('viewExpense', \{ expenseId: item\.id \}\)\}/);
+  assert.match(groupDetailSource, /if \(event\.key === 'Enter' \|\| event\.key === ' '\) onAction\?\.\('viewExpense', \{ expenseId: item\.id \}\)/);
+  assert.match(groupDetailSource, /event\.stopPropagation\(\); onMenu\?\.\(item\);/);
+});
+
 test('Home source breakdown rows open their related module', () => {
   assert.match(homeSource, /<SourceBreakdown sources=\{d\.sourceBreakdown \|\| \[\]\} onAction=\{onAction\} \/>/);
   assert.match(homeSource, /function SourceBreakdown\(\{ sources, onAction \}\)/);

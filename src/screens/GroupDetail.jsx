@@ -1159,7 +1159,15 @@ function ActivityCard({ item, isTreasurer, currentMemberId, onAction, onMenu }) 
   const isOwnPending = item.submittedBy === currentMemberId && item.status === 'pending';
   const canManage = isTreasurer || isOwnPending;
   return (
-    <ListCard style={{ padding: 16 }}>
+    <ListCard
+      role="button"
+      tabIndex={0}
+      onClick={() => onAction?.('viewExpense', { expenseId: item.id })}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') onAction?.('viewExpense', { expenseId: item.id });
+      }}
+      style={{ padding: 16, cursor: 'pointer' }}
+    >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
         <div style={{
           width: 38, height: 38, borderRadius: 12,
