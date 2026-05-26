@@ -133,6 +133,11 @@ test('GroupDetail hero stats and personal balance avoid mobile overflow', () => 
 });
 
 test('GroupDetail edit sheet uses group type picker and saves matching icon and description', () => {
+  const heroSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('<ModuleHero'),
+    groupDetailSource.indexOf('<SummaryChipRow')
+  );
+
   assert.match(groupDetailSource, /const GROUP_TYPES = \[/);
   assert.match(groupDetailSource, /descriptionPlaceholder: 'Ví dụ: Ăn uống sau giờ chơi, cafe cuối tuần'/);
   assert.match(groupDetailSource, /const \[groupDescription, setGroupDescription\] = useState\(d\.description \|\| ''\)/);
@@ -140,6 +145,8 @@ test('GroupDetail edit sheet uses group type picker and saves matching icon and 
   assert.match(groupDetailSource, /emoji: selectedGroupType\.emoji \|\| '👥'/);
   assert.match(groupDetailSource, /groupType: selectedGroupType\.key/);
   assert.match(groupDetailSource, /description: groupDescription\.trim\(\)/);
+  assert.match(heroSource, /\{d\.description && \(/);
+  assert.match(heroSource, /\{d\.description\}/);
   assert.match(groupDetailSource, /function GroupTypePicker\(\{ value, options, onChange \}\)/);
   assert.match(groupDetailSource, /<GroupTypePicker value=\{groupTypeKey\} options=\{groupTypeOptions\} onChange=\{setGroupTypeKey\} \/>/);
   assert.match(groupDetailSource, /<TextArea label="Mô tả nhóm" value=\{groupDescription\} onChange=\{setGroupDescription\} placeholder=\{selectedGroupType\.descriptionPlaceholder\}/);

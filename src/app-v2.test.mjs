@@ -91,6 +91,7 @@ test('AppV2 edit group preserves descriptions for expense group settings', () =>
   assert.match(appSource, /if \(type === 'editGroup'\)/)
   assert.match(appSource, /description: group\.description \|\| '',/)
   assert.match(appSource, /\.rpc\('edit_expense_group'/)
+  assert.match(storeSource, /const normalGroups = activeGroups\.map\(group => \(\{[\s\S]*?description: group\.description \|\| '',/)
   assert.match(storeSource, /case 'EDIT_GROUP':/)
   assert.match(storeSource, /description: action\.group\.description \|\| '',/)
 })

@@ -1187,6 +1187,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     id: group.id,
     name: group.name,
     emoji: group.emoji || '👥',
+    description: group.description || '',
     color: group.color || '#574EFA',
     createdBy: group.created_by || null,
     created_by: group.created_by || null,

@@ -145,6 +145,21 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           }}>{d.emoji || '👥'}</div>}
           style={{ cursor: 'pointer' }}
         >
+          {d.description && (
+            <div style={{
+              marginTop: 2,
+              padding: '9px 10px',
+              borderRadius: 12,
+              background: 'rgba(255,255,255,0.055)',
+              border: '1px solid rgba(255,255,255,0.09)',
+              color: colors.textSecondary,
+              fontSize: 12,
+              lineHeight: 1.45,
+              overflowWrap: 'anywhere',
+            }}>
+              {d.description}
+            </div>
+          )}
           <SummaryChipRow
             memberCount={d.memberCount || (d.members || []).length}
             expenseCount={d.expenseCount || 0}
