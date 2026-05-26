@@ -428,9 +428,17 @@ test('Home renders a consolidated pending expense approval zone', () => {
 });
 
 test('Home hero review chip is an explicit settle-all action', () => {
-  assert.match(homeSource, /<button[\s\S]*aria-label=\{isNeg \? `Xem \$\{d\.owedTo\} quỹ cần kiểm tra` : 'Xem chi tiết quỹ'\}/);
+  assert.doesNotMatch(homeSource, /<ModuleHero/);
+  assert.doesNotMatch(homeSource, /onAction\?\.\('addExpense'\)/);
+  assert.doesNotMatch(homeSource, />\+ Thêm chi tiêu<\/Button>/);
+  assert.doesNotMatch(homeSource, />Chi tiết quỹ<\/Button>/);
+  assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onAction \}\)/);
+  assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
+  assert.match(homeSource, /formatVND\(Math\.abs\(totalBalance\)\)/);
+  assert.match(homeSource, /aria-label=\{isNegativeTotal \? `Xem \$\{owedTo\} quỹ cần kiểm tra` : 'Xem nguồn tiền'\}/);
   assert.match(homeSource, /onClick=\{\(event\) => \{ event\.stopPropagation\(\); onAction\?\.\('settleAll'\); \}\}/);
-  assert.match(homeSource, /Xem \{d\.owedTo\} quỹ cần kiểm tra/);
+  assert.match(homeSource, /Xem \{owedTo\} quỹ cần kiểm tra/);
   assert.doesNotMatch(homeSource, /<span style=\{\{ width: 6, height: 6/);
 });
 
@@ -516,7 +524,7 @@ test('Home removes unused personal balance helpers', () => {
 });
 
 test('Home has a controlled Của tôi filter that composes with existing filters', () => {
-  assert.match(homeSource, /const \[mineOnly, setMineOnly\] = useState\(false\)/);
+  assert.match(homeSource, /const \[mineOnly, setMineOnly\] = useState\(true\)/);
   assert.match(homeSource, /const mineMatches = !mineOnly \|\| transactionBelongsToCurrentUser\(tx, d\.currentUserId\)/);
   assert.match(homeSource, /return titleMatches && statusMatches && categoryMatches && mineMatches/);
   assert.match(homeSource, /onClick=\{\(\) => setMineOnly\(value => !value\)\}/);
@@ -550,8 +558,8 @@ test('GroupDetail activity cards open expense detail for members', () => {
 });
 
 test('Home source breakdown rows open their related module', () => {
-  assert.match(homeSource, /<SourceBreakdown sources=\{d\.sourceBreakdown \|\| \[\]\} onAction=\{onAction\} \/>/);
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, onAction \}\)/);
+  assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{d\.sourceBreakdown \|\| \[\]\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onAction \}\)/);
   assert.match(homeSource, /const openSource = \(\) => \{/);
   assert.match(homeSource, /if \(isPickleball\) \{\s*onAction\?\.\('tab', 'pickleball'\)/);
   assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/);

@@ -4,8 +4,8 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button,
-  SectionLabel, ModuleHero, SearchInput, SectionHeader, ListCard,
+  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card,
+  SectionLabel, SearchInput, SectionHeader, ListCard,
 } from '../primitives';
 
 const STATUS_FILTERS = [
@@ -27,7 +27,7 @@ export default function Home({ data, isTreasurer, onAction }) {
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [mineOnly, setMineOnly] = useState(false);
+  const [mineOnly, setMineOnly] = useState(true);
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
@@ -56,37 +56,13 @@ export default function Home({ data, isTreasurer, onAction }) {
 
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
-        <ModuleHero
-          tone="finance"
-          eyebrow={balanceLabel}
-          title={formatVND(Math.abs(d.totalBalance))}
-          subtitle="Tổng hợp tất cả nguồn tiền tháng này"
-          style={{ cursor: 'pointer' }}
-          onClick={() => onAction?.('settleAll')}
-        >
-          <button
-            type="button"
-            aria-label={isNeg ? `Xem ${d.owedTo} quỹ cần kiểm tra` : 'Xem chi tiết quỹ'}
-            onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}
-            style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10,
-            padding: '5px 10px', borderRadius: 100,
-            background: isNeg ? 'rgba(248,113,113,0.15)' : 'rgba(52,211,153,0.15)',
-            border: `1px solid ${isNeg ? 'rgba(248,113,113,0.25)' : 'rgba(52,211,153,0.25)'}`,
-            fontSize: 11, fontWeight: 600,
-            color: isNeg ? '#fca5a5' : '#6ee7b7',
-            fontFamily: 'inherit',
-            cursor: 'pointer',
-          }}>
-            {isNeg ? <>Xem {d.owedTo} quỹ cần kiểm tra</> : d.totalBalance > 0 ? 'Xem quỹ cần bù' : 'Chi tiết quỹ'}
-          </button>
-          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('addExpense'); }}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}>Chi tiết quỹ</Button>
-          </div>
-        </ModuleHero>
-
-        <SourceBreakdown sources={d.sourceBreakdown || []} onAction={onAction} />
+        <SourceBreakdown
+          sources={d.sourceBreakdown || []}
+          totalBalance={d.totalBalance}
+          balanceLabel={balanceLabel}
+          owedTo={d.owedTo}
+          onAction={onAction}
+        />
 
         <PendingApprovalZone expenses={pendingExpenses} onAction={onAction} />
 
@@ -285,13 +261,73 @@ function approvalButton(background, color) {
   };
 }
 
-function SourceBreakdown({ sources, onAction }) {
+function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onAction }) {
   if (!safeArray(sources).length) return null;
   const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
+  const isNegativeTotal = totalBalance < 0;
+  const isPositiveTotal = totalBalance > 0;
   return (
     <>
       <SectionLabel>Theo nguồn tiền</SectionLabel>
-      <Card style={{ padding: '6px 14px' }}>
+      <Card style={{ padding: '14px 14px 6px' }}>
+        <button
+          type="button"
+          aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
+          onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}
+          style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 8,
+            padding: '0 0 12px',
+            marginBottom: 8,
+            border: 'none',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            background: 'transparent',
+            color: 'inherit',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              fontSize: 10,
+              fontWeight: 850,
+              color: isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
+              textTransform: 'uppercase',
+              letterSpacing: '1.4px',
+            }}>
+              {balanceLabel}
+            </div>
+            <div style={{
+              fontSize: 26,
+              fontWeight: 900,
+              marginTop: 5,
+              color: '#f8fafc',
+              whiteSpace: 'nowrap',
+              ...type.mono,
+            }}>
+              {formatVND(Math.abs(totalBalance))}
+            </div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+              Tổng hợp tất cả nguồn tiền tháng này
+            </div>
+          </div>
+          <div style={{
+            padding: '5px 9px',
+            borderRadius: 100,
+            background: isNegativeTotal ? 'rgba(248,113,113,0.13)' : 'rgba(52,211,153,0.13)',
+            border: `1px solid ${isNegativeTotal ? 'rgba(248,113,113,0.24)' : 'rgba(52,211,153,0.24)'}`,
+            color: isNegativeTotal ? '#fca5a5' : '#6ee7b7',
+            fontSize: 10,
+            fontWeight: 800,
+            whiteSpace: 'nowrap',
+          }}>
+            {isNegativeTotal ? <>Xem {owedTo} quỹ cần kiểm tra</> : isPositiveTotal ? 'Xem quỹ cần bù' : '0'}
+          </div>
+        </button>
         {sources.map((source, index) => {
           const amount = Number(source.amount) || 0;
           const isPickleball = source.sourceType === 'pickleball';

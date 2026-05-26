@@ -65,8 +65,9 @@ test('new group uses shared module hero and scrollable existing-profile picker',
   assert.doesNotMatch(newGroupSource, /gridTemplateColumns: 'repeat\(6, 1fr\)'/)
 })
 
-test('primary money screens share hero, search, section, and list primitives', () => {
-  assert.match(homeSource, /ModuleHero/)
+test('primary money screens share summary, search, section, and list primitives', () => {
+  assert.doesNotMatch(homeSource, /ModuleHero/)
+  assert.match(homeSource, /function SourceBreakdown/)
   assert.match(homeSource, /SearchInput/)
   assert.match(homeSource, /SectionHeader/)
   assert.match(homeSource, /ListCard/)
