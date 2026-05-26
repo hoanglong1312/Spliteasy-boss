@@ -11,21 +11,31 @@ import {
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
-const GROUP_EMOJI_OPTIONS = [
-  '🍜','🥘','☕','🍺','✈️','🚗',
-  '🏖','🏨','🎮','🎵','💼','🏠',
-  '🎯','🎲','💰','👥','🏓','🏸',
+const GROUP_TYPES = [
+  { key: 'food', label: 'Ăn uống', emoji: '🍜', hint: 'Nhà hàng, cà phê', descriptionPlaceholder: 'Ví dụ: Ăn uống sau giờ chơi, cafe cuối tuần' },
+  { key: 'travel', label: 'Du lịch', emoji: '✈️', hint: 'Đi chơi, nghỉ dưỡng', descriptionPlaceholder: 'Ví dụ: Du lịch Đà Lạt 3 ngày 2 đêm' },
+  { key: 'expense', label: 'Chi tiêu', emoji: '💰', hint: 'Quỹ chung, mua sắm', descriptionPlaceholder: 'Ví dụ: Quỹ chung, mua đồ, chi phí sinh hoạt' },
+  { key: 'sport', label: 'Thể thao', emoji: '🏓', hint: 'Pickleball, bóng đá', descriptionPlaceholder: 'Ví dụ: Nhóm pickleball thứ 2-4-6' },
+  { key: 'home', label: 'Gia đình', emoji: '🏠', hint: 'Nhà cửa, sinh hoạt', descriptionPlaceholder: 'Ví dụ: Tiền nhà, sinh hoạt gia đình' },
+  { key: 'party', label: 'Tiệc', emoji: '🎂', hint: 'Sinh nhật, gặp mặt', descriptionPlaceholder: 'Ví dụ: Sinh nhật, liên hoan, gặp mặt bạn bè' },
+  { key: 'work', label: 'Công việc', emoji: '💼', hint: 'Team, dự án', descriptionPlaceholder: 'Ví dụ: Chi phí team, dự án, công tác' },
+  { key: 'other', label: 'Khác', emoji: '🎯', hint: 'Nhóm linh hoạt', descriptionPlaceholder: 'Ví dụ: Nhóm chi tiêu linh hoạt' },
 ];
 
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
+  const groupTypeOptions = d.groupTypeOptions || GROUP_TYPES;
+  const initialGroupType = groupTypeOptions.find(option => option.key === d.groupType)
+    || groupTypeOptions.find(option => option.emoji === d.emoji)
+    || groupTypeOptions.find(option => option.key === 'expense')
+    || groupTypeOptions[0];
   const canManageMembers = Boolean(isTreasurer || d.isGroupCreator);
   const canAddMembers = true;
   const [activeTab, setActiveTab] = useState('members');
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
-  const [groupEmoji, setGroupEmoji] = useState(d.emoji || '👥');
+  const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
   const [groupDescription, setGroupDescription] = useState(d.description || '');
   const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
@@ -40,6 +50,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const ownPendingExpenses = pendingExpenses.filter(expense => String(expense.submittedBy || '') === String(d.currentMemberId || ''));
   const heroBalanceLabel = d.balance > 0 ? 'Bạn cần thu' : d.balance < 0 ? 'Bạn cần nộp' : 'Bạn đã cân bằng';
   const heroBalanceTone = d.balance < 0 ? colors.danger : d.balance > 0 ? '#6ee7b7' : colors.textSecondary;
+  const selectedGroupType = groupTypeOptions.find(option => option.key === groupTypeKey) || groupTypeOptions[0];
   const visibleMembers = (d.members || []).filter(member => {
     const query = normalizeSearch(memberSearch);
     if (!query) return true;
@@ -59,7 +70,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
     await onAction?.('editGroup', {
       id: d.id,
       name,
-      emoji: groupEmoji || '👥',
+      emoji: selectedGroupType.emoji || '👥',
+      groupType: selectedGroupType.key,
       description: groupDescription.trim(),
       color: d.color || '#574EFA',
     });
@@ -245,8 +257,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         <BottomSheet title="Sửa thông tin nhóm" onClose={() => setEditingGroup(false)}>
           <form onSubmit={saveGroup}>
             <Field label="Tên nhóm" value={groupName} onChange={setGroupName} autoFocus />
-            <EmojiPicker value={groupEmoji} onChange={setGroupEmoji} />
-            <TextArea label="Mô tả nhóm" value={groupDescription} onChange={setGroupDescription} placeholder="Ví dụ: Ăn uống sau giờ chơi, đi du lịch, cafe..." />
+            <GroupTypePicker value={groupTypeKey} options={groupTypeOptions} onChange={setGroupTypeKey} />
+            <TextArea label="Mô tả nhóm" value={groupDescription} onChange={setGroupDescription} placeholder={selectedGroupType.descriptionPlaceholder} />
             <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu nhóm</Button>
           </form>
         </BottomSheet>
@@ -1021,7 +1033,7 @@ function TextArea({ label, value, onChange, placeholder }) {
   );
 }
 
-function EmojiPicker({ value, options = GROUP_EMOJI_OPTIONS, onChange }) {
+function GroupTypePicker({ value, options, onChange }) {
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{
@@ -1031,37 +1043,45 @@ function EmojiPicker({ value, options = GROUP_EMOJI_OPTIONS, onChange }) {
         letterSpacing: '1.2px',
         color: colors.textSecondary,
         marginBottom: 6,
-      }}>Chọn biểu tượng</div>
+      }}>Chọn loại nhóm</div>
       <div style={{
         display: 'flex',
         gap: 8,
         overflowX: 'auto',
-        padding: '2px 0 4px',
+        padding: '4px 0 2px',
         scrollbarWidth: 'none',
       }}>
-        {options.map(icon => {
-          const active = icon === value;
+        {options.map(option => {
+          const active = option.key === value;
           return (
             <button
-              key={icon}
+              key={option.key}
               type="button"
-              onClick={() => onChange(icon)}
+              onClick={() => onChange(option.key)}
               style={{
-                width: 40,
-                height: 40,
+                minWidth: 108,
                 flex: '0 0 auto',
-                display: 'flex',
+                display: 'grid',
+                gridTemplateColumns: '24px minmax(0, 1fr)',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: 8,
                 borderRadius: 12,
-                background: active ? 'rgba(251,191,36,0.16)' : colors.inputBg,
-                border: active ? '2px solid rgba(251,191,36,0.62)' : `1px solid ${colors.borderSubtle}`,
-                color: colors.textPrimary,
-                fontSize: 20,
+                padding: '10px 12px',
+                background: active ? 'rgba(52,211,153,0.18)' : colors.inputBg,
+                border: active ? `2px solid ${colors.pickleball}` : `1px solid ${colors.borderSubtle}`,
+                color: active ? '#d1fae5' : colors.textSecondary,
                 fontFamily: 'inherit',
                 cursor: 'pointer',
+                boxShadow: active ? '0 0 12px rgba(52,211,153,0.2)' : 'none',
+                textAlign: 'left',
               }}
-            >{icon}</button>
+            >
+              <span style={{ fontSize: 20, lineHeight: 1 }}>{option.emoji}</span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}>{option.label}</span>
+                <span style={{ display: 'block', fontSize: 9, color: colors.textMuted, marginTop: 2, whiteSpace: 'nowrap' }}>{option.hint}</span>
+              </span>
+            </button>
           );
         })}
       </div>

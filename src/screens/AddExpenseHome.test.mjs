@@ -132,14 +132,19 @@ test('GroupDetail hero stats and personal balance avoid mobile overflow', () => 
   assert.match(summarySource, /formatVND\(Math\.abs\(balance \|\| 0\)\)/);
 });
 
-test('GroupDetail edit sheet uses an icon picker and saves group description', () => {
-  assert.match(groupDetailSource, /const GROUP_EMOJI_OPTIONS = \[/);
+test('GroupDetail edit sheet uses group type picker and saves matching icon and description', () => {
+  assert.match(groupDetailSource, /const GROUP_TYPES = \[/);
+  assert.match(groupDetailSource, /descriptionPlaceholder: 'Ví dụ: Ăn uống sau giờ chơi, cafe cuối tuần'/);
   assert.match(groupDetailSource, /const \[groupDescription, setGroupDescription\] = useState\(d\.description \|\| ''\)/);
+  assert.match(groupDetailSource, /const selectedGroupType = groupTypeOptions\.find\(option => option\.key === groupTypeKey\) \|\| groupTypeOptions\[0\]/);
+  assert.match(groupDetailSource, /emoji: selectedGroupType\.emoji \|\| '👥'/);
+  assert.match(groupDetailSource, /groupType: selectedGroupType\.key/);
   assert.match(groupDetailSource, /description: groupDescription\.trim\(\)/);
-  assert.match(groupDetailSource, /function EmojiPicker\(\{ value, options = GROUP_EMOJI_OPTIONS, onChange \}\)/);
-  assert.match(groupDetailSource, /<EmojiPicker value=\{groupEmoji\} onChange=\{setGroupEmoji\} \/>/);
-  assert.match(groupDetailSource, /<TextArea label="Mô tả nhóm" value=\{groupDescription\} onChange=\{setGroupDescription\}/);
+  assert.match(groupDetailSource, /function GroupTypePicker\(\{ value, options, onChange \}\)/);
+  assert.match(groupDetailSource, /<GroupTypePicker value=\{groupTypeKey\} options=\{groupTypeOptions\} onChange=\{setGroupTypeKey\} \/>/);
+  assert.match(groupDetailSource, /<TextArea label="Mô tả nhóm" value=\{groupDescription\} onChange=\{setGroupDescription\} placeholder=\{selectedGroupType\.descriptionPlaceholder\}/);
   assert.doesNotMatch(groupDetailSource, /<Field label="Biểu tượng"/);
+  assert.doesNotMatch(groupDetailSource, /function EmojiPicker/);
   assert.match(appSource, /description: group\.description \|\| '',/);
   assert.match(storeSource, /description: action\.group\.description \|\| '',/);
   assert.match(screenDataSource, /description: g\.description \|\| '',/);
