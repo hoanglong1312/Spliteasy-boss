@@ -406,6 +406,39 @@ test('Home activity list filters by title, status, and category', () => {
   assert.doesNotMatch(homeSource, /function MiniStat/);
 });
 
+test('Home renders a consolidated pending expense approval zone', () => {
+  assert.match(screenDataSource, /pendingExpenses: buildPendingExpenseApprovals\(expenseGroups, members\)/);
+  assert.match(screenDataSource, /function buildPendingExpenseApprovals\(groups, members\)/);
+  assert.match(homeSource, /const pendingExpenses = d\.pendingExpenses \|\| \[\]/);
+  assert.match(homeSource, /<PendingApprovalZone expenses=\{pendingExpenses\} onAction=\{onAction\} \/>/);
+  assert.match(homeSource, /function PendingApprovalZone\(\{ expenses, onAction \}\)/);
+  assert.match(homeSource, /const \[expanded, setExpanded\] = useState\(false\)/);
+  assert.match(homeSource, /Cần duyệt · \{expenses\.length\} chi tiêu/);
+  assert.match(homeSource, /aria-expanded=\{expanded\}/);
+  assert.match(homeSource, /\{expanded && \(/);
+  assert.match(homeSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id, groupId: expense\.groupId \}\)/);
+  assert.match(homeSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id, groupId: expense\.groupId \}\)/);
+});
+
+test('GroupDetail no longer shows treasurer pending approval alert outside activity', () => {
+  const groupDetailHeroSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('{/* Treasurer actions */}'),
+    groupDetailSource.indexOf('<SubTabs')
+  );
+  assert.doesNotMatch(groupDetailHeroSource, /ReviewAlert/);
+  assert.doesNotMatch(groupDetailHeroSource, /Cần duyệt/);
+  assert.match(groupDetailSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id, groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id, groupId: d\.id \}\)/);
+});
+
+test('AppV2 approves and rejects expenses with the reviewer member from the expense group', () => {
+  assert.match(appSource, /function expenseGroupId\(state, expenseId\)/);
+  assert.match(appSource, /const groupId = payload\?\.groupId \|\| expenseGroupId\(state, expenseId\)/);
+  assert.match(appSource, /\.rpc\('review_expense_group_expense'/);
+  assert.match(appSource, /p_status: 'approved'/);
+  assert.match(appSource, /p_status: 'rejected'/);
+});
+
 test('Home hides monthly member balances and does not render attendance shortcut', () => {
   assert.match(homeSource, /<Screen style=\{\{ paddingBottom: '72px' \}\}>/);
   assert.match(homeSource, /export default function Home\(\{ data, isTreasurer, onAction \}\)/);

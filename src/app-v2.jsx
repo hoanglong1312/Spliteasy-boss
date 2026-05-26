@@ -1204,36 +1204,32 @@ export default function AppV2() {
 
     if (type === 'approveExpense') {
       const expenseId = payload?.expenseId ?? payload?.id ?? payload
-      const currentMemberId = state.currentGroupMember?.id || state.currentUserId
-      if (!expenseId || !currentMemberId) return
+      const groupId = payload?.groupId || expenseGroupId(state, expenseId)
+      if (!expenseId || !groupId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const now = new Date().toISOString()
-      const { error } = await sb.from('expenses').update({
-        status: 'approved',
-        reviewed_by_member_id: currentMemberId,
-        reviewed_at: new Date().toISOString(),
-        updated_at: now,
-      }).eq('id', expenseId)
-      if (error) throw error
+      const { data, error } = await sb.rpc('review_expense_group_expense', {
+        p_expense_id: expenseId,
+        p_group_id: groupId,
+        p_status: 'approved',
+      })
+      if (error || data?.error) throw error || new Error(data.error)
       await dispatch({ type: 'REFRESH' })
       return
     }
 
     if (type === 'rejectExpense') {
       const expenseId = payload?.expenseId ?? payload?.id ?? payload
-      const currentMemberId = state.currentGroupMember?.id || state.currentUserId
-      if (!expenseId || !currentMemberId) return
+      const groupId = payload?.groupId || expenseGroupId(state, expenseId)
+      if (!expenseId || !groupId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const now = new Date().toISOString()
-      const { error } = await sb.from('expenses').update({
-        status: 'rejected',
-        reviewed_by_member_id: currentMemberId,
-        reviewed_at: new Date().toISOString(),
-        updated_at: now,
-      }).eq('id', expenseId)
-      if (error) throw error
+      const { data, error } = await sb.rpc('review_expense_group_expense', {
+        p_expense_id: expenseId,
+        p_group_id: groupId,
+        p_status: 'rejected',
+      })
+      if (error || data?.error) throw error || new Error(data.error)
       await dispatch({ type: 'REFRESH' })
       return
     }
@@ -1927,7 +1923,14 @@ function normalizeTicketMemberIds(value, state) {
       ))
       return member?.id || member?.member_id || text
     })
-    .filter(Boolean)
+        .filter(Boolean)
+}
+
+function expenseGroupId(state, expenseId) {
+  const expense = safeArray(state?.expenses)
+    .concat(safeArray(state?.groups).flatMap(group => safeArray(group?.expenses)))
+    .find(item => String(item?.id || '') === String(expenseId || ''))
+  return expense?.groupId || expense?.group_id || ''
 }
 
 function activePickleballGroupId(state) {

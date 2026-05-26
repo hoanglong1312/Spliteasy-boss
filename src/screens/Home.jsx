@@ -31,6 +31,7 @@ export default function Home({ data, isTreasurer, onAction }) {
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
+  const pendingExpenses = d.pendingExpenses || [];
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
     const statusMatches = statusFilter === 'all' || transactionStatus(tx) === statusFilter;
@@ -81,6 +82,8 @@ export default function Home({ data, isTreasurer, onAction }) {
         </ModuleHero>
 
         <SourceBreakdown sources={d.sourceBreakdown || []} onAction={onAction} />
+
+        <PendingApprovalZone expenses={pendingExpenses} onAction={onAction} />
 
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
         <SearchInput
@@ -182,6 +185,101 @@ export default function Home({ data, isTreasurer, onAction }) {
   );
 }
 
+function PendingApprovalZone({ expenses, onAction }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!expenses.length) return null;
+  const totalAmount = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  return (
+    <section style={{ marginTop: 14 }}>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(value => !value)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '11px 12px',
+          borderRadius: 14,
+          background: 'rgba(245,158,11,0.10)',
+          border: '1px solid rgba(245,158,11,0.28)',
+          color: 'inherit',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+          boxShadow: '0 10px 24px rgba(245,158,11,0.08)',
+        }}
+      >
+        <div style={{
+          width: 34,
+          height: 34,
+          borderRadius: 11,
+          background: 'rgba(245,158,11,0.18)',
+          border: '1px solid rgba(245,158,11,0.30)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+          flexShrink: 0,
+        }}>⏳</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: '#fcd34d', textTransform: 'uppercase' }}>
+            Cần duyệt · {expenses.length} chi tiêu
+          </div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Bấm để xem danh sách giao dịch đang chờ
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: '#fcd34d', ...type.mono }}>{formatVND(totalAmount)}</div>
+          <div style={{ fontSize: 18, color: '#fcd34d', lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
+        </div>
+      </button>
+      {expanded && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          {expenses.map(expense => (
+            <div key={expense.id} style={{
+              padding: 10,
+              borderRadius: 12,
+              background: 'rgba(255,255,255,0.035)',
+              border: '1px solid rgba(245,158,11,0.18)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.title}</div>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                    {expense.groupName} · {expense.submittedByName || 'Thành viên'} gửi
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 900, marginTop: 6, color: '#fcd34d', ...type.mono }}>{formatVND(expense.amount)}</div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 78, flexShrink: 0 }}>
+                  <button type="button" onClick={() => onAction?.('approveExpense', { expenseId: expense.id, groupId: expense.groupId })} style={approvalButton('#22c55e', '#052e16')}>Duyệt</button>
+                  <button type="button" onClick={() => onAction?.('rejectExpense', { expenseId: expense.id, groupId: expense.groupId })} style={approvalButton(colors.danger, '#fff')}>Từ chối</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function approvalButton(background, color) {
+  return {
+    border: 'none',
+    borderRadius: 10,
+    padding: '8px 6px',
+    background,
+    color,
+    fontSize: 11,
+    fontWeight: 900,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  };
+}
+
 function SourceBreakdown({ sources, onAction }) {
   if (!safeArray(sources).length) return null;
   const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
@@ -269,7 +367,6 @@ function SourceBreakdown({ sources, onAction }) {
     </>
   );
 }
-
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
 }

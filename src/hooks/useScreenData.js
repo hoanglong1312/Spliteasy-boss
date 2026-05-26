@@ -198,6 +198,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     expenses: buildHomeExpenses(expenseGroups, currentUserId, members, state?.currentUserName, today),
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
+    pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members),
     sourceBreakdown: currentProfileSourceBreakdown(sourceBalances, currentUserId, members),
     profileBreakdown: aggregateBalancesByProfile(sourceBalances, members),
   }
@@ -281,6 +282,27 @@ function buildHomeExpenses(groups, currentUserId, members, currentUserName, mont
         }
       })
   })
+}
+
+function buildPendingExpenseApprovals(groups, members) {
+  return safeArray(groups).flatMap(group => (
+    safeArray(group.expenses)
+      .filter(expense => String(expense.status || '').toLowerCase() === 'pending')
+      .map(expense => {
+        const submittedBy = expense.submittedBy || expense.submitted_by_member_id || expense.createdBy || expense.created_by || null
+        return {
+          id: expense.id,
+          groupId: expense.groupId || expense.group_id || group.id,
+          groupName: group.name || 'Nhóm',
+          title: expense.title || 'Chi tiêu',
+          amount: Number(expense.amount) || 0,
+          date: expense.date || expense.expense_date,
+          submittedBy,
+          submittedByName: submittedBy ? memberName(submittedBy, members) : '',
+        }
+      })
+  ))
+    .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
 }
 
 function normalizeHomeSplit(split) {

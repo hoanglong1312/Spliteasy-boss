@@ -208,11 +208,10 @@ test('AppV2 handles expense edit delete and approval actions', () => {
   assert.match(appSource, /await dispatch\(\{ type: 'REFRESH' \}\)/)
 
   assert.match(appSource, /if \(type === 'approveExpense'\)/)
-  assert.match(appSource, /status: 'approved'/)
-  assert.match(appSource, /reviewed_by_member_id: currentMemberId/)
-  assert.match(appSource, /reviewed_at: new Date\(\)\.toISOString\(\)/)
+  assert.match(appSource, /\.rpc\('review_expense_group_expense'/)
+  assert.match(appSource, /p_status: 'approved'/)
   assert.match(appSource, /if \(type === 'rejectExpense'\)/)
-  assert.match(appSource, /status: 'rejected'/)
+  assert.match(appSource, /p_status: 'rejected'/)
 })
 
 test('GroupDetail renders expense action menu and pending approval UI', () => {
@@ -221,15 +220,13 @@ test('GroupDetail renders expense action menu and pending approval UI', () => {
   assert.match(groupDetailSource, /pendingExpenses = d\.pendingExpenses \|\| \[\]/)
   assert.match(groupDetailSource, /ownPendingExpenses = pendingExpenses\.filter\(expense => String\(expense\.submittedBy \|\| ''\) === String\(d\.currentMemberId \|\| ''\)\)/)
   assert.match(groupDetailSource, /CHỜ DUYỆT · \{pendingExpenses\.length\}/)
-  assert.match(groupDetailSource, /ReviewAlert/)
-  assert.match(groupDetailSource, /Cần duyệt/)
   assert.match(groupDetailSource, /PendingStatusAlert/)
   assert.match(groupDetailSource, /Đang chờ duyệt/)
   assert.match(groupDetailSource, /!isTreasurer && ownPendingExpenses\.length > 0/)
   assert.match(groupDetailSource, /setActiveTab\('activity'\)/)
   assert.match(groupDetailSource, /function PendingExpenseCard\(\{ expense, onApprove, onReject \}\)/)
-  assert.match(groupDetailSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id \}\)/)
-  assert.match(groupDetailSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id \}\)/)
+  assert.match(groupDetailSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id, groupId: d\.id \}\)/)
+  assert.match(groupDetailSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id, groupId: d\.id \}\)/)
 
   assert.match(groupDetailSource, /function ActivityCard\(\{ item, isTreasurer, currentMemberId, onAction, onMenu \}\)/)
   assert.match(groupDetailSource, /item\.submittedBy === currentMemberId/)

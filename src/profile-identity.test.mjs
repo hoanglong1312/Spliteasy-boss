@@ -64,6 +64,15 @@ test('expense group expense RPC auto-approves creator and treasurer submissions'
   assert.match(expenseGroupRoleRpcMigration, /THEN 'approved'/)
 })
 
+test('expense review RPC resolves the reviewer inside the target expense group profile', () => {
+  assert.match(expenseGroupRoleRpcMigration, /CREATE OR REPLACE FUNCTION public\.review_expense_group_expense/)
+  assert.match(expenseGroupRoleRpcMigration, /p_status NOT IN \('approved', 'rejected', 'declined'\)/)
+  assert.match(expenseGroupRoleRpcMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)
+  assert.match(expenseGroupRoleRpcMigration, /public\.is_expense_group_admin\(p_group_id, v_actor_member_id\)/)
+  assert.match(expenseGroupRoleRpcMigration, /UPDATE public\.expenses[\s\S]*status = p_status/)
+  assert.match(expenseGroupRoleRpcMigration, /GRANT EXECUTE ON FUNCTION public\.review_expense_group_expense\(uuid, uuid, text\) TO anon/)
+})
+
 test('delete expense group RPC resolves the actor inside the target group profile', () => {
   assert.match(expenseGroupRoleRpcMigration, /CREATE OR REPLACE FUNCTION public\.delete_expense_group/)
   assert.match(expenseGroupRoleRpcMigration, /actor\.profile_id IS NOT NULL[\s\S]*m\.profile_id = actor\.profile_id/)

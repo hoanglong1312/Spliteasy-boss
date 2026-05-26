@@ -159,9 +159,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
 
-        {isTreasurer && pendingExpenses.length > 0 && (
-          <ReviewAlert count={pendingExpenses.length} onClick={() => setActiveTab('activity')} />
-        )}
         {!isTreasurer && ownPendingExpenses.length > 0 && (
           <PendingStatusAlert count={ownPendingExpenses.length} onClick={() => setActiveTab('activity')} />
         )}
@@ -185,8 +182,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                     <PendingExpenseCard
                       key={expense.id}
                       expense={expense}
-                      onApprove={() => onAction?.('approveExpense', { expenseId: expense.id })}
-                      onReject={() => onAction?.('rejectExpense', { expenseId: expense.id })}
+                      onApprove={() => onAction?.('approveExpense', { expenseId: expense.id, groupId: d.id })}
+                      onReject={() => onAction?.('rejectExpense', { expenseId: expense.id, groupId: d.id })}
                     />
                   ))}
                 </div>
@@ -1123,33 +1120,6 @@ function PendingExpenseCard({ expense, onApprove, onReject }) {
         </div>
       </div>
     </ListCard>
-  );
-}
-
-function ReviewAlert({ count, onClick }) {
-  return (
-    <button type="button" onClick={onClick} style={{
-      width: '100%',
-      marginTop: 12,
-      padding: '12px 14px',
-      borderRadius: 14,
-      border: '1px solid rgba(245,158,11,0.35)',
-      background: 'rgba(245,158,11,0.10)',
-      color: '#fcd34d',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      fontFamily: 'inherit',
-      cursor: 'pointer',
-      textAlign: 'left',
-    }}>
-      <span style={{ fontSize: 18 }}>⏳</span>
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ display: 'block', fontSize: 12, fontWeight: 900 }}>Cần duyệt · {count} chi tiêu</span>
-        <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Bấm để mở danh sách chờ duyệt</span>
-      </span>
-      <span style={{ color: colors.textMuted, fontSize: 18 }}>›</span>
-    </button>
   );
 }
 

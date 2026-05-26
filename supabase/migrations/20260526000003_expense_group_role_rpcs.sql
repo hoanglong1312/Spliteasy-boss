@@ -499,9 +499,79 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.review_expense_group_expense(
+  p_expense_id uuid,
+  p_group_id uuid,
+  p_status text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions
+AS $$
+DECLARE
+  v_actor_member_id uuid;
+  v_existing record;
+BEGIN
+  IF p_status NOT IN ('approved', 'rejected', 'declined') THEN
+    RETURN jsonb_build_object('error', 'expense_review_status_invalid');
+  END IF;
+
+  SELECT *
+  INTO v_existing
+  FROM public.expenses
+  WHERE id = p_expense_id
+    AND group_id = p_group_id;
+
+  IF v_existing.id IS NULL THEN
+    RETURN jsonb_build_object('error', 'expense_not_found');
+  END IF;
+
+  WITH current_actor AS (
+    SELECT id, profile_id, name
+    FROM public.members
+    WHERE id = public.get_current_member_id()
+      AND is_active IS NOT FALSE
+    LIMIT 1
+  )
+  SELECT m.id
+  INTO v_actor_member_id
+  FROM public.members m
+  JOIN current_actor actor ON (
+    m.id = actor.id
+    OR (actor.profile_id IS NOT NULL AND m.profile_id = actor.profile_id)
+    OR lower(m.name) = lower(actor.name)
+  )
+  WHERE m.group_id = p_group_id
+    AND m.is_active IS NOT FALSE
+    AND m.expense_active IS DISTINCT FROM false
+  ORDER BY (m.id = actor.id) DESC, m.created_at DESC
+  LIMIT 1;
+
+  IF v_actor_member_id IS NULL THEN
+    RETURN jsonb_build_object('error', 'expense_group_actor_not_found');
+  END IF;
+
+  IF NOT public.is_expense_group_admin(p_group_id, v_actor_member_id) THEN
+    RETURN jsonb_build_object('error', 'expense_review_permission_denied');
+  END IF;
+
+  UPDATE public.expenses
+  SET
+    status = p_status,
+    reviewed_by_member_id = v_actor_member_id,
+    reviewed_at = now()
+  WHERE id = p_expense_id
+    AND group_id = p_group_id;
+
+  RETURN jsonb_build_object('id', p_expense_id, 'status', p_status);
+END;
+$$;
+
 GRANT EXECUTE ON FUNCTION public.is_expense_group_admin(uuid, uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.create_group(text, text, text[]) TO anon;
 GRANT EXECUTE ON FUNCTION public.delete_expense_group(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.set_expense_group_member_role(uuid, uuid, text) TO anon;
 GRANT EXECUTE ON FUNCTION public.create_expense_group_expense(uuid, text, numeric, uuid, text, text, date, uuid[], jsonb) TO anon;
 GRANT EXECUTE ON FUNCTION public.update_expense_group_expense(uuid, uuid, text, numeric, uuid, text, text, date, uuid[], jsonb) TO anon;
+GRANT EXECUTE ON FUNCTION public.review_expense_group_expense(uuid, uuid, text) TO anon;
