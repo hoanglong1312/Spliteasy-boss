@@ -383,6 +383,52 @@ test('group detail member balances use payer positive and debtors negative signs
   })
 })
 
+test('group detail exposes monthly total spent and expense count for the summary card', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    members: ['long', 'myt'],
+    expenses: [
+      { id: 'may-1', groupId: 'expense-1', title: 'Ăn tối', amount: 100000, paidBy: 'long', participants: ['long', 'myt'], status: 'approved', date: '2026-05-04' },
+      { id: 'may-2', groupId: 'expense-1', title: 'Cafe', amount: 50000, paidBy: 'myt', participants: ['long', 'myt'], status: 'pending', date: '2026-05-20' },
+      { id: 'june-1', groupId: 'expense-1', title: 'Tháng sau', amount: 900000, paidBy: 'long', participants: ['long'], status: 'approved', date: '2026-06-01' },
+    ],
+  }
+  const members = [
+    { id: 'long', groupId: 'expense-1', name: 'Long', isActive: true },
+    { id: 'myt', groupId: 'expense-1', name: 'Mýt', isActive: true },
+  ]
+
+  const detail = buildGroupDetailData(group, 'long', members, 'Long', '2026-05')
+
+  assert.equal(detail.totalSpent, 150000)
+  assert.equal(detail.expenseCount, 2)
+})
+
+test('group detail assigns stable distinct fallback avatar colors when members have no color', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    members: ['long', 'myt', 'cuong'],
+    expenses: [],
+  }
+  const members = [
+    { id: 'long', profileId: 'profile-long', groupId: 'expense-1', name: 'Long', isActive: true },
+    { id: 'myt', profileId: 'profile-myt', groupId: 'expense-1', name: 'Mýt', isActive: true },
+    { id: 'cuong', profileId: 'profile-cuong', groupId: 'expense-1', name: 'Cường', isActive: true },
+  ]
+
+  const first = buildGroupDetailData(group, 'long', members, 'Long', '2026-05')
+  const second = buildGroupDetailData(group, 'long', members, 'Long', '2026-05')
+  const colors = first.members.map(member => member.color)
+
+  assert.deepEqual(colors, second.members.map(member => member.color))
+  assert.equal(new Set(colors).size, 3)
+  assert.ok(colors.every(color => color.startsWith('linear-gradient(')))
+})
+
 test('group detail exposes pending expenses for treasurer approval', () => {
   const { buildGroupDetailData } = loadScreenDataBuilders()
   const group = {

@@ -53,6 +53,15 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa nhóm \$\{d\.name\}/);
   assert.doesNotMatch(groupDetailSource, /\{ key: 'balances', label: 'Số dư' \}/);
   assert.doesNotMatch(groupDetailSource, /activeTab === 'balances'/);
+  assert.doesNotMatch(groupDetailSource, /d\.balanceLabel/);
+  assert.doesNotMatch(groupDetailSource, /label="Số dư"/);
+  assert.doesNotMatch(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)\}>\s*<span>＋<\/span> Thêm/);
+  assert.match(groupDetailSource, /const heroBalanceLabel = d\.balance > 0 \? 'Bạn cần thu' : d\.balance < 0 \? 'Bạn cần nộp' : 'Bạn đã cân bằng'/);
+  assert.match(groupDetailSource, /<GroupSummaryCard[\s\S]*memberCount=\{d\.memberCount \|\| \(d\.members \|\| \[\]\)\.length\}[\s\S]*expenseCount=\{d\.expenseCount \|\| 0\}[\s\S]*totalSpent=\{d\.totalSpent \|\| 0\}/);
+  assert.match(groupDetailSource, /function GroupSummaryCard/);
+  assert.match(groupDetailSource, /Thành viên/);
+  assert.match(groupDetailSource, /Khoản chi/);
+  assert.match(groupDetailSource, /Tổng chi/);
   assert.match(groupDetailSource, /const \[activeTab, setActiveTab\] = useState\('members'\)/);
   assert.match(groupDetailSource, /items=\{\[\s*\{ key: 'members',\s+label: `Thành viên · \$\{d\.memberCount\}` \},\s*\{ key: 'activity', label: 'Hoạt động' \},\s*\]\}/);
   assert.match(groupDetailSource, /activeTab === 'members'/);
@@ -86,7 +95,7 @@ test('GroupDetail lets group creators manage members without treasurer role', ()
 test('GroupDetail hero balances amount on the right', () => {
   const heroBalanceSource = groupDetailSource.slice(
     groupDetailSource.indexOf('<ModuleHero'),
-    groupDetailSource.indexOf('<StatGrid')
+    groupDetailSource.indexOf('<GroupSummaryCard')
   );
   assert.match(heroBalanceSource, /display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between'/);
   assert.match(heroBalanceSource, /textAlign: 'right'/);

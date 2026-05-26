@@ -5,8 +5,8 @@ import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
-  ModuleHero, ActionButton, SearchInput, SectionHeader, StatGrid, ListCard, BottomSheet,
-  MemberPicker, Stat,
+  ModuleHero, ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
+  MemberPicker,
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
@@ -37,6 +37,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [deleteConfirmExpense, setDeleteConfirmExpense] = useState(null);
   const [memberSearch, setMemberSearch] = useState('');
   const pendingExpenses = d.pendingExpenses || [];
+  const heroBalanceLabel = d.balance > 0 ? 'Bạn cần thu' : d.balance < 0 ? 'Bạn cần nộp' : 'Bạn đã cân bằng';
+  const heroBalanceTone = d.balance < 0 ? colors.danger : d.balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const visibleMembers = (d.members || []).filter(member => {
     const query = normalizeSearch(memberSearch);
     if (!query) return true;
@@ -133,14 +135,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 8 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
-              <div style={{
-                display: 'inline-flex', gap: 6, marginTop: 10, padding: '5px 10px',
-                borderRadius: 100, background: 'rgba(248,113,113,0.18)',
-                border: '1px solid rgba(248,113,113,0.3)', color: '#fca5a5',
-                fontSize: 11, fontWeight: 600,
-              }}>{d.balanceLabel}</div>
+              <div style={{ marginTop: 8, fontSize: 12, fontWeight: 800, color: heroBalanceTone }}>{heroBalanceLabel}</div>
             </div>
-            <div style={{ ...type.amountLg, ...type.mono, textAlign: 'right', lineHeight: 1 }}>{formatVND(d.balance)}</div>
+            <div style={{ ...type.amountLg, ...type.mono, fontSize: 32, textAlign: 'right', lineHeight: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>{formatVND(Math.abs(d.balance || 0))}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
@@ -148,11 +145,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         </ModuleHero>
 
-        <StatGrid style={{ marginTop: 12 }}>
-          <Stat value={d.memberCount || (d.members || []).length} label="Thành viên" accent="groups" />
-          <Stat value={(d.activitiesByWeek || []).reduce((sum, week) => sum + (week.items || []).length, 0)} label="Chi tiêu" color={colors.warning} />
-          <Stat value={formatVND(Math.abs(d.balance || 0))} label="Số dư" color={(d.balance || 0) < 0 ? colors.danger : colors.success} />
-        </StatGrid>
+        <GroupSummaryCard
+          memberCount={d.memberCount || (d.members || []).length}
+          expenseCount={d.expenseCount || 0}
+          totalSpent={d.totalSpent || 0}
+        />
 
         {/* Treasurer actions */}
         {isTreasurer && (
@@ -164,14 +161,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               fontSize: 11, fontWeight: 600, color: '#c7d2fe', cursor: 'pointer',
             }} onClick={() => onAction?.('closeMonth', { groupId: d.id })}>
               <span style={{ fontSize: 14 }}>🔒</span> Chốt sổ tháng
-            </div>
-            <div style={{
-              padding: '11px 12px', borderRadius: 12,
-              background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`,
-              fontSize: 11, fontWeight: 600, color: colors.textSecondary,
-              display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-            }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>
-              <span>＋</span> Thêm
             </div>
           </div>
         )}
@@ -399,6 +388,41 @@ function EmptyState({ title, sub }) {
       <div style={{ fontSize: 13, fontWeight: 800 }}>{title}</div>
       <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 5, lineHeight: 1.45 }}>{sub}</div>
     </Card>
+  );
+}
+
+function GroupSummaryCard({ memberCount, expenseCount, totalSpent }) {
+  return (
+    <Card style={{ marginTop: 12, padding: '13px 14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 0.8fr 1.4fr', gap: 10, alignItems: 'center' }}>
+        <SummaryCell value={memberCount} label="Thành viên" tone={colors.textPrimary} />
+        <SummaryCell value={expenseCount} label="Khoản chi" tone={colors.warning} />
+        <SummaryCell value={formatVND(totalSpent)} label="Tổng chi" tone="#6ee7b7" align="right" />
+      </div>
+    </Card>
+  );
+}
+
+function SummaryCell({ value, label, tone, align = 'left' }) {
+  return (
+    <div style={{ minWidth: 0, textAlign: align }}>
+      <div style={{
+        fontSize: align === 'right' ? 18 : 16,
+        fontWeight: 900,
+        color: tone,
+        lineHeight: 1.05,
+        whiteSpace: 'nowrap',
+        ...type.mono,
+      }}>{value}</div>
+      <div style={{
+        marginTop: 5,
+        fontSize: 9,
+        fontWeight: 900,
+        letterSpacing: '1.1px',
+        textTransform: 'uppercase',
+        color: colors.textSecondary,
+      }}>{label}</div>
+    </div>
   );
 }
 

@@ -10,6 +10,20 @@ import {
 
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 const WEEKDAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+const FALLBACK_AVATAR_COLORS = [
+  'linear-gradient(135deg, #6366f1, #8b5cf6)',
+  'linear-gradient(135deg, #34d399, #10b981)',
+  'linear-gradient(135deg, #f59e0b, #d97706)',
+  'linear-gradient(135deg, #f87171, #dc2626)',
+  'linear-gradient(135deg, #a78bfa, #7c3aed)',
+  'linear-gradient(135deg, #ec4899, #be185d)',
+  'linear-gradient(135deg, #14b8a6, #0f766e)',
+  'linear-gradient(135deg, #38bdf8, #2563eb)',
+  'linear-gradient(135deg, #fb7185, #be123c)',
+  'linear-gradient(135deg, #facc15, #ca8a04)',
+  'linear-gradient(135deg, #c084fc, #9333ea)',
+  'linear-gradient(135deg, #2dd4bf, #0891b2)',
+]
 
 function profilePhotoStorageKey(memberId) {
   return `spliteasy_profile_photo_${memberId || 'me'}`
@@ -400,6 +414,21 @@ function isMemberGroupCreator(group, member) {
   )
 }
 
+function memberDisplayColor(member) {
+  if (member?.color) return member.color
+  const key = String(member?.profileId || member?.profile_id || member?.id || member?.name || '')
+  return FALLBACK_AVATAR_COLORS[stableHash(key) % FALLBACK_AVATAR_COLORS.length]
+}
+
+function stableHash(value) {
+  let hash = 2166136261
+  for (const char of String(value || 'member')) {
+    hash ^= char.charCodeAt(0)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
 function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = []) {
   const g = safeGroup(group)
   const monthDate = dateFromYearMonth(selectedYearMonth)
@@ -421,6 +450,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
     .slice(0, 20)
     .map(expense => toActivity(expense, members))
+  const monthlyExpenses = safeArray(monthlyGroup.expenses)
+  const totalSpent = monthlyExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
   const pendingExpenses = safeArray(monthlyGroup.expenses)
     .filter(expense => expense.status === 'pending')
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -446,6 +477,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     isGroupCreator,
     isTreasurer: isGroupTreasurer,
     memberCount: groupMembers.length,
+    expenseCount: monthlyExpenses.length,
+    totalSpent,
     balance,
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
     currentMemberId: currentGroupMember?.id || null,
@@ -463,7 +496,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         currentYearMonth: monthKey(monthDate),
         name: member.displayName || member.name,
         initials: initials(member),
-        color: member.color || '#6366f1',
+        color: memberDisplayColor(member),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
         bankName: member.bankName || member.bank_name || '',
@@ -482,7 +515,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         id: member.id,
         name: member.displayName || member.name,
         initials: initials(member),
-        color: member.color || '#6366f1',
+        color: memberDisplayColor(member),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
         amount: memberBalanceMap[member.id] || 0,
