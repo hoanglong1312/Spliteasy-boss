@@ -77,7 +77,7 @@ test('primary money screens share hero, search, section, and list primitives', (
   assert.match(groupsListSource, /ListCard/)
 
   assert.match(groupDetailSource, /ModuleHero/)
-  assert.match(groupDetailSource, /GroupSummaryCard/)
+  assert.match(groupDetailSource, /SummaryChipRow/)
   assert.match(groupDetailSource, /SearchInput/)
   assert.match(groupDetailSource, /ListCard/)
 })

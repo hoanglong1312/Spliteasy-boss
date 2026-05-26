@@ -57,8 +57,10 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.doesNotMatch(groupDetailSource, /label="Số dư"/);
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)\}>\s*<span>＋<\/span> Thêm/);
   assert.match(groupDetailSource, /const heroBalanceLabel = d\.balance > 0 \? 'Bạn cần thu' : d\.balance < 0 \? 'Bạn cần nộp' : 'Bạn đã cân bằng'/);
-  assert.match(groupDetailSource, /<GroupSummaryCard[\s\S]*memberCount=\{d\.memberCount \|\| \(d\.members \|\| \[\]\)\.length\}[\s\S]*expenseCount=\{d\.expenseCount \|\| 0\}[\s\S]*totalSpent=\{d\.totalSpent \|\| 0\}/);
-  assert.match(groupDetailSource, /function GroupSummaryCard/);
+  assert.match(groupDetailSource, /<SummaryChipRow[\s\S]*memberCount=\{d\.memberCount \|\| \(d\.members \|\| \[\]\)\.length\}[\s\S]*expenseCount=\{d\.expenseCount \|\| 0\}[\s\S]*totalSpent=\{d\.totalSpent \|\| 0\}/);
+  assert.match(groupDetailSource, /function SummaryChipRow/);
+  assert.doesNotMatch(groupDetailSource, /<GroupSummaryCard/);
+  assert.doesNotMatch(groupDetailSource, /function GroupSummaryCard/);
   assert.match(groupDetailSource, /Thành viên/);
   assert.match(groupDetailSource, /Khoản chi/);
   assert.match(groupDetailSource, /Tổng chi/);
@@ -95,10 +97,11 @@ test('GroupDetail lets group creators manage members without treasurer role', ()
 test('GroupDetail hero balances amount on the right', () => {
   const heroBalanceSource = groupDetailSource.slice(
     groupDetailSource.indexOf('<ModuleHero'),
-    groupDetailSource.indexOf('<GroupSummaryCard')
+    groupDetailSource.indexOf('{/* Treasurer actions */}')
   );
   assert.match(heroBalanceSource, /display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between'/);
   assert.match(heroBalanceSource, /textAlign: 'right'/);
+  assert.match(heroBalanceSource, /<SummaryChipRow/);
 });
 
 test('GroupDetail edit sheet uses an icon picker and saves group description', () => {

@@ -118,7 +118,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           tone="groups"
           eyebrow="CHI TIÊU NHÓM"
           title={d.name}
-          subtitle={`${d.memberCount || (d.members || []).length} thành viên · ${d.monthLabel || 'Tháng này'}`}
+          subtitle={d.monthLabel || 'Tháng này'}
           action={<div style={{
             width: 46,
             height: 46,
@@ -132,6 +132,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           }}>{d.emoji || '👥'}</div>}
           style={{ cursor: 'pointer' }}
         >
+          <SummaryChipRow
+            memberCount={d.memberCount || (d.members || []).length}
+            expenseCount={d.expenseCount || 0}
+            totalSpent={d.totalSpent || 0}
+          />
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 8 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
@@ -144,12 +149,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
           </div>
         </ModuleHero>
-
-        <GroupSummaryCard
-          memberCount={d.memberCount || (d.members || []).length}
-          expenseCount={d.expenseCount || 0}
-          totalSpent={d.totalSpent || 0}
-        />
 
         {/* Treasurer actions */}
         {isTreasurer && (
@@ -391,23 +390,32 @@ function EmptyState({ title, sub }) {
   );
 }
 
-function GroupSummaryCard({ memberCount, expenseCount, totalSpent }) {
+function SummaryChipRow({ memberCount, expenseCount, totalSpent }) {
   return (
-    <Card style={{ marginTop: 12, padding: '13px 14px' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '0.8fr 0.8fr 1.4fr', gap: 10, alignItems: 'center' }}>
-        <SummaryCell value={memberCount} label="Thành viên" tone={colors.textPrimary} />
-        <SummaryCell value={expenseCount} label="Khoản chi" tone={colors.warning} />
-        <SummaryCell value={formatVND(totalSpent)} label="Tổng chi" tone="#6ee7b7" align="right" />
-      </div>
-    </Card>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', marginTop: 10 }}>
+      <SummaryChip value={memberCount} label="Thành viên" tone={colors.textPrimary} />
+      <SummaryChip value={expenseCount} label="Khoản chi" tone={colors.warning} />
+      <SummaryChip value={formatVND(totalSpent)} label="Tổng chi" tone="#6ee7b7" wide />
+    </div>
   );
 }
 
-function SummaryCell({ value, label, tone, align = 'left' }) {
+function SummaryChip({ value, label, tone, wide = false }) {
   return (
-    <div style={{ minWidth: 0, textAlign: align }}>
+    <div style={{
+      flex: wide ? '1 1 auto' : '0 0 auto',
+      minWidth: 0,
+      display: 'flex',
+      alignItems: 'baseline',
+      justifyContent: wide ? 'flex-end' : 'flex-start',
+      gap: 4,
+      padding: '5px 7px',
+      borderRadius: 999,
+      background: 'rgba(255,255,255,0.08)',
+      border: '1px solid rgba(255,255,255,0.10)',
+    }}>
       <div style={{
-        fontSize: align === 'right' ? 18 : 16,
+        fontSize: wide ? 12 : 11,
         fontWeight: 900,
         color: tone,
         lineHeight: 1.05,
@@ -415,12 +423,12 @@ function SummaryCell({ value, label, tone, align = 'left' }) {
         ...type.mono,
       }}>{value}</div>
       <div style={{
-        marginTop: 5,
-        fontSize: 9,
+        fontSize: 7,
         fontWeight: 900,
-        letterSpacing: '1.1px',
+        letterSpacing: '0.6px',
         textTransform: 'uppercase',
-        color: colors.textSecondary,
+        color: 'rgba(226,232,240,0.72)',
+        whiteSpace: 'nowrap',
       }}>{label}</div>
     </div>
   );
