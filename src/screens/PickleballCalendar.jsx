@@ -20,7 +20,7 @@ const CELL_STATE = {
   upcoming: { bg: 'rgba(255,255,255,0.02)', border: 'rgba(99,102,241,0.35)', dashed: true, color: colors.brandLight },
   moved:    { bg: 'rgba(255,255,255,0.02)', border: 'transparent',                color: '#334155', lineThrough: true },
   ticket:   { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.38)',       color: '#fde68a' },
-  ticketOther: { bg: 'rgba(251,191,36,0.055)', border: 'rgba(251,191,36,0.18)',    color: '#fef3c7' },
+  ticketOther: { bg: 'rgba(255,255,255,0.02)', border: 'rgba(251,191,36,0.48)', dashed: true, color: '#fcd34d' },
 };
 
 const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8', ticket: '#fbbf24', ticketOther: 'rgba(251,191,36,0.55)' };
@@ -80,7 +80,8 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
           <LegendChip color="rgba(52,211,153,0.55)" label="Đã đánh" />
           <LegendChip color="rgba(248,113,113,0.55)" label="Vắng" />
           <LegendChip dashed label="Sắp tới" />
-          <LegendChip color="rgba(251,191,36,0.75)" label="Vé lẻ" />
+          <LegendChip color="rgba(251,191,36,0.75)" label="Vé của tôi" />
+          <LegendChip dashed borderColor="rgba(251,191,36,0.75)" label="Vé khác" />
         </div>
 
         {/* Calendar */}
@@ -168,13 +169,13 @@ function nextDateInputValue(value) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function LegendChip({ color, label, dashed }) {
+function LegendChip({ color, label, dashed, borderColor }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
       <span style={{
         width: 8, height: 8, borderRadius: 2,
         background: color || 'transparent',
-        border: dashed ? '1px dashed rgba(99,102,241,0.55)' : 'none',
+        border: dashed ? `1px dashed ${borderColor || 'rgba(99,102,241,0.55)'}` : 'none',
       }} />
       {label}
     </span>

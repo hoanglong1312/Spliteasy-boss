@@ -620,6 +620,13 @@ test('calendar attendance chips use compact 34px avatar-style green and grey sta
   assert.doesNotMatch(calendarSource, /memberType: a\.memberType/)
 })
 
+test('calendar legend and ticket styles distinguish my tickets from other tickets', () => {
+  assert.match(calendarSource, /ticket:\s+\{ bg: 'rgba\(251,191,36,0\.12\)'/)
+  assert.match(calendarSource, /ticketOther:\s+\{ bg: 'rgba\(255,255,255,0\.02\)'[\s\S]*?dashed: true[\s\S]*?color: '#fcd34d'/)
+  assert.match(calendarSource, /label="Vé của tôi"/)
+  assert.match(calendarSource, /borderColor="rgba\(251,191,36,0\.75\)" label="Vé khác"/)
+})
+
 test('calendar disambiguates attendance chips when fixed members share a first name', () => {
   const { buildPickleballCalendarData } = loadScreenDataBuilders()
   const state = {
