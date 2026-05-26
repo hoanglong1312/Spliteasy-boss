@@ -99,9 +99,21 @@ test('GroupDetail hero balances amount on the right', () => {
     groupDetailSource.indexOf('<ModuleHero'),
     groupDetailSource.indexOf('{/* Treasurer actions */}')
   );
-  assert.match(heroBalanceSource, /display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between'/);
-  assert.match(heroBalanceSource, /textAlign: 'right'/);
+  assert.match(heroBalanceSource, /<HeroBalancePanel label=\{heroBalanceLabel\} balance=\{d\.balance \|\| 0\} tone=\{heroBalanceTone\} \/>/);
   assert.match(heroBalanceSource, /<SummaryChipRow/);
+});
+
+test('GroupDetail hero stats and personal balance avoid mobile overflow', () => {
+  const summarySource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function SummaryChipRow'),
+    groupDetailSource.indexOf('function MemberRow')
+  );
+  assert.match(summarySource, /display: 'grid'/);
+  assert.match(summarySource, /gridTemplateColumns: 'repeat\(3, minmax\(0, 1fr\)\)'/);
+  assert.match(summarySource, /overflowWrap: 'anywhere'/);
+  assert.match(summarySource, /function HeroBalancePanel\(\{ label, balance, tone \}\)/);
+  assert.match(summarySource, /SỐ DƯ CỦA BẠN/);
+  assert.match(summarySource, /formatVND\(Math\.abs\(balance \|\| 0\)\)/);
 });
 
 test('GroupDetail edit sheet uses an icon picker and saves group description', () => {

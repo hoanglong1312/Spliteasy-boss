@@ -138,13 +138,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             expenseCount={d.expenseCount || 0}
             totalSpent={d.totalSpent || 0}
           />
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginTop: 8 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
-              <div style={{ marginTop: 8, fontSize: 12, fontWeight: 800, color: heroBalanceTone }}>{heroBalanceLabel}</div>
-            </div>
-            <div style={{ ...type.amountLg, ...type.mono, fontSize: 32, textAlign: 'right', lineHeight: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>{formatVND(Math.abs(d.balance || 0))}</div>
-          </div>
+          <HeroBalancePanel label={heroBalanceLabel} balance={d.balance || 0} tone={heroBalanceTone} />
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
@@ -396,34 +390,33 @@ function EmptyState({ title, sub }) {
 
 function SummaryChipRow({ memberCount, expenseCount, totalSpent }) {
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'nowrap', marginTop: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 7, marginTop: 12 }}>
       <SummaryChip value={memberCount} label="Thành viên" tone={colors.textPrimary} />
       <SummaryChip value={expenseCount} label="Khoản chi" tone={colors.warning} />
-      <SummaryChip value={formatVND(totalSpent)} label="Tổng chi" tone="#6ee7b7" wide />
+      <SummaryChip value={formatVND(totalSpent)} label="Tổng chi" tone="#6ee7b7" />
     </div>
   );
 }
 
-function SummaryChip({ value, label, tone, wide = false }) {
+function SummaryChip({ value, label, tone }) {
   return (
     <div style={{
-      flex: wide ? '1 1 auto' : '0 0 auto',
       minWidth: 0,
       display: 'flex',
-      alignItems: 'baseline',
-      justifyContent: wide ? 'flex-end' : 'flex-start',
-      gap: 4,
-      padding: '5px 7px',
-      borderRadius: 999,
+      flexDirection: 'column',
+      justifyContent: 'center',
+      gap: 3,
+      padding: '8px 7px',
+      borderRadius: 10,
       background: 'rgba(255,255,255,0.08)',
       border: '1px solid rgba(255,255,255,0.10)',
     }}>
       <div style={{
-        fontSize: wide ? 12 : 11,
+        fontSize: 12,
         fontWeight: 900,
         color: tone,
         lineHeight: 1.05,
-        whiteSpace: 'nowrap',
+        overflowWrap: 'anywhere',
         ...type.mono,
       }}>{value}</div>
       <div style={{
@@ -434,6 +427,30 @@ function SummaryChip({ value, label, tone, wide = false }) {
         color: 'rgba(226,232,240,0.72)',
         whiteSpace: 'nowrap',
       }}>{label}</div>
+    </div>
+  );
+}
+
+function HeroBalancePanel({ label, balance, tone }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1fr) minmax(112px, auto)',
+      alignItems: 'end',
+      gap: 12,
+      marginTop: 10,
+      padding: '12px 12px',
+      borderRadius: 14,
+      background: 'rgba(15,23,42,0.22)',
+      border: '1px solid rgba(255,255,255,0.14)',
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
+        <div style={{ marginTop: 7, fontSize: 12, fontWeight: 800, color: tone }}>{label}</div>
+      </div>
+      <div style={{ ...type.amountLg, ...type.mono, fontSize: 27, textAlign: 'right', lineHeight: 1.05, overflowWrap: 'anywhere', minWidth: 0 }}>
+        {formatVND(Math.abs(balance || 0))}
+      </div>
     </div>
   );
 }
