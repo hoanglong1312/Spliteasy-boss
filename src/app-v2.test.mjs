@@ -219,9 +219,13 @@ test('GroupDetail renders expense action menu and pending approval UI', () => {
   const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
 
   assert.match(groupDetailSource, /pendingExpenses = d\.pendingExpenses \|\| \[\]/)
+  assert.match(groupDetailSource, /ownPendingExpenses = pendingExpenses\.filter\(expense => String\(expense\.submittedBy \|\| ''\) === String\(d\.currentMemberId \|\| ''\)\)/)
   assert.match(groupDetailSource, /CHỜ DUYỆT · \{pendingExpenses\.length\}/)
   assert.match(groupDetailSource, /ReviewAlert/)
   assert.match(groupDetailSource, /Cần duyệt/)
+  assert.match(groupDetailSource, /PendingStatusAlert/)
+  assert.match(groupDetailSource, /Đang chờ duyệt/)
+  assert.match(groupDetailSource, /!isTreasurer && ownPendingExpenses\.length > 0/)
   assert.match(groupDetailSource, /setActiveTab\('activity'\)/)
   assert.match(groupDetailSource, /function PendingExpenseCard\(\{ expense, onApprove, onReject \}\)/)
   assert.match(groupDetailSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id \}\)/)

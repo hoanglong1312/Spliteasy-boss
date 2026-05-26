@@ -37,6 +37,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [deleteConfirmExpense, setDeleteConfirmExpense] = useState(null);
   const [memberSearch, setMemberSearch] = useState('');
   const pendingExpenses = d.pendingExpenses || [];
+  const ownPendingExpenses = pendingExpenses.filter(expense => String(expense.submittedBy || '') === String(d.currentMemberId || ''));
   const heroBalanceLabel = d.balance > 0 ? 'Bạn cần thu' : d.balance < 0 ? 'Bạn cần nộp' : 'Bạn đã cân bằng';
   const heroBalanceTone = d.balance < 0 ? colors.danger : d.balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const visibleMembers = (d.members || []).filter(member => {
@@ -166,6 +167,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         {isTreasurer && pendingExpenses.length > 0 && (
           <ReviewAlert count={pendingExpenses.length} onClick={() => setActiveTab('activity')} />
+        )}
+        {!isTreasurer && ownPendingExpenses.length > 0 && (
+          <PendingStatusAlert count={ownPendingExpenses.length} onClick={() => setActiveTab('activity')} />
         )}
 
         <SubTabs
@@ -1126,6 +1130,33 @@ function ReviewAlert({ count, onClick }) {
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 12, fontWeight: 900 }}>Cần duyệt · {count} chi tiêu</span>
         <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Bấm để mở danh sách chờ duyệt</span>
+      </span>
+      <span style={{ color: colors.textMuted, fontSize: 18 }}>›</span>
+    </button>
+  );
+}
+
+function PendingStatusAlert({ count, onClick }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      width: '100%',
+      marginTop: 12,
+      padding: '12px 14px',
+      borderRadius: 14,
+      border: '1px solid rgba(245,158,11,0.35)',
+      background: 'rgba(245,158,11,0.10)',
+      color: '#fcd34d',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      fontFamily: 'inherit',
+      cursor: 'pointer',
+      textAlign: 'left',
+    }}>
+      <span style={{ fontSize: 18 }}>⏳</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 12, fontWeight: 900 }}>Đang chờ duyệt · {count} chi tiêu</span>
+        <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Thủ quỹ sẽ duyệt trước khi tính vào số dư nhóm</span>
       </span>
       <span style={{ color: colors.textMuted, fontSize: 18 }}>›</span>
     </button>
