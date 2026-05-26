@@ -130,6 +130,39 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   ]))
 })
 
+test('overview resolves same-profile current user to pickleball member before reading tickets', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'cuong-expense',
+    currentUserName: 'Cường',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'Virgo Pickleball 246', members: ['minh-pickle', 'cuong-pickle'] },
+    members: [
+      { id: 'cuong-expense', groupId: 'expense-1', name: 'Cường', memberType: 'fixed', isActive: true, profileId: 'profile-cuong' },
+      { id: 'minh-pickle', groupId: 'g1', name: 'Minh Em', memberType: 'fixed', isActive: true, profileId: 'profile-minh' },
+      { id: 'cuong-pickle', groupId: 'g1', name: 'Cường', memberType: 'fixed', isActive: true, profileId: 'profile-cuong' },
+    ],
+    pickle: {
+      fixedMembers: ['minh-pickle', 'cuong-pickle'],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 0 }],
+      sessions: [],
+      externalTickets: [
+        { id: 'ticket-16', groupId: 'g1', yearMonth: '2026-05', date: '2026-05-16', status: 'unpaid', totalAmount: 100000, memberIds: ['minh-pickle', 'cuong-pickle'], advancerId: 'minh-pickle' },
+      ],
+    },
+    _allPickle: { externalTickets: [] },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'cuong-expense', state.members, '2026-05')
+
+  assert.equal(data.yourBalance.name, 'Cường')
+  assert.equal(data.yourTickets.summary.sessionCount, 1)
+  assert.equal(data.yourTickets.summary.displayAdjustment, -50000)
+  assert.deepEqual(JSON.parse(JSON.stringify(data.yourTickets.rows.map(row => [row.dateLabel, row.sourceLabel, row.roleLabel, row.displayAmount]))), [
+    ['T7 16/05', 'Minh Em ứng', 'Bạn tham gia', -50000],
+  ])
+})
+
 test('team fund tracks venue bank info and owner payment history', () => {
   const { buildPickleballOverviewData } = loadScreenDataBuilders()
   const state = {

@@ -771,15 +771,16 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
-  const p2pTicketBalance = memberTicketBalance(state, currentUserId)
-  const teamFundTicketShare = memberTeamFundTicketShare(state, currentUserId)
+  const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
+  const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId)
+  const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
   const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
   const teamFundOverview = buildPickleballTeamFundData(state)
-  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentUserId)
-  const breakdown = buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, ticketAmount, memberBalance)
-  const currentMember = members.find(member => String(member.id || member.member_id) === String(currentUserId))
+  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentPickleballMemberId)
+  const breakdown = buildPickleBreakdown(pickle, monthSessions, currentPickleballMemberId, summary, ticketAmount, memberBalance)
+  const currentMember = members.find(member => String(member.id || member.member_id) === String(currentPickleballMemberId))
   const ticketAdjustment = -ticketAmount
 
   return {
@@ -812,7 +813,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment),
       breakdown,
     },
-    yourTickets: buildPersonalTicketOverview(state, currentUserId),
+    yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId),
     ticketStats,
     ticketFund,
     teamFundOverview,
