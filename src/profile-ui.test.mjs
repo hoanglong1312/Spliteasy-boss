@@ -47,6 +47,16 @@ test('Avatar primitive and member screens render uploaded member photos', () => 
   assert.match(memberDetailSource, /photoUrl=\{d\.photoUrl\}/)
 })
 
+test('Profile shows the delete-photo action as a hover X on the avatar', () => {
+  assert.match(profileSource, /const \[avatarHover, setAvatarHover\]/)
+  assert.match(profileSource, /onMouseEnter=\{\(\) => setAvatarHover\(true\)\}/)
+  assert.match(profileSource, /onMouseLeave=\{\(\) => setAvatarHover\(false\)\}/)
+  assert.match(profileSource, /aria-label="Xóa ảnh đại diện"/)
+  assert.match(profileSource, /currentPhotoUrl && \(/)
+  assert.match(profileSource, /color: '#fecaca'/)
+  assert.doesNotMatch(profileSource, />Xóa ảnh<\/button>/)
+})
+
 test('GroupDetail keeps treasurer pill inline with the member name', () => {
   const memberRowSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberRow'),

@@ -12,6 +12,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const fileInputRef = useRef(null);
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(d.user.photoUrl || '');
+  const [avatarHover, setAvatarHover] = useState(false);
 
   useEffect(() => {
     setCurrentPhotoUrl(d.user.photoUrl || '');
@@ -47,7 +48,13 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
 
         {/* Avatar hero */}
         <Hero variant="violet" style={{ textAlign: 'center', padding: '24px 20px' }}>
-          <div style={{ position: 'relative', display: 'inline-block' }}>
+          <div
+            onMouseEnter={() => setAvatarHover(true)}
+            onMouseLeave={() => setAvatarHover(false)}
+            onFocus={() => setAvatarHover(true)}
+            onBlur={() => setAvatarHover(false)}
+            style={{ position: 'relative', display: 'inline-block' }}
+          >
             <div style={{
               width: 88, height: 88, borderRadius: '50%',
               background: currentPhotoUrl ? colors.shellBg : d.user.color,
@@ -79,24 +86,40 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 13, cursor: 'pointer',
             }}>📷</button>
+            {currentPhotoUrl && (
+              <button
+                type="button"
+                aria-label="Xóa ảnh đại diện"
+                onClick={clearPhoto}
+                style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  border: '1px solid rgba(254,202,202,0.75)',
+                  background: 'rgba(127,29,29,0.95)',
+                  color: '#fecaca',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 16,
+                  fontWeight: 900,
+                  fontFamily: 'inherit',
+                  lineHeight: 1,
+                  boxShadow: '0 8px 18px rgba(127,29,29,0.35)',
+                  cursor: 'pointer',
+                  opacity: avatarHover ? 1 : 0,
+                  transform: avatarHover ? 'scale(1)' : 'scale(0.82)',
+                  transition: 'opacity 140ms ease, transform 140ms ease',
+                  pointerEvents: avatarHover ? 'auto' : 'none',
+                }}
+              >
+                ×
+              </button>
+            )}
           </div>
-          {currentPhotoUrl && (
-            <button type="button" onClick={clearPhoto} style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: 10,
-              padding: '7px 12px',
-              borderRadius: 999,
-              border: '1px solid rgba(255,255,255,0.18)',
-              background: 'rgba(7,8,15,0.26)',
-              color: '#e2e8f0',
-              fontSize: 11,
-              fontWeight: 800,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-            }}>Xóa ảnh</button>
-          )}
           <div style={{ fontSize: 20, fontWeight: 800, marginTop: 14, letterSpacing: '-0.3px' }}>{d.user.name}</div>
           <div style={{ fontSize: 12, color: '#c4b5fd', fontWeight: 500 }}>{d.user.email}</div>
           {isTreasurer && (
