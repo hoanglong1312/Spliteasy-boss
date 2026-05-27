@@ -8,7 +8,7 @@ import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, Sect
 
 export default function JoinGroup({ data, onAction }) {
   const d = data || DEMO;
-  const [code, setCode] = useState(d.code || '');
+  const [code, setCode] = useState(d.joinCode || d.code || '');
   const [selected, setSelected] = useState(d.selectedName);
   const [newName, setNewName] = useState('');
   const [joining, setJoining] = useState(false);

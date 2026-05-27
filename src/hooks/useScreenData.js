@@ -567,6 +567,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     monthLabel: formatMonthLabel(monthDate),
     currentYearMonth: monthKey(monthDate),
     createdBy: g.createdBy || g.created_by || null,
+    inviteCode: g.inviteCode || g.invite_code || '',
+    invite_code: g.inviteCode || g.invite_code || '',
     isPickleball: groupKind(g) === 'pickleball',
     isGroupCreator,
     isTreasurer: isGroupTreasurer,

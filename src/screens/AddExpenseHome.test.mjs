@@ -54,15 +54,17 @@ test('AddExpense uses scroll date picker and supports receipt image previews', (
 });
 
 test('GroupDetail menu, balances, and members tabs render real group data', () => {
-  assert.match(groupDetailSource, /const \[menuOpen, setMenuOpen\] = useState\(false\)/);
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /onAction\?\.\('settle', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /<GroupManagementPanel/);
+  assert.match(groupDetailSource, /inviteCode=\{d\.inviteCode\}/);
   assert.match(groupDetailSource, /Sửa thông tin nhóm/);
   assert.match(groupDetailSource, /Chia sẻ link mời/);
   assert.match(groupDetailSource, /Mã mời thủ công/);
   assert.match(groupDetailSource, /Xóa nhóm/);
+  assert.doesNotMatch(groupDetailSource, /setMenuOpen/);
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
-  assert.match(groupDetailSource, /onAction\?\.\('createGroupInviteShare', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /onShare=\{\(\) => onAction\?\.\('createGroupInviteShare', \{ groupId: d\.id, inviteCode: d\.inviteCode \}\)\}/);
   assert.match(groupDetailSource, /action=\{<div[\s\S]*\{d\.emoji \|\| '👥'\}/);
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /const \[deleteConfirmGroup, setDeleteConfirmGroup\] = useState\(false\)/);

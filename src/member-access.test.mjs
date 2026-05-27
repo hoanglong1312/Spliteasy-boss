@@ -33,12 +33,15 @@ test('recent member sessions keep resumable tokens and collapse duplicate identi
 test('AppV2 consumes member access links and passes recent sessions to JoinGroup', () => {
   assert.match(appSource, /accessTokenFromLocation\(\)/)
   assert.match(appSource, /inviteTokenFromLocation\(\)/)
+  assert.match(appSource, /joinCodeFromLocation\(\)/)
   assert.match(appSource, /\.rpc\('consume_member_access_link'/)
   assert.match(appSource, /dispatch\(\{[\s\S]*type: 'LOGIN'[\s\S]*token: data\.authToken/)
   assert.match(appSource, /window\.history\.replaceState\(null, '', window\.location\.pathname\)/)
   assert.match(appSource, /getRecentSessions\(\)/)
   assert.match(appSource, /recentSessions: getRecentSessions\(\)/)
   assert.match(appSource, /inviteToken: groupInviteToken/)
+  assert.match(appSource, /joinCode: groupJoinCode/)
+  assert.match(appSource, /if \(groupJoinCode\)/)
   assert.match(appSource, /accessLinkError/)
 })
 
@@ -68,6 +71,7 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.match(joinGroupSource, /requestJoinByInviteLink/)
   assert.match(joinGroupSource, /const recentSessions = d\.recentSessions \|\| \[\]/)
   assert.match(joinGroupSource, /const inviteToken = d\.inviteToken \|\| ''/)
+  assert.match(joinGroupSource, /useState\(d\.joinCode \|\| d\.code \|\| ''\)/)
   assert.match(joinGroupSource, /Vào lại tài khoản gần đây/)
   assert.match(joinGroupSource, /onAction\?\.\('resumeRecentSession'/)
   assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
@@ -95,7 +99,7 @@ test('JoinGroup allows existing members with a manual invite code but blocks inv
   assert.doesNotMatch(joinGroupSource, /if \(selected && !newName\)/)
 })
 
-test('member detail and group menu expose app-login and group-invite share links', () => {
+test('member detail and group surface expose personal and group invite links', () => {
   assert.match(groupDetailSource, /ensureMemberBillShare/)
   assert.match(groupDetailSource, /LINK CÁ NHÂN/)
   assert.match(groupDetailSource, /Sao chép/)
@@ -104,6 +108,9 @@ test('member detail and group menu expose app-login and group-invite share links
   assert.match(groupDetailSource, /Tùy chọn khác/)
   assert.match(groupDetailSource, /createGroupInviteShare/)
   assert.match(groupDetailSource, /Chia sẻ link mời/)
+  assert.match(groupDetailSource, /<GroupManagementPanel/)
+  assert.match(groupDetailSource, /Mã mời thủ công/)
+  assert.doesNotMatch(groupDetailSource, /setMenuOpen/)
 })
 
 test('member bill link opens the member home first and keeps bill as fallback', () => {
@@ -124,6 +131,15 @@ test('member bill link opens the member home first and keeps bill as fallback', 
   assert.match(billShareSource, /bill\.groupName/)
   assert.match(billShareSource, /bill\.memberName/)
   assert.doesNotMatch(appSource, /p_purpose: 'member_login'[\s\S]*createMemberAccessLink/)
+})
+
+test('group share link opens JoinGroup with the manual invite code filled', () => {
+  assert.match(appSource, /function joinCodeFromLocation\(\)/)
+  assert.match(appSource, /params\.get\('join'\)/)
+  assert.match(appSource, /const url = `\$\{window\.location\.origin\}\$\{window\.location\.pathname\}\?join=\$\{encodeURIComponent\(inviteCode\)\}`/)
+  assert.match(appSource, /joinCode: groupJoinCode/)
+  assert.doesNotMatch(appSource, /create_group_invite_link[\s\S]*if \(type === 'createGroupInviteShare'\)/)
+  assert.match(joinGroupSource, /useState\(d\.joinCode \|\| d\.code \|\| ''\)/)
 })
 
 test('member bill share rpc can read member access link bill tokens', () => {

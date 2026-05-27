@@ -107,11 +107,18 @@ function inviteTokenFromLocation() {
   return params.get('invite') || ''
 }
 
+function joinCodeFromLocation() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  return (params.get('join') || '').trim().toUpperCase()
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const [publicBillToken, setPublicBillToken] = useState(() => publicBillTokenFromLocation())
   const [memberAccessToken] = useState(() => accessTokenFromLocation())
   const [groupInviteToken] = useState(() => inviteTokenFromLocation())
+  const [groupJoinCode] = useState(() => joinCodeFromLocation())
   const [publicBillData, setPublicBillData] = useState(null)
   const [publicBillLoading, setPublicBillLoading] = useState(Boolean(publicBillToken))
   const [accessLinkLoading, setAccessLinkLoading] = useState(Boolean(memberAccessToken))
@@ -1065,19 +1072,12 @@ export default function AppV2() {
     }
 
     if (type === 'createGroupInviteShare') {
-      const { token } = getStoredAuth()
-      if (!token) return
-      const sb = createSupabase(token)
-      const { data, error } = await sb.rpc('create_group_invite_link', {
-        p_group_id: payload?.groupId || state.currentGroupId,
-      })
-      if (error || data?.error) {
-        console.error('[app] createGroupInviteShare:', error || data)
-        dispatch({ type: 'SHOW_TOAST', message: 'Không tạo được link mời.' })
+      const inviteCode = String(payload?.inviteCode || payload?.invite_code || state.currentGroup?.inviteCode || state.currentGroup?.invite_code || '').trim().toUpperCase()
+      if (!inviteCode) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Nhóm chưa có mã mời.' })
         return
       }
-      const inviteToken = data?.urlToken || data?.token || data
-      const url = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(inviteToken)}`
+      const url = `${window.location.origin}${window.location.pathname}?join=${encodeURIComponent(inviteCode)}`
       if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
       dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link mời nhóm.' })
       return
@@ -1708,10 +1708,18 @@ export default function AppV2() {
     )
   }
 
+  if (groupJoinCode) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
+      </div>
+    )
+  }
+
   if (!state.currentUserId) {
     return (
       <div style={{ minHeight: '100vh', background: '#07080f' }}>
-        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, accessLinkError }} onAction={handle} />
+        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
       </div>
     )
   }

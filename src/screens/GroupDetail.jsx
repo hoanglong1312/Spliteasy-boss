@@ -31,7 +31,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const canManageMembers = Boolean(isTreasurer || d.isGroupCreator);
   const canAddMembers = true;
   const [activeTab, setActiveTab] = useState('members');
-  const [menuOpen, setMenuOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
@@ -107,25 +106,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: colors.textMuted, textTransform: 'uppercase' }}>NHÓM</div>
             <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{d.name}</div>
           </div>
-          <div style={{ position: 'relative' }}>
-            <IconButton onClick={() => setMenuOpen(open => !open)}>⋯</IconButton>
-            {menuOpen && (
-              <Card style={{
-                position: 'absolute',
-                right: 0,
-                top: 58,
-                width: 190,
-                padding: 8,
-                zIndex: 20,
-                boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
-              }}>
-                <MenuItem onClick={() => { setMenuOpen(false); setEditingGroup(true); }}>Sửa thông tin nhóm</MenuItem>
-                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('createGroupInviteShare', { groupId: d.id }); }}>Chia sẻ link mời</MenuItem>
-                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('join', { groupId: d.id }); }}>Mã mời thủ công</MenuItem>
-                {isTreasurer && <MenuItem danger onClick={() => { setMenuOpen(false); setDeleteConfirmGroup(true); }}>Xóa nhóm</MenuItem>}
-              </Card>
-            )}
-          </div>
+          <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton>
         </div>
 
         <ModuleHero
@@ -177,6 +158,15 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
           </div>
         </ModuleHero>
+
+        <GroupManagementPanel
+          inviteCode={d.inviteCode}
+          canDelete={isTreasurer}
+          onEdit={() => setEditingGroup(true)}
+          onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
+          onManualJoin={() => onAction?.('join', { groupId: d.id })}
+          onDelete={() => setDeleteConfirmGroup(true)}
+        />
 
         {/* Treasurer actions */}
         {isTreasurer && (
@@ -385,28 +375,72 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   );
 }
 
-function MenuItem({ children, danger, onClick }) {
+function GroupManagementPanel({ inviteCode, canDelete, onEdit, onShare, onManualJoin, onDelete }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        width: '100%',
-        padding: '11px 10px',
-        border: 'none',
-        borderRadius: 8,
-        background: 'transparent',
-        color: danger ? colors.danger : colors.textPrimary,
-        fontSize: 12,
-        fontWeight: 700,
-        textAlign: 'left',
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-      }}
-    >
-      {children}
-    </button>
+    <Card style={{ marginTop: 12, padding: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '1px', color: colors.textMuted, textTransform: 'uppercase' }}>Quản lý nhóm</div>
+          <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span style={{ fontSize: 11, color: colors.textSecondary }}>Mã mời thủ công</span>
+            <span style={{
+              padding: '4px 8px',
+              borderRadius: 8,
+              background: 'rgba(251,191,36,0.12)',
+              border: '1px solid rgba(251,191,36,0.25)',
+              color: '#fcd34d',
+              fontSize: 11,
+              fontWeight: 900,
+              ...type.mono,
+            }}>{inviteCode || '--'}</span>
+          </div>
+        </div>
+        <button type="button" onClick={onEdit} style={compactIconButtonStyle('rgba(99,102,241,0.12)', '#c7d2fe')}>✎</button>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: canDelete ? '1fr 1fr 42px' : '1fr 1fr', gap: 8, marginTop: 12 }}>
+        <button type="button" onClick={onShare} style={groupActionStyle('brand')}>🔗 Chia sẻ link mời</button>
+        <button type="button" onClick={onManualJoin} style={groupActionStyle('muted')}>⌨ Mã mời thủ công</button>
+        {canDelete && <button type="button" onClick={onDelete} aria-label="Xóa nhóm" style={compactIconButtonStyle('rgba(248,113,113,0.12)', '#fca5a5')}>🗑</button>}
+      </div>
+    </Card>
   );
+}
+
+function groupActionStyle(tone) {
+  const palette = tone === 'brand'
+    ? ['rgba(99,102,241,0.14)', 'rgba(99,102,241,0.28)', '#c7d2fe']
+    : ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.12)', colors.textPrimary];
+  return {
+    minWidth: 0,
+    padding: '10px 9px',
+    borderRadius: 11,
+    border: `1px solid ${palette[1]}`,
+    background: palette[0],
+    color: palette[2],
+    fontSize: 11,
+    fontWeight: 850,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  };
+}
+
+function compactIconButtonStyle(background, color) {
+  return {
+    width: 42,
+    height: 38,
+    borderRadius: 12,
+    border: `1px solid ${colors.borderSubtle}`,
+    background,
+    color,
+    fontSize: 15,
+    fontWeight: 900,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    flexShrink: 0,
+  };
 }
 
 function EmptyState({ title, sub }) {
