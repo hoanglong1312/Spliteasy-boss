@@ -1,21 +1,12 @@
 // Spliteasy Boss — Profile / Cá nhân
-// Props: data { user, profileColor, monthStats, bank, pin }, isTreasurer
+// Props: data { user, monthStats, bank, pin }, isTreasurer
 
 import React, { useEffect, useRef, useState } from 'react';
-import { colors, type, formatVNDShort } from '../tokens';
+import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge,
   SectionLabel,
 } from '../primitives';
-
-const PROFILE_COLORS = [
-  'linear-gradient(135deg, #6366f1, #8b5cf6)',
-  'linear-gradient(135deg, #34d399, #10b981)',
-  'linear-gradient(135deg, #f59e0b, #d97706)',
-  'linear-gradient(135deg, #f87171, #dc2626)',
-  'linear-gradient(135deg, #a78bfa, #7c3aed)',
-  'linear-gradient(135deg, #ec4899, #be185d)',
-];
 
 export default function Profile({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
@@ -54,7 +45,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <div style={{
               width: 88, height: 88, borderRadius: '50%',
-              background: currentPhotoUrl ? colors.shellBg : PROFILE_COLORS[d.profileColor],
+              background: currentPhotoUrl ? colors.shellBg : d.user.color,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               overflow: 'hidden',
               fontSize: 36, fontWeight: 900, color: 'white',
@@ -97,56 +88,6 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
             </div>
           )}
         </Hero>
-
-        {/* Profile color */}
-        <SectionLabel>Màu hiển thị</SectionLabel>
-        <Card style={{ padding: 14 }}>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-            {PROFILE_COLORS.map((c, i) => {
-              const active = i === d.profileColor;
-              return (
-                <button key={i} onClick={() => onAction?.('color', i)} style={{
-                  width: 34, height: 34, borderRadius: 10,
-                  background: c,
-                  border: `2px solid ${active ? '#f8fafc' : 'rgba(255,255,255,0.05)'}`,
-                  boxShadow: active ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
-                  cursor: 'pointer', padding: 0,
-                }} />
-              );
-            })}
-          </div>
-        </Card>
-
-        {/* Monthly stats */}
-        <SectionLabel>{d.monthStats.label}</SectionLabel>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <Card accent="pickleball" style={{ padding: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>🏓</span>
-              <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Buổi đánh
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 900, letterSpacing: '-0.5px', marginTop: 8, ...type.mono }}>
-              {d.monthStats.sessions.attended}<span style={{ fontSize: 14, color: colors.textMuted, fontWeight: 600 }}>/{d.monthStats.sessions.total}</span>
-            </div>
-            <div style={{ fontSize: 10, color: '#6ee7b7', marginTop: 2, fontWeight: 600 }}>
-              {d.monthStats.sessions.deltaLabel}
-            </div>
-          </Card>
-          <Card accent="finance" style={{ padding: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 16 }}>💸</span>
-              <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Số dư
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: colors.danger, letterSpacing: '-0.5px', marginTop: 8, ...type.mono }}>
-              {formatVNDShort(d.monthStats.balance)}
-            </div>
-            <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, fontWeight: 600 }}>{d.monthStats.balanceLabel}</div>
-          </Card>
-        </div>
 
         {/* Bank */}
         <SectionLabel action="Sửa →" onAction={() => onAction?.('settings')}>Thông tin ngân hàng</SectionLabel>
@@ -206,9 +147,9 @@ const DEMO = {
     email: 'long.nguyen@gmail.com',
     initial: 'L',
     club: 'Cầu Giấy',
+    color: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
     photoUrl: '',
   },
-  profileColor: 0,
   monthStats: {
     label: 'Tháng 5 · 2026',
     sessions: { attended: 8, total: 13, deltaLabel: '+2 so với tháng 4' },

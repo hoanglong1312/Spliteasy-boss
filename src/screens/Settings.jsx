@@ -7,9 +7,14 @@ import {
   PhoneFrame, Screen, IconButton, Card, Button, Badge,
 } from '../primitives';
 
+function memberPinStorageKey(memberId) {
+  return `spliteasy_pin_${memberId || 'unknown'}`;
+}
+
 export default function Settings({ data, onAction }) {
   const d = data || DEMO;
-  const [pinSet, setPinSet] = useState(() => !!localStorage.getItem('spliteasy_pin'));
+  const pinKey = memberPinStorageKey(d.memberId);
+  const [pinSet, setPinSet] = useState(() => !!localStorage.getItem(pinKey));
   const [pinSetupMode, setPinSetupMode] = useState(null);
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinSetupError, setPinSetupError] = useState('');
@@ -32,16 +37,16 @@ export default function Settings({ data, onAction }) {
   }
 
   function submitPinSetup() {
-    const stored = localStorage.getItem('spliteasy_pin');
+    const stored = localStorage.getItem(pinKey);
     if (pinSetupMode === 'set') {
       if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
-      localStorage.setItem('spliteasy_pin', pinInputValue);
+      localStorage.setItem(pinKey, pinInputValue);
       setPinSet(true);
       cancelPinSetup();
       onAction?.('setPin');
     } else if (pinSetupMode === 'remove') {
       if (pinInputValue !== stored) { setPinSetupError('PIN không đúng.'); return; }
-      localStorage.removeItem('spliteasy_pin');
+      localStorage.removeItem(pinKey);
       setPinSet(false);
       cancelPinSetup();
       onAction?.('removePin');
@@ -52,7 +57,7 @@ export default function Settings({ data, onAction }) {
       setPinSetupError('');
     } else if (pinSetupMode === 'change-new') {
       if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
-      localStorage.setItem('spliteasy_pin', pinInputValue);
+      localStorage.setItem(pinKey, pinInputValue);
       setPinSet(true);
       cancelPinSetup();
       onAction?.('setPin');
@@ -332,6 +337,7 @@ function Caret() {
 }
 
 const DEMO = {
+  memberId: 'demo',
   accountHolder: 'NGUYEN HOANG LONG',
   banks: [
     { code: 'VCB', name: 'Vietcombank', accountMasked: '1027 8438 ••••',

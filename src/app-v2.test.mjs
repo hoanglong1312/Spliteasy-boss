@@ -17,8 +17,12 @@ test('PinEntryScreen uses a controlled numeric password input instead of a numpa
 })
 
 test('recent session resume asks for the simple PIN input before login when PIN is enabled', () => {
+  assert.match(appSource, /function memberPinStorageKey\(memberId\)/)
+  assert.match(appSource, /return `spliteasy_pin_\$\{memberId \|\| 'unknown'\}`/)
+  assert.match(appSource, /function storedPinForMember\(memberId\)/)
   assert.match(appSource, /const \[pendingPinSession, setPendingPinSession\] = useState\(null\)/)
-  assert.match(appSource, /const requiresPin = payload\?\.hasPin \|\| Boolean\(localStorage\.getItem\('spliteasy_pin'\)\)/)
+  assert.match(appSource, /const requiresPin = payload\?\.hasPin \|\| Boolean\(storedPinForMember\(payload\?\.memberId\)\)/)
+  assert.doesNotMatch(appSource, /localStorage\.getItem\('spliteasy_pin'\)/)
   assert.match(appSource, /setPendingPinSession\(payload\)/)
   assert.match(appSource, /if \(awaitingPin\)/)
   assert.match(appSource, /const pending = pendingPinSession[\s\S]*handle\('resumeRecentSession', \{ \.\.\.pending, hasPin: false \}\)/)

@@ -1075,6 +1075,7 @@ function buildProfileData(me, state, pickle) {
       email: '',
       initial: initials(me || { name: state?.currentUserName }).slice(0, 2),
       club: state?.currentGroup?.name || 'Spliteasy',
+      color: me?.color || '#6366f1',
       photoUrl: loadStoredProfilePhoto(currentUserId),
     },
     profileColor: profileColorIndex(me?.color),
@@ -1728,6 +1729,7 @@ function buildApprovalQueueData(state) {
 function buildAccountSettingsData(state) {
   const me = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
   return {
+    memberId: state?.currentUserId,
     accountHolder: me?.bankAccountName || me?.bank_account_name || me?.displayName || me?.name || state?.currentUserName || 'Bạn',
     banks: [bankData(me, true)],
     profileSync: buildProfileSyncData(state, me),

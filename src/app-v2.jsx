@@ -36,6 +36,15 @@ function profilePhotoStorageKey(memberId) {
   return `spliteasy_profile_photo_${memberId || 'me'}`
 }
 
+function memberPinStorageKey(memberId) {
+  return `spliteasy_pin_${memberId || 'unknown'}`
+}
+
+function storedPinForMember(memberId) {
+  if (typeof localStorage === 'undefined' || !memberId) return ''
+  return localStorage.getItem(memberPinStorageKey(memberId)) || ''
+}
+
 function isPickleballActionGroup(group) {
   const explicit = String(group?.type || group?.kind || group?.groupType || group?.group_type || '').toLowerCase()
   return explicit === 'pickleball'
@@ -132,7 +141,7 @@ export default function AppV2() {
     const { token, member } = getStoredAuth()
     const memberId = member?.id
     return !!(
-      localStorage.getItem('spliteasy_pin') &&
+      storedPinForMember(memberId) &&
       token &&
       memberId &&
       sessionStorage.getItem(PIN_UNLOCK_KEY) !== memberId
@@ -229,9 +238,9 @@ export default function AppV2() {
   }
 
   function submitPin(value = pinInput) {
-    const stored = localStorage.getItem('spliteasy_pin')
+    const pending = pendingPinSession
+    const stored = storedPinForMember(pending?.memberId || state.currentUserId)
     if (value === stored) {
-      const pending = pendingPinSession
       if (pending?.memberId) sessionStorage.setItem(PIN_UNLOCK_KEY, pending.memberId)
       if (!pending && state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
       setPendingPinSession(null)
@@ -264,7 +273,7 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      const requiresPin = payload?.hasPin || Boolean(localStorage.getItem('spliteasy_pin'))
+      const requiresPin = payload?.hasPin || Boolean(storedPinForMember(payload?.memberId))
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
         setPendingPinSession(payload)
         setAwaitingPin(true)
@@ -1420,7 +1429,7 @@ export default function AppV2() {
         groupId: result.group_id,
         memberName: result.member_name,
       })
-      const storedPin = localStorage.getItem('spliteasy_pin')
+      const storedPin = storedPinForMember(result.member_id)
       if (storedPin) {
         setAwaitingPin(true)
         return
