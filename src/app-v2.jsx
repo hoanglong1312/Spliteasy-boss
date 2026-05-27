@@ -31,9 +31,21 @@ import SettlementPeriod from './screens/SettlementPeriod'
 import MemberBillShare from './screens/MemberBillShare'
 
 const PIN_UNLOCK_KEY = 'spliteasy_pin_unlocked'
+const PROFILE_PHOTO_CHANGED_EVENT = 'spliteasy-profile-photo-changed'
 
-function profilePhotoStorageKey(memberId) {
-  return `spliteasy_profile_photo_${memberId || 'me'}`
+function profilePhotoStorageKey(identityId) {
+  return `spliteasy_profile_photo_${identityId || 'me'}`
+}
+
+function profilePhotoIdentityIds(memberId, profileId, members = []) {
+  const ids = [
+    profileId,
+    memberId,
+    ...safeArray(members)
+      .filter(member => profileId && String(member?.profileId || member?.profile_id || '') === String(profileId))
+      .map(member => member?.id),
+  ].filter(Boolean)
+  return Array.from(new Set(ids.map(String)))
 }
 
 function memberPinStorageKey(memberId) {
@@ -1482,17 +1494,29 @@ export default function AppV2() {
 
     if (type === 'uploadPhoto') {
       const memberId = payload?.memberId || state.currentUserId
+      const member = safeArray(state.members).find(item => String(item.id) === String(memberId)) || {}
+      const profileId = payload?.profileId || payload?.profile_id || member.profileId || member.profile_id
       const photoUrl = String(payload?.photoUrl || '')
       if (memberId && photoUrl) {
-        localStorage.setItem(profilePhotoStorageKey(memberId), photoUrl)
+        localStorage.setItem(profilePhotoStorageKey(profileId || memberId), photoUrl)
+        profilePhotoIdentityIds(memberId, profileId, state.members).forEach(identityId => {
+          localStorage.setItem(profilePhotoStorageKey(identityId), photoUrl)
+        })
+        window.dispatchEvent(new Event(PROFILE_PHOTO_CHANGED_EVENT))
       }
       return
     }
 
     if (type === 'clearPhoto') {
       const memberId = payload?.memberId || state.currentUserId
+      const member = safeArray(state.members).find(item => String(item.id) === String(memberId)) || {}
+      const profileId = payload?.profileId || payload?.profile_id || member.profileId || member.profile_id
       if (memberId) {
-        localStorage.removeItem(profilePhotoStorageKey(memberId))
+        localStorage.removeItem(profilePhotoStorageKey(profileId || memberId))
+        profilePhotoIdentityIds(memberId, profileId, state.members).forEach(identityId => {
+          localStorage.removeItem(profilePhotoStorageKey(identityId))
+        })
+        window.dispatchEvent(new Event(PROFILE_PHOTO_CHANGED_EVENT))
       }
       return
     }

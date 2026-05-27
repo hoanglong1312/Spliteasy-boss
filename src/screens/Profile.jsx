@@ -27,14 +27,14 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
       const photoUrl = String(reader.result || '');
       if (!photoUrl) return;
       setCurrentPhotoUrl(photoUrl);
-      onAction?.('uploadPhoto', { memberId: d.user.id, photoUrl });
+      onAction?.('uploadPhoto', { memberId: d.user.id, profileId: d.user.profileId, photoUrl });
     };
     reader.readAsDataURL(file);
   }
 
   function clearPhoto() {
     setCurrentPhotoUrl('');
-    onAction?.('clearPhoto', { memberId: d.user.id });
+    onAction?.('clearPhoto', { memberId: d.user.id, profileId: d.user.profileId });
   }
 
   return (

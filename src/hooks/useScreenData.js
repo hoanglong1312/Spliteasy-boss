@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../store.jsx'
 import {
   fmtVNDFull,
@@ -34,24 +34,38 @@ const GROUP_TYPE_LABELS = [
   { key: 'work', label: 'Công việc', emojis: ['💼'] },
   { key: 'other', label: 'Khác', emojis: ['🎯', '👥'] },
 ]
+const PROFILE_PHOTO_CHANGED_EVENT = 'spliteasy-profile-photo-changed'
 
-function profilePhotoStorageKey(memberId) {
-  return `spliteasy_profile_photo_${memberId || 'me'}`
+function profilePhotoStorageKey(identityId) {
+  return `spliteasy_profile_photo_${identityId || 'me'}`
 }
 
-function loadStoredProfilePhoto(memberId) {
-  if (!memberId || typeof localStorage === 'undefined') return ''
-  return localStorage.getItem(profilePhotoStorageKey(memberId)) || ''
+function loadStoredProfilePhoto(identityId) {
+  if (!identityId || typeof localStorage === 'undefined') return ''
+  return localStorage.getItem(profilePhotoStorageKey(identityId)) || ''
 }
 
-function memberPhotoUrl(member) {
-  return loadStoredProfilePhoto(member?.id)
+function memberPhotoUrl(member, allMembers = []) {
+  const profileId = member?.profileId || member?.profile_id
+  const identityIds = [
+    profileId,
+    member?.id,
+    ...safeArray(allMembers)
+      .filter(item => profileId && String(item?.profileId || item?.profile_id || '') === String(profileId))
+      .map(item => item?.id),
+  ].filter(Boolean)
+  for (const identityId of Array.from(new Set(identityIds.map(String)))) {
+    const photoUrl = loadStoredProfilePhoto(identityId)
+    if (photoUrl) return photoUrl
+  }
+  return ''
 }
 
 export function useScreenData() {
   const { state, dispatch } = useApp()
   const autoGenerateRef = useRef('')
   const staleCleanupRef = useRef('')
+  const [photoVersion, setPhotoVersion] = useState(0)
   const {
     currentUserId,
     currentUserName,
@@ -117,7 +131,15 @@ export function useScreenData() {
       getExpenseDetailData: (params) => buildExpenseDetailData(state, params),
       dispatch,
     }
-  }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, selectedYearMonth, me, isTreasurer, isPickleballTreasurer, dispatch])
+  }, [state, currentUserId, currentUserName, currentGroup, members, groups, pickle, _allPickle, selectedYearMonth, photoVersion, me, isTreasurer, isPickleballTreasurer, dispatch])
+
+  useEffect(() => {
+    function refreshProfilePhotos() {
+      setPhotoVersion(version => version + 1)
+    }
+    window.addEventListener(PROFILE_PHOTO_CHANGED_EVENT, refreshProfilePhotos)
+    return () => window.removeEventListener(PROFILE_PHOTO_CHANGED_EVENT, refreshProfilePhotos)
+  }, [])
 
   useEffect(() => {
     const request = screenData.pickleballCalendarData?.autoGenerateRequest || screenData.pickleballOverviewData?.autoGenerateRequest
@@ -567,7 +589,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         name: member.displayName || member.name,
         initials: initials(member),
         color: memberDisplayColor(member),
-        photoUrl: memberPhotoUrl(member),
+        photoUrl: memberPhotoUrl(member, members),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
         bankName: member.bankName || member.bank_name || '',
@@ -587,7 +609,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         name: member.displayName || member.name,
         initials: initials(member),
         color: memberDisplayColor(member),
-        photoUrl: memberPhotoUrl(member),
+        photoUrl: memberPhotoUrl(member, members),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
         amount: memberBalanceMap[member.id] || 0,
@@ -1077,12 +1099,13 @@ function buildProfileData(me, state, pickle) {
     color: me?.color || '#6366f1',
     user: {
       id: currentUserId,
+      profileId: me?.profileId || me?.profile_id || currentUserId,
       name: me?.displayName || me?.name || state?.currentUserName || 'Bạn',
       email: '',
       initial: initials(me || { name: state?.currentUserName }).slice(0, 2),
       club: state?.currentGroup?.name || 'Spliteasy',
       color: me?.color || '#6366f1',
-      photoUrl: memberPhotoUrl(me),
+      photoUrl: memberPhotoUrl(me, state?.members),
     },
     profileColor: profileColorIndex(me?.color),
     monthStats: {
@@ -1282,8 +1305,8 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, fixedMembers))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, fixedMembers))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, state?.members))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, state?.members))
 
   return {
     groupId: currentGroup(state)?.id,
@@ -1329,7 +1352,7 @@ function buildMemberDetailData(state, memberId, selectedYearMonth) {
     name: member.displayName || member.name || 'Thành viên',
     initial: initials(member),
     initials: initials(member),
-    photoUrl: memberPhotoUrl(member),
+    photoUrl: memberPhotoUrl(member, state?.members),
     color: member.color,
     role: member.role || 'member',
     type: memberType(member),
@@ -2094,7 +2117,7 @@ function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
     bankAccountName: member.bankAccountName || member.bank_account_name || '',
     bankAccount: member.bankAccount || member.bank_account || '',
     color: member.color,
-    photoUrl: memberPhotoUrl(member),
+    photoUrl: memberPhotoUrl(member, members),
   }
 }
 
