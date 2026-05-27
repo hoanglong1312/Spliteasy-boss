@@ -5,6 +5,7 @@ import test from 'node:test'
 const profileSource = readFileSync(new URL('./screens/Profile.jsx', import.meta.url), 'utf8')
 const settingsSource = readFileSync(new URL('./screens/Settings.jsx', import.meta.url), 'utf8')
 const screenDataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
+const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const primitiveSource = readFileSync(new URL('./primitives.jsx', import.meta.url), 'utf8')
 const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
 const pickleballMembersSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
@@ -36,6 +37,29 @@ test('Settings stores app PIN per member instead of globally per browser', () =>
   assert.doesNotMatch(settingsSource, /localStorage\.setItem\('spliteasy_pin'/)
   assert.doesNotMatch(settingsSource, /localStorage\.removeItem\('spliteasy_pin'\)/)
   assert.match(screenDataSource, /memberId: state\?\.currentUserId/)
+})
+
+test('Profile owns account settings without opening the settings screen', () => {
+  assert.doesNotMatch(profileSource, /<IconButton onClick=\{\(\) => onAction\?\.\('settings'\)\}>/)
+  assert.doesNotMatch(profileSource, /SectionLabel action="Sửa →" onAction=\{\(\) => onAction\?\.\('settings'\)\}/)
+  assert.doesNotMatch(profileSource, /onClick=\{\(\) => onAction\?\.\('settings'\)\}/)
+  assert.match(profileSource, /const \[editingBank, setEditingBank\]/)
+  assert.match(profileSource, /BANK_SUGGESTIONS/)
+  assert.match(profileSource, /list="profile-bank-suggestions"/)
+  assert.match(profileSource, /onAction\?\.\('saveBank', \{ bankName: bankName\.trim\(\), bankAccount: bankAccount\.trim\(\), bankAccountName: bankOwner\.trim\(\) \}\)/)
+  assert.match(appSource, /if \(stack\[stack\.length - 1\]\?\.screen === 'settings'\)/)
+  assert.match(profileSource, /function submitPinSetup\(\)/)
+  assert.match(profileSource, /function SettingRow/)
+  assert.match(profileSource, /onAction\?\.\('logout'\)/)
+})
+
+test('Bank placeholders stay empty and add-bank entry is removed', () => {
+  assert.doesNotMatch(profileSource, /Thêm ngân hàng khác/)
+  assert.doesNotMatch(profileSource, /Chưa cập nhật/)
+  assert.doesNotMatch(settingsSource, /Thêm ngân hàng khác/)
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('addBank'\)/)
+  assert.match(screenDataSource, /const bankName = member\?\.bankName \|\| member\?\.bank_name \|\| ''/)
+  assert.match(screenDataSource, /if \(!digits\) return ''/)
 })
 
 test('Avatar primitive and member screens render uploaded member photos', () => {

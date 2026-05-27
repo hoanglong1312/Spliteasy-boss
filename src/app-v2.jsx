@@ -1528,7 +1528,9 @@ export default function AppV2() {
 
     if (type === 'saveBank') {
       await dispatch({ type: 'UPDATE_BANK_INFO', bankInfo: payload })
-      setStack((s) => s.slice(0, -1))
+      if (stack[stack.length - 1]?.screen === 'settings') {
+        setStack((s) => s.slice(0, -1))
+      }
       return
     }
 

@@ -118,19 +118,6 @@ export default function Settings({ data, onAction }) {
           )}
         </Card>
 
-        {/* Add second bank */}
-        <button onClick={() => onAction?.('addBank')} style={{
-          width: '100%', marginTop: 8,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          padding: '11px 14px',
-          border: '1px dashed rgba(99,102,241,0.4)',
-          background: 'transparent', borderRadius: 12,
-          color: colors.brandLight, fontSize: 12, fontWeight: 700,
-          letterSpacing: '0.3px', fontFamily: 'inherit', cursor: 'pointer',
-        }}>
-          <span style={{ fontSize: 14 }}>+</span> Thêm ngân hàng khác
-        </button>
-
         {/* Security */}
         <SectionLabel>Bảo mật</SectionLabel>
         <Card style={{ padding: '6px 16px' }}>

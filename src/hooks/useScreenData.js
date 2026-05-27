@@ -1122,10 +1122,10 @@ function buildProfileData(me, state, pickle) {
       bankName,
       bankAccount,
       accountName: bankAccountName,
-      name: bankName || 'Chưa cập nhật',
+      name: bankName,
       code: bankCode(bankName),
       maskedAccount: maskBankAccount(bankAccount),
-      owner: bankAccountName || 'Chưa cập nhật',
+      owner: bankAccountName,
     },
     pin: Boolean(me?.hasPin || me?.has_pin),
   }
@@ -2996,7 +2996,7 @@ function batchAccessories(session, members, presentIds) {
 }
 
 function bankData(member, primary = false) {
-  const bankName = member?.bankName || member?.bank_name || 'Chưa cập nhật'
+  const bankName = member?.bankName || member?.bank_name || ''
   const account = member?.bankAccount || member?.bank_account || ''
   const holder = member?.bankAccountName || member?.bank_account_name || member?.displayName || member?.name || ''
   const code = bankCode(bankName)
@@ -3845,7 +3845,7 @@ function bankCode(bankName) {
 
 function maskBankAccount(value) {
   const digits = String(value || '').replace(/\s+/g, '')
-  if (!digits) return 'Chưa cập nhật'
+  if (!digits) return ''
   if (digits.length <= 4) return digits
   return `${digits.slice(0, 4)} ${digits.slice(4, 8)} ••••`.trim()
 }
