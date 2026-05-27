@@ -3,7 +3,7 @@ import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, Card, SearchInput, SubTabs, Badge, Button } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
-export default function MemberBillShare({ data, loading = false }) {
+export default function MemberBillShare({ data, loading = false, onOpenApp }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const bill = data || {};
@@ -36,12 +36,32 @@ export default function MemberBillShare({ data, loading = false }) {
         )}
         {!loading && !invalid && (
           <>
-            <div style={{ padding: '4px 2px 16px' }}>
-              <div style={{ fontSize: 10, fontWeight: 900, color: '#fcd34d', letterSpacing: '1.6px', textTransform: 'uppercase' }}>{bill.groupName}</div>
-              <div style={{ fontSize: 25, fontWeight: 900, marginTop: 4 }}>{bill.memberName}</div>
-              <div style={{ fontSize: 13, color: colors.textSecondary, marginTop: 5 }}>{bill.monthLabel || 'Tháng hiện tại'}</div>
-            </div>
-            <Card>
+            <Card style={{
+              background: 'linear-gradient(145deg, rgba(16,185,129,0.18), rgba(251,191,36,0.08))',
+              border: '1px solid rgba(255,255,255,0.12)',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 900, color: '#fcd34d', letterSpacing: '1.4px', textTransform: 'uppercase' }}>Bill cá nhân</div>
+              <div style={{ marginTop: 8, fontSize: 24, fontWeight: 950, lineHeight: 1.15 }}>{bill.memberName}</div>
+              <div style={{
+                marginTop: 10,
+                display: 'inline-flex',
+                maxWidth: '100%',
+                padding: '7px 10px',
+                borderRadius: 999,
+                background: 'rgba(7,8,15,0.34)',
+                border: '1px solid rgba(255,255,255,0.10)',
+                color: colors.textPrimary,
+                fontSize: 12,
+                fontWeight: 850,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                {bill.groupName}
+              </div>
+              <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }}>{bill.monthLabel || 'Tháng hiện tại'}</div>
+            </Card>
+            <Card style={{ marginTop: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <MiniShareStat label="Cần trả" value={summary.owes} tone={colors.danger} />
                 <MiniShareStat label="Đã ứng" value={summary.advanced} tone="#6ee7b7" />
@@ -68,6 +88,9 @@ export default function MemberBillShare({ data, loading = false }) {
                 )}
               </div>
             </Card>
+            {bill.canOpenApp && (
+              <Button variant="muted" style={{ marginTop: 12, width: '100%' }} onClick={onOpenApp}>Mở trang chính</Button>
+            )}
           </>
         )}
       </Screen>
@@ -104,7 +127,7 @@ function PaymentCard({ bill, summary }) {
 
   return (
     <Card style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 900, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>Thanh toán</div>
+      <div style={{ fontSize: 12, fontWeight: 900, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>Thanh toán về quỹ nhóm</div>
       {owesAmount <= 0 && (
         <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, color: '#6ee7b7' }}>Không cần thanh toán</div>
       )}

@@ -1,7 +1,7 @@
 // Spliteasy Boss — Chi tiết nhóm (tab Hoạt động)
 // Props: data { name, balance, you, activitiesByWeek[] }, isTreasurer
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
@@ -605,6 +605,9 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [memberActionsOpen, setMemberActionsOpen] = useState(false);
+  const [personalLink, setPersonalLink] = useState('');
+  const [personalLinkStatus, setPersonalLinkStatus] = useState('idle');
+  const [personalLinkError, setPersonalLinkError] = useState('');
   const balance = Number(member.balance || 0);
   const summary = member.memberTransactionSummary || { owes: 0, advanced: 0, net: 0 };
   const transactions = member.memberTransactions || [];
@@ -623,6 +626,34 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : '0';
   const balanceAmountLabel = balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`;
+  const memberShareKey = `${member.groupId || ''}:${member.id || ''}`;
+
+  useEffect(() => {
+    let alive = true;
+    async function ensureMemberBillShare() {
+      if (!member.groupId || !member.id || personalLinkStatus === 'loading') return;
+      setPersonalLink('');
+      setPersonalLinkError('');
+      setPersonalLinkStatus('loading');
+      const url = await onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id, copy: false });
+      if (!alive) return;
+      if (url) {
+        setPersonalLink(url);
+        setPersonalLinkStatus('ready');
+      } else {
+        setPersonalLinkStatus('error');
+        setPersonalLinkError('Không tạo được link cá nhân.');
+      }
+    }
+    ensureMemberBillShare();
+    return () => { alive = false; };
+  }, [memberShareKey]);
+
+  function copyPersonalLink() {
+    if (!personalLink || !navigator.clipboard) return;
+    navigator.clipboard.writeText(personalLink).catch(() => {});
+    onAction?.('toast', 'Đã sao chép link cá nhân.');
+  }
 
   return (
     <Screen style={{ paddingBottom: '28px' }}>
@@ -675,7 +706,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
 
       {isTreasurer && (
         <Card style={{ marginTop: 14 }}>
-          <SectionTitle>THÔNG TIN THANH TOÁN</SectionTitle>
+          <SectionTitle>THÔNG TIN NHẬN HOÀN ỨNG</SectionTitle>
           <InfoLine label="Ngân hàng" value={member.bankName || 'Chưa cập nhật'} />
           <InfoLine label="Chủ tài khoản" value={member.bankAccountName || 'Chưa cập nhật'} />
           <InfoLine label="STK ngân hàng" value={member.bankAccount || 'Chưa cập nhật'} />
@@ -716,26 +747,49 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         )}
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginTop: 14 }}>
-        <Button
-          variant="brand"
-          style={{ fontSize: 14 }}
-          onClick={() => onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id })}
-        >Gửi bill cá nhân</Button>
+      <Card style={{ marginTop: 14 }}>
+        <SectionTitle>LINK CÁ NHÂN</SectionTitle>
+        <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+          <div style={{
+            minHeight: 42,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '9px 10px',
+            borderRadius: 12,
+            background: colors.inputBg,
+            border: `1px solid ${colors.borderSubtle}`,
+            color: personalLink ? colors.textPrimary : colors.textSecondary,
+            fontSize: 12,
+            lineHeight: 1.35,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {personalLinkStatus === 'loading' ? 'Đang tạo link...' : personalLink || personalLinkError || 'Chưa có link'}
+          </div>
+          <Button
+            variant="muted"
+            style={{ fontSize: 12, padding: '11px 12px' }}
+            disabled={!personalLink}
+            onClick={copyPersonalLink}
+          >Sao chép</Button>
+        </div>
+        <div style={{ marginTop: 8, fontSize: 11, color: colors.textSecondary, lineHeight: 1.45 }}>
+          Link mở bill cá nhân trước. Member có thể vào app từ trang bill nếu cần.
+        </div>
+      </Card>
+
+      {isTreasurer && (
         <Button
           variant="muted"
-          style={{ fontSize: 13 }}
+          style={{ marginTop: 14, width: '100%', fontSize: 13 }}
           onClick={() => setMemberActionsOpen(true)}
         >Tùy chọn khác</Button>
-      </div>
+      )}
 
       {memberActionsOpen && (
         <BottomSheet title="Tùy chọn khác" onClose={() => setMemberActionsOpen(false)}>
           <div style={{ display: 'grid', gap: 10 }}>
-            <ActionButton onClick={() => {
-              setMemberActionsOpen(false);
-              onAction?.('createMemberAccessLink', { groupId: member.groupId, memberId: member.id });
-            }}>Tạo link vào app</ActionButton>
             {isTreasurer && <ActionButton onClick={() => { setMemberActionsOpen(false); onEdit?.(); }}>Chỉnh sửa thông tin</ActionButton>}
             {isTreasurer && <ActionButton danger onClick={() => { setMemberActionsOpen(false); onDelete?.(); }}>Xóa khỏi nhóm</ActionButton>}
           </div>

@@ -88,7 +88,7 @@ function inviteTokenFromLocation() {
 
 export default function AppV2() {
   const { state, dispatch } = useApp()
-  const [publicBillToken] = useState(() => publicBillTokenFromLocation())
+  const [publicBillToken, setPublicBillToken] = useState(() => publicBillTokenFromLocation())
   const [memberAccessToken] = useState(() => accessTokenFromLocation())
   const [groupInviteToken] = useState(() => inviteTokenFromLocation())
   const [publicBillData, setPublicBillData] = useState(null)
@@ -186,6 +186,30 @@ export default function AppV2() {
     consumeAccessLink()
     return () => { alive = false }
   }, [memberAccessToken, dispatch])
+
+  async function openMemberBillInApp(token) {
+    if (!token) return
+    const sb = createSupabase()
+    const { data, error } = await sb.rpc('consume_member_access_link', { p_token: token })
+    if (error || data?.error || !data?.authToken) {
+      dispatch({ type: 'SHOW_TOAST', message: 'Link vào app không còn hiệu lực. Nhờ thủ quỹ gửi lại link mới.' })
+      return
+    }
+    await dispatch({
+      type: 'LOGIN',
+      token: data.authToken,
+      memberId: data.memberId,
+      groupId: data.groupId,
+      memberName: data.memberName,
+      purpose: data.purpose,
+    })
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+    setPublicBillToken('')
+    setPublicBillData(null)
+    setPublicBillLoading(false)
+  }
 
   function submitPin(value = pinInput) {
     const stored = localStorage.getItem('spliteasy_pin')
@@ -936,13 +960,19 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'toast') {
+      dispatch({ type: 'SHOW_TOAST', message: typeof payload === 'string' ? payload : payload?.message || '' })
+      return
+    }
+
     if (type === 'createMemberBillShare') {
       const { token } = getStoredAuth()
       if (!token) return
       const sb = createSupabase(token)
-      const { data, error } = await sb.rpc('create_member_bill_share_token', {
+      const { data, error } = await sb.rpc('create_member_access_link', {
         p_group_id: payload?.groupId,
         p_member_id: payload?.memberId,
+        p_purpose: 'member_bill',
       })
       if (error || data?.error) {
         const billShareError = error?.message || data?.error || 'Không tạo được link chia sẻ.'
@@ -950,32 +980,13 @@ export default function AppV2() {
         dispatch({ type: 'SHOW_TOAST', message: `Không tạo được link chia sẻ: ${billShareError}` })
         return
       }
-      const shareToken = data?.token || data
+      const shareToken = data?.urlToken || data?.token || data
       const url = `${window.location.origin}${window.location.pathname}?bill=${encodeURIComponent(shareToken)}`
-      if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
-      dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link bill cá nhân.' })
-      return
-    }
-
-    if (type === 'createMemberAccessLink') {
-      const { token } = getStoredAuth()
-      if (!token) return
-      const sb = createSupabase(token)
-      const { data, error } = await sb.rpc('create_member_access_link', {
-        p_group_id: payload?.groupId,
-        p_member_id: payload?.memberId,
-        p_purpose: 'member_login',
-      })
-      if (error || data?.error) {
-        console.error('[app] createMemberAccessLink:', error || data)
-        dispatch({ type: 'SHOW_TOAST', message: 'Không tạo được link vào app.' })
-        return
+      if (payload?.copy !== false && navigator.clipboard) {
+        navigator.clipboard.writeText(url).catch(() => {})
+        dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link cá nhân.' })
       }
-      const accessToken = data?.urlToken || data?.token || data
-      const url = `${window.location.origin}${window.location.pathname}?access=${encodeURIComponent(accessToken)}`
-      if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
-      dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link vào app.' })
-      return
+      return url
     }
 
     if (type === 'createGroupInviteShare') {
@@ -1572,7 +1583,7 @@ export default function AppV2() {
   if (publicBillToken) {
     return (
       <div style={{ minHeight: '100vh', background: '#07080f' }}>
-        <MemberBillShare data={publicBillData} loading={publicBillLoading} />
+        <MemberBillShare data={publicBillData} loading={publicBillLoading} onOpenApp={() => openMemberBillInApp(publicBillToken)} />
       </div>
     )
   }

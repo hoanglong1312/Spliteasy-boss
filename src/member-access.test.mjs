@@ -61,11 +61,51 @@ test('JoinGroup allows existing members with a manual invite code but blocks inv
 })
 
 test('member detail and group menu expose app-login and group-invite share links', () => {
-  assert.match(groupDetailSource, /createMemberAccessLink/)
-  assert.match(groupDetailSource, /Tạo link vào app/)
+  assert.match(groupDetailSource, /ensureMemberBillShare/)
+  assert.match(groupDetailSource, /LINK CÁ NHÂN/)
+  assert.match(groupDetailSource, /Sao chép/)
+  assert.doesNotMatch(groupDetailSource, /Tạo link vào app/)
+  assert.doesNotMatch(groupDetailSource, /Gửi bill cá nhân/)
   assert.match(groupDetailSource, /Tùy chọn khác/)
   assert.match(groupDetailSource, /createGroupInviteShare/)
   assert.match(groupDetailSource, /Chia sẻ link mời/)
+})
+
+test('member bill link is bill-first and can open the app from the public bill page', () => {
+  const billShareSource = readFileSync(new URL('./screens/MemberBillShare.jsx', import.meta.url), 'utf8')
+
+  assert.match(appSource, /p_purpose: 'member_bill'/)
+  assert.match(appSource, /setPublicBillToken\(''\)/)
+  assert.match(appSource, /onOpenApp=\{\(\) => openMemberBillInApp\(publicBillToken\)\}/)
+  assert.match(billShareSource, /export default function MemberBillShare\(\{ data, loading = false, onOpenApp \}\)/)
+  assert.match(billShareSource, /Mở trang chính/)
+  assert.match(billShareSource, /Thanh toán về quỹ nhóm/)
+  assert.match(billShareSource, /bill\.groupName/)
+  assert.match(billShareSource, /bill\.memberName/)
+  assert.doesNotMatch(appSource, /p_purpose: 'member_login'[\s\S]*createMemberAccessLink/)
+})
+
+test('member bill share rpc can read member access link bill tokens', () => {
+  const billAccessMigration = readFileSync(new URL('../supabase/migrations/20260527000003_member_bill_access_links.sql', import.meta.url), 'utf8')
+
+  assert.match(billAccessMigration, /CREATE OR REPLACE FUNCTION public\.get_member_bill_share\(p_token text\)/)
+  assert.match(billAccessMigration, /public\.member_access_links/)
+  assert.match(billAccessMigration, /mal\.purpose = 'member_bill'/)
+  assert.match(billAccessMigration, /encode\(digest\(p_token, 'sha256'\), 'hex'\)/)
+  assert.match(billAccessMigration, /'canOpenApp', v_share\.can_open_app/)
+  assert.match(billAccessMigration, /UNION ALL/)
+  assert.match(billAccessMigration, /public\.member_bill_share_tokens/)
+})
+
+test('member access link creator helper is profile-aware across duplicate memberships', () => {
+  const profileAwareMigration = readFileSync(new URL('../supabase/migrations/20260527000004_profile_aware_access_link_creator.sql', import.meta.url), 'utf8')
+
+  assert.match(profileAwareMigration, /CREATE OR REPLACE FUNCTION public\.is_access_link_creator/)
+  assert.match(profileAwareMigration, /WITH current_actor AS/)
+  assert.match(profileAwareMigration, /creator\.id = actor\.id/)
+  assert.match(profileAwareMigration, /creator\.profile_id = actor\.profile_id/)
+  assert.match(profileAwareMigration, /lower\(creator\.name\) = lower\(actor\.name\)/)
+  assert.match(profileAwareMigration, /creator\.role = 'treasurer' OR g\.created_by = creator\.id OR g\.created_by = creator\.profile_id/)
 })
 
 test('member access link migration stores hashed scoped tokens and pending invite requests', () => {

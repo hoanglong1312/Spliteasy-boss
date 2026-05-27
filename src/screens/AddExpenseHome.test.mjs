@@ -300,7 +300,7 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /Chi tiết thành viên/);
   assert.match(groupDetailSource, /Cần nộp vào quỹ/);
   assert.doesNotMatch(groupDetailSource, /SỐ DƯ TRONG NHÓM/);
-  assert.match(groupDetailSource, /THÔNG TIN THANH TOÁN/);
+  assert.match(groupDetailSource, /THÔNG TIN NHẬN HOÀN ỨNG/);
   assert.match(groupDetailSource, /onClick=\{\(\) => onOpen\?\.\(member\)\}/);
   assert.match(groupDetailSource, /event\.stopPropagation\(\)/);
   assert.match(groupDetailSource, /onEdit=\{\(\) => \{ setEditingMember\(selectedMember\); setSelectedMember\(null\); \}\}/);
@@ -359,7 +359,7 @@ test('GroupDetail hides member detail bank accounts from non-treasurers', () => 
   );
   assert.doesNotMatch(memberDetailSource, /canViewMemberBank/);
   assert.doesNotMatch(memberDetailSource, /Ẩn với thành viên khác/);
-  assert.match(memberDetailSource, /\{isTreasurer && \(\s*<Card style=\{\{ marginTop: 14 \}\}>\s*<SectionTitle>THÔNG TIN THANH TOÁN<\/SectionTitle>/);
+  assert.match(memberDetailSource, /\{isTreasurer && \(\s*<Card style=\{\{ marginTop: 14 \}\}>\s*<SectionTitle>THÔNG TIN NHẬN HOÀN ỨNG<\/SectionTitle>/);
   assert.match(memberDetailSource, /<InfoLine label="Ngân hàng" value=\{member\.bankName \|\| 'Chưa cập nhật'\} \/>/);
   assert.match(memberDetailSource, /<InfoLine label="STK ngân hàng" value=\{member\.bankAccount \|\| 'Chưa cập nhật'\} \/>/);
   assert.match(screenDataSource, /isCurrentUser: String\(member\.id\) === String\(currentGroupMember\?\.id \|\| ''\)/);
@@ -402,12 +402,14 @@ test('GroupDetail member detail shows payer transactions for the selected month'
   assert.doesNotMatch(groupDetailSource, /member\.payerTransactions/);
 });
 
-test('GroupDetail member detail uses bill sharing as the primary action and moves app login to secondary options', () => {
+test('GroupDetail member detail shows a personal bill link and removes separate app-link action', () => {
   assert.match(groupDetailSource, /onAction\?\.\('createMemberBillShare'/);
-  assert.match(groupDetailSource, /Gửi bill cá nhân/);
+  assert.match(groupDetailSource, /LINK CÁ NHÂN/);
+  assert.match(groupDetailSource, /Sao chép/);
   assert.match(groupDetailSource, /Tùy chọn khác/);
-  assert.match(groupDetailSource, /Tạo link vào app/);
-  assert.match(groupDetailSource, /onAction\?\.\('createMemberAccessLink'/);
+  assert.doesNotMatch(groupDetailSource, /Gửi bill cá nhân/);
+  assert.doesNotMatch(groupDetailSource, /Tạo link vào app/);
+  assert.doesNotMatch(groupDetailSource, /onAction\?\.\('createMemberAccessLink'/);
   assert.doesNotMatch(groupDetailSource, /const \[billQrOpen, setBillQrOpen\] = useState\(false\)/);
   assert.doesNotMatch(groupDetailSource, />Tạo QR thanh toán<\/Button>/);
   assert.doesNotMatch(groupDetailSource, /Chia sẻ link vào app/);
@@ -433,7 +435,8 @@ test('App supports public member bill tokens without requiring login', () => {
   assert.match(appSource, /if \(publicBillToken\)/);
   assert.match(appSource, /<MemberBillShare data=\{publicBillData\}/);
   assert.match(appSource, /if \(type === 'createMemberBillShare'\)/);
-  assert.match(appSource, /\.rpc\('create_member_bill_share_token'/);
+  assert.match(appSource, /\.rpc\('create_member_access_link'/);
+  assert.match(appSource, /p_purpose: 'member_bill'/);
   assert.match(appSource, /const billShareError = error\?\.message \|\| data\?\.error \|\| 'Không tạo được link chia sẻ\.'/);
 });
 
