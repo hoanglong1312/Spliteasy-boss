@@ -314,6 +314,20 @@ test('GroupDetail member detail exposes clear treasurer edit access', () => {
   assert.doesNotMatch(memberDetailSource, />Sửa thành viên<\/Button>/);
 });
 
+test('GroupDetail member detail stacks the balance chip under identity on mobile', () => {
+  const memberDetailSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberDetailPanel'),
+    groupDetailSource.indexOf('function MiniBillStat')
+  );
+
+  assert.match(memberDetailSource, /flexDirection: 'column'/);
+  assert.match(memberDetailSource, /width: '100%'/);
+  assert.match(memberDetailSource, /justifyContent: 'space-between'/);
+  assert.match(memberDetailSource, /overflow: 'hidden'/);
+  assert.match(memberDetailSource, /textOverflow: 'ellipsis'/);
+  assert.doesNotMatch(memberDetailSource, /minWidth: 108/);
+});
+
 test('GroupDetail delete member does not depend on native confirm dialogs', () => {
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{selectedMember\.name\} khỏi nhóm\?`\)/);
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa \$\{memberMenu\.name\} khỏi nhóm\?`\)/);

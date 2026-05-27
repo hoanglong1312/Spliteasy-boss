@@ -648,26 +648,31 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         </div>
       </div>
 
-      <Hero variant="emerald" glow={false} style={{ padding: 22, borderRadius: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Avatar initial={member.initials} size={74} color={member.color} ring style={{ border: '4px solid rgba(7,8,15,0.85)' }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 28, fontWeight: 900 }}>{member.name}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-              {member.role === 'treasurer' && <Badge tone="warn">Thủ quỹ</Badge>}
-              <Badge tone="success">Thành viên</Badge>
+      <Hero variant="emerald" glow={false} style={{ padding: 18, borderRadius: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+            <Avatar initial={member.initials} size={68} color={member.color} ring style={{ border: '4px solid rgba(7,8,15,0.85)', flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 26, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                {member.role === 'treasurer' && <Badge tone="warn">Thủ quỹ</Badge>}
+                <Badge tone="success">Thành viên</Badge>
+              </div>
             </div>
           </div>
           <div style={{
-            minWidth: 108,
-            padding: '10px 12px',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '11px 12px',
             borderRadius: 14,
             background: 'rgba(7,8,15,0.36)',
             border: '1px solid rgba(255,255,255,0.12)',
-            textAlign: 'right',
           }}>
-            <div style={{ fontSize: 9, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>{balanceLabel}</div>
-            <div style={{ marginTop: 5, fontSize: 18, fontWeight: 950, color: balanceTone, whiteSpace: 'nowrap', ...type.mono }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>{balanceLabel}</div>
+            <div style={{ fontSize: 18, fontWeight: 950, color: balanceTone, whiteSpace: 'nowrap', ...type.mono }}>
               {balanceAmountLabel}
             </div>
           </div>
