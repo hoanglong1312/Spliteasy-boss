@@ -26,6 +26,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const [openTicketId, setOpenTicketId] = useState('');
   const [saveState, setSaveState] = useState('');
   const [paymentState, setPaymentState] = useState('');
+  const [itemSavingKey, setItemSavingKey] = useState('');
   const [paymentQrOpen, setPaymentQrOpen] = useState(false);
   const [ownerBankOpen, setOwnerBankOpen] = useState(false);
   const perSession = Math.round(courtFee / Math.max(Number(d.sessionsCount) || 1, 1));
@@ -54,8 +55,38 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
     setSelectedPaymentKeys(defaultPaymentKeys(paymentDraft.items));
     setSaveState('');
     setPaymentState('');
+    setItemSavingKey('');
     setPaymentQrOpen(false);
   }, [d.courtFeeTotal, d.ticketPrice, venueBank.ownerName, venueBank.bankName, venueBank.bankAccount, paymentDraft.items]);
+
+  async function markSinglePaymentItem(item) {
+    const key = paymentItemKey(item);
+    if (item.paid || Number(item.amount) <= 0 || itemSavingKey) return;
+    setPaymentState('');
+    setItemSavingKey(key);
+    try {
+      await onAction?.('markOwnerPayment', {
+        currentYearMonth: d.currentYearMonth,
+        paidAt: new Date().toISOString().slice(0, 10),
+        totalAmount: Number(item.amount) || 0,
+        bankSnapshot: {
+          ownerName: venueOwnerName,
+          bankName: selectedBank?.shortName || venueBankName,
+          bankId: qrBankId,
+          bankAccount: venueBankAccount,
+        },
+        items: [item],
+        note: paymentNote,
+      });
+      setSelectedPaymentKeys(keys => keys.filter(value => value !== key));
+      setPaymentQrOpen(false);
+      setPaymentState('saved');
+    } catch {
+      setPaymentState('error');
+    } finally {
+      setItemSavingKey('');
+    }
+  }
 
   if (!isTreasurer) {
     return (
@@ -166,8 +197,9 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             {paymentDraft.items.map(item => {
               const key = paymentItemKey(item);
               const checked = selectedPaymentKeys.includes(key);
+              const canMarkItemPaid = !item.paid && Number(item.amount) > 0;
               return (
-                <label key={key} style={{
+                <div key={key} style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: 9,
@@ -198,7 +230,41 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                   <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : colors.warning, ...type.mono }}>
                     {formatVND(item.amount || 0)}
                   </div>
-                </label>
+                  {item.paid ? (
+                    <div style={{
+                      padding: '6px 8px',
+                      borderRadius: 999,
+                      background: 'rgba(52,211,153,0.12)',
+                      color: '#6ee7b7',
+                      fontSize: 10,
+                      fontWeight: 900,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Đã thanh toán
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!canMarkItemPaid || Boolean(itemSavingKey)}
+                      onClick={() => markSinglePaymentItem(item)}
+                      style={{
+                        border: 'none',
+                        borderRadius: 999,
+                        padding: '7px 9px',
+                        background: canMarkItemPaid ? 'rgba(96,165,250,0.16)' : 'rgba(148,163,184,0.10)',
+                        color: canMarkItemPaid ? '#bfdbfe' : colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        fontFamily: 'inherit',
+                        cursor: canMarkItemPaid && !itemSavingKey ? 'pointer' : 'default',
+                        opacity: itemSavingKey && itemSavingKey !== key ? 0.55 : 1,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {itemSavingKey === key ? 'Đang lưu' : 'Xác nhận đã thanh toán'}
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
