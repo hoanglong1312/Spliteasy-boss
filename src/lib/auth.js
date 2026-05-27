@@ -28,29 +28,61 @@ export function getStoredAuth() {
 export function storeAuth(token, member) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(MEMBER_KEY, JSON.stringify(member))
-  rememberRecentSession(member)
+  rememberRecentSession(member, token)
 }
 
 export function getRecentSessions() {
   try {
-    return JSON.parse(localStorage.getItem(RECENT_SESSIONS_KEY) || '[]')
+    const parsed = JSON.parse(localStorage.getItem(RECENT_SESSIONS_KEY) || '[]')
+    const deduped = dedupeRecentSessions(parsed)
+    localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(deduped))
+    return deduped
   } catch {
     return []
   }
 }
 
-export function rememberRecentSession(member) {
+export function rememberRecentSession(member, token = '') {
   if (!member?.id) return
   const nextSession = {
     memberId: member.id,
     groupId: member.groupId || member.group_id || '',
+    profileId: member.profileId || member.profile_id || '',
     memberName: member.name || member.memberName || '',
     groupName: member.groupName || '',
     hasPin: member.hasPin === true || member.has_pin === true,
+    authToken: token || member.authToken || '',
   }
+  const nextKey = sessionIdentityKey(nextSession)
   const sessions = getRecentSessions()
-    .filter(session => String(session.memberId || '') !== String(nextSession.memberId))
+    .filter(session => sessionIdentityKey(session) !== nextKey)
   localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([nextSession, ...sessions].slice(0, 5)))
+}
+
+function dedupeRecentSessions(sessions) {
+  const seen = new Set()
+  return (Array.isArray(sessions) ? sessions : [])
+    .filter(session => session?.memberId && session?.memberName)
+    .filter(session => {
+      const key = sessionIdentityKey(session)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .slice(0, 5)
+}
+
+function sessionIdentityKey(session) {
+  const profileId = String(session?.profileId || session?.profile_id || '').trim()
+  if (profileId) return `profile:${profileId}`
+  const name = String(session?.memberName || session?.name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'd')
+    .trim()
+    .toLowerCase()
+  return `name:${name || session?.memberId || ''}`
 }
 
 export function clearAuth({ keepRecent = true } = {}) {

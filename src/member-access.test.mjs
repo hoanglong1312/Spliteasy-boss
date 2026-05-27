@@ -12,10 +12,21 @@ const accessLinkMigration = readFileSync(new URL('../supabase/migrations/2026052
 test('local auth keeps recent member sessions after logout', () => {
   assert.match(authSource, /const RECENT_SESSIONS_KEY\s*=\s*'spliteasy_recent_sessions'/)
   assert.match(authSource, /export function getRecentSessions\(\)/)
-  assert.match(authSource, /export function rememberRecentSession\(member\)/)
+  assert.match(authSource, /export function rememberRecentSession\(member, token = ''\)/)
   assert.match(authSource, /export function clearAuth\(\{ keepRecent = true \} = \{\}\)/)
   assert.match(authSource, /if \(!keepRecent\) localStorage\.removeItem\(RECENT_SESSIONS_KEY\)/)
-  assert.match(authSource, /rememberRecentSession\(member\)/)
+  assert.match(authSource, /rememberRecentSession\(member, token\)/)
+})
+
+test('recent member sessions keep resumable tokens and collapse duplicate identities', () => {
+  assert.match(authSource, /export function rememberRecentSession\(member, token = ''\)/)
+  assert.match(authSource, /authToken: token \|\| member\.authToken \|\| ''/)
+  assert.match(authSource, /sessionIdentityKey\(session\)/)
+  assert.match(authSource, /member\.profileId \|\| member\.profile_id/)
+  assert.match(authSource, /dedupeRecentSessions\(parsed\)/)
+  assert.match(authSource, /localStorage\.setItem\(RECENT_SESSIONS_KEY, JSON\.stringify\(deduped\)\)/)
+  assert.match(authSource, /\.filter\(session => sessionIdentityKey\(session\) !== nextKey\)/)
+  assert.match(authSource, /\.filter\(session => session\?\.memberId && session\?\.memberName\)/)
 })
 
 test('AppV2 consumes member access links and passes recent sessions to JoinGroup', () => {
@@ -30,6 +41,15 @@ test('AppV2 consumes member access links and passes recent sessions to JoinGroup
   assert.match(appSource, /accessLinkError/)
 })
 
+test('AppV2 resumes recent sessions with a saved token instead of showing a dead card', () => {
+  assert.match(appSource, /if \(type === 'resumeRecentSession'\)/)
+  assert.match(appSource, /if \(!payload\?\.authToken\)/)
+  assert.match(appSource, /type: 'LOGIN'[\s\S]*token: payload\.authToken/)
+  assert.match(appSource, /memberId: payload\.memberId/)
+  assert.match(appSource, /groupId: payload\.groupId/)
+  assert.doesNotMatch(appSource, /Mở lại link cá nhân hoặc nhờ thủ quỹ gửi link mới để vào tài khoản này\./)
+})
+
 test('JoinGroup supports invite-token links, recent sessions, and pending join requests', () => {
   assert.match(joinGroupSource, /lookupGroupInviteLink/)
   assert.match(joinGroupSource, /requestJoinByInviteLink/)
@@ -39,6 +59,7 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.match(joinGroupSource, /onAction\?\.\('resumeRecentSession'/)
   assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
   assert.match(joinGroupSource, /Tên đã có cần link cá nhân hoặc PIN/)
+  assert.match(joinGroupSource, /session\.authToken \? 'Nhóm đã tham gia' : 'Cần mở lại link cá nhân'/)
   assert.match(joinGroupSource, /await requestJoinByInviteLink\(inviteToken, memberName\)/)
   assert.match(joinGroupSource, /setJoinSent\(true\)/)
 })

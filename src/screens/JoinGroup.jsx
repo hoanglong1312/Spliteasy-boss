@@ -132,7 +132,7 @@ export default function JoinGroup({ data, onAction }) {
                 >
                   <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
                   <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                    {session.groupName || 'Nhóm đã tham gia'}{session.hasPin ? ' · Có PIN' : ''}
+                    {session.groupName || (session.authToken ? 'Nhóm đã tham gia' : 'Cần mở lại link cá nhân')}{session.hasPin ? ' · Có PIN' : ''}
                   </span>
                 </button>
               ))}

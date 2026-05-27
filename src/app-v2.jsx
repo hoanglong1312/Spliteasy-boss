@@ -242,7 +242,19 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      dispatch({ type: 'SHOW_TOAST', message: 'Mở lại link cá nhân hoặc nhờ thủ quỹ gửi link mới để vào tài khoản này.' })
+      if (!payload?.authToken) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Phiên gần đây thiếu token. Mở lại link cá nhân để vào tài khoản này.' })
+        return
+      }
+      await dispatch({
+        type: 'LOGIN',
+        token: payload.authToken,
+        memberId: payload.memberId,
+        groupId: payload.groupId,
+        memberName: payload.memberName,
+      })
+      setStack([])
+      setActiveTab('home')
       return
     }
 
