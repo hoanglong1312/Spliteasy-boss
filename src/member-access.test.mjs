@@ -53,6 +53,13 @@ test('JoinGroup empty state does not show a fake Spliteasy group before link or 
   assert.doesNotMatch(screenDataSource, /name: group\.name \|\| 'Nhóm Spliteasy'/)
 })
 
+test('JoinGroup allows existing members with a manual invite code but blocks invite-link impersonation', () => {
+  assert.match(joinGroupSource, /const isInviteLinkFlow = Boolean\(inviteToken\)/)
+  assert.match(joinGroupSource, /if \(isInviteLinkFlow && selected && !newName\)/)
+  assert.match(joinGroupSource, /await onAction\?\.\('joinGroup', \{ code: code\.trim\(\), memberName \}\)/)
+  assert.doesNotMatch(joinGroupSource, /if \(selected && !newName\)/)
+})
+
 test('member detail and group menu expose app-login and group-invite share links', () => {
   assert.match(groupDetailSource, /createMemberAccessLink/)
   assert.match(groupDetailSource, /Chia sẻ link vào app/)

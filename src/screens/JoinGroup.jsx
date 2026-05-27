@@ -21,6 +21,7 @@ export default function JoinGroup({ data, onAction }) {
   const memberName = (newName || selected || '').trim();
   const recentSessions = d.recentSessions || [];
   const inviteToken = d.inviteToken || '';
+  const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
 
   const existingNames = hasGroupPreview ? (foundGroup?.member_names || d.existingNames || []) : [];
@@ -258,7 +259,7 @@ export default function JoinGroup({ data, onAction }) {
           <>
             <SectionLabel>Bạn là ai?</SectionLabel>
             <div style={{ fontSize: 11, color: colors.textSecondary, margin: '-4px 0 12px', lineHeight: 1.5 }}>
-              Nhập tên mới để gửi yêu cầu tham gia. Tên đã có cần link cá nhân hoặc PIN để vào đúng tài khoản.
+              Có mã mời thì chọn tên có sẵn để vào nhóm. Link mời công khai chỉ nhận tên mới để chờ thủ quỹ duyệt.
             </div>
 
             <Card style={{ padding: 14 }}>
@@ -343,10 +344,10 @@ export default function JoinGroup({ data, onAction }) {
             setJoinError('');
             if (!inviteToken && !code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
             if (!memberName) { setJoinError('Vui lòng chọn hoặc nhập tên của bạn.'); return; }
-            if (selected && !newName) { setJoinError('Tên đã có cần link cá nhân hoặc PIN. Nhờ thủ quỹ gửi link vào app.'); return; }
+            if (isInviteLinkFlow && selected && !newName) { setJoinError('Tên đã có cần link cá nhân hoặc PIN. Nhờ thủ quỹ gửi link vào app.'); return; }
             setJoining(true);
             try {
-              if (inviteToken) {
+              if (isInviteLinkFlow) {
                 await requestJoinByInviteLink(inviteToken, memberName);
                 setJoinSent(true);
                 setJoining(false);
