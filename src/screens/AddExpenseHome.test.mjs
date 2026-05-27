@@ -6,6 +6,7 @@ const addExpenseSource = readFileSync(new URL('./AddExpense.jsx', import.meta.ur
 const groupDetailSource = readFileSync(new URL('./GroupDetail.jsx', import.meta.url), 'utf8');
 const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8');
 const expenseDetailSource = readFileSync(new URL('./ExpenseDetail.jsx', import.meta.url), 'utf8');
+const memberBillShareSource = readFileSync(new URL('./MemberBillShare.jsx', import.meta.url), 'utf8');
 const screenDataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 const primitivesSource = readFileSync(new URL('../primitives.jsx', import.meta.url), 'utf8');
@@ -312,7 +313,8 @@ test('GroupDetail member detail exposes clear treasurer edit access', () => {
     groupDetailSource.indexOf('function MemberPaidTransactionRow')
   );
   assert.match(memberDetailSource, /\{isTreasurer && \(/);
-  assert.match(memberDetailSource, /<Button variant="brand" style=\{\{ fontSize: 13 \}\} onClick=\{onEdit\}>Chỉnh sửa thông tin<\/Button>/);
+  assert.match(memberDetailSource, /<BottomSheet title="Tùy chọn khác"/);
+  assert.match(memberDetailSource, /<ActionButton onClick=\{\(\) => \{ setMemberActionsOpen\(false\); onEdit\?\.\(\); \}\}>Chỉnh sửa thông tin<\/ActionButton>/);
   assert.doesNotMatch(memberDetailSource, />Sửa thành viên<\/Button>/);
 });
 
@@ -400,14 +402,28 @@ test('GroupDetail member detail shows payer transactions for the selected month'
   assert.doesNotMatch(groupDetailSource, /member\.payerTransactions/);
 });
 
-test('GroupDetail member detail exposes share link and member bill VietQR actions', () => {
-  assert.match(groupDetailSource, /import \{ BANK_LIST, generateQRUrl \} from '\.\.\/lib\/vietqr\.js'/);
-  assert.match(groupDetailSource, /const \[billQrOpen, setBillQrOpen\] = useState\(false\)/);
+test('GroupDetail member detail uses bill sharing as the primary action and moves app login to secondary options', () => {
   assert.match(groupDetailSource, /onAction\?\.\('createMemberBillShare'/);
-  assert.match(groupDetailSource, /Tạo QR thanh toán/);
-  assert.match(groupDetailSource, /generateQRUrl\(\{/);
-  assert.match(groupDetailSource, /member\.paymentTarget/);
-  assert.match(groupDetailSource, /Cập nhật thông tin thanh toán/);
+  assert.match(groupDetailSource, /Gửi bill cá nhân/);
+  assert.match(groupDetailSource, /Tùy chọn khác/);
+  assert.match(groupDetailSource, /Tạo link vào app/);
+  assert.match(groupDetailSource, /onAction\?\.\('createMemberAccessLink'/);
+  assert.doesNotMatch(groupDetailSource, /const \[billQrOpen, setBillQrOpen\] = useState\(false\)/);
+  assert.doesNotMatch(groupDetailSource, />Tạo QR thanh toán<\/Button>/);
+  assert.doesNotMatch(groupDetailSource, /Chia sẻ link vào app/);
+});
+
+test('MemberBillShare renders payment QR when the member owes money and a payment target exists', () => {
+  assert.match(memberBillShareSource, /import \{ BANK_LIST, generateQRUrl \} from '\.\.\/lib\/vietqr\.js'/);
+  assert.match(memberBillShareSource, /function PaymentCard\(\{ bill, summary \}\)/);
+  assert.match(memberBillShareSource, /<PaymentCard bill=\{bill\} summary=\{summary\} \/>/);
+  assert.match(memberBillShareSource, /const canGenerateQr = Boolean\(qrBankId && paymentTarget\.bankAccount && paymentTarget\.bankAccountName && owesAmount > 0\)/);
+  assert.match(memberBillShareSource, /generateQRUrl\(\{/);
+  assert.match(memberBillShareSource, /alt="QR thanh toán"/);
+  assert.match(memberBillShareSource, /Nội dung chuyển khoản/);
+  assert.match(memberBillShareSource, /copyPaymentInfo/);
+  assert.match(memberBillShareSource, /Không cần thanh toán/);
+  assert.match(memberBillShareSource, /Chưa có thông tin quỹ, liên hệ thủ quỹ/);
 });
 
 test('App supports public member bill tokens without requiring login', () => {

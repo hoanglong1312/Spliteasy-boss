@@ -8,7 +8,6 @@ import {
   ModuleHero, ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
   MemberPicker,
 } from '../primitives';
-import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
 const GROUP_TYPES = [
@@ -605,7 +604,7 @@ function RolePill({ icon, label }) {
 function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, onEdit, onDelete }) {
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionFilter, setTransactionFilter] = useState('all');
-  const [billQrOpen, setBillQrOpen] = useState(false);
+  const [memberActionsOpen, setMemberActionsOpen] = useState(false);
   const balance = Number(member.balance || 0);
   const summary = member.memberTransactionSummary || { owes: 0, advanced: 0, net: 0 };
   const transactions = member.memberTransactions || [];
@@ -621,20 +620,6 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       (transactionFilter === 'settled' && net === 0);
     return matchesSearch && matchesFilter;
   });
-  const paymentTarget = member.paymentTarget || {};
-  const debtAmount = Math.max(0, Number(summary.owes || 0));
-  const selectedBank = resolveBank(paymentTarget.bankName);
-  const qrBankId = selectedBank?.id || paymentTarget.bankName || '';
-  const canGenerateQr = Boolean(qrBankId && paymentTarget.bankAccount && paymentTarget.bankAccountName && debtAmount > 0);
-  const [billYear, billMonth] = String(member.currentYearMonth || '').split('-');
-  const qrDescription = `${member.name} - ${groupName} - Thang ${billMonth || new Date().getMonth() + 1}/${billYear || new Date().getFullYear()}`;
-  const qrUrl = canGenerateQr ? generateQRUrl({
-    bankId: qrBankId,
-    account: paymentTarget.bankAccount,
-    accountName: paymentTarget.bankAccountName,
-    amount: debtAmount,
-    description: qrDescription,
-  }) : '';
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : '0';
   const balanceAmountLabel = balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`;
@@ -731,49 +716,32 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         )}
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginTop: 14 }}>
+        <Button
+          variant="brand"
+          style={{ fontSize: 14 }}
+          onClick={() => onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id })}
+        >Gửi bill cá nhân</Button>
         <Button
           variant="muted"
           style={{ fontSize: 13 }}
-          onClick={() => onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id })}
-        >Chia sẻ bill</Button>
-        <Button
-          variant="brand"
-          style={{ fontSize: 13 }}
-          onClick={() => onAction?.('createMemberAccessLink', { groupId: member.groupId, memberId: member.id })}
-        >Chia sẻ link vào app</Button>
+          onClick={() => setMemberActionsOpen(true)}
+        >Tùy chọn khác</Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginTop: 10 }}>
-        <Button variant="success" style={{ fontSize: 13 }} onClick={() => setBillQrOpen(true)}>Tạo QR thanh toán</Button>
-      </div>
-
-      {isTreasurer && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
-          <Button variant="brand" style={{ fontSize: 13 }} onClick={onEdit}>Chỉnh sửa thông tin</Button>
-          <Button variant="danger" style={{ fontSize: 13 }} onClick={onDelete}>Xóa khỏi nhóm</Button>
-        </div>
-      )}
-
-      {billQrOpen && (
-        <BottomSheet title="QR thanh toán" onClose={() => setBillQrOpen(false)}>
-          {canGenerateQr ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
-              <img src={qrUrl} alt="QR thanh toán" style={{ width: 220, height: 220, borderRadius: 12, background: 'white' }} />
-              <div style={{ fontSize: 24, fontWeight: 900, color: colors.danger, ...type.mono }}>{formatVND(debtAmount)}</div>
-              <div style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{paymentTarget.bankAccountName} · {paymentTarget.bankAccount}</div>
-              <div style={{ fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{qrDescription}</div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-                Cập nhật thông tin thanh toán của thủ quỹ và đảm bảo thành viên đang có số tiền cần trả.
-              </div>
-              <Button variant="brand" onClick={() => onAction?.('settings')}>Cập nhật thông tin thanh toán</Button>
-            </div>
-          )}
+      {memberActionsOpen && (
+        <BottomSheet title="Tùy chọn khác" onClose={() => setMemberActionsOpen(false)}>
+          <div style={{ display: 'grid', gap: 10 }}>
+            <ActionButton onClick={() => {
+              setMemberActionsOpen(false);
+              onAction?.('createMemberAccessLink', { groupId: member.groupId, memberId: member.id });
+            }}>Tạo link vào app</ActionButton>
+            {isTreasurer && <ActionButton onClick={() => { setMemberActionsOpen(false); onEdit?.(); }}>Chỉnh sửa thông tin</ActionButton>}
+            {isTreasurer && <ActionButton danger onClick={() => { setMemberActionsOpen(false); onDelete?.(); }}>Xóa khỏi nhóm</ActionButton>}
+          </div>
         </BottomSheet>
       )}
+
     </Screen>
   );
 }
@@ -1014,15 +982,6 @@ function normalizeSearch(value) {
     .replace(/Đ/g, 'd')
     .trim()
     .toLowerCase();
-}
-
-function resolveBank(value) {
-  const normalized = String(value || '').trim().toLowerCase();
-  return BANK_LIST.find(bank => (
-    bank.id.toLowerCase() === normalized ||
-    bank.shortName.toLowerCase() === normalized ||
-    bank.name.toLowerCase() === normalized
-  )) || null;
 }
 
 function EditMemberEditor({ title, member, onClose, onAction }) {

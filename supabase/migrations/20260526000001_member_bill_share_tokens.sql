@@ -99,6 +99,35 @@ BEGIN
     'memberId', v_share.member_id,
     'memberName', v_share.member_name,
     'expiresAt', v_share.expires_at,
+    'paymentTarget', jsonb_build_object(
+      'bankName', (
+        SELECT treasurer.bank_name
+        FROM public.members treasurer
+        WHERE treasurer.group_id = v_share.group_id
+          AND treasurer.role = 'treasurer'
+          AND treasurer.is_active IS DISTINCT FROM false
+        ORDER BY treasurer.created_at ASC
+        LIMIT 1
+      ),
+      'bankAccount', (
+        SELECT treasurer.bank_account
+        FROM public.members treasurer
+        WHERE treasurer.group_id = v_share.group_id
+          AND treasurer.role = 'treasurer'
+          AND treasurer.is_active IS DISTINCT FROM false
+        ORDER BY treasurer.created_at ASC
+        LIMIT 1
+      ),
+      'bankAccountName', (
+        SELECT treasurer.bank_account_name
+        FROM public.members treasurer
+        WHERE treasurer.group_id = v_share.group_id
+          AND treasurer.role = 'treasurer'
+          AND treasurer.is_active IS DISTINCT FROM false
+        ORDER BY treasurer.created_at ASC
+        LIMIT 1
+      )
+    ),
     'summary', COALESCE((
       SELECT jsonb_build_object(
         'owes', SUM(GREATEST(0, ep.share_amount - CASE WHEN e.paid_by_member_id = v_share.member_id THEN e.amount ELSE 0 END)),

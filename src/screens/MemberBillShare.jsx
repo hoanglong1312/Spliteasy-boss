@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
-import { PhoneFrame, Screen, Card, SearchInput, SubTabs, Badge } from '../primitives';
+import { PhoneFrame, Screen, Card, SearchInput, SubTabs, Badge, Button } from '../primitives';
+import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 export default function MemberBillShare({ data, loading = false }) {
   const [search, setSearch] = useState('');
@@ -47,6 +48,7 @@ export default function MemberBillShare({ data, loading = false }) {
                 <MiniShareStat label="Net" value={summary.net} tone={(summary.net || 0) < 0 ? colors.danger : '#6ee7b7'} signed />
               </div>
             </Card>
+            <PaymentCard bill={bill} summary={summary} />
             <Card style={{ marginTop: 12 }}>
               <SearchInput value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm giao dịch..." />
               <SubTabs
@@ -70,6 +72,77 @@ export default function MemberBillShare({ data, loading = false }) {
         )}
       </Screen>
     </PhoneFrame>
+  );
+}
+
+function PaymentCard({ bill, summary }) {
+  const owesAmount = Math.max(0, Number(summary?.owes || 0));
+  const paymentTarget = bill?.paymentTarget || {};
+  const bank = resolveBank(paymentTarget.bankName);
+  const qrBankId = bank?.id || paymentTarget.bankName || '';
+  const description = `${bill?.memberName || 'Thanh vien'} - ${bill?.groupName || 'Nhom'} - ${bill?.monthLabel || 'Thang hien tai'}`;
+  const canGenerateQr = Boolean(qrBankId && paymentTarget.bankAccount && paymentTarget.bankAccountName && owesAmount > 0);
+  const qrUrl = canGenerateQr
+    ? generateQRUrl({
+        bankId: qrBankId,
+        account: paymentTarget.bankAccount,
+        accountName: paymentTarget.bankAccountName,
+        amount: owesAmount,
+        description,
+      })
+    : '';
+
+  function copyPaymentInfo() {
+    if (!navigator.clipboard) return;
+    navigator.clipboard.writeText([
+      formatVND(owesAmount),
+      paymentTarget.bankAccountName,
+      paymentTarget.bankAccount,
+      description,
+    ].filter(Boolean).join('\n')).catch(() => {});
+  }
+
+  return (
+    <Card style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 900, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>Thanh toán</div>
+      {owesAmount <= 0 && (
+        <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, color: '#6ee7b7' }}>Không cần thanh toán</div>
+      )}
+      {owesAmount > 0 && !canGenerateQr && (
+        <div style={{ marginTop: 10, fontSize: 14, fontWeight: 800, color: colors.textSecondary, lineHeight: 1.45 }}>
+          Chưa có thông tin quỹ, liên hệ thủ quỹ.
+        </div>
+      )}
+      {canGenerateQr && (
+        <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '116px 1fr',
+            gap: 12,
+            alignItems: 'center',
+          }}>
+            <img
+              src={qrUrl}
+              alt="QR thanh toán"
+              style={{ width: 116, height: 116, borderRadius: 12, background: '#fff', objectFit: 'cover' }}
+            />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>Số tiền cần chuyển</div>
+              <div style={{ marginTop: 4, fontSize: 20, fontWeight: 950, color: colors.danger, ...type.mono }}>{formatVND(owesAmount)}</div>
+              <div style={{ marginTop: 9, fontSize: 11, color: colors.textSecondary, lineHeight: 1.45 }}>
+                {paymentTarget.bankAccountName}<br />
+                {bank?.shortName || paymentTarget.bankName} · {paymentTarget.bankAccount}
+              </div>
+            </div>
+          </div>
+          <div style={{ padding: 10, borderRadius: 12, background: colors.inputBg, border: `1px solid ${colors.borderSubtle}` }}>
+            <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 800 }}>Nội dung chuyển khoản</div>
+            <div style={{ marginTop: 5, fontSize: 12, fontWeight: 850, lineHeight: 1.4 }}>{description}</div>
+          </div>
+          <Button variant="muted" onClick={copyPaymentInfo}>Copy thông tin chuyển khoản</Button>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -101,6 +174,16 @@ function ShareTransactionRow({ row }) {
       </div>
     </div>
   );
+}
+
+function resolveBank(value) {
+  const target = normalizeSearch(value);
+  if (!target) return null;
+  return BANK_LIST.find(bank => (
+    normalizeSearch(bank.id) === target ||
+    normalizeSearch(bank.shortName) === target ||
+    normalizeSearch(bank.name) === target
+  )) || null;
 }
 
 function normalizeSearch(value) {

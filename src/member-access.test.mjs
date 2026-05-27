@@ -62,7 +62,8 @@ test('JoinGroup allows existing members with a manual invite code but blocks inv
 
 test('member detail and group menu expose app-login and group-invite share links', () => {
   assert.match(groupDetailSource, /createMemberAccessLink/)
-  assert.match(groupDetailSource, /Chia sẻ link vào app/)
+  assert.match(groupDetailSource, /Tạo link vào app/)
+  assert.match(groupDetailSource, /Tùy chọn khác/)
   assert.match(groupDetailSource, /createGroupInviteShare/)
   assert.match(groupDetailSource, /Chia sẻ link mời/)
 })

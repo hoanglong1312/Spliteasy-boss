@@ -952,7 +952,7 @@ export default function AppV2() {
       const shareToken = data?.token || data
       const url = `${window.location.origin}${window.location.pathname}?bill=${encodeURIComponent(shareToken)}`
       if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
-      dispatch({ type: 'SHOW_TOAST', message: 'Đã tạo link và sao chép.' })
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link bill cá nhân.' })
       return
     }
 
