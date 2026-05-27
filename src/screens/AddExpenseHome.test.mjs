@@ -352,6 +352,15 @@ test('Screen data excludes inactive memberships from group member lists', () => 
 });
 
 test('GroupDetail member detail shows payer transactions for the selected month', () => {
+  const memberDetailSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberDetailPanel'),
+    groupDetailSource.indexOf('function MiniBillStat')
+  );
+  const memberTransactionSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberTransactionRow'),
+    groupDetailSource.indexOf('function MemberPaidTransactionRow')
+  );
+
   assert.match(screenDataSource, /const memberTransactions = buildMemberTransactions\(g, member\.id, selectedYearMonth, groupMembers\)/);
   assert.match(screenDataSource, /function buildMemberTransactions\(group, memberId, selectedYearMonth, members = \[\]\)/);
   assert.match(screenDataSource, /memberTransactionSummary: summarizeMemberTransactions\(memberTransactions\)/);
@@ -359,7 +368,15 @@ test('GroupDetail member detail shows payer transactions for the selected month'
   assert.match(groupDetailSource, /member\.memberTransactions/);
   assert.match(groupDetailSource, /transactionFilter/);
   assert.match(groupDetailSource, /placeholder="Tìm giao dịch/);
+  assert.match(memberDetailSource, /<NetBillStat value=\{summary\.net\} \/>/);
+  assert.match(memberDetailSource, /gridTemplateColumns: '1fr 1fr'/);
+  assert.doesNotMatch(memberDetailSource, /\{ key: 'settled', label: 'Cân bằng' \}/);
   assert.match(groupDetailSource, /function MemberTransactionRow\(\{ transaction, onOpen \}\)/);
+  assert.match(groupDetailSource, /function NetBillStat\(\{ value \}\)/);
+  assert.match(groupDetailSource, /whiteSpace: 'nowrap'/);
+  assert.match(memberTransactionSource, /<TransactionPill label=\{roleLabel\} tone=\{roleTone\} \/>/);
+  assert.match(memberTransactionSource, /<TransactionPill label=\{statusLabel\} tone=\{statusTone\} \/>/);
+  assert.match(memberTransactionSource, /transactionStatusLabel\(transaction\.status\)/);
   assert.match(groupDetailSource, /onAction\?\.\('expenseDetail', \{ expenseId: transaction\.id \}\)/);
   assert.doesNotMatch(screenDataSource, /payerTransactions: buildMemberPayerTransactions/);
   assert.doesNotMatch(groupDetailSource, /member\.payerTransactions/);

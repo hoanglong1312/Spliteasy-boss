@@ -674,10 +674,10 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
 
       <Card style={{ marginTop: 14 }}>
         <SectionTitle>TỔNG QUAN GIAO DỊCH</SectionTitle>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
           <MiniBillStat label="Cần trả" value={summary.owes} tone={colors.danger} />
           <MiniBillStat label="Đã ứng" value={summary.advanced} tone="#6ee7b7" />
-          <MiniBillStat label="Net" value={summary.net} tone={summary.net < 0 ? colors.danger : summary.net > 0 ? '#6ee7b7' : colors.textSecondary} signed />
+          <NetBillStat value={summary.net} />
         </div>
       </Card>
 
@@ -704,7 +704,6 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
             { key: 'all', label: 'Tất cả' },
             { key: 'owes', label: 'Cần trả' },
             { key: 'advanced', label: 'Đã ứng' },
-            { key: 'settled', label: 'Cân bằng' },
           ]}
           active={transactionFilter}
           onChange={setTransactionFilter}
@@ -768,9 +767,38 @@ function MiniBillStat({ label, value, tone, signed = false }) {
   const amount = Number(value || 0);
   const prefix = signed && amount > 0 ? '+' : signed && amount < 0 ? '-' : '';
   return (
-    <div style={{ padding: 10, borderRadius: 12, background: colors.inputBg, border: `1px solid ${colors.borderSubtle}` }}>
+    <div style={{ padding: 10, borderRadius: 12, background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`, minWidth: 0 }}>
       <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 800 }}>{label}</div>
-      <div style={{ marginTop: 5, fontSize: 13, fontWeight: 900, color: tone, ...type.mono }}>{prefix}{formatVND(Math.abs(amount))}</div>
+      <div style={{ marginTop: 5, fontSize: 14, fontWeight: 900, color: tone, whiteSpace: 'nowrap', ...type.mono }}>{prefix}{formatVND(Math.abs(amount))}</div>
+    </div>
+  );
+}
+
+function NetBillStat({ value }) {
+  const amount = Number(value || 0);
+  const tone = amount < 0 ? colors.danger : amount > 0 ? '#6ee7b7' : colors.textSecondary;
+  const label = amount < 0 ? 'Còn phải nộp' : amount > 0 ? 'Cần thu lại' : '0';
+  const amountLabel = amount === 0 ? '0 đ' : `${amount > 0 ? '+' : '-'}${formatVND(Math.abs(amount))}`;
+  return (
+    <div style={{
+      gridColumn: '1 / -1',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      padding: '12px 13px',
+      borderRadius: 14,
+      background: amount < 0 ? 'rgba(248,113,113,0.10)' : amount > 0 ? 'rgba(52,211,153,0.10)' : colors.inputBg,
+      border: `1px solid ${amount < 0 ? 'rgba(248,113,113,0.24)' : amount > 0 ? 'rgba(52,211,153,0.24)' : colors.borderSubtle}`,
+      minWidth: 0,
+    }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>Net</div>
+        <div style={{ marginTop: 3, fontSize: 12, fontWeight: 800, color: tone }}>{label}</div>
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 950, color: tone, whiteSpace: 'nowrap', ...type.mono }}>
+        {amountLabel}
+      </div>
     </div>
   );
 }
@@ -779,6 +807,10 @@ function MemberTransactionRow({ transaction, onOpen }) {
   const net = Number(transaction.netAmount || 0);
   const tone = net < 0 ? colors.danger : net > 0 ? '#6ee7b7' : colors.textSecondary;
   const label = net < 0 ? `-${formatVND(Math.abs(net))}` : net > 0 ? `+${formatVND(net)}` : '0 đ';
+  const roleLabel = transaction.role === 'payer' ? 'Đã ứng' : 'Cần trả';
+  const roleTone = transaction.role === 'payer' ? '#6ee7b7' : colors.danger;
+  const statusLabel = transactionStatusLabel(transaction.status);
+  const statusTone = transactionStatusTone(transaction.status);
   return (
     <button type="button" onClick={onOpen} style={{
       width: '100%',
@@ -796,16 +828,62 @@ function MemberTransactionRow({ transaction, onOpen }) {
       textAlign: 'left',
       cursor: 'pointer',
     }}>
-      <div style={{ width: 42, color: colors.textSecondary, fontSize: 11, fontWeight: 800 }}>{transaction.date}</div>
+      <div style={{
+        width: 48,
+        padding: '6px 0',
+        borderRadius: 10,
+        background: 'rgba(255,255,255,0.055)',
+        border: `1px solid ${colors.borderSubtle}`,
+        color: colors.textSecondary,
+        fontSize: 11,
+        fontWeight: 900,
+        textAlign: 'center',
+        flexShrink: 0,
+      }}>{transaction.date}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{transaction.title}</div>
-        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-          {transaction.role === 'payer' ? 'Đã ứng' : 'Cần trả'} · {transaction.paidByName} trả · {transaction.status}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', marginTop: 6 }}>
+          <TransactionPill label={roleLabel} tone={roleTone} />
+          <TransactionPill label={statusLabel} tone={statusTone} />
+          <span style={{ fontSize: 10, color: colors.textSecondary }}>{transaction.paidByName} trả</span>
         </div>
       </div>
       <div style={{ fontSize: 13, fontWeight: 900, color: tone, ...type.mono }}>{label}</div>
     </button>
   );
+}
+
+function TransactionPill({ label, tone }) {
+  return (
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      padding: '3px 7px',
+      borderRadius: 999,
+      background: `${tone}1A`,
+      border: `1px solid ${tone}33`,
+      color: tone,
+      fontSize: 9,
+      fontWeight: 900,
+      lineHeight: 1,
+    }}>{label}</span>
+  );
+}
+
+function transactionStatusLabel(status) {
+  const value = String(status || '').toLowerCase();
+  if (value === 'pending') return 'Chờ duyệt';
+  if (value === 'approved') return 'Đã duyệt';
+  if (value === 'rejected' || value === 'declined') return 'Từ chối';
+  return status || 'Mới';
+}
+
+function transactionStatusTone(status) {
+  const value = String(status || '').toLowerCase();
+  if (value === 'pending') return '#93c5fd';
+  if (value === 'approved') return '#c4b5fd';
+  if (value === 'rejected' || value === 'declined') return colors.danger;
+  return colors.textSecondary;
 }
 
 function MemberPaidTransactionRow({ transaction }) {
