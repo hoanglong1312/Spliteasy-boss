@@ -627,10 +627,12 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : '0';
   const balanceAmountLabel = balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`;
   const memberShareKey = `${member.groupId || ''}:${member.id || ''}`;
+  const canCreatePersonalLink = Boolean(isTreasurer || member.isCurrentUser);
 
   useEffect(() => {
     let alive = true;
     async function ensureMemberBillShare() {
+      if (!canCreatePersonalLink) return;
       if (!member.groupId || !member.id || personalLinkStatus === 'loading') return;
       setPersonalLink('');
       setPersonalLinkError('');
@@ -647,7 +649,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
     }
     ensureMemberBillShare();
     return () => { alive = false; };
-  }, [memberShareKey]);
+  }, [memberShareKey, canCreatePersonalLink]);
 
   function copyPersonalLink() {
     if (!personalLink || !navigator.clipboard) return;
@@ -675,6 +677,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
                 {member.role === 'treasurer' && <Badge tone="warn">Thủ quỹ</Badge>}
                 <Badge tone="success">Thành viên</Badge>
               </div>
+              <GroupNamePill groupName={groupName} />
             </div>
           </div>
           <div style={{
@@ -747,37 +750,39 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         )}
       </Card>
 
-      <Card style={{ marginTop: 14 }}>
-        <SectionTitle>LINK CÁ NHÂN</SectionTitle>
-        <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
-          <div style={{
-            minHeight: 42,
-            display: 'flex',
-            alignItems: 'center',
-            padding: '9px 10px',
-            borderRadius: 12,
-            background: colors.inputBg,
-            border: `1px solid ${colors.borderSubtle}`,
-            color: personalLink ? colors.textPrimary : colors.textSecondary,
-            fontSize: 12,
-            lineHeight: 1.35,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
-            {personalLinkStatus === 'loading' ? 'Đang tạo link...' : personalLink || personalLinkError || 'Chưa có link'}
+      {canCreatePersonalLink && (
+        <Card style={{ marginTop: 14 }}>
+          <SectionTitle>LINK CÁ NHÂN</SectionTitle>
+          <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
+            <div style={{
+              minHeight: 42,
+              display: 'flex',
+              alignItems: 'center',
+              padding: '9px 10px',
+              borderRadius: 12,
+              background: colors.inputBg,
+              border: `1px solid ${colors.borderSubtle}`,
+              color: personalLink ? colors.textPrimary : colors.textSecondary,
+              fontSize: 12,
+              lineHeight: 1.35,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              {personalLinkStatus === 'loading' ? 'Đang tạo link...' : personalLink || personalLinkError || 'Chưa có link'}
+            </div>
+            <Button
+              variant="muted"
+              style={{ fontSize: 12, padding: '11px 12px' }}
+              disabled={!personalLink}
+              onClick={copyPersonalLink}
+            >Sao chép</Button>
           </div>
-          <Button
-            variant="muted"
-            style={{ fontSize: 12, padding: '11px 12px' }}
-            disabled={!personalLink}
-            onClick={copyPersonalLink}
-          >Sao chép</Button>
-        </div>
-        <div style={{ marginTop: 8, fontSize: 11, color: colors.textSecondary, lineHeight: 1.45 }}>
-          Link mở bill cá nhân trước. Member có thể vào app từ trang bill nếu cần.
-        </div>
-      </Card>
+          <div style={{ marginTop: 8, fontSize: 11, color: colors.textSecondary, lineHeight: 1.45 }}>
+            Link mở bill cá nhân trước. Member có thể vào app từ trang bill nếu cần.
+          </div>
+        </Card>
+      )}
 
       {isTreasurer && (
         <Button
@@ -797,6 +802,30 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       )}
 
     </Screen>
+  );
+}
+
+function GroupNamePill({ groupName }) {
+  if (!groupName) return null;
+  return (
+    <div style={{
+      marginTop: 10,
+      display: 'inline-flex',
+      maxWidth: '100%',
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: 'rgba(7,8,15,0.30)',
+      border: '1px solid rgba(255,255,255,0.12)',
+      color: '#d1fae5',
+      fontSize: 11,
+      fontWeight: 850,
+      lineHeight: 1.2,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    }}>
+      {groupName}
+    </div>
   );
 }
 

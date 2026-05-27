@@ -108,6 +108,29 @@ test('member access link creator helper is profile-aware across duplicate member
   assert.match(profileAwareMigration, /creator\.role = 'treasurer' OR g\.created_by = creator\.id OR g\.created_by = creator\.profile_id/)
 })
 
+test('member bill link card is scoped to managers or the current member', () => {
+  const memberDetailSource = groupDetailSource.slice(
+    groupDetailSource.indexOf('function MemberDetailPanel'),
+    groupDetailSource.indexOf('function MiniBillStat')
+  )
+
+  assert.match(memberDetailSource, /const canCreatePersonalLink = Boolean\(isTreasurer \|\| member\.isCurrentUser\)/)
+  assert.match(memberDetailSource, /if \(!canCreatePersonalLink\) return/)
+  assert.match(memberDetailSource, /\{canCreatePersonalLink && \(\s*<Card style=\{\{ marginTop: 14 \}\}>/)
+  assert.match(memberDetailSource, /groupName=\{groupName\}/)
+})
+
+test('member access links allow members to create their own bill link only', () => {
+  const selfLinkMigration = readFileSync(new URL('../supabase/migrations/20260527000005_member_self_bill_links.sql', import.meta.url), 'utf8')
+
+  assert.match(selfLinkMigration, /CREATE OR REPLACE FUNCTION public\.is_member_access_link_allowed/)
+  assert.match(selfLinkMigration, /p_purpose = 'member_bill'/)
+  assert.match(selfLinkMigration, /target\.id = actor\.id/)
+  assert.match(selfLinkMigration, /target\.profile_id = actor\.profile_id/)
+  assert.match(selfLinkMigration, /CREATE OR REPLACE FUNCTION public\.create_member_access_link/)
+  assert.match(selfLinkMigration, /public\.is_member_access_link_allowed\(p_group_id, p_member_id, p_purpose, v_actor\)/)
+})
+
 test('member access link migration stores hashed scoped tokens and pending invite requests', () => {
   assert.match(accessLinkMigration, /CREATE TABLE IF NOT EXISTS public\.member_access_links/)
   assert.match(accessLinkMigration, /token_hash text NOT NULL UNIQUE/)
