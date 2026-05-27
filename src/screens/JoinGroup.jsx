@@ -2,7 +2,7 @@
 // Props: data { code, group, existingNames[], selectedName }
 
 import React, { useState, useEffect, useRef } from 'react';
-import { lookupGroupByCode } from '../lib/auth.js';
+import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink } from '../lib/auth.js';
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel } from '../primitives';
 
@@ -16,8 +16,11 @@ export default function JoinGroup({ data, onAction }) {
   const [foundGroup, setFoundGroup] = useState(null);
   const [lookupError, setLookupError] = useState('');
   const [looking, setLooking] = useState(false);
+  const [joinSent, setJoinSent] = useState(false);
   const lookupTimer = useRef(null);
   const memberName = (newName || selected || '').trim();
+  const recentSessions = d.recentSessions || [];
+  const inviteToken = d.inviteToken || '';
 
   const existingNames = foundGroup?.member_names || d.existingNames || [];
   const displayGroup = foundGroup
@@ -28,6 +31,31 @@ export default function JoinGroup({ data, onAction }) {
     : d.group;
 
   useEffect(() => {
+    if (!inviteToken) return;
+    let alive = true;
+    setLooking(true);
+    setLookupError('');
+    lookupGroupInviteLink(inviteToken)
+      .then(result => {
+        if (!alive) return;
+        setFoundGroup({
+          ...result,
+          member_names: [],
+          treasurer: result.treasurer || result.treasurer_name,
+        });
+      })
+      .catch(err => {
+        if (!alive) return;
+        setLookupError(err?.message || 'Link mời không còn hiệu lực.');
+      })
+      .finally(() => {
+        if (alive) setLooking(false);
+      });
+    return () => { alive = false; };
+  }, [inviteToken]);
+
+  useEffect(() => {
+    if (inviteToken) return;
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
     const trimmed = code.trim();
     if (trimmed.length < 6) { setFoundGroup(null); setLookupError(''); return; }
@@ -47,7 +75,7 @@ export default function JoinGroup({ data, onAction }) {
       }
     }, 600);
     return () => clearTimeout(lookupTimer.current);
-  }, [code]);
+  }, [code, inviteToken]);
 
   return (
     <PhoneFrame>
@@ -75,6 +103,41 @@ export default function JoinGroup({ data, onAction }) {
         </div>
 
         {/* Invite code */}
+        {recentSessions.length > 0 && (
+          <Card style={{ padding: 14, marginBottom: 14 }}>
+            <div style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: '1px',
+              color: colors.textSecondary, textTransform: 'uppercase',
+              marginBottom: 10,
+            }}>Vào lại tài khoản gần đây</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recentSessions.map(session => (
+                <button
+                  key={session.memberId}
+                  type="button"
+                  onClick={() => onAction?.('resumeRecentSession', session)}
+                  style={{
+                    width: '100%',
+                    padding: 12,
+                    borderRadius: 12,
+                    border: `1px solid ${colors.borderSubtle}`,
+                    background: colors.inputBg,
+                    color: colors.textPrimary,
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
+                  <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                    {session.groupName || 'Nhóm đã tham gia'}{session.hasPin ? ' · Có PIN' : ''}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Card>
+        )}
+
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '12px 14px',
@@ -91,11 +154,12 @@ export default function JoinGroup({ data, onAction }) {
             <div style={{
               fontSize: 9, color: '#6ee7b7', fontWeight: 700,
               textTransform: 'uppercase', letterSpacing: '0.5px',
-            }}>Mã mời</div>
+            }}>{inviteToken ? 'Link mời nhóm' : 'Mã mời thủ công'}</div>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="NHẬP-MÃ-MỜI"
+              disabled={Boolean(inviteToken)}
               style={{
                 width: '100%',
                 marginTop: 1,
@@ -103,6 +167,7 @@ export default function JoinGroup({ data, onAction }) {
                 border: 'none',
                 outline: 'none',
                 color: colors.textPrimary,
+                opacity: inviteToken ? 0.45 : 1,
                 fontSize: 14,
                 fontWeight: 800,
                 letterSpacing: '0.5px',
@@ -168,7 +233,7 @@ export default function JoinGroup({ data, onAction }) {
         {/* Identity selection */}
         <SectionLabel>Bạn là ai?</SectionLabel>
         <div style={{ fontSize: 11, color: colors.textSecondary, margin: '-4px 0 12px', lineHeight: 1.5 }}>
-          Chọn tên đã có trong nhóm nếu thủ quỹ đã thêm bạn, hoặc nhập tên mới.
+          Nhập tên mới để gửi yêu cầu tham gia. Tên đã có cần link cá nhân hoặc PIN để vào đúng tài khoản.
         </div>
 
         <Card style={{ padding: 14 }}>
@@ -179,7 +244,7 @@ export default function JoinGroup({ data, onAction }) {
           }}>Tên có sẵn trong nhóm</div>
           {existingNames.length === 0 && (
             <div style={{ fontSize: 11, color: colors.textMuted, fontStyle: 'italic' }}>
-              Nhập mã mời ở trên để xem danh sách tên.
+              Link mời không hiển thị danh sách tên để tránh vào nhầm tài khoản.
             </div>
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -236,14 +301,30 @@ export default function JoinGroup({ data, onAction }) {
           }}>{joinError}</div>
         )}
 
+        {joinSent && (
+          <div style={{
+            marginTop: 10, padding: '10px 14px',
+            background: 'rgba(52,211,153,0.10)',
+            border: '1px solid rgba(52,211,153,0.25)',
+            borderRadius: 10, fontSize: 11, color: '#6ee7b7',
+          }}>Đã gửi yêu cầu tham gia. Chờ thủ quỹ duyệt trước khi xem dữ liệu nhóm.</div>
+        )}
+
         <Button block variant="brand" style={{ marginTop: 10, opacity: joining ? 0.6 : 1 }}
           onClick={async () => {
             if (joining) return;
             setJoinError('');
-            if (!code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
+            if (!inviteToken && !code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
             if (!memberName) { setJoinError('Vui lòng chọn hoặc nhập tên của bạn.'); return; }
+            if (selected && !newName) { setJoinError('Tên đã có cần link cá nhân hoặc PIN. Nhờ thủ quỹ gửi link vào app.'); return; }
             setJoining(true);
             try {
+              if (inviteToken) {
+                await requestJoinByInviteLink(inviteToken, memberName);
+                setJoinSent(true);
+                setJoining(false);
+                return;
+              }
               await onAction?.('joinGroup', { code: code.trim(), memberName });
             } catch (err) {
               setJoinError(err?.message || 'Mã mời không đúng hoặc kết nối có vấn đề. Thử lại.');

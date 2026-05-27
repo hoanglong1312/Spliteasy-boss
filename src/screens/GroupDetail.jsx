@@ -121,7 +121,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
               }}>
                 <MenuItem onClick={() => { setMenuOpen(false); setEditingGroup(true); }}>Sửa thông tin nhóm</MenuItem>
-                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('join', { groupId: d.id }); }}>Mã mời thành viên</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('createGroupInviteShare', { groupId: d.id }); }}>Chia sẻ link mời</MenuItem>
+                <MenuItem onClick={() => { setMenuOpen(false); onAction?.('join', { groupId: d.id }); }}>Mã mời thủ công</MenuItem>
                 {isTreasurer && <MenuItem danger onClick={() => { setMenuOpen(false); setDeleteConfirmGroup(true); }}>Xóa nhóm</MenuItem>}
               </Card>
             )}
@@ -735,7 +736,15 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
           variant="muted"
           style={{ fontSize: 13 }}
           onClick={() => onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id })}
-        >Chia sẻ link</Button>
+        >Chia sẻ bill</Button>
+        <Button
+          variant="brand"
+          style={{ fontSize: 13 }}
+          onClick={() => onAction?.('createMemberAccessLink', { groupId: member.groupId, memberId: member.id })}
+        >Chia sẻ link vào app</Button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginTop: 10 }}>
         <Button variant="success" style={{ fontSize: 13 }} onClick={() => setBillQrOpen(true)}>Tạo QR thanh toán</Button>
       </div>
 

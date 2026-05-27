@@ -57,9 +57,11 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /onAction\?\.\('settle', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /Sửa thông tin nhóm/);
-  assert.match(groupDetailSource, /Mã mời thành viên/);
+  assert.match(groupDetailSource, /Chia sẻ link mời/);
+  assert.match(groupDetailSource, /Mã mời thủ công/);
   assert.match(groupDetailSource, /Xóa nhóm/);
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
+  assert.match(groupDetailSource, /onAction\?\.\('createGroupInviteShare', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /action=\{<div[\s\S]*\{d\.emoji \|\| '👥'\}/);
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /const \[deleteConfirmGroup, setDeleteConfirmGroup\] = useState\(false\)/);

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
-import { getStoredAuth, joinGroup } from './lib/auth.js'
+import { getRecentSessions, getStoredAuth, joinGroup } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
@@ -74,11 +74,27 @@ function publicBillTokenFromLocation() {
   return params.get('bill') || ''
 }
 
+function accessTokenFromLocation() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  return params.get('access') || ''
+}
+
+function inviteTokenFromLocation() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  return params.get('invite') || ''
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const [publicBillToken] = useState(() => publicBillTokenFromLocation())
+  const [memberAccessToken] = useState(() => accessTokenFromLocation())
+  const [groupInviteToken] = useState(() => inviteTokenFromLocation())
   const [publicBillData, setPublicBillData] = useState(null)
   const [publicBillLoading, setPublicBillLoading] = useState(Boolean(publicBillToken))
+  const [accessLinkLoading, setAccessLinkLoading] = useState(Boolean(memberAccessToken))
+  const [accessLinkError, setAccessLinkError] = useState('')
   const groups = state.groups || []
   const members = state.members || []
   const {
@@ -140,6 +156,37 @@ export default function AppV2() {
     return () => { alive = false }
   }, [publicBillToken])
 
+  useEffect(() => {
+    if (!memberAccessToken) return
+    let alive = true
+    async function consumeAccessLink() {
+      setAccessLinkLoading(true)
+      setAccessLinkError('')
+      const sb = createSupabase()
+      const { data, error } = await sb.rpc('consume_member_access_link', { p_token: memberAccessToken })
+      if (!alive) return
+      if (error || data?.error || !data?.authToken) {
+        setAccessLinkError('Link đăng nhập không còn hiệu lực. Nhờ thủ quỹ gửi lại link mới.')
+        setAccessLinkLoading(false)
+        return
+      }
+      await dispatch({
+        type: 'LOGIN',
+        token: data.authToken,
+        memberId: data.memberId,
+        groupId: data.groupId,
+        memberName: data.memberName,
+        purpose: data.purpose,
+      })
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', window.location.pathname)
+      }
+      setAccessLinkLoading(false)
+    }
+    consumeAccessLink()
+    return () => { alive = false }
+  }, [memberAccessToken, dispatch])
+
   function submitPin(value = pinInput) {
     const stored = localStorage.getItem('spliteasy_pin')
     if (value === stored) {
@@ -167,6 +214,11 @@ export default function AppV2() {
       setAwaitingPin(false)
       setPinError('')
       setPinInput('')
+      return
+    }
+
+    if (type === 'resumeRecentSession') {
+      dispatch({ type: 'SHOW_TOAST', message: 'Mở lại link cá nhân hoặc nhờ thủ quỹ gửi link mới để vào tài khoản này.' })
       return
     }
 
@@ -904,6 +956,46 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'createMemberAccessLink') {
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('create_member_access_link', {
+        p_group_id: payload?.groupId,
+        p_member_id: payload?.memberId,
+        p_purpose: 'member_login',
+      })
+      if (error || data?.error) {
+        console.error('[app] createMemberAccessLink:', error || data)
+        dispatch({ type: 'SHOW_TOAST', message: 'Không tạo được link vào app.' })
+        return
+      }
+      const accessToken = data?.urlToken || data?.token || data
+      const url = `${window.location.origin}${window.location.pathname}?access=${encodeURIComponent(accessToken)}`
+      if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link vào app.' })
+      return
+    }
+
+    if (type === 'createGroupInviteShare') {
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('create_group_invite_link', {
+        p_group_id: payload?.groupId || state.currentGroupId,
+      })
+      if (error || data?.error) {
+        console.error('[app] createGroupInviteShare:', error || data)
+        dispatch({ type: 'SHOW_TOAST', message: 'Không tạo được link mời.' })
+        return
+      }
+      const inviteToken = data?.urlToken || data?.token || data
+      const url = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(inviteToken)}`
+      if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link mời nhóm.' })
+      return
+    }
+
     if (type === 'confirm') {
       console.log('confirm payload', payload)
       const route = stack[stack.length - 1]
@@ -1484,10 +1576,18 @@ export default function AppV2() {
     )
   }
 
+  if (accessLinkLoading) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#07080f', color: colors.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: type.family }}>
+        Đang mở link đăng nhập...
+      </div>
+    )
+  }
+
   if (!state.currentUserId) {
     return (
       <div style={{ minHeight: '100vh', background: '#07080f' }}>
-        <JoinGroup data={getJoinGroupData()} onAction={handle} />
+        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, accessLinkError }} onAction={handle} />
       </div>
     )
   }

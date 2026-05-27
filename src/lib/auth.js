@@ -2,6 +2,7 @@ import { createSupabase } from './supabase.js'
 
 const TOKEN_KEY  = 'spliteasy_token'
 const MEMBER_KEY = 'spliteasy_member'
+const RECENT_SESSIONS_KEY = 'spliteasy_recent_sessions'
 
 export function getStoredAuth() {
   try {
@@ -27,12 +28,36 @@ export function getStoredAuth() {
 export function storeAuth(token, member) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(MEMBER_KEY, JSON.stringify(member))
+  rememberRecentSession(member)
 }
 
-export function clearAuth() {
+export function getRecentSessions() {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_SESSIONS_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+export function rememberRecentSession(member) {
+  if (!member?.id) return
+  const nextSession = {
+    memberId: member.id,
+    groupId: member.groupId || member.group_id || '',
+    memberName: member.name || member.memberName || '',
+    groupName: member.groupName || '',
+    hasPin: member.hasPin === true || member.has_pin === true,
+  }
+  const sessions = getRecentSessions()
+    .filter(session => String(session.memberId || '') !== String(nextSession.memberId))
+  localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([nextSession, ...sessions].slice(0, 5)))
+}
+
+export function clearAuth({ keepRecent = true } = {}) {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(MEMBER_KEY)
   localStorage.removeItem('spliteasy_tokens')
+  if (!keepRecent) localStorage.removeItem(RECENT_SESSIONS_KEY)
 }
 
 // Tra cứu nhóm theo mã mời — không cần token (SECURITY DEFINER)
@@ -56,4 +81,23 @@ export async function joinGroup(inviteCode, name, existingToken = null) {
   if (error) throw error
   if (data?.error) throw new Error(data.error)
   return data  // { token, member_id, group_id, member_name }
+}
+
+export async function lookupGroupInviteLink(inviteToken) {
+  const sb = createSupabase()
+  const { data, error } = await sb.rpc('lookup_group_invite_link', { p_token: inviteToken })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+export async function requestJoinByInviteLink(inviteToken, name) {
+  const sb = createSupabase()
+  const { data, error } = await sb.rpc('request_join_by_invite_link', {
+    p_token: inviteToken,
+    p_name: name,
+  })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
 }
