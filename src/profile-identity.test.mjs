@@ -203,15 +203,15 @@ test('monthly close renders one profile bill with source breakdown rows', () => 
   assert.match(settlementSource, /bill\.sources\.map/)
 })
 
-test('settings exposes profile link management and app updates membership profile ids', () => {
+test('settings hides profile link management from the app UI while keeping profile RPC handlers available', () => {
   assert.match(screenDataSource, /profileSync: buildProfileSyncData\(state, me\)/)
   assert.match(screenDataSource, /function buildProfileSyncData\(state, me\) \{/)
-  assert.match(settingsSource, /const profileSync = d\.profileSync/)
-  assert.match(settingsSource, /Danh bạ liên thông/)
-  assert.match(settingsSource, /profileSync\.linkedMemberships\.map/)
-  assert.match(settingsSource, /profileSync\.candidates\.map/)
-  assert.match(settingsSource, /onAction\?\.\('linkProfile'/)
-  assert.match(settingsSource, /onAction\?\.\('unlinkProfile'/)
+  assert.doesNotMatch(settingsSource, /Danh bạ liên thông/)
+  assert.doesNotMatch(settingsSource, /Có thể gộp vào danh bạ này/)
+  assert.doesNotMatch(settingsSource, /function ProfileSyncSection/)
+  assert.doesNotMatch(settingsSource, /function ProfileMembershipRow/)
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('linkProfile'/)
+  assert.doesNotMatch(settingsSource, /onAction\?\.\('unlinkProfile'/)
   assert.match(appSource, /if \(type === 'linkProfile'\)/)
   assert.match(appSource, /\.from\('members'\)\s*\.update\(\{ profile_id: profileId \}\)/)
   assert.match(appSource, /if \(type === 'unlinkProfile'\)/)

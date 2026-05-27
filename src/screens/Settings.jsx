@@ -14,7 +14,6 @@ export default function Settings({ data, onAction }) {
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinSetupError, setPinSetupError] = useState('');
   const primaryBank = d.banks.find((b) => b.primary) || d.banks[0];
-  const profileSync = d.profileSync;
   const [editingBank, setEditingBank] = useState(false);
   const [bankName, setBankName] = useState(primaryBank?.name || '');
   const [bankAccount, setBankAccount] = useState(primaryBank?.accountRaw || primaryBank?.account || primaryBank?.accountMasked || '');
@@ -126,8 +125,6 @@ export default function Settings({ data, onAction }) {
         }}>
           <span style={{ fontSize: 14 }}>+</span> Thêm ngân hàng khác
         </button>
-
-        <ProfileSyncSection profileSync={profileSync} onAction={onAction} />
 
         {/* Security */}
         <SectionLabel>Bảo mật</SectionLabel>
@@ -275,120 +272,6 @@ export default function Settings({ data, onAction }) {
       </Screen>
     </PhoneFrame>
   );
-}
-
-function ProfileSyncSection({ profileSync, onAction }) {
-  if (!profileSync) return null;
-  return (
-    <>
-      <SectionLabel>Danh bạ liên thông</SectionLabel>
-      <Card style={{ padding: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 42,
-            height: 42,
-            borderRadius: 12,
-            background: 'rgba(99,102,241,0.18)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 15,
-            fontWeight: 900,
-            color: colors.brandLight,
-          }}>{initialsFromName(profileSync.name)}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: '#f1f5f9' }}>{profileSync.name}</div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-              {profileSync.bankName || 'Chưa có ngân hàng'} · {profileSync.bankAccount || 'Chưa có STK'}
-            </div>
-          </div>
-          <Badge tone="success">{profileSync.linkedMemberships.length} nhóm</Badge>
-        </div>
-
-        <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0 8px' }} />
-        {profileSync.linkedMemberships.map(member => (
-          <ProfileMembershipRow
-            key={member.memberId}
-            member={member}
-            actionLabel="Tách"
-            actionTone="danger"
-            onClick={() => onAction?.('unlinkProfile', { memberId: member.memberId })}
-          />
-        ))}
-      </Card>
-
-      {profileSync.candidates.length > 0 && (
-        <Card style={{ padding: 16, marginTop: 8 }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: colors.textSecondary, marginBottom: 6 }}>
-            Có thể gộp vào danh bạ này
-          </div>
-          {profileSync.candidates.map(member => (
-            <ProfileMembershipRow
-              key={member.memberId}
-              member={member}
-              actionLabel="Gộp"
-              actionTone="brand"
-              onClick={() => onAction?.('linkProfile', { memberId: member.memberId, profileId: profileSync.profileId })}
-            />
-          ))}
-        </Card>
-      )}
-    </>
-  );
-}
-
-function ProfileMembershipRow({ member, actionLabel, actionTone, onClick }) {
-  const isDanger = actionTone === 'danger';
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 10,
-      padding: '9px 0',
-    }}>
-      <div style={{
-        width: 32,
-        height: 32,
-        borderRadius: 10,
-        background: 'rgba(255,255,255,0.06)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 13,
-        fontWeight: 800,
-        flexShrink: 0,
-      }}>{member.initials}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9' }}>{member.name}</div>
-        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>
-          {member.groupEmoji} {member.groupName} · {member.role === 'treasurer' ? 'Thủ quỹ' : 'Thành viên'}
-        </div>
-      </div>
-      <button type="button" onClick={onClick} style={{
-        padding: '6px 10px',
-        borderRadius: 8,
-        background: isDanger ? 'rgba(248,113,113,0.1)' : 'rgba(99,102,241,0.15)',
-        border: `1px solid ${isDanger ? 'rgba(248,113,113,0.25)' : 'rgba(99,102,241,0.3)'}`,
-        color: isDanger ? '#fca5a5' : colors.brandLight,
-        fontSize: 11,
-        fontWeight: 800,
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-        flexShrink: 0,
-      }}>{actionLabel}</button>
-    </div>
-  );
-}
-
-function initialsFromName(name) {
-  return String(name || '?')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase() || '?';
 }
 
 function BankInput({ label, value, onChange, placeholder }) {

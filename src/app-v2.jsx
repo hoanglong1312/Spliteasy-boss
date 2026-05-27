@@ -140,6 +140,7 @@ export default function AppV2() {
   })
   const [pinError, setPinError] = useState('')
   const [pinInput, setPinInput] = useState('')
+  const [pendingPinSession, setPendingPinSession] = useState(null)
 
   useEffect(() => {
     if (!publicBillToken) return
@@ -230,10 +231,14 @@ export default function AppV2() {
   function submitPin(value = pinInput) {
     const stored = localStorage.getItem('spliteasy_pin')
     if (value === stored) {
-      if (state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
+      const pending = pendingPinSession
+      if (pending?.memberId) sessionStorage.setItem(PIN_UNLOCK_KEY, pending.memberId)
+      if (!pending && state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
+      setPendingPinSession(null)
       setAwaitingPin(false)
       setPinError('')
       setPinInput('')
+      if (pending) handle('resumeRecentSession', { ...pending, hasPin: false })
     } else {
       setPinError('Mã PIN không đúng. Thử lại.')
       setPinInput('')
@@ -252,12 +257,21 @@ export default function AppV2() {
       setStack([])
       setActiveTab('home')
       setAwaitingPin(false)
+      setPendingPinSession(null)
       setPinError('')
       setPinInput('')
       return
     }
 
     if (type === 'resumeRecentSession') {
+      const requiresPin = payload?.hasPin || Boolean(localStorage.getItem('spliteasy_pin'))
+      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
+        setPendingPinSession(payload)
+        setAwaitingPin(true)
+        setPinError('')
+        setPinInput('')
+        return
+      }
       const authToken = await resolveRecentSessionToken(payload)
       if (!authToken) {
         dispatch({ type: 'SHOW_TOAST', message: 'Không vào lại được tài khoản này. Nhờ thủ quỹ gửi link mới nếu tên đã bị xóa hoặc đổi.' })
@@ -1625,14 +1639,6 @@ export default function AppV2() {
     )
   }
 
-  if (!state.currentUserId) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#07080f' }}>
-        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, accessLinkError }} onAction={handle} />
-      </div>
-    )
-  }
-
   if (awaitingPin) {
     return (
       <div style={{ minHeight: '100vh', background: '#07080f' }}>
@@ -1642,6 +1648,14 @@ export default function AppV2() {
           onChange={updatePinInput}
           onSubmit={submitPin}
         />
+      </div>
+    )
+  }
+
+  if (!state.currentUserId) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, accessLinkError }} onAction={handle} />
       </div>
     )
   }

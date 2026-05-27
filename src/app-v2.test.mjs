@@ -16,6 +16,15 @@ test('PinEntryScreen uses a controlled numeric password input instead of a numpa
   assert.doesNotMatch(appSource, /isBackspace/)
 })
 
+test('recent session resume asks for the simple PIN input before login when PIN is enabled', () => {
+  assert.match(appSource, /const \[pendingPinSession, setPendingPinSession\] = useState\(null\)/)
+  assert.match(appSource, /const requiresPin = payload\?\.hasPin \|\| Boolean\(localStorage\.getItem\('spliteasy_pin'\)\)/)
+  assert.match(appSource, /setPendingPinSession\(payload\)/)
+  assert.match(appSource, /if \(awaitingPin\)/)
+  assert.match(appSource, /const pending = pendingPinSession[\s\S]*handle\('resumeRecentSession', \{ \.\.\.pending, hasPin: false \}\)/)
+  assert.ok(appSource.indexOf('if (awaitingPin)') < appSource.lastIndexOf('if (!state.currentUserId)'))
+})
+
 test('AppV2 renders the store toast as a fixed bottom overlay', () => {
   assert.match(appSource, /<ToastOverlay toast=\{state\.toast\} \/>/)
   assert.match(appSource, /function ToastOverlay\(\{ toast \}\) \{/)
