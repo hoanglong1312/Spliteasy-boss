@@ -1042,6 +1042,14 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'copyInviteCode') {
+      const inviteCode = String(payload?.inviteCode || payload?.invite_code || '').trim().toUpperCase()
+      if (!inviteCode) return
+      if (navigator.clipboard) navigator.clipboard.writeText(inviteCode).catch(() => {})
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép mã mời.' })
+      return
+    }
+
     if (type === 'toast') {
       dispatch({ type: 'SHOW_TOAST', message: typeof payload === 'string' ? payload : payload?.message || '' })
       return

@@ -35,7 +35,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
   const [groupDescription, setGroupDescription] = useState(d.description || '');
-  const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
@@ -75,11 +74,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       color: d.color || '#574EFA',
     });
     setEditingGroup(false);
-  }
-
-  async function deleteGroup() {
-    await onAction?.('deleteGroup', { groupId: d.id });
-    setDeleteConfirmGroup(false);
   }
 
   return (
@@ -161,11 +155,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         <GroupManagementPanel
           inviteCode={d.inviteCode}
-          canDelete={isTreasurer}
-          onEdit={() => setEditingGroup(true)}
           onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
-          onManualJoin={() => onAction?.('join', { groupId: d.id })}
-          onDelete={() => setDeleteConfirmGroup(true)}
+          onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
         />
 
         {/* Treasurer actions */}
@@ -286,18 +277,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
       )}
 
-      {deleteConfirmGroup && (
-        <BottomSheet title="Xóa nhóm?" onClose={() => setDeleteConfirmGroup(false)}>
-          <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, marginTop: 8 }}>
-            Dữ liệu nhóm sẽ được ẩn khỏi danh sách nhóm. Các giao dịch cũ không bị xóa khỏi DB.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
-            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmGroup(false)}>Hủy</Button>
-            <Button type="button" variant="danger" onClick={deleteGroup}>Xác nhận</Button>
-          </div>
-        </BottomSheet>
-      )}
-
       {memberMenu && canManageMembers && (
         <BottomSheet title={memberMenu.name} onClose={() => setMemberMenu(null)}>
           <ActionButton onClick={() => { setEditingMember(memberMenu); setMemberMenu(null); }}>✏️ Sửa thành viên</ActionButton>
@@ -375,32 +354,38 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   );
 }
 
-function GroupManagementPanel({ inviteCode, canDelete, onEdit, onShare, onManualJoin, onDelete }) {
+function GroupManagementPanel({ inviteCode, onShare, onCopyInviteCode }) {
   return (
-    <Card style={{ marginTop: 12, padding: 14 }}>
+    <Card style={{ marginTop: 10, padding: 11 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '1px', color: colors.textMuted, textTransform: 'uppercase' }}>Quản lý nhóm</div>
-          <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-            <span style={{ fontSize: 11, color: colors.textSecondary }}>Mã mời thủ công</span>
-            <span style={{
-              padding: '4px 8px',
-              borderRadius: 8,
-              background: 'rgba(251,191,36,0.12)',
-              border: '1px solid rgba(251,191,36,0.25)',
-              color: '#fcd34d',
-              fontSize: 11,
-              fontWeight: 900,
-              ...type.mono,
-            }}>{inviteCode || '--'}</span>
-          </div>
+        <div style={{ fontSize: 10, fontWeight: 900, letterSpacing: '1px', color: colors.textMuted, textTransform: 'uppercase', minWidth: 0 }}>
+          Quản lý nhóm
         </div>
-        <button type="button" onClick={onEdit} style={compactIconButtonStyle('rgba(99,102,241,0.12)', '#c7d2fe')}>✎</button>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: canDelete ? '1fr 1fr 42px' : '1fr 1fr', gap: 8, marginTop: 12 }}>
         <button type="button" onClick={onShare} style={groupActionStyle('brand')}>🔗 Chia sẻ link mời</button>
-        <button type="button" onClick={onManualJoin} style={groupActionStyle('muted')}>⌨ Mã mời thủ công</button>
-        {canDelete && <button type="button" onClick={onDelete} aria-label="Xóa nhóm" style={compactIconButtonStyle('rgba(248,113,113,0.12)', '#fca5a5')}>🗑</button>}
+      </div>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 9,
+      }}>
+        <span style={{ fontSize: 11, color: colors.textSecondary }}>Mã mời</span>
+        <span style={{
+          minWidth: 0,
+          padding: '5px 8px',
+          borderRadius: 8,
+          background: 'rgba(251,191,36,0.12)',
+          border: '1px solid rgba(251,191,36,0.25)',
+          color: '#fcd34d',
+          fontSize: 11,
+          fontWeight: 900,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          ...type.mono,
+        }}>{inviteCode || '--'}</span>
+        <button type="button" onClick={onCopyInviteCode} style={compactCopyButtonStyle()}>Sao chép</button>
       </div>
     </Card>
   );
@@ -427,19 +412,19 @@ function groupActionStyle(tone) {
   };
 }
 
-function compactIconButtonStyle(background, color) {
+function compactCopyButtonStyle() {
   return {
-    width: 42,
-    height: 38,
-    borderRadius: 12,
-    border: `1px solid ${colors.borderSubtle}`,
-    background,
-    color,
-    fontSize: 15,
-    fontWeight: 900,
+    flexShrink: 0,
+    padding: '8px 10px',
+    borderRadius: 10,
+    border: '1px solid rgba(99,102,241,0.28)',
+    background: 'rgba(99,102,241,0.14)',
+    color: '#c7d2fe',
+    fontSize: 11,
+    fontWeight: 850,
     fontFamily: 'inherit',
     cursor: 'pointer',
-    flexShrink: 0,
+    whiteSpace: 'nowrap',
   };
 }
 

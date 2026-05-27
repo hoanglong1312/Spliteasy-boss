@@ -113,7 +113,8 @@ test('member detail and group surface expose personal and group invite links', (
   assert.match(groupDetailSource, /createGroupInviteShare/)
   assert.match(groupDetailSource, /Chia sẻ link mời/)
   assert.match(groupDetailSource, /<GroupManagementPanel/)
-  assert.match(groupDetailSource, /Mã mời thủ công/)
+  assert.match(groupDetailSource, /onCopyInviteCode=\{\(\) => onAction\?\.\('copyInviteCode', \{ inviteCode: d\.inviteCode \}\)\}/)
+  assert.doesNotMatch(groupDetailSource, /⌨ Mã mời thủ công/)
   assert.doesNotMatch(groupDetailSource, /setMenuOpen/)
 })
 
