@@ -1013,11 +1013,16 @@ export default function AppV2() {
       if (!ticketId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const { error } = await sb
+      const { data, error } = await sb
         .from('pickleball_tickets')
         .delete()
         .eq('id', ticketId)
+        .select('id')
       if (error) throw error
+      if (!data?.length) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Không xóa được vé lẻ. Kiểm tra quyền thủ quỹ hoặc thử tải lại.' })
+        return
+      }
       await dispatch({ type: 'REFRESH' })
       return
     }

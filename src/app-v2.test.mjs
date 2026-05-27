@@ -211,6 +211,8 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
 
   assert.match(appSource, /if \(type === 'deleteTicket'\)/)
   assert.match(appSource, /\.from\('pickleball_tickets'\)\s*\.delete\(\)/)
+  assert.match(appSource, /\.eq\('id', ticketId\)\s*\.select\('id'\)/)
+  assert.match(appSource, /Không xóa được vé lẻ/)
 })
 
 test('AppV2 handles expense edit delete and approval actions', () => {
@@ -270,6 +272,7 @@ test('AppV2 routes pickleball writes through the dedicated pickleball group cont
 test('ticket approval migration allows pending member requests', () => {
   const migrationSource = readFileSync(new URL('../supabase/migrations/20260522000002_pickleball_ticket_approval.sql', import.meta.url), 'utf8')
   const profileMemberIdsSource = readFileSync(new URL('../supabase/migrations/20260527000001_pickleball_ticket_member_ids.sql', import.meta.url), 'utf8')
+  const deletePolicySource = readFileSync(new URL('../supabase/migrations/20260527000007_pickleball_ticket_delete_policy.sql', import.meta.url), 'utf8')
 
   assert.match(migrationSource, /UPDATE pickleball_tickets[\s\S]*SET status = 'unpaid'[\s\S]*WHERE status = 'paid'/)
   assert.match(migrationSource, /CHECK \(status = ANY \(ARRAY\['unpaid', 'team_fund', 'pending_review'\]\)\)/)
@@ -277,6 +280,11 @@ test('ticket approval migration allows pending member requests', () => {
   assert.match(migrationSource, /status = 'pending_review'/)
   assert.match(profileMemberIdsSource, /CREATE OR REPLACE FUNCTION public\.get_my_member_ids\(\)/)
   assert.match(profileMemberIdsSource, /actor\.profile_id IS NOT NULL AND m\.profile_id = actor\.profile_id/)
+  assert.match(deletePolicySource, /ALTER TABLE public\.pickleball_tickets ENABLE ROW LEVEL SECURITY/)
+  assert.match(deletePolicySource, /ON public\.pickleball_tickets FOR DELETE/)
+  assert.match(deletePolicySource, /m\.id IN \(SELECT public\.get_my_member_ids\(\)\)/)
+  assert.match(deletePolicySource, /m\.role = 'treasurer'/)
+  assert.match(deletePolicySource, /m\.is_active IS DISTINCT FROM false/)
 })
 
 test('expense approval migration allows rejected review status', () => {
