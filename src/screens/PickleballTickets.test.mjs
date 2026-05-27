@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const screenSource = readFileSync(new URL('./PickleballTickets.jsx', import.meta.url), 'utf8')
+const calendarSource = readFileSync(new URL('./PickleballCalendar.jsx', import.meta.url), 'utf8')
 
 test('PickleballTickets renders emerald tickets layout and treasurer actions', () => {
   assert.match(screenSource, /import React, \{ useEffect, useMemo, useState \} from 'react'/)
@@ -48,4 +49,18 @@ test('PickleballTickets add form calculates total from selected participants and
   assert.match(screenSource, /function ticketValidationError\(/)
   assert.match(screenSource, /onSave\(\{\s*session_date: dateToIso\(date\),\s*session_time: time,\s*member_ids: memberIds,\s*total_amount: totalAmountToSave,\s*advancer_id: paymentMode === 'advancer' \? advancerId : null,\s*paymentMode,\s*\}\)/)
   assert.match(screenSource, /\{formatShortAmount\(amountPerPerson\)\}\/người/)
+})
+
+test('PickleballCalendar ticket sheet keeps member save errors visible', () => {
+  const sheetSource = calendarSource.slice(
+    calendarSource.indexOf('function AddTicketSheet'),
+    calendarSource.indexOf('function SessionDetailPanel')
+  )
+
+  assert.match(sheetSource, /try \{/)
+  assert.match(sheetSource, /await onSave\(\{/)
+  assert.match(sheetSource, /catch \(err\) \{/)
+  assert.match(sheetSource, /setError\(ticketErrorMessage\(err\)\)/)
+  assert.match(sheetSource, /function ticketErrorMessage\(err\)/)
+  assert.match(sheetSource, /ticket_rls_denied/)
 })

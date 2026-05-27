@@ -170,6 +170,7 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /const totalAmount = parseMoneyAmount\(payload\?\.total_amount \?\? payload\?\.totalAmount\)/)
   assert.match(appSource, /const rawAdvancerId = payload\?\.advancer_id \?\? payload\?\.advancerId \?\? null/)
   assert.match(appSource, /const advancerId = wantsTeamFund \? null : rawAdvancerId/)
+  assert.match(appSource, /const actorMemberId = activePickleballActorMemberId\(state, groupId\)/)
   assert.match(appSource, /const ticketStatus = isPickleballTreasurer \? \(advancerId \? 'unpaid' : 'team_fund'\) : 'pending_review'/)
   assert.match(appSource, /session_date: sessionDate/)
   assert.match(appSource, /session_time: sessionTime/)
@@ -177,7 +178,7 @@ test('AppV2 handles individual-ticket Supabase writes', () => {
   assert.match(appSource, /advancer_id: advancerId/)
   assert.match(appSource, /status: ticketStatus/)
   assert.match(appSource, /year_month: monthKey\(sessionDate \|\| new Date\(\)\)/)
-  assert.match(appSource, /created_by: state\.currentUserId/)
+  assert.match(appSource, /created_by: actorMemberId/)
 
   assert.match(appSource, /if \(type === 'updateTicket'\)/)
   assert.match(appSource, /const ticketId = payload\?\.ticketId \?\? payload\?\.id/)
@@ -248,16 +249,21 @@ test('AppV2 routes pickleball writes through the dedicated pickleball group cont
   assert.match(appSource, /const groupId = activePickleballGroupId\(state\)[\s\S]*?type: 'ADD_PICKLEBALL_OWNER_PAYMENT'/)
   assert.match(appSource, /const groupId = activePickleballGroupId\(state\)[\s\S]*?\.from\('pickleball_tickets'\)[\s\S]*?group_id: groupId/)
   assert.match(appSource, /function normalizeTicketMemberIds\(value, state\) \{[\s\S]*?const groupId = activePickleballGroupId\(state\)/)
+  assert.match(appSource, /function activePickleballActorMemberId\(state, groupId = activePickleballGroupId\(state\)\)/)
+  assert.match(appSource, /memberIdentityKey\(member\) === currentIdentity/)
   assert.match(appSource, /function sessionGenerationConfigFromState\(state, yearMonth\) \{[\s\S]*?const groupId = activePickleballGroupId\(state\)/)
 })
 
 test('ticket approval migration allows pending member requests', () => {
   const migrationSource = readFileSync(new URL('../supabase/migrations/20260522000002_pickleball_ticket_approval.sql', import.meta.url), 'utf8')
+  const profileMemberIdsSource = readFileSync(new URL('../supabase/migrations/20260527000001_pickleball_ticket_member_ids.sql', import.meta.url), 'utf8')
 
   assert.match(migrationSource, /UPDATE pickleball_tickets[\s\S]*SET status = 'unpaid'[\s\S]*WHERE status = 'paid'/)
   assert.match(migrationSource, /CHECK \(status = ANY \(ARRAY\['unpaid', 'team_fund', 'pending_review'\]\)\)/)
   assert.match(migrationSource, /CREATE POLICY "group members can request tickets"/)
   assert.match(migrationSource, /status = 'pending_review'/)
+  assert.match(profileMemberIdsSource, /CREATE OR REPLACE FUNCTION public\.get_my_member_ids\(\)/)
+  assert.match(profileMemberIdsSource, /actor\.profile_id IS NOT NULL AND m\.profile_id = actor\.profile_id/)
 })
 
 test('expense approval migration allows rejected review status', () => {

@@ -317,14 +317,18 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
     if (!String(time || '').trim()) return setError('Nhập giờ chơi.');
     if (memberIds.length === 0) return setError('Chọn ít nhất một người.');
     if (paymentMode === 'advancer' && !advancerId) return setError('Chọn người ứng tiền.');
-    await onSave({
-      session_date: selectedDate,
-      session_time: time,
-      member_ids: memberIds,
-      total_amount: totalAmount,
-      advancer_id: paymentMode === 'advancer' ? advancerId : null,
-      paymentMode,
-    });
+    try {
+      await onSave({
+        session_date: selectedDate,
+        session_time: time,
+        member_ids: memberIds,
+        total_amount: totalAmount,
+        advancer_id: paymentMode === 'advancer' ? advancerId : null,
+        paymentMode,
+      });
+    } catch (err) {
+      setError(ticketErrorMessage(err));
+    }
   };
 
   return (
@@ -433,6 +437,18 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
       </form>
     </div>
   );
+}
+
+function ticketErrorMessage(err) {
+  const code = String(err?.message || err || '');
+  const map = {
+    ticket_session_date_required: 'Chọn ngày chơi.',
+    ticket_members_required: 'Chọn ít nhất một người.',
+    ticket_total_amount_required: 'Không tính được tổng tiền vé.',
+    ticket_payment_required: 'Chọn người ứng tiền hoặc quỹ team.',
+    ticket_rls_denied: 'Bạn chưa có quyền thêm vé trong nhóm pickleball này.',
+  };
+  return map[code] || 'Không lưu được vé. Thử lại.';
 }
 
 function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction }) {

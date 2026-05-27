@@ -713,6 +713,7 @@ export default function AppV2() {
       if (memberIds.length === 0) throw new Error('ticket_members_required')
       if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
       if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
+      const actorMemberId = activePickleballActorMemberId(state, groupId)
       const ticketStatus = isPickleballTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
@@ -727,7 +728,7 @@ export default function AppV2() {
           advancer_id: advancerId,
           status: ticketStatus,
           year_month: monthKey(sessionDate || new Date()),
-          created_by: state.currentUserId,
+          created_by: actorMemberId,
         })
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
@@ -1929,6 +1930,22 @@ function normalizeTicketMemberIds(value, state) {
       return member?.id || member?.member_id || text
     })
         .filter(Boolean)
+}
+
+function activePickleballActorMemberId(state, groupId = activePickleballGroupId(state)) {
+  const members = safeArray(state?.members)
+  const currentMember = members.find(member => String(member?.id || member?.member_id || '') === String(state?.currentUserId || ''))
+  const currentIdentity = memberIdentityKey(currentMember) || normalizeMemberName(state?.currentUserName)
+  const actor = members.find(member => (
+    String(member?.groupId || member?.group_id || '') === String(groupId || '') &&
+    member?.isActive !== false &&
+    member?.is_active !== false &&
+    (
+      String(member?.id || member?.member_id || '') === String(state?.currentUserId || '') ||
+      (currentIdentity && memberIdentityKey(member) === currentIdentity)
+    )
+  ))
+  return actor?.id || actor?.member_id || state?.currentUserId
 }
 
 function expenseGroupId(state, expenseId) {
