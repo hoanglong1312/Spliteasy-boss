@@ -106,12 +106,18 @@ test('member detail and group menu expose app-login and group-invite share links
   assert.match(groupDetailSource, /Chia sẻ link mời/)
 })
 
-test('member bill link is bill-first and can open the app from the public bill page', () => {
+test('member bill link opens the member home first and keeps bill as fallback', () => {
   const billShareSource = readFileSync(new URL('./screens/MemberBillShare.jsx', import.meta.url), 'utf8')
 
   assert.match(appSource, /p_purpose: 'member_bill'/)
+  assert.match(appSource, /async function openPersonalLinkHome\(token\)/)
+  assert.match(appSource, /\.rpc\('consume_member_access_link', \{ p_token: token \}\)/)
+  assert.match(appSource, /purpose: data\.purpose/)
+  assert.match(appSource, /setActiveTab\('home'\)/)
+  assert.match(appSource, /setStack\(\[\]\)/)
   assert.match(appSource, /setPublicBillToken\(''\)/)
-  assert.match(appSource, /onOpenApp=\{\(\) => openMemberBillInApp\(publicBillToken\)\}/)
+  assert.match(appSource, /await openPersonalLinkHome\(publicBillToken\)/)
+  assert.match(appSource, /\.rpc\('get_member_bill_share'/)
   assert.match(billShareSource, /export default function MemberBillShare\(\{ data, loading = false, onOpenApp \}\)/)
   assert.match(billShareSource, /Mở trang chính/)
   assert.match(billShareSource, /Thanh toán về quỹ nhóm/)

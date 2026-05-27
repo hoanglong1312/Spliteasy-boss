@@ -166,15 +166,17 @@ export default function AppV2() {
   useEffect(() => {
     if (!publicBillToken) return
     let alive = true
-    async function loadPublicBill() {
+    async function openBillLink() {
       setPublicBillLoading(true)
+      const openedHome = await openPersonalLinkHome(publicBillToken)
+      if (!alive || openedHome) return
       const sb = createSupabase()
       const { data, error } = await sb.rpc('get_member_bill_share', { p_token: publicBillToken })
       if (!alive) return
       setPublicBillData(error ? { error: 'invalid_token' } : data)
       setPublicBillLoading(false)
     }
-    loadPublicBill()
+    openBillLink()
     return () => { alive = false }
   }, [publicBillToken])
 
@@ -209,13 +211,12 @@ export default function AppV2() {
     return () => { alive = false }
   }, [memberAccessToken, dispatch])
 
-  async function openMemberBillInApp(token) {
+  async function openPersonalLinkHome(token) {
     if (!token) return
     const sb = createSupabase()
     const { data, error } = await sb.rpc('consume_member_access_link', { p_token: token })
     if (error || data?.error || !data?.authToken) {
-      dispatch({ type: 'SHOW_TOAST', message: 'Link vào app không còn hiệu lực. Nhờ thủ quỹ gửi lại link mới.' })
-      return
+      return false
     }
     await dispatch({
       type: 'LOGIN',
@@ -231,6 +232,16 @@ export default function AppV2() {
     setPublicBillToken('')
     setPublicBillData(null)
     setPublicBillLoading(false)
+    setActiveTab('home')
+    setStack([])
+    return true
+  }
+
+  async function openMemberBillInApp(token) {
+    const openedHome = await openPersonalLinkHome(token)
+    if (!openedHome) {
+      dispatch({ type: 'SHOW_TOAST', message: 'Link vào app không còn hiệu lực. Nhờ thủ quỹ gửi lại link mới.' })
+    }
   }
 
   async function resolveRecentSessionToken(session) {

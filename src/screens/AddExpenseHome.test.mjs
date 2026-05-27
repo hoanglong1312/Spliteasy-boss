@@ -431,6 +431,9 @@ test('MemberBillShare renders payment QR when the member owes money and a paymen
 test('App supports public member bill tokens without requiring login', () => {
   assert.match(appSource, /import MemberBillShare from '\.\/screens\/MemberBillShare'/);
   assert.match(appSource, /useState\(\(\) => publicBillTokenFromLocation\(\)\)/);
+  assert.match(appSource, /async function openPersonalLinkHome\(token\)/);
+  assert.match(appSource, /await openPersonalLinkHome\(publicBillToken\)/);
+  assert.match(appSource, /setActiveTab\('home'\)/);
   assert.match(appSource, /\.rpc\('get_member_bill_share'/);
   assert.match(appSource, /if \(publicBillToken\)/);
   assert.match(appSource, /<MemberBillShare data=\{publicBillData\}/);
