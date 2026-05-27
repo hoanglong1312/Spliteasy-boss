@@ -434,6 +434,7 @@ test('App supports public member bill tokens without requiring login', () => {
   assert.match(appSource, /<MemberBillShare data=\{publicBillData\}/);
   assert.match(appSource, /if \(type === 'createMemberBillShare'\)/);
   assert.match(appSource, /\.rpc\('create_member_bill_share_token'/);
+  assert.match(appSource, /const billShareError = error\?\.message \|\| data\?\.error \|\| 'Không tạo được link chia sẻ\.'/);
 });
 
 test('App uses one selectedYearMonth across home, groups, group detail, and pickleball screens', () => {

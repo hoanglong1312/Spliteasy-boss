@@ -945,8 +945,9 @@ export default function AppV2() {
         p_member_id: payload?.memberId,
       })
       if (error || data?.error) {
-        console.error('[app] createMemberBillShare:', error || data)
-        dispatch({ type: 'SHOW_TOAST', message: 'Không tạo được link chia sẻ.' })
+        const billShareError = error?.message || data?.error || 'Không tạo được link chia sẻ.'
+        console.error('[app] createMemberBillShare:', billShareError, error || data)
+        dispatch({ type: 'SHOW_TOAST', message: `Không tạo được link chia sẻ: ${billShareError}` })
         return
       }
       const shareToken = data?.token || data

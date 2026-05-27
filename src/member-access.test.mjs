@@ -91,3 +91,24 @@ test('member access link migration stores hashed scoped tokens and pending invit
   assert.match(accessLinkMigration, /RETURN jsonb_build_object\('authToken'/)
   assert.doesNotMatch(accessLinkMigration, /token text NOT NULL UNIQUE/)
 })
+
+test('member access link migration creates helper functions before policies use them', () => {
+  const helperIndex = accessLinkMigration.indexOf('CREATE OR REPLACE FUNCTION public.is_access_link_creator')
+  const policyIndex = accessLinkMigration.indexOf('CREATE POLICY join_requests_select')
+  assert.notEqual(helperIndex, -1)
+  assert.notEqual(policyIndex, -1)
+  assert.ok(helperIndex < policyIndex)
+})
+
+test('member access link migration can replace legacy join request review functions', () => {
+  const approveDropIndex = accessLinkMigration.indexOf('DROP FUNCTION IF EXISTS public.approve_join_request(uuid)')
+  const approveCreateIndex = accessLinkMigration.indexOf('CREATE OR REPLACE FUNCTION public.approve_join_request')
+  const rejectDropIndex = accessLinkMigration.indexOf('DROP FUNCTION IF EXISTS public.reject_join_request(uuid)')
+  const rejectCreateIndex = accessLinkMigration.indexOf('CREATE OR REPLACE FUNCTION public.reject_join_request')
+  assert.notEqual(approveDropIndex, -1)
+  assert.notEqual(approveCreateIndex, -1)
+  assert.notEqual(rejectDropIndex, -1)
+  assert.notEqual(rejectCreateIndex, -1)
+  assert.ok(approveDropIndex < approveCreateIndex)
+  assert.ok(rejectDropIndex < rejectCreateIndex)
+})

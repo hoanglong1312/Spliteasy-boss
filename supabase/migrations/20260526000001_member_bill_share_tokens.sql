@@ -29,10 +29,11 @@ CREATE OR REPLACE FUNCTION public.create_member_bill_share_token(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_current_member uuid;
+  v_actor_member_id uuid;
   v_token text;
 BEGIN
   v_current_member := public.get_current_member_id();
@@ -41,15 +42,30 @@ BEGIN
     RETURN jsonb_build_object('error', 'unauthorized');
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.members creator
-    JOIN public.groups g ON g.id = p_group_id
-    WHERE creator.id = v_current_member
-      AND creator.group_id = p_group_id
-      AND creator.expense_active IS DISTINCT FROM false
-      AND (creator.role = 'treasurer' OR g.created_by = creator.id OR g.created_by = creator.profile_id)
-  ) THEN
+  WITH current_actor AS (
+    SELECT id, profile_id, name
+    FROM public.members
+    WHERE id = v_current_member
+      AND is_active IS NOT FALSE
+    LIMIT 1
+  )
+  SELECT creator.id
+  INTO v_actor_member_id
+  FROM public.members creator
+  JOIN current_actor actor ON (
+    creator.id = actor.id
+    OR (actor.profile_id IS NOT NULL AND creator.profile_id = actor.profile_id)
+    OR lower(creator.name) = lower(actor.name)
+  )
+  JOIN public.groups g ON g.id = p_group_id
+  WHERE creator.group_id = p_group_id
+    AND creator.is_active IS NOT FALSE
+    AND creator.expense_active IS DISTINCT FROM false
+    AND (creator.role = 'treasurer' OR g.created_by = creator.id OR g.created_by = creator.profile_id)
+  ORDER BY (creator.id = actor.id) DESC, creator.created_at DESC
+  LIMIT 1;
+
+  IF v_actor_member_id IS NULL THEN
     RETURN jsonb_build_object('error', 'forbidden');
   END IF;
 
@@ -65,7 +81,7 @@ BEGIN
   v_token := encode(gen_random_bytes(24), 'hex');
 
   INSERT INTO public.member_bill_share_tokens (token, group_id, member_id, expires_at, created_by)
-  VALUES (v_token, p_group_id, p_member_id, now() + COALESCE(p_expires_in, interval '14 days'), v_current_member);
+  VALUES (v_token, p_group_id, p_member_id, now() + COALESCE(p_expires_in, interval '14 days'), v_actor_member_id);
 
   RETURN jsonb_build_object('token', v_token, 'expiresAt', now() + COALESCE(p_expires_in, interval '14 days'));
 END;

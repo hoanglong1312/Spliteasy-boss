@@ -39,11 +39,6 @@ CREATE INDEX IF NOT EXISTS idx_member_access_links_scope
 CREATE INDEX IF NOT EXISTS idx_join_requests_group_status
   ON public.join_requests (group_id, status, created_at);
 
-DROP POLICY IF EXISTS join_requests_select ON public.join_requests;
-CREATE POLICY join_requests_select
-  ON public.join_requests FOR SELECT
-  USING (public.is_access_link_creator(group_id, public.get_current_member_id()));
-
 CREATE OR REPLACE FUNCTION public.is_access_link_creator(p_group_id uuid, p_actor_member_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -61,6 +56,11 @@ AS $$
       AND (actor.role = 'treasurer' OR g.created_by = actor.id OR g.created_by = actor.profile_id)
   );
 $$;
+
+DROP POLICY IF EXISTS join_requests_select ON public.join_requests;
+CREATE POLICY join_requests_select
+  ON public.join_requests FOR SELECT
+  USING (public.is_access_link_creator(group_id, public.get_current_member_id()));
 
 CREATE OR REPLACE FUNCTION public.create_member_access_link(
   p_group_id uuid,
@@ -262,6 +262,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.approve_join_request(uuid);
 CREATE OR REPLACE FUNCTION public.approve_join_request(p_request_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -337,6 +338,7 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS public.reject_join_request(uuid);
 CREATE OR REPLACE FUNCTION public.reject_join_request(p_request_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql

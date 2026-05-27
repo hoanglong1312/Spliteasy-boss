@@ -49,6 +49,15 @@ test('member bill share migration creates scoped expiring public tokens', () => 
   assert.match(memberBillShareMigration, /GRANT EXECUTE ON FUNCTION public\.get_member_bill_share\(text\) TO anon/)
 })
 
+test('member bill share token creation resolves the actor inside the target expense group profile', () => {
+  assert.match(memberBillShareMigration, /v_actor_member_id uuid/)
+  assert.match(memberBillShareMigration, /CREATE OR REPLACE FUNCTION public\.create_member_bill_share_token[\s\S]*SET search_path = public, extensions/)
+  assert.match(memberBillShareMigration, /WITH current_actor AS \(/)
+  assert.match(memberBillShareMigration, /actor\.profile_id IS NOT NULL AND creator\.profile_id = actor\.profile_id/)
+  assert.match(memberBillShareMigration, /creator\.id = actor\.id/)
+  assert.match(memberBillShareMigration, /created_by\)[\s\S]*VALUES \(v_token, p_group_id, p_member_id[\s\S]*v_actor_member_id\)/)
+})
+
 test('expense group expense RPC saves expenses through the current profile membership', () => {
   assert.match(expenseGroupExpenseRpcMigration, /CREATE OR REPLACE FUNCTION public\.create_expense_group_expense/)
   assert.match(expenseGroupExpenseRpcMigration, /public\.is_member_of_expense_group\(p_group_id\)/)
