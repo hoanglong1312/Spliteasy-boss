@@ -419,7 +419,7 @@ function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
       textAlign: 'left',
       cursor: 'pointer',
     }}>
-      <Avatar initial={member.initial} size={34} color={member.color} />
+      <Avatar initial={member.initial} size={34} color={member.color} photoUrl={member.photoUrl} />
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
           <span style={{

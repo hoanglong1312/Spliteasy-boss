@@ -32,6 +32,11 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
     reader.readAsDataURL(file);
   }
 
+  function clearPhoto() {
+    setCurrentPhotoUrl('');
+    onAction?.('clearPhoto', { memberId: d.user.id });
+  }
+
   return (
     <PhoneFrame>
       <Screen>
@@ -75,6 +80,23 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
               fontSize: 13, cursor: 'pointer',
             }}>📷</button>
           </div>
+          {currentPhotoUrl && (
+            <button type="button" onClick={clearPhoto} style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: 10,
+              padding: '7px 12px',
+              borderRadius: 999,
+              border: '1px solid rgba(255,255,255,0.18)',
+              background: 'rgba(7,8,15,0.26)',
+              color: '#e2e8f0',
+              fontSize: 11,
+              fontWeight: 800,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}>Xóa ảnh</button>
+          )}
           <div style={{ fontSize: 20, fontWeight: 800, marginTop: 14, letterSpacing: '-0.3px' }}>{d.user.name}</div>
           <div style={{ fontSize: 12, color: '#c4b5fd', fontWeight: 500 }}>{d.user.email}</div>
           {isTreasurer && (

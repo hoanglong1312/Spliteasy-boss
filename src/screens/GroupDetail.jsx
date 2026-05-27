@@ -548,14 +548,12 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Avatar initial={member.initials} size={34} color={member.color} ring={false} style={{ borderRadius: 12 }} />
+        <Avatar initial={member.initials} size={34} color={member.color} photoUrl={member.photoUrl} ring={false} style={{ borderRadius: 12 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
-          {member.role === 'treasurer' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, flexWrap: 'wrap' }}>
-              {member.role === 'treasurer' && <RolePill icon="💳" label="Thủ quỹ" />}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</span>
+            {member.role === 'treasurer' && <RolePill icon="💳" label="Thủ quỹ" />}
+          </div>
         </div>
         <div style={{ fontSize: 15, fontWeight: 800, color: balanceTone, ...type.mono }}>
           {balanceLabel}
@@ -670,7 +668,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       <Hero variant="emerald" glow={false} style={{ padding: 18, borderRadius: 20 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <Avatar initial={member.initials} size={68} color={member.color} ring style={{ border: '4px solid rgba(7,8,15,0.85)', flexShrink: 0 }} />
+            <Avatar initial={member.initials} size={68} color={member.color} photoUrl={member.photoUrl} ring style={{ border: '4px solid rgba(7,8,15,0.85)', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 26, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>

@@ -247,7 +247,7 @@ const AVATAR_GRADIENTS = {
   K:  'linear-gradient(135deg, #fbbf24, #d97706)',  // khách
 };
 
-export function Avatar({ initial, size = 24, color, ring = true, style }) {
+export function Avatar({ initial, size = 24, color, photoUrl = '', ring = true, style }) {
   const bg = color || AVATAR_GRADIENTS[initial] || AVATAR_GRADIENTS.L;
   return (
     <span style={{
@@ -257,8 +257,17 @@ export function Avatar({ initial, size = 24, color, ring = true, style }) {
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       fontSize: size * 0.4, fontWeight: 700, color: 'white',
       flexShrink: 0,
+      overflow: 'hidden',
       ...style,
-    }}>{initial}</span>
+    }}>
+      {photoUrl ? (
+        <img
+          src={photoUrl}
+          alt={initial}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : initial}
+    </span>
   );
 }
 

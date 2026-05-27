@@ -1489,6 +1489,14 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'clearPhoto') {
+      const memberId = payload?.memberId || state.currentUserId
+      if (memberId) {
+        localStorage.removeItem(profilePhotoStorageKey(memberId))
+      }
+      return
+    }
+
     if (type === 'exportCsv') {
       exportStateCsv(state)
       return

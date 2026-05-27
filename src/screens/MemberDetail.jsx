@@ -100,7 +100,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
             pointerEvents: 'none',
           }} />
           <div style={{ position: 'relative', display: 'flex', gap: 14, alignItems: 'center' }}>
-            <Avatar initial={d.initial} size={56} color={d.color} />
+            <Avatar initial={d.initial} size={56} color={d.color} photoUrl={d.photoUrl} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{

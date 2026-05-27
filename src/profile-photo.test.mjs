@@ -18,9 +18,24 @@ test('Profile supports uploading a personal photo instead of export CSV', () => 
 })
 
 test('Profile photo is keyed by current member and persisted locally', () => {
-  assert.match(screenDataSource, /photoUrl: loadStoredProfilePhoto\(currentUserId\)/)
+  assert.match(screenDataSource, /photoUrl: memberPhotoUrl\(me\)/)
   assert.match(screenDataSource, /id: currentUserId/)
   assert.match(screenDataSource, /function profilePhotoStorageKey\(memberId\)/)
   assert.match(appSource, /if \(type === 'uploadPhoto'\)/)
   assert.match(appSource, /localStorage\.setItem\(profilePhotoStorageKey\(memberId\), photoUrl\)/)
+})
+
+test('Profile can clear a personal photo back to the default avatar', () => {
+  assert.match(profileSource, /onAction\?\.\('clearPhoto', \{ memberId: d\.user\.id \}\)/)
+  assert.match(profileSource, /setCurrentPhotoUrl\(''\)/)
+  assert.match(profileSource, /currentPhotoUrl && \(/)
+  assert.match(appSource, /if \(type === 'clearPhoto'\)/)
+  assert.match(appSource, /localStorage\.removeItem\(profilePhotoStorageKey\(memberId\)\)/)
+})
+
+test('stored member photos are reused by member lists and detail avatars', () => {
+  assert.match(screenDataSource, /function memberPhotoUrl\(member\)/)
+  assert.match(screenDataSource, /return loadStoredProfilePhoto\(member\?\.id\)/)
+  assert.match(screenDataSource, /photoUrl: memberPhotoUrl\(member\)/)
+  assert.match(screenDataSource, /photoUrl: memberPhotoUrl\(me\)/)
 })

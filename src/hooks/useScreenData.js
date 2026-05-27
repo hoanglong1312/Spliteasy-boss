@@ -44,6 +44,10 @@ function loadStoredProfilePhoto(memberId) {
   return localStorage.getItem(profilePhotoStorageKey(memberId)) || ''
 }
 
+function memberPhotoUrl(member) {
+  return loadStoredProfilePhoto(member?.id)
+}
+
 export function useScreenData() {
   const { state, dispatch } = useApp()
   const autoGenerateRef = useRef('')
@@ -563,6 +567,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         name: member.displayName || member.name,
         initials: initials(member),
         color: memberDisplayColor(member),
+        photoUrl: memberPhotoUrl(member),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
         bankName: member.bankName || member.bank_name || '',
@@ -582,6 +587,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         name: member.displayName || member.name,
         initials: initials(member),
         color: memberDisplayColor(member),
+        photoUrl: memberPhotoUrl(member),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
         amount: memberBalanceMap[member.id] || 0,
@@ -1076,7 +1082,7 @@ function buildProfileData(me, state, pickle) {
       initial: initials(me || { name: state?.currentUserName }).slice(0, 2),
       club: state?.currentGroup?.name || 'Spliteasy',
       color: me?.color || '#6366f1',
-      photoUrl: loadStoredProfilePhoto(currentUserId),
+      photoUrl: memberPhotoUrl(me),
     },
     profileColor: profileColorIndex(me?.color),
     monthStats: {
@@ -1323,6 +1329,7 @@ function buildMemberDetailData(state, memberId, selectedYearMonth) {
     name: member.displayName || member.name || 'Thành viên',
     initial: initials(member),
     initials: initials(member),
+    photoUrl: memberPhotoUrl(member),
     color: member.color,
     role: member.role || 'member',
     type: memberType(member),
@@ -2087,6 +2094,7 @@ function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
     bankAccountName: member.bankAccountName || member.bank_account_name || '',
     bankAccount: member.bankAccount || member.bank_account || '',
     color: member.color,
+    photoUrl: memberPhotoUrl(member),
   }
 }
 
