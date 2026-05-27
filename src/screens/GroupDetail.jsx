@@ -51,6 +51,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const heroBalanceLabel = d.balance > 0 ? 'Bạn cần thu' : d.balance < 0 ? 'Bạn cần nộp' : 'Bạn đã cân bằng';
   const heroBalanceTone = d.balance < 0 ? colors.danger : d.balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const selectedGroupType = groupTypeOptions.find(option => option.key === groupTypeKey) || groupTypeOptions[0];
+  const currentMemberRow = (d.members || []).find(member => String(member.id) === String(d.currentMemberId || '')) || null;
   const visibleMembers = (d.members || []).filter(member => {
     const query = normalizeSearch(memberSearch);
     if (!query) return true;
@@ -165,7 +166,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             expenseCount={d.expenseCount || 0}
             totalSpent={d.totalSpent || 0}
           />
-          <HeroBalancePanel label={heroBalanceLabel} balance={d.balance || 0} tone={heroBalanceTone} />
+          <HeroBalancePanel
+            label={heroBalanceLabel}
+            balance={d.balance || 0}
+            tone={heroBalanceTone}
+            onOpen={currentMemberRow ? () => setSelectedMember(currentMemberRow) : null}
+          />
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
             <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settle', { groupId: d.id })}>⚡ Tất toán</Button>
@@ -455,9 +461,20 @@ function SummaryChip({ value, label, tone }) {
   );
 }
 
-function HeroBalancePanel({ label, balance, tone }) {
+function HeroBalancePanel({ label, balance, tone, onOpen }) {
+  const clickable = Boolean(onOpen);
+  const handleKeyDown = (event) => {
+    if (!clickable) return;
+    if (event.key === 'Enter' || event.key === ' ') onOpen();
+  };
+
   return (
-    <div style={{
+    <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onOpen || undefined}
+      onKeyDown={handleKeyDown}
+      style={{
       display: 'grid',
       gridTemplateColumns: 'minmax(0, 1fr) minmax(112px, auto)',
       alignItems: 'end',
@@ -467,6 +484,7 @@ function HeroBalancePanel({ label, balance, tone }) {
       borderRadius: 14,
       background: 'rgba(15,23,42,0.22)',
       border: '1px solid rgba(255,255,255,0.14)',
+      cursor: clickable ? 'pointer' : 'default',
     }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
