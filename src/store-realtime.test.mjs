@@ -63,6 +63,10 @@ test('store fetches venue owner payments and persists team-fund owner actions', 
   assert.match(storeSource, /\.from\('pickleball_owner_payments'\)\s*\.insert\(\{/)
   assert.match(storeSource, /bank_snapshot: action\.bankSnapshot \|\| \{\}/)
   assert.match(storeSource, /items: safeArray\(action\.items\)/)
+  assert.match(storeSource, /case 'UNMARK_PICKLEBALL_OWNER_PAYMENT_ITEM': \{/)
+  assert.match(storeSource, /const nextItems = currentItems\.filter/)
+  assert.match(storeSource, /\.from\('pickleball_owner_payments'\)\s*\.update\(\{/)
+  assert.match(storeSource, /total_amount: nextItems\.reduce/)
 })
 
 test('monthly pickleball config save persists schedule time aliases', () => {

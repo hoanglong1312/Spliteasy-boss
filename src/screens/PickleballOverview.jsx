@@ -211,7 +211,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   Chi phí team và khoản đã trả chủ sân
                 </div>
               </div>
-              <button type="button" onClick={() => onAction?.('push', 'pickleball-team-fund')} style={{
+              <button type="button" onClick={() => onAction?.('push', { screen: 'pickleball-team-fund', params: { yearMonth: d.currentYearMonth } })} style={{
                 border: 'none',
                 background: 'rgba(96,165,250,0.13)',
                 color: '#bfdbfe',

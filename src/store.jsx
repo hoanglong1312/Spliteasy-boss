@@ -19,6 +19,11 @@ function monthKey(value) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
+function ownerPaymentItemMatches(item, targetItem, payment = {}) {
+  return String(item?.key || item?.type || '') === String(targetItem?.key || targetItem?.type || '') &&
+    String(item?.yearMonth || item?.year_month || payment?.yearMonth || payment?.year_month || '') === String(targetItem?.yearMonth || targetItem?.year_month || '')
+}
+
 function isDoneStatus(status) {
   return ['completed', 'done', 'closed'].includes(String(status || '').toLowerCase())
 }
@@ -2138,6 +2143,33 @@ export function AppProvider({ children }) {
           .single()
         if (error) {
           console.error('[store] ADD_PICKLEBALL_OWNER_PAYMENT:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
+      case 'UNMARK_PICKLEBALL_OWNER_PAYMENT_ITEM': {
+        if (!sb) return
+        const paymentId = action.paymentId || action.id
+        if (!paymentId) return
+        const payment = safeArray(stateRef.current?.pickle?.ownerPayments || stateRef.current?._allPickle?.ownerPayments)
+          .find(row => String(row?.id || '') === String(paymentId))
+        if (!payment) return
+        const targetItem = action.item || {}
+        const currentItems = safeArray(payment.items)
+        const nextItems = currentItems.filter(item => !ownerPaymentItemMatches(item, targetItem, payment))
+        const { data, error } = await sb
+          .from('pickleball_owner_payments')
+          .update({
+            items: nextItems,
+            total_amount: nextItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+          })
+          .eq('id', paymentId)
+          .select()
+          .single()
+        if (error) {
+          console.error('[store] UNMARK_PICKLEBALL_OWNER_PAYMENT_ITEM:', error)
           throw error
         }
         await refresh()

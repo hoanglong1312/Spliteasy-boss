@@ -566,6 +566,16 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'unmarkOwnerPayment') {
+      if (!isPickleballTreasurer) return
+      await dispatch({
+        type: 'UNMARK_PICKLEBALL_OWNER_PAYMENT_ITEM',
+        paymentId: payload?.paymentId,
+        item: payload?.item,
+      })
+      return
+    }
+
     if (type === 'monthPrev' || type === 'monthNext') {
       const route = stack[stack.length - 1]
       const currentYearMonth = state.selectedYearMonth || route?.params?.yearMonth || monthKey(new Date())
@@ -1827,7 +1837,7 @@ export default function AppV2() {
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} onAction={handle} />
-      case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
+      case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
       case 'join-group':          return <JoinGroup data={getJoinGroupData()} onAction={handle} />

@@ -323,7 +323,7 @@ test('AppV2 passes pickleball settings time and home treasurer role through prop
 
 test('AppV2 routes treasurer team-fund config through a dedicated screen and handler', () => {
   assert.match(appSource, /import PickleballTeamFund from '\.\/screens\/PickleballTeamFund'/)
-  assert.match(appSource, /case 'pickleball-team-fund':\s*return <PickleballTeamFund data=\{getPickleballTeamFundData\(\)\} isTreasurer=\{isPickleballTreasurer\} onAction=\{handle\} \/>/)
+  assert.match(appSource, /case 'pickleball-team-fund':\s*return <PickleballTeamFund data=\{getPickleballTeamFundData\(route\.params\)\} isTreasurer=\{isPickleballTreasurer\} onAction=\{handle\} \/>/)
   assert.match(appSource, /if \(type === 'saveTeamFundConfig'\)/)
   assert.match(appSource, /type: 'SAVE_PICKLEBALL_MONTHLY_CONFIG'[\s\S]*?courtFee: payload\?\.courtFee[\s\S]*?ticketPrice: payload\?\.ticketPrice/)
   assert.match(appSource, /type: 'SAVE_VENUE_OWNER_BANK'/)
@@ -332,6 +332,8 @@ test('AppV2 routes treasurer team-fund config through a dedicated screen and han
   assert.match(appSource, /venueBankAccount: payload\?\.venueBankAccount/)
   assert.match(appSource, /if \(type === 'markOwnerPayment'\)/)
   assert.match(appSource, /type: 'ADD_PICKLEBALL_OWNER_PAYMENT'/)
+  assert.match(appSource, /if \(type === 'unmarkOwnerPayment'\)/)
+  assert.match(appSource, /type: 'UNMARK_PICKLEBALL_OWNER_PAYMENT_ITEM'/)
   assert.match(appSource, /bankSnapshot: payload\?\.bankSnapshot/)
   assert.match(appSource, /items: payload\?\.items/)
 })

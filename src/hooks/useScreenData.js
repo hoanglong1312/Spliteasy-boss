@@ -123,7 +123,7 @@ export function useScreenData() {
       getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId, selectedYearMonth),
       getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
       getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState),
-      getPickleballTeamFundData: () => buildPickleballTeamFundData(pickleballState),
+      getPickleballTeamFundData: (params) => buildPickleballTeamFundData(pickleballState, params?.yearMonth || selectedYearMonth),
       getBatchEntryData: () => buildBatchEntryData(pickleballState),
       getPaymentFlowData: (memberId) => buildPaymentFlowData(pickleballState, memberId),
       getJoinGroupData: () => buildJoinGroupData(state),
@@ -822,7 +822,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
   const ticketStats = buildTicketMonthStats(state)
   const ticketFund = buildTicketFundSummary(state)
-  const teamFundOverview = buildPickleballTeamFundData(state)
+  const teamFundOverview = buildPickleballTeamFundData(state, currentYearMonth)
   const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentPickleballMemberId)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentPickleballMemberId, summary, ticketAmount, memberBalance)
   const currentMember = members.find(member => String(member.id || member.member_id) === String(currentPickleballMemberId))
@@ -871,8 +871,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   }
 }
 
-function buildPickleballTeamFundData(state) {
-  const today = new Date()
+function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Date())) {
+  const today = dateFromYearMonth(selectedYearMonth)
   const currentYearMonth = monthKey(today)
   const nextYearMonth = shiftMonthKey(currentYearMonth, 1)
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)

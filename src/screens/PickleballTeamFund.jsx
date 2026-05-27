@@ -88,6 +88,26 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
     }
   }
 
+  async function unmarkSinglePaymentItem(item) {
+    const payment = ownerPaymentForItem(ownerPayments, item);
+    const key = paymentItemKey(item);
+    if (!payment?.id || itemSavingKey) return;
+    setPaymentState('');
+    setItemSavingKey(key);
+    try {
+      await onAction?.('unmarkOwnerPayment', {
+        paymentId: payment.id,
+        item,
+      });
+      setPaymentQrOpen(false);
+      setPaymentState('saved');
+    } catch {
+      setPaymentState('error');
+    } finally {
+      setItemSavingKey('');
+    }
+  }
+
   if (!isTreasurer) {
     return (
       <PhoneFrame>
@@ -231,16 +251,38 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     {formatVND(item.amount || 0)}
                   </div>
                   {item.paid ? (
-                    <div style={{
-                      padding: '6px 8px',
-                      borderRadius: 999,
-                      background: 'rgba(52,211,153,0.12)',
-                      color: '#6ee7b7',
-                      fontSize: 10,
-                      fontWeight: 900,
-                      whiteSpace: 'nowrap',
-                    }}>
-                      Đã thanh toán
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
+                      <div style={{
+                        padding: '6px 8px',
+                        borderRadius: 999,
+                        background: 'rgba(52,211,153,0.12)',
+                        color: '#6ee7b7',
+                        fontSize: 10,
+                        fontWeight: 900,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        Đã thanh toán
+                      </div>
+                      <button
+                        type="button"
+                        disabled={Boolean(itemSavingKey)}
+                        onClick={() => unmarkSinglePaymentItem(item)}
+                        style={{
+                          border: 'none',
+                          borderRadius: 999,
+                          padding: '6px 8px',
+                          background: 'rgba(248,113,113,0.12)',
+                          color: '#fecaca',
+                          fontSize: 10,
+                          fontWeight: 900,
+                          fontFamily: 'inherit',
+                          cursor: itemSavingKey ? 'default' : 'pointer',
+                          opacity: itemSavingKey && itemSavingKey !== key ? 0.55 : 1,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {itemSavingKey === key ? 'Đang lưu' : 'Hủy thanh toán'}
+                      </button>
                     </div>
                   ) : (
                     <button
@@ -639,6 +681,15 @@ function BankSelect({ value, onChange }) {
 
 function paymentItemKey(item) {
   return `${item?.key || item?.label}:${item?.yearMonth || ''}`;
+}
+
+function ownerPaymentForItem(payments, targetItem) {
+  return safeArray(payments).find(payment => safeArray(payment?.items).some(item => paymentItemsMatch(item, targetItem, payment))) || null;
+}
+
+function paymentItemsMatch(item, targetItem, payment = {}) {
+  return String(item?.key || item?.type || '') === String(targetItem?.key || targetItem?.type || '') &&
+    String(item?.yearMonth || item?.year_month || payment?.yearMonth || payment?.year_month || '') === String(targetItem?.yearMonth || targetItem?.year_month || '');
 }
 
 function resolveBank(value) {
