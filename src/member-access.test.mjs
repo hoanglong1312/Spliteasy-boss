@@ -6,6 +6,7 @@ const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const authSource = readFileSync(new URL('./lib/auth.js', import.meta.url), 'utf8')
 const joinGroupSource = readFileSync(new URL('./screens/JoinGroup.jsx', import.meta.url), 'utf8')
 const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
+const screenDataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 const accessLinkMigration = readFileSync(new URL('../supabase/migrations/20260527000002_member_access_links.sql', import.meta.url), 'utf8')
 
 test('local auth keeps recent member sessions after logout', () => {
@@ -36,10 +37,20 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.match(joinGroupSource, /const inviteToken = d\.inviteToken \|\| ''/)
   assert.match(joinGroupSource, /Vào lại tài khoản gần đây/)
   assert.match(joinGroupSource, /onAction\?\.\('resumeRecentSession'/)
-  assert.match(joinGroupSource, /Mã mời thủ công/)
+  assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
   assert.match(joinGroupSource, /Tên đã có cần link cá nhân hoặc PIN/)
   assert.match(joinGroupSource, /await requestJoinByInviteLink\(inviteToken, memberName\)/)
   assert.match(joinGroupSource, /setJoinSent\(true\)/)
+})
+
+test('JoinGroup empty state does not show a fake Spliteasy group before link or code lookup', () => {
+  assert.match(joinGroupSource, /const hasGroupPreview = Boolean\(foundGroup \|\| d\.group\?\.id\)/)
+  assert.match(joinGroupSource, /Chưa xác định nhóm/)
+  assert.match(joinGroupSource, /Mở link cá nhân/)
+  assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
+  assert.match(joinGroupSource, /\{hasGroupPreview \? \(/)
+  assert.doesNotMatch(joinGroupSource, /const displayGroup = foundGroup[\s\S]*: d\.group/)
+  assert.doesNotMatch(screenDataSource, /name: group\.name \|\| 'Nhóm Spliteasy'/)
 })
 
 test('member detail and group menu expose app-login and group-invite share links', () => {

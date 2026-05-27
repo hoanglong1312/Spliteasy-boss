@@ -1576,20 +1576,22 @@ function buildJoinGroupData(state) {
   const members = currentGroupMembers(state)
   const treasurer = members.find(member => member.role === 'treasurer') || members[0]
   const existingNames = members.map(member => member.displayName || member.name).filter(Boolean)
+  const hasGroup = Boolean(group.id)
 
   return {
     code: group.inviteCode || group.invite_code || '',
-    group: {
+    group: hasGroup ? {
+      id: group.id,
       emoji: group.emoji || '👥',
-      name: group.name || 'Nhóm Spliteasy',
+      name: group.name || 'Nhóm',
       treasurer: treasurer?.displayName || treasurer?.name || 'Thủ quỹ',
       foundedLabel: monthYearLabel(group.createdAt || group.created_at),
       activeCount: members.length,
       memberCount: members.length,
       memberAvatars: members.slice(0, 6).map(member => initials(member)),
       extraMembers: Math.max(members.length - 6, 0),
-    },
-    existingNames,
+    } : null,
+    existingNames: hasGroup ? existingNames : [],
     suggestedName: '',
     selectedName: '',
   }
