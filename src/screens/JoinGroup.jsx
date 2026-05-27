@@ -106,12 +106,26 @@ export default function JoinGroup({ data, onAction }) {
 
         {/* Invite code */}
         {recentSessions.length > 0 && (
-          <Card style={{ padding: 14, marginBottom: 14 }}>
+          <Card style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(99,102,241,0.28)', background: 'rgba(99,102,241,0.08)' }}>
             <div style={{
-              fontSize: 9, fontWeight: 800, letterSpacing: '1px',
-              color: colors.textSecondary, textTransform: 'uppercase',
-              marginBottom: 10,
-            }}>Vào lại tài khoản gần đây</div>
+              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
+            }}>
+              <div style={{
+                width: 34, height: 34, borderRadius: 12,
+                background: 'rgba(99,102,241,0.18)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16,
+              }}>↩</div>
+              <div>
+                <div style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: '1px',
+                  color: '#c7d2fe', textTransform: 'uppercase',
+                }}>Vào lại tài khoản gần đây</div>
+                <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                  Chạm vào tên đã dùng trên máy này.
+                </div>
+              </div>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {recentSessions.map(session => (
                 <button
@@ -120,27 +134,34 @@ export default function JoinGroup({ data, onAction }) {
                   onClick={() => onAction?.('resumeRecentSession', session)}
                   style={{
                     width: '100%',
-                    padding: 12,
+                    padding: '12px 13px',
                     borderRadius: 12,
                     border: `1px solid ${colors.borderSubtle}`,
-                    background: colors.inputBg,
+                    background: 'rgba(15,23,42,0.72)',
                     color: colors.textPrimary,
                     fontFamily: 'inherit',
                     textAlign: 'left',
                     cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
                   }}
                 >
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
-                  <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                    {session.groupName || (session.authToken ? 'Nhóm đã tham gia' : 'Cần mở lại link cá nhân')}{session.hasPin ? ' · Có PIN' : ''}
+                  <Avatar initial={(session.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {session.groupName || 'Bấm để vào lại'}{session.hasPin ? ' · Có PIN' : ''}
+                    </span>
                   </span>
+                  <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>
                 </button>
               ))}
             </div>
           </Card>
         )}
 
-        {!hasGroupPreview && !looking && (
+        {!(recentSessions.length > 0) && !hasGroupPreview && !looking && (
           <Card style={{ padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{

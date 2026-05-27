@@ -211,6 +211,22 @@ export default function AppV2() {
     setPublicBillLoading(false)
   }
 
+  async function resolveRecentSessionToken(session) {
+    if (session?.authToken) return session.authToken
+    if (!session?.memberId) return ''
+
+    const sb = createSupabase()
+    const { data, error } = await sb.rpc('resume_recent_member_session', {
+      p_member_id: session.memberId,
+      p_member_name: session.memberName || '',
+    })
+    if (error || data?.error || !data?.authToken) {
+      console.error('[app] resumeRecentSession:', error || data)
+      return ''
+    }
+    return data.authToken
+  }
+
   function submitPin(value = pinInput) {
     const stored = localStorage.getItem('spliteasy_pin')
     if (value === stored) {
@@ -242,13 +258,14 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      if (!payload?.authToken) {
-        dispatch({ type: 'SHOW_TOAST', message: 'Phiên gần đây thiếu token. Mở lại link cá nhân để vào tài khoản này.' })
+      const authToken = await resolveRecentSessionToken(payload)
+      if (!authToken) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Không vào lại được tài khoản này. Nhờ thủ quỹ gửi link mới nếu tên đã bị xóa hoặc đổi.' })
         return
       }
       await dispatch({
         type: 'LOGIN',
-        token: payload.authToken,
+        token: authToken,
         memberId: payload.memberId,
         groupId: payload.groupId,
         memberName: payload.memberName,
