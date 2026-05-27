@@ -157,6 +157,7 @@ test('member bill link card is scoped to managers or the current member', () => 
 
 test('member access links allow members to create their own bill link only', () => {
   const selfLinkMigration = readFileSync(new URL('../supabase/migrations/20260527000005_member_self_bill_links.sql', import.meta.url), 'utf8')
+  const avatarAndBillMigration = readFileSync(new URL('../supabase/migrations/20260527000006_profile_avatar_and_expense_bill_links.sql', import.meta.url), 'utf8')
 
   assert.match(selfLinkMigration, /CREATE OR REPLACE FUNCTION public\.is_member_access_link_allowed/)
   assert.match(selfLinkMigration, /p_purpose = 'member_bill'/)
@@ -164,6 +165,9 @@ test('member access links allow members to create their own bill link only', () 
   assert.match(selfLinkMigration, /target\.profile_id = actor\.profile_id/)
   assert.match(selfLinkMigration, /CREATE OR REPLACE FUNCTION public\.create_member_access_link/)
   assert.match(selfLinkMigration, /public\.is_member_access_link_allowed\(p_group_id, p_member_id, p_purpose, v_actor\)/)
+  assert.match(avatarAndBillMigration, /AND target\.expense_active IS DISTINCT FROM false/)
+  assert.match(avatarAndBillMigration, /AND actor\.expense_active IS DISTINCT FROM false/)
+  assert.match(avatarAndBillMigration, /AND m\.expense_active IS DISTINCT FROM false/)
 })
 
 test('member access link migration stores hashed scoped tokens and pending invite requests', () => {

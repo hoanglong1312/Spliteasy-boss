@@ -1498,6 +1498,7 @@ export default function AppV2() {
       const profileId = payload?.profileId || payload?.profile_id || member.profileId || member.profile_id
       const photoUrl = String(payload?.photoUrl || '')
       if (memberId && photoUrl) {
+        await dispatch({ type: 'UPDATE_PROFILE_PHOTO', memberId, profileId, photoUrl })
         localStorage.setItem(profilePhotoStorageKey(profileId || memberId), photoUrl)
         profilePhotoIdentityIds(memberId, profileId, state.members).forEach(identityId => {
           localStorage.setItem(profilePhotoStorageKey(identityId), photoUrl)
@@ -1512,6 +1513,7 @@ export default function AppV2() {
       const member = safeArray(state.members).find(item => String(item.id) === String(memberId)) || {}
       const profileId = payload?.profileId || payload?.profile_id || member.profileId || member.profile_id
       if (memberId) {
+        await dispatch({ type: 'UPDATE_PROFILE_PHOTO', memberId, profileId, photoUrl: null })
         localStorage.removeItem(profilePhotoStorageKey(profileId || memberId))
         profilePhotoIdentityIds(memberId, profileId, state.members).forEach(identityId => {
           localStorage.removeItem(profilePhotoStorageKey(identityId))

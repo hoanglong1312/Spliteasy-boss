@@ -46,6 +46,8 @@ function loadStoredProfilePhoto(identityId) {
 }
 
 function memberPhotoUrl(member, allMembers = []) {
+  const supabasePhotoUrl = member?.avatarUrl || member?.avatar_url || member?.photoUrl || member?.photo_url
+  if (supabasePhotoUrl) return supabasePhotoUrl
   const profileId = member?.profileId || member?.profile_id
   const identityIds = [
     profileId,

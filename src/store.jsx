@@ -1140,6 +1140,10 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     short: profile.short || String(profile.name || '').trim().split(' ').pop(),
     initials: profile.initials || String(profile.name || '').trim().slice(0, 2).toUpperCase(),
     color: profile.color || '#574EFA',
+    avatarUrl: profile.avatar_url || '',
+    avatar_url: profile.avatar_url || '',
+    photoUrl: profile.avatar_url || '',
+    photo_url: profile.avatar_url || '',
     bankName: profile.bank_name || '',
     bankAccount: profile.bank_account || '',
     bankAccountName: profile.bank_account_name || '',
@@ -1162,6 +1166,10 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     short: profile?.short || m.short || String(profile?.name || m.name || '').trim().split(' ').pop(),
     initials: profile?.initials || m.initials || String(profile?.name || m.name || '').trim().slice(0, 2).toUpperCase(),
     color: profile?.color || m.color || '#574EFA',
+    avatarUrl: profile?.avatar_url || m.avatar_url || '',
+    avatar_url: profile?.avatar_url || m.avatar_url || '',
+    photoUrl: profile?.avatar_url || m.avatar_url || '',
+    photo_url: profile?.avatar_url || m.avatar_url || '',
     role: m.role,
     memberType: m.member_type || 'fixed',
     member_type: m.member_type || 'fixed',
@@ -1616,6 +1624,25 @@ export function AppProvider({ children }) {
           .eq('id', id)
         if (error) {
           console.error('[store] UPDATE_BANK_INFO:', error)
+          throw error
+        }
+        await refresh()
+        break
+      }
+
+      case 'UPDATE_PROFILE_PHOTO': {
+        if (!sb || !state.currentUserId) return
+        const memberId = action.memberId || state.currentUserId
+        const member = safeArray(state.members).find(item => String(item.id) === String(memberId)) || {}
+        const profileId = action.profileId || action.profile_id || member.profileId || member.profile_id
+        const table = profileId ? 'profiles' : 'members'
+        const id = profileId || memberId
+        const { error } = await sb
+          .from(table)
+          .update({ avatar_url: action.photoUrl || null })
+          .eq('id', id)
+        if (error) {
+          console.error('[store] UPDATE_PROFILE_PHOTO:', error)
           throw error
         }
         await refresh()
