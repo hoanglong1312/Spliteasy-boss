@@ -2,13 +2,14 @@
 // Drop into src/primitives.jsx. All styles inline per spec.
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { colors, type, radius } from './tokens';
 
 /* ───────────────────────── Phone shell ───────────────────────── */
 
 export function PhoneFrame({ children, statusBar = true }) {
   return (
-    <div style={{
+    <div data-spliteasy-phone-frame style={{
       width: 375,
       height: 812,
       margin: '24px auto',
@@ -649,7 +650,7 @@ export function StatGrid({ children, style }) {
 
 export function BottomSheet({ title, children, onClose, tone = 'finance', style }) {
   const t = toneConfig(tone);
-  return (
+  const sheet = (
     <div style={{
       position: 'absolute',
       inset: 0,
@@ -691,6 +692,10 @@ export function BottomSheet({ title, children, onClose, tone = 'finance', style 
       </div>
     </div>
   );
+  const target = typeof document === 'undefined'
+    ? null
+    : document.querySelector('[data-spliteasy-phone-frame]');
+  return target ? createPortal(sheet, target) : sheet;
 }
 
 export function MemberPicker({

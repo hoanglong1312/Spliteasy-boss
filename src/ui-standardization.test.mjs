@@ -40,6 +40,13 @@ test('shared visual primitives exist for Pickleball-style module screens', () =>
   assert.doesNotMatch(primitivesSource, /gridTemplateColumns: '1fr 1fr'[\s\S]*?>\s*Bỏ chọn\s*<\/button>/)
 })
 
+test('BottomSheet portals to the phone frame instead of the scrollable screen', () => {
+  assert.match(primitivesSource, /import \{ createPortal \} from 'react-dom'/)
+  assert.match(primitivesSource, /data-spliteasy-phone-frame/)
+  assert.match(primitivesSource, /document\.querySelector\('\[data-spliteasy-phone-frame\]'\)/)
+  assert.match(primitivesSource, /return target \? createPortal\(sheet, target\) : sheet/)
+})
+
 test('group and pickleball member sheets use the same searchable multi-select picker', () => {
   assert.match(groupDetailSource, /MemberPicker/)
   assert.match(groupDetailSource, /selectedIds=\{selectedCandidateIds\}/)
