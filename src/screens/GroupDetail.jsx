@@ -610,7 +610,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
   const transactions = member.memberTransactions || [];
   const visibleTransactions = transactions.filter(transaction => {
     const query = normalizeSearch(transactionSearch);
-    const searchable = normalizeSearch(`${transaction.title} ${transaction.category} ${transaction.paidByName} ${transaction.status}`);
+    const searchable = normalizeSearch(`${transaction.date} ${transaction.title} ${transaction.category} ${transaction.paidByName} ${transaction.status}`);
     const matchesSearch = !query || searchable.includes(query);
     const net = Number(transaction.netAmount || 0);
     const matchesFilter =
@@ -635,7 +635,8 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
     description: qrDescription,
   }) : '';
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
-  const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : 'Đang cân bằng';
+  const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : '0';
+  const balanceAmountLabel = balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`;
 
   return (
     <Screen style={{ paddingBottom: '28px' }}>
@@ -648,36 +649,36 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       </div>
 
       <Hero variant="emerald" glow={false} style={{ padding: 22, borderRadius: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <Avatar initial={member.initials} size={74} color={member.color} ring style={{ border: '4px solid rgba(7,8,15,0.85)' }} />
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 28, fontWeight: 900 }}>{member.name}</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
               {member.role === 'treasurer' && <Badge tone="warn">Thủ quỹ</Badge>}
               <Badge tone="success">Thành viên</Badge>
             </div>
           </div>
-        </div>
-      </Hero>
-
-      <Card style={{ marginTop: 14 }}>
-        <SectionTitle>SỐ DƯ TRONG NHÓM</SectionTitle>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 14 }}>
-          <div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 700 }}>{balanceLabel}</div>
-            <div style={{ fontSize: 32, fontWeight: 900, color: balanceTone, marginTop: 4, ...type.mono }}>
-              {balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`}
+          <div style={{
+            minWidth: 108,
+            padding: '10px 12px',
+            borderRadius: 14,
+            background: 'rgba(7,8,15,0.36)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            textAlign: 'right',
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>{balanceLabel}</div>
+            <div style={{ marginTop: 5, fontSize: 18, fontWeight: 950, color: balanceTone, whiteSpace: 'nowrap', ...type.mono }}>
+              {balanceAmountLabel}
             </div>
           </div>
         </div>
-      </Card>
+      </Hero>
 
       <Card style={{ marginTop: 14 }}>
         <SectionTitle>TỔNG QUAN GIAO DỊCH</SectionTitle>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
           <MiniBillStat label="Cần trả" value={summary.owes} tone={colors.danger} />
           <MiniBillStat label="Đã ứng" value={summary.advanced} tone="#6ee7b7" />
-          <NetBillStat value={summary.net} />
         </div>
       </Card>
 
@@ -696,7 +697,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         <SearchInput
           value={transactionSearch}
           onChange={event => setTransactionSearch(event.target.value)}
-          placeholder="Tìm giao dịch, loại chi phí, người trả..."
+          placeholder="Tìm tên, ngày, loại chi phí, người trả..."
           style={{ marginTop: 12 }}
         />
         <SubTabs
@@ -770,35 +771,6 @@ function MiniBillStat({ label, value, tone, signed = false }) {
     <div style={{ padding: 10, borderRadius: 12, background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`, minWidth: 0 }}>
       <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 800 }}>{label}</div>
       <div style={{ marginTop: 5, fontSize: 14, fontWeight: 900, color: tone, whiteSpace: 'nowrap', ...type.mono }}>{prefix}{formatVND(Math.abs(amount))}</div>
-    </div>
-  );
-}
-
-function NetBillStat({ value }) {
-  const amount = Number(value || 0);
-  const tone = amount < 0 ? colors.danger : amount > 0 ? '#6ee7b7' : colors.textSecondary;
-  const label = amount < 0 ? 'Còn phải nộp' : amount > 0 ? 'Cần thu lại' : '0';
-  const amountLabel = amount === 0 ? '0 đ' : `${amount > 0 ? '+' : '-'}${formatVND(Math.abs(amount))}`;
-  return (
-    <div style={{
-      gridColumn: '1 / -1',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      padding: '12px 13px',
-      borderRadius: 14,
-      background: amount < 0 ? 'rgba(248,113,113,0.10)' : amount > 0 ? 'rgba(52,211,153,0.10)' : colors.inputBg,
-      border: `1px solid ${amount < 0 ? 'rgba(248,113,113,0.24)' : amount > 0 ? 'rgba(52,211,153,0.24)' : colors.borderSubtle}`,
-      minWidth: 0,
-    }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px' }}>Net</div>
-        <div style={{ marginTop: 3, fontSize: 12, fontWeight: 800, color: tone }}>{label}</div>
-      </div>
-      <div style={{ fontSize: 20, fontWeight: 950, color: tone, whiteSpace: 'nowrap', ...type.mono }}>
-        {amountLabel}
-      </div>
     </div>
   );
 }

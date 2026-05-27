@@ -295,7 +295,8 @@ test('GroupDetail member cards open a detail view with edit and delete actions',
   assert.match(groupDetailSource, /onOpen=\{setSelectedMember\}/);
   assert.match(groupDetailSource, /function MemberDetailPanel\(\{ groupName, member, isTreasurer, onAction, onBack, onEdit, onDelete \}\)/);
   assert.match(groupDetailSource, /Chi tiết thành viên/);
-  assert.match(groupDetailSource, /SỐ DƯ TRONG NHÓM/);
+  assert.match(groupDetailSource, /Cần nộp vào quỹ/);
+  assert.doesNotMatch(groupDetailSource, /SỐ DƯ TRONG NHÓM/);
   assert.match(groupDetailSource, /THÔNG TIN THANH TOÁN/);
   assert.match(groupDetailSource, /onClick=\{\(\) => onOpen\?\.\(member\)\}/);
   assert.match(groupDetailSource, /event\.stopPropagation\(\)/);
@@ -367,12 +368,13 @@ test('GroupDetail member detail shows payer transactions for the selected month'
   assert.match(groupDetailSource, /GIAO DỊCH LIÊN QUAN/);
   assert.match(groupDetailSource, /member\.memberTransactions/);
   assert.match(groupDetailSource, /transactionFilter/);
-  assert.match(groupDetailSource, /placeholder="Tìm giao dịch/);
-  assert.match(memberDetailSource, /<NetBillStat value=\{summary\.net\} \/>/);
+  assert.match(groupDetailSource, /placeholder="Tìm tên, ngày, loại chi phí, người trả\.\.\."/);
+  assert.match(groupDetailSource, /transaction\.date/);
+  assert.doesNotMatch(memberDetailSource, /<NetBillStat value=\{summary\.net\} \/>/);
   assert.match(memberDetailSource, /gridTemplateColumns: '1fr 1fr'/);
   assert.doesNotMatch(memberDetailSource, /\{ key: 'settled', label: 'Cân bằng' \}/);
   assert.match(groupDetailSource, /function MemberTransactionRow\(\{ transaction, onOpen \}\)/);
-  assert.match(groupDetailSource, /function NetBillStat\(\{ value \}\)/);
+  assert.doesNotMatch(groupDetailSource, /function NetBillStat\(\{ value \}\)/);
   assert.match(groupDetailSource, /whiteSpace: 'nowrap'/);
   assert.match(memberTransactionSource, /<TransactionPill label=\{roleLabel\} tone=\{roleTone\} \/>/);
   assert.match(memberTransactionSource, /<TransactionPill label=\{statusLabel\} tone=\{statusTone\} \/>/);
