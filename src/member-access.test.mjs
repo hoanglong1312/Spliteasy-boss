@@ -41,8 +41,12 @@ test('AppV2 consumes member access links and passes recent sessions to JoinGroup
   assert.match(appSource, /recentSessions: getRecentSessions\(\)/)
   assert.match(appSource, /inviteToken: groupInviteToken/)
   assert.match(appSource, /joinCode: groupJoinCode/)
-  assert.match(appSource, /if \(groupJoinCode\)/)
   assert.match(appSource, /accessLinkError/)
+})
+
+test('AppV2 ignores manual invite codes when a member session is already active', () => {
+  assert.match(appSource, /if \(!state\.currentUserId\) \{[\s\S]*joinCode: groupJoinCode[\s\S]*<JoinGroup/)
+  assert.doesNotMatch(appSource, /if \(groupJoinCode\) \{[\s\S]*<JoinGroup/)
 })
 
 test('AppV2 resumes recent sessions with a saved token instead of showing a dead card', () => {

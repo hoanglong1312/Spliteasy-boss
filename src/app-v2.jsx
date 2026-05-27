@@ -1708,14 +1708,6 @@ export default function AppV2() {
     )
   }
 
-  if (groupJoinCode) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#07080f' }}>
-        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
-      </div>
-    )
-  }
-
   if (!state.currentUserId) {
     return (
       <div style={{ minHeight: '100vh', background: '#07080f' }}>
