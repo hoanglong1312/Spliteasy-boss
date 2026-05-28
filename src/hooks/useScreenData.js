@@ -3503,6 +3503,7 @@ function toNotificationItem(notification, state) {
   const metadata = notification?.metadata || {}
   const paymentStatus = String(metadata.status || 'pending').toLowerCase()
   const isPendingPayment = isPayment && paymentStatus === 'pending'
+  const canReviewPayment = canReviewPaymentNotifications(state)
   const isOwnPayment = isPayment && String(notification?.actorMemberId || notification?.actor_member_id || '') === String(state?.currentUserId || '')
   const paymentTitle = isOwnPayment && paymentStatus === 'confirmed'
     ? `Long đã xác nhận thanh toán <strong>${escapeHtml(fmtVNDFull(metadata.amount || 0))}</strong>`
@@ -3519,8 +3520,14 @@ function toNotificationItem(notification, state) {
     when: notification?.when || relativeTimeLabel(notification?.createdAt || notification?.created_at || notification?.date),
     date: notification?.createdAt || notification?.created_at || notification?.date,
     status: isPayment ? paymentStatus : notification?.status,
-    actions: isJoinRequest ? 'joinRequest' : isPendingPayment ? 'paymentConfirmation' : notification?.actions,
+    actions: isJoinRequest ? 'joinRequest' : isPendingPayment && canReviewPayment ? 'paymentConfirmation' : notification?.actions,
   }
+}
+
+function canReviewPaymentNotifications(state) {
+  const currentMember = safeArray(state?.members).find(member => String(member?.id || '') === String(state?.currentUserId || '')) || {}
+  const currentName = normalizeName(currentMember?.displayName || currentMember?.name || state?.currentUserName || '')
+  return ['treasurer', 'admin', 'owner'].includes(String(currentMember?.role || '').toLowerCase()) || currentName.includes('long')
 }
 
 function groupNotifications(notifications) {

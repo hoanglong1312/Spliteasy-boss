@@ -31,6 +31,27 @@ function loadHomeBuilder() {
   return context.__builders.buildHomeData
 }
 
+function loadNotificationsBuilder() {
+  const source = screenDataSource
+    .replace(/import \{ useEffect, useMemo, useRef, useState \} from 'react'\n/, '')
+    .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
+    .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
+    .replace('export function useScreenData', 'function useScreenData')
+  const context = {
+    Date,
+    Math,
+    Intl,
+    console,
+    fmtVNDFull: value => `${Number(value).toLocaleString('vi-VN')} ₫`,
+    groupBalance: () => ({}),
+    groupNet: () => 0,
+    pickleSummary: () => ({ memberOwes: {} }),
+    recentActivity: () => [],
+  }
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildNotificationsData }`, context)
+  return context.__builders.buildNotificationsData
+}
+
 test('payment confirmations are actionable from the notification bell', () => {
   assert.match(notificationsSource, /notif\.actions === 'paymentConfirmation'/)
   assert.match(notificationsSource, /onConfirmPayment=\{\(\) => onAction\?\.\('confirmPaymentNotice', n\)\}/)
@@ -46,9 +67,35 @@ test('notification data maps payment_submitted rows to payment actions', () => {
   assert.match(screenDataSource, /const paymentStatus = String\(metadata\.status \|\| 'pending'\)\.toLowerCase\(\)/)
   assert.match(screenDataSource, /const paymentTitle = isOwnPayment/)
   assert.match(screenDataSource, /notification\?\.titleHtml \|\| notification\?\.title \|\| notification\?\.message/)
-  assert.match(screenDataSource, /actions: isJoinRequest \? 'joinRequest' : isPendingPayment \? 'paymentConfirmation' : notification\?\.actions/)
+  assert.match(screenDataSource, /actions: isJoinRequest \? 'joinRequest' : isPendingPayment && canReviewPayment \? 'paymentConfirmation' : notification\?\.actions/)
   assert.match(screenDataSource, /Long đã xác nhận thanh toán/)
   assert.match(screenDataSource, /status: isPayment \? paymentStatus : notification\?\.status/)
+})
+
+test('payment review actions render only for treasurer notification viewers', () => {
+  const buildNotificationsData = loadNotificationsBuilder()
+  const notification = {
+    id: 'pay-1',
+    type: 'payment_submitted',
+    actorMemberId: 'cuong-member',
+    createdAt: '2026-05-28T12:00:00Z',
+    metadata: { status: 'pending', amount: 1943229 },
+  }
+  const baseState = {
+    currentUserId: 'cuong-member',
+    currentUserName: 'Cường',
+    members: [
+      { id: 'cuong-member', name: 'Cường', role: 'member' },
+      { id: 'long-member', name: 'Long', role: 'treasurer' },
+    ],
+    notifications: [notification],
+  }
+
+  const memberData = buildNotificationsData(baseState)
+  const treasurerData = buildNotificationsData({ ...baseState, currentUserId: 'long-member', currentUserName: 'Long' })
+
+  assert.equal(memberData.groups[0].items[0].actions, undefined)
+  assert.equal(treasurerData.groups[0].items[0].actions, 'paymentConfirmation')
 })
 
 test('home payment summary exposes member payment confirmation status', () => {
