@@ -6,12 +6,13 @@
 @rules/supabase.md
 @rules/testing.md
 @context/architecture.md
+@docs/architecture/identity-model.md
 
 ## Project-Specific Rules
 
 ### Constraints Đặc Thù
 
-**Sandbox EPERM:** Codex `workspace-write` không bind được network port → không yêu cầu Codex chạy `npx playwright test` hay khởi động dev server. Codex chỉ chạy `npm run build`. Claude main chạy Playwright trực tiếp.
+**Identity Source of Truth:** Bắt buộc đọc `docs/architecture/identity-model.md` trước mọi task liên quan member/profile/auth/PIN/avatar/bank/role/expense participant/attendance/share link. Mặc định: dữ liệu cá nhân dùng `profile_id`; dữ liệu trong một nhóm dùng `member.id + group_id`; `state.currentUserId` là `member.id`, không phải `profile.id`.
 
 **Git Lock song song:** Hai Codex session đồng thời có thể tranh `.git/index.lock` → Claude main commit thủ công khi Codex báo lỗi lock:
 ```bash
@@ -19,7 +20,7 @@ git add [files Codex báo]
 git commit -m "[message Codex đề xuất]"
 ```
 
-**Emergency Fallback:** Nếu Codex lỗi/không khả dụng → Claude main dùng Edit/Write trực tiếp, ghi chú lý do trong commit message.
+**Browser Debugging:** Ưu tiên Browser/Playwright cho reproduce/verify UI. Dùng Chrome DevTools MCP khi cần console, network request/response, Supabase payload, storage hoặc performance. Nếu Playwright không chạy được trong Claude Code, Chrome DevTools MCP là fallback để kiểm tra localhost bằng Chrome profile tách biệt. MCP này chạy qua Node bundle của Codex runtime vì package yêu cầu Node `20.19.0+`.
 
 ### Quality Gate — Bắt Buộc Trước Khi Bàn Giao User
 

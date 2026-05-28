@@ -16,8 +16,9 @@ Nhóm 6–15 người chơi pickleball định kỳ cần chia tiền sân, ti�
 ```
 Frontend: React + Vite (đã migrate từ CDN Babel)
 Styles:   src/tokens.js (design tokens — màu, typography)
-State:    Supabase (server state) + localStorage (PIN, token, member)
+State:    Supabase (server state, PIN theo profile) + localStorage (token, recent member session metadata)
 Backend:  Supabase — PostgreSQL + RLS + Realtime
+Identity: docs/architecture/identity-model.md là source of truth cho profile/member IDs
 ```
 
 ## Runtime source of truth
