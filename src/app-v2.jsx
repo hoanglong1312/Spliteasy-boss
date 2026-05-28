@@ -23,7 +23,6 @@ import JoinGroup from './screens/JoinGroup'
 import ExpenseDetail from './screens/ExpenseDetail'
 import SessionDetail from './screens/SessionDetail'
 import NewGroup from './screens/NewGroup'
-import SettleAll from './screens/SettleAll'
 import Notifications from './screens/Notifications'
 import ApprovalQueue from './screens/ApprovalQueue'
 import Settings from './screens/Settings'
@@ -161,6 +160,7 @@ export default function AppV2() {
   const [pinInput, setPinInput] = useState('')
   const [pendingPinSession, setPendingPinSession] = useState(null)
   const [, setRecentSessionVersion] = useState(0)
+  const [homePaymentOpen, setHomePaymentOpen] = useState(false)
 
   useEffect(() => {
     if (!publicBillToken) return
@@ -1707,6 +1707,23 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'settleAll' || type === 'settle') {
+      setActiveTab('home')
+      setStack([])
+      setHomePaymentOpen(true)
+      return
+    }
+
+    if (type === 'closeHomePayment') {
+      setHomePaymentOpen(false)
+      return
+    }
+
+    if (type === 'markRefundPaid') {
+      dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu hoàn tiền cho ${payload?.name || 'thành viên'}.` })
+      return
+    }
+
     const ACTION_TO_SCREEN = {
       addExpense:       'add-expense',
       payment:          'payment-flow',
@@ -1717,8 +1734,6 @@ export default function AppV2() {
       newGroup:         'new-group',
       notifications:    'notifications',
       approvalQueue:    'approval-queue',
-      settleAll:        'settle-all',
-      settle:           'settle-all',
       settlementPeriod: 'settlement-period',
       closeMonth:       'settlement-period',
       closePeriod:      'settlement-period',
@@ -1856,7 +1871,7 @@ export default function AppV2() {
         return <Profile data={profileData} isTreasurer={isTreasurer} onAction={handle} />
       case 'home':
       default:
-        return <Home data={homeData} isTreasurer={isTreasurer} onAction={handle} />
+        return <Home data={homeData} isTreasurer={isTreasurer} paymentOpen={homePaymentOpen} onPaymentClose={() => handle('closeHomePayment')} onAction={handle} />
     }
   }
 
@@ -1879,7 +1894,6 @@ export default function AppV2() {
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />
       case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'new-group':           return <NewGroup data={newGroupData} onAction={handle} />
-      case 'settle-all':          return <SettleAll data={getSettleAllData()} isTreasurer={isTreasurer} onAction={handle} />
       case 'notifications':       return <Notifications data={notificationsData} onAction={handle} />
       case 'approval-queue':      return <ApprovalQueue data={approvalQueueData} isTreasurer={isTreasurer} onAction={handle} />
       case 'settings':            return <Settings data={accountSettingsData} onAction={handle} />

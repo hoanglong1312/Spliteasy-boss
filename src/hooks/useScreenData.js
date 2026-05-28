@@ -210,6 +210,9 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const pickleballBalance = buildMemberMonthBalance(pickleballState, pickle, monthSessions, pickleballMemberId).netBalance || 0
   const totalBalance = expenseBalance + pickleballBalance
   const sourceBalances = buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, monthSessions, members, today)
+  const sourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
+  const profileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
+  const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
 
   return {
     user: {
@@ -237,8 +240,25 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
     pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
-    sourceBreakdown: currentProfileSourceBreakdown(sourceBalances, currentUserId, members),
-    profileBreakdown: aggregateBalancesByProfile(sourceBalances, members),
+    sourceBreakdown,
+    profileBreakdown,
+    paymentSummary: buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, today),
+  }
+}
+
+function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate) {
+  const netBalance = safeArray(sourceBreakdown).reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
+  return {
+    monthLabel: formatMonthLabel(monthDate),
+    netBalance,
+    paymentTarget: findAdminPaymentTarget(members, state),
+    refundRows: safeArray(profileBreakdown)
+      .filter(row => Number(row.amount) > 0)
+      .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || ''))
+      .map(row => ({
+        ...row,
+        bank: bankData(findProfileMember(row.profileId, members), true),
+      })),
   }
 }
 
@@ -1721,7 +1741,7 @@ function buildSettleAllData(state) {
     isTreasurer: me?.role === 'treasurer',
     settlements: [],
     sources,
-    paymentTarget: bankData(me, true),
+    paymentTarget: findAdminPaymentTarget(members, state),
   }
 }
 
@@ -3028,6 +3048,24 @@ function bankData(member, primary = false) {
     brandColor: bankBrandColor(code),
     primary,
   }
+}
+
+function findAdminPaymentTarget(members, state) {
+  const rows = safeArray(members)
+  const isMoneyManager = (member) => ['treasurer', 'admin', 'owner'].includes(String(member?.role || '').toLowerCase())
+  const admin = rows.find(member => (
+    isMoneyManager(member) &&
+    normalizeName(member?.displayName || member?.name).includes('long') &&
+    (member?.bankAccount || member?.bank_account)
+  )) || rows.find(member => (
+    isMoneyManager(member) &&
+    (member?.bankAccount || member?.bank_account)
+  )) || rows.find(member => String(member?.id || '') === String(state?.currentUserId || '')) || rows[0]
+  return bankData(admin, true)
+}
+
+function findProfileMember(profileId, members) {
+  return safeArray(members).find(member => String(member.profileId || member.profile_id || member.id) === String(profileId || '')) || {}
 }
 
 function bankBrandColor(code) {

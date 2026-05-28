@@ -5,8 +5,9 @@ import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card,
-  SectionLabel, SearchInput, SectionHeader, ListCard,
+  SectionLabel, SearchInput, SectionHeader, ListCard, BottomSheet,
 } from '../primitives';
+import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -22,12 +23,14 @@ const CATEGORY_FILTERS = [
   { key: 'other', label: 'Khác' },
 ];
 
-export default function Home({ data, isTreasurer, onAction }) {
+export default function Home({ data, isTreasurer, paymentOpen = false, onPaymentClose, onAction }) {
   const d = data || DEMO;
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(true);
+  const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
+  const [confirmedRefunds, setConfirmedRefunds] = useState(() => new Set());
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
@@ -61,6 +64,7 @@ export default function Home({ data, isTreasurer, onAction }) {
           totalBalance={d.totalBalance}
           balanceLabel={balanceLabel}
           owedTo={d.owedTo}
+          onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
         />
 
@@ -160,6 +164,22 @@ export default function Home({ data, isTreasurer, onAction }) {
           )}
         </ListCard>
       </Screen>
+
+      <PaymentSheet
+        open={paymentOpen || paymentSheetOpen}
+        data={d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }}
+        isTreasurer={isTreasurer}
+        confirmedRefunds={confirmedRefunds}
+        onConfirmRefund={(row) => {
+          const key = String(row.profileId || row.name || 'member');
+          setConfirmedRefunds(prev => new Set([...prev, key]));
+          onAction?.('markRefundPaid', row);
+        }}
+        onClose={() => {
+          setPaymentSheetOpen(false);
+          onPaymentClose?.();
+        }}
+      />
 
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
@@ -261,7 +281,7 @@ function approvalButton(background, color) {
   };
 }
 
-function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onAction }) {
+function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction }) {
   if (!safeArray(sources).length) return null;
   const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
   const isNegativeTotal = totalBalance < 0;
@@ -273,7 +293,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
         <button
           type="button"
           aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
-          onClick={(event) => { event.stopPropagation(); onAction?.('settleAll'); }}
+          onClick={(event) => { event.stopPropagation(); onOpenPayment?.(); }}
           style={{
             width: '100%',
             display: 'flex',
@@ -325,7 +345,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
             fontWeight: 800,
             whiteSpace: 'nowrap',
           }}>
-            {isNegativeTotal ? <>Xem {owedTo} quỹ cần kiểm tra</> : isPositiveTotal ? 'Xem quỹ cần bù' : '0'}
+            💳 Thanh toán
           </div>
         </button>
         {sources.map((source, index) => {
@@ -407,6 +427,108 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
       </Card>
     </>
   );
+}
+
+function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose }) {
+  if (!open) return null;
+  const netBalance = Number(data?.netBalance) || 0;
+  const target = data?.paymentTarget || {};
+  const qrBank = resolveVietQrBank(target);
+  const amountToPay = Math.max(0, Math.abs(netBalance));
+  const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
+  const qrUrl = canShowQr ? generateQRUrl({
+    bankId: qrBank.id,
+    account: target.account,
+    accountName: target.holder,
+    amount: amountToPay,
+    description: `THANH TOAN ${data?.monthLabel || ''}`.trim(),
+  }) : '';
+
+  return (
+    <BottomSheet title="Thanh toán" onClose={onClose}>
+      {netBalance < 0 && (
+        <Card style={{ padding: 14, borderColor: canShowQr ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)' }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Thanh toán về thủ quỹ
+          </div>
+          <div style={{ fontSize: 28, fontWeight: 950, color: '#fca5a5', marginTop: 6, ...type.mono }}>
+            {formatVND(amountToPay)}
+          </div>
+          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
+            Chuyển về {target.holder || 'Long'} · {target.name || target.code || 'Ngân hàng'} {target.account ? `· ${target.account}` : ''}
+          </div>
+          {canShowQr ? (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
+              <img src={qrUrl} alt="QR thanh toán thủ quỹ" style={{ width: 210, height: 210, borderRadius: 16, background: '#fff', objectFit: 'cover' }} />
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: '#fde68a', lineHeight: 1.45, fontWeight: 700, marginTop: 10 }}>
+              Chưa có đủ thông tin ngân hàng của thủ quỹ. Nhờ Long cập nhật STK trong tab cá nhân.
+            </div>
+          )}
+        </Card>
+      )}
+
+      {netBalance >= 0 && (
+        <Card style={{ padding: 14, borderColor: 'rgba(52,211,153,0.25)' }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
+            Chờ thủ quỹ hoàn tiền
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 950, color: '#6ee7b7', marginTop: 6, ...type.mono }}>
+            {formatVND(Math.max(0, netBalance))}
+          </div>
+          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 5, lineHeight: 1.45 }}>
+            Bạn đang dư tiền trong tháng này. Long sẽ xem danh sách cần hoàn ở giao diện thủ quỹ và chuyển khoản ngược lại.
+          </div>
+        </Card>
+      )}
+
+      {isTreasurer && safeArray(data?.refundRows).length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <SectionLabel>Cần hoàn tiền</SectionLabel>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {safeArray(data.refundRows).map(row => {
+              const key = String(row.profileId || row.name || 'member');
+              const done = confirmedRefunds?.has?.(key);
+              return (
+                <Card key={key} style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary }}>{row.name}</div>
+                    <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                      {row.bank?.name || 'Chưa có ngân hàng'} {row.bank?.account ? `· ${row.bank.account}` : ''}
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 950, color: '#6ee7b7', marginTop: 5, ...type.mono }}>{formatVND(row.amount)}</div>
+                  </div>
+                  <button type="button" onClick={() => onConfirmRefund?.(row)} disabled={done} style={{
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '9px 10px',
+                    background: done ? 'rgba(52,211,153,0.18)' : colors.brand,
+                    color: done ? '#6ee7b7' : '#fff',
+                    fontSize: 11,
+                    fontWeight: 900,
+                    fontFamily: 'inherit',
+                    cursor: done ? 'default' : 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}>{done ? 'Đã chuyển' : 'Xác nhận'}</button>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </BottomSheet>
+  );
+}
+
+function resolveVietQrBank(bank = {}) {
+  const raw = String(bank.code || bank.name || '').trim().toLowerCase();
+  if (!raw || raw === '--') return null;
+  return BANK_LIST.find(item => (
+    item.id.toLowerCase() === raw ||
+    item.shortName.toLowerCase() === raw ||
+    item.name.toLowerCase() === raw
+  )) || { id: bank.code || bank.name, shortName: bank.name || bank.code };
 }
 function safeArray(value) {
   return Array.isArray(value) ? value : [];

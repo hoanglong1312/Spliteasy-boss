@@ -114,7 +114,7 @@ test('SettleAll shows refund bank readiness instead of QR when the member has su
   assert.match(screenDataSource, /function buildSettleAllData\(state\)/);
   assert.match(screenDataSource, /const sourceBalances = buildHomeSourceBalances/);
   assert.match(screenDataSource, /currentProfileSourceBreakdown\(sourceBalances, state\?\.currentUserId, members\)/);
-  assert.match(screenDataSource, /paymentTarget: bankData\(me, true\)/);
+  assert.match(screenDataSource, /paymentTarget: findAdminPaymentTarget\(members, state\)/);
   assert.match(settleAllSource, /Thanh toán tổng hợp/);
   assert.match(settleAllSource, /Theo nguồn tiền/);
   assert.match(settleAllSource, /Thông tin hoàn tiền/);
@@ -533,14 +533,26 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.doesNotMatch(homeSource, /onAction\?\.\('addExpense'\)/);
   assert.doesNotMatch(homeSource, />\+ Thêm chi tiêu<\/Button>/);
   assert.doesNotMatch(homeSource, />Chi tiết quỹ<\/Button>/);
+  assert.match(homeSource, /paymentOpen = false/);
+  assert.match(homeSource, /<PaymentSheet[\s\S]*open=\{paymentOpen \|\| paymentSheetOpen\}/);
+  assert.match(homeSource, /function PaymentSheet\(\{ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose \}\)/);
+  assert.match(homeSource, /Thanh toán về thủ quỹ/);
+  assert.match(homeSource, /generateQRUrl\(/);
+  assert.match(homeSource, /Chờ thủ quỹ hoàn tiền/);
+  assert.match(homeSource, /Cần hoàn tiền/);
+  assert.match(homeSource, /onConfirmRefund\?\.\(row\)/);
   assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}/);
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onAction \}\)/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction \}\)/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
   assert.match(homeSource, /formatVND\(Math\.abs\(totalBalance\)\)/);
   assert.match(homeSource, /aria-label=\{isNegativeTotal \? `Xem \$\{owedTo\} quỹ cần kiểm tra` : 'Xem nguồn tiền'\}/);
-  assert.match(homeSource, /onClick=\{\(event\) => \{ event\.stopPropagation\(\); onAction\?\.\('settleAll'\); \}\}/);
-  assert.match(homeSource, /Xem \{owedTo\} quỹ cần kiểm tra/);
+  assert.match(homeSource, /setPaymentSheetOpen\(true\)/);
+  assert.match(homeSource, /💳 Thanh toán/);
   assert.doesNotMatch(homeSource, /<span style=\{\{ width: 6, height: 6/);
+  assert.doesNotMatch(appSource, /settleAll:\s*'settle-all'/);
+  assert.doesNotMatch(appSource, /case 'settle-all'/);
+  assert.match(appSource, /if \(type === 'settleAll' \|\| type === 'settle'\)/);
+  assert.match(appSource, /setHomePaymentOpen\(true\)/);
 });
 
 test('GroupDetail no longer shows treasurer pending approval alert outside activity', () => {
@@ -564,7 +576,7 @@ test('AppV2 approves and rejects expenses with the reviewer member from the expe
 
 test('Home hides monthly member balances and does not render attendance shortcut', () => {
   assert.match(homeSource, /<Screen style=\{\{ paddingBottom: '72px' \}\}>/);
-  assert.match(homeSource, /export default function Home\(\{ data, isTreasurer, onAction \}\)/);
+  assert.match(homeSource, /export default function Home\(\{ data, isTreasurer, paymentOpen = false, onPaymentClose, onAction \}\)/);
   assert.doesNotMatch(homeSource, /<PaymentBalanceSection balances=\{d\.memberBalances \|\| \[\]\} onAction=\{onAction\} \/>/);
   assert.doesNotMatch(homeSource, /isTreasurer && d\.todaySession/);
   assert.doesNotMatch(homeSource, /onAction\?\.\('attend', d\.todaySession\.id\)/);
@@ -659,8 +671,8 @@ test('GroupDetail activity cards open expense detail for members', () => {
 });
 
 test('Home source breakdown rows open their related module', () => {
-  assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{d\.sourceBreakdown \|\| \[\]\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/);
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onAction \}\)/);
+  assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{d\.sourceBreakdown \|\| \[\]\}[\s\S]*onOpenPayment=\{\(\) => setPaymentSheetOpen\(true\)\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction \}\)/);
   assert.match(homeSource, /const openSource = \(\) => \{/);
   assert.match(homeSource, /if \(isPickleball\) \{\s*onAction\?\.\('tab', 'pickleball'\)/);
   assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/);

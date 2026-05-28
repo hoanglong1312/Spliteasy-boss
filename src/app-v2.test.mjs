@@ -319,7 +319,7 @@ test('AppV2 passes pickleball settings time and home treasurer role through prop
   assert.match(appSource, /scheduleStartDay: payload\?\.startDate,\s*scheduleTime: payload\?\.scheduleTime,/)
   assert.doesNotMatch(appSource, /courtFee: payload\?\.courtFee,[\s\S]*?scheduleWeekdays: payload\?\.weekdays/)
   assert.doesNotMatch(appSource, /ticketPrice: payload\?\.ticketPrice,[\s\S]*?scheduleWeekdays: payload\?\.weekdays/)
-  assert.match(appSource, /return <Home data=\{homeData\} isTreasurer=\{isTreasurer\} onAction=\{handle\} \/>/)
+  assert.match(appSource, /return <Home data=\{homeData\} isTreasurer=\{isTreasurer\} paymentOpen=\{homePaymentOpen\} onPaymentClose=\{\(\) => handle\('closeHomePayment'\)\} onAction=\{handle\} \/>/)
 })
 
 test('AppV2 routes treasurer team-fund config through a dedicated screen and handler', () => {
