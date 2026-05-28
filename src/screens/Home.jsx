@@ -440,19 +440,33 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
 }
 
 function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose }) {
+  const [copiedPayment, setCopiedPayment] = useState(false);
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
   const target = data?.paymentTarget || {};
   const qrBank = resolveVietQrBank(target);
   const amountToPay = Math.max(0, Math.abs(netBalance));
   const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
+  const transferDescription = `${data?.memberName || 'Thanh vien'} - Thanh toan ${data?.monthLabel || ''}`.trim();
   const qrUrl = canShowQr ? generateQRUrl({
     bankId: qrBank.id,
     account: target.account,
     accountName: target.holder,
     amount: amountToPay,
-    description: `THANH TOAN ${data?.monthLabel || ''}`.trim(),
+    description: transferDescription,
   }) : '';
+  const paymentInfo = [
+    `So tien: ${formatVND(amountToPay)}`,
+    `Nguoi nhan: ${target.holder || 'Long'}`,
+    target.name || target.code ? `Ngan hang: ${target.name || target.code}` : '',
+    target.account ? `STK: ${target.account}` : '',
+    `Noi dung: ${transferDescription}`,
+  ].filter(Boolean).join('\n');
+  const copyPaymentInfo = async () => {
+    if (!navigator?.clipboard) return;
+    await navigator.clipboard.writeText(paymentInfo);
+    setCopiedPayment(true);
+  };
 
   return (
     <BottomSheet title="Thanh toán" onClose={onClose}>
@@ -467,9 +481,48 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
           <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
             Chuyển về {target.holder || 'Long'} · {target.name || target.code || 'Ngân hàng'} {target.account ? `· ${target.account}` : ''}
           </div>
+          {canShowQr && (
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 6, lineHeight: 1.4 }}>
+              Nội dung: {transferDescription}
+            </div>
+          )}
           {canShowQr ? (
-            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-              <img src={qrUrl} alt="QR thanh toán thủ quỹ" style={{ width: 210, height: 210, borderRadius: 16, background: '#fff', objectFit: 'cover' }} />
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
+                <img src={qrUrl} alt="QR thanh toán thủ quỹ" style={{ width: 210, height: 210, borderRadius: 16, background: '#fff', objectFit: 'cover' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                <a
+                  href={qrUrl}
+                  download="vietqr-thanh-toan.png"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minHeight: 42,
+                    borderRadius: 12,
+                    background: 'rgba(52,211,153,0.16)',
+                    border: '1px solid rgba(52,211,153,0.32)',
+                    color: '#6ee7b7',
+                    fontSize: 12,
+                    fontWeight: 900,
+                    textDecoration: 'none',
+                  }}
+                >Lưu QR</a>
+                <button type="button" onClick={copyPaymentInfo} style={{
+                  minHeight: 42,
+                  borderRadius: 12,
+                  background: copiedPayment ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${copiedPayment ? 'rgba(129,140,248,0.38)' : 'rgba(255,255,255,0.12)'}`,
+                  color: copiedPayment ? colors.brandLight : colors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: 900,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}>{copiedPayment ? 'Đã sao chép' : 'Sao chép STK'}</button>
+              </div>
             </div>
           ) : (
             <div style={{ fontSize: 12, color: '#fde68a', lineHeight: 1.45, fontWeight: 700, marginTop: 10 }}>

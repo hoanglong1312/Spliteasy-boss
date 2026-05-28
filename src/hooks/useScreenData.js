@@ -250,6 +250,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   const netBalance = safeArray(sourceBreakdown).reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   return {
     monthLabel: formatMonthLabel(monthDate),
+    memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
     netBalance,
     paymentTarget: findAdminPaymentTarget(members, state),
     refundRows: safeArray(profileBreakdown)

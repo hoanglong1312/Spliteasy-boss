@@ -538,6 +538,11 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /function PaymentSheet\(\{ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose \}\)/);
   assert.match(homeSource, /Thanh toán về thủ quỹ/);
   assert.match(homeSource, /generateQRUrl\(/);
+  assert.match(homeSource, /download=\"vietqr-thanh-toan\.png\"/);
+  assert.match(homeSource, /Lưu QR/);
+  assert.match(homeSource, /navigator\.clipboard\.writeText\(paymentInfo\)/);
+  assert.match(homeSource, /Sao chép STK/);
+  assert.match(homeSource, /const transferDescription = `\$\{data\?\.memberName \|\| 'Thanh vien'\} - Thanh toan \$\{data\?\.monthLabel \|\| ''\}`\.trim\(\)/);
   assert.match(homeSource, /Chờ thủ quỹ hoàn tiền/);
   assert.match(homeSource, /Cần hoàn tiền/);
   assert.match(homeSource, /onConfirmRefund\?\.\(row\)/);
