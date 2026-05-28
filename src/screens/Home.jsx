@@ -441,13 +441,17 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
 
 function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose }) {
   const [copiedPayment, setCopiedPayment] = useState(false);
+  const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
   const target = data?.paymentTarget || {};
   const qrBank = resolveVietQrBank(target);
-  const amountToPay = Math.max(0, Math.abs(netBalance));
+  const payForRows = safeArray(data?.payForRows);
+  const selectedPayForRows = payForRows.filter(row => selectedPayForIds.has(String(row.profileId || row.name)));
+  const amountToPay = Math.max(0, Math.abs(netBalance)) + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
   const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
-  const transferDescription = `${data?.memberName || 'Thanh vien'} - Thanh toan ${data?.monthLabel || ''}`.trim();
+  const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
+  const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${data?.monthLabel || ''}`.trim();
   const qrUrl = canShowQr ? generateQRUrl({
     bankId: qrBank.id,
     account: target.account,
@@ -467,6 +471,16 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
     await navigator.clipboard.writeText(paymentInfo);
     setCopiedPayment(true);
   };
+  const togglePayFor = (row) => {
+    const key = String(row.profileId || row.name);
+    setSelectedPayForIds(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setCopiedPayment(false);
+  };
 
   return (
     <BottomSheet title="Thanh toán" onClose={onClose}>
@@ -484,6 +498,52 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
           {canShowQr && (
             <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 6, lineHeight: 1.4 }}>
               Nội dung: {transferDescription}
+            </div>
+          )}
+          {canShowQr && payForRows.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 10, fontWeight: 900, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                Thanh toán hộ
+              </div>
+              <div style={{ display: 'grid', gap: 7, marginTop: 8 }}>
+                {payForRows.map(row => {
+                  const key = String(row.profileId || row.name);
+                  const active = selectedPayForIds.has(key);
+                  return (
+                    <button key={key} type="button" onClick={() => togglePayFor(row)} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 9,
+                      width: '100%',
+                      padding: '9px 10px',
+                      borderRadius: 12,
+                      border: `1px solid ${active ? 'rgba(52,211,153,0.38)' : 'rgba(255,255,255,0.10)'}`,
+                      background: active ? 'rgba(52,211,153,0.14)' : 'rgba(255,255,255,0.04)',
+                      color: colors.textPrimary,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}>
+                      <span style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 6,
+                        border: `1px solid ${active ? '#6ee7b7' : 'rgba(255,255,255,0.22)'}`,
+                        background: active ? 'rgba(52,211,153,0.24)' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#6ee7b7',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        flexShrink: 0,
+                      }}>{active ? '✓' : ''}</span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
+                      <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 900, ...type.mono }}>{formatVND(Math.abs(Number(row.amount) || 0))}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
           {canShowQr ? (

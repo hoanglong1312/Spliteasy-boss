@@ -542,7 +542,14 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /Lưu QR/);
   assert.match(homeSource, /navigator\.clipboard\.writeText\(paymentInfo\)/);
   assert.match(homeSource, /Sao chép STK/);
-  assert.match(homeSource, /const transferDescription = `\$\{data\?\.memberName \|\| 'Thanh vien'\} - Thanh toan \$\{data\?\.monthLabel \|\| ''\}`\.trim\(\)/);
+  assert.match(homeSource, /const transferDescription = `\$\{paymentNames\.join\(', '\)\} - Thanh toan \$\{data\?\.monthLabel \|\| ''\}`\.trim\(\)/);
+  assert.match(homeSource, /const \[selectedPayForIds, setSelectedPayForIds\] = useState\(\(\) => new Set\(\)\)/);
+  assert.match(homeSource, /const payForRows = safeArray\(data\?\.payForRows\)/);
+  assert.match(homeSource, /const selectedPayForRows = payForRows\.filter\(row => selectedPayForIds\.has\(String\(row\.profileId \|\| row\.name\)\)\)/);
+  assert.match(homeSource, /const amountToPay = Math\.max\(0, Math\.abs\(netBalance\)\) \+ selectedPayForRows\.reduce/);
+  assert.match(homeSource, /paymentNames\.join\(', '\)/);
+  assert.match(homeSource, /Thanh toán hộ/);
+  assert.match(homeSource, /onClick=\{\(\) => togglePayFor\(row\)\}/);
   assert.match(homeSource, /Chờ thủ quỹ hoàn tiền/);
   assert.match(homeSource, /Cần hoàn tiền/);
   assert.match(homeSource, /onConfirmRefund\?\.\(row\)/);

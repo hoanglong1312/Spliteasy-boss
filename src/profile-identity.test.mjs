@@ -176,6 +176,8 @@ test('screen data exposes profile aggregation helpers for home and monthly close
   assert.match(screenDataSource, /const profileBreakdown = aggregateBalancesByProfile\(sourceBalances, members\)/)
   assert.match(screenDataSource, /profileBreakdown,/)
   assert.match(screenDataSource, /memberName: me\?\.displayName \|\| me\?\.name \|\| state\?\.currentUserName \|\| 'Thành viên'/)
+  assert.match(screenDataSource, /payForRows: safeArray\(profileBreakdown\)/)
+  assert.match(screenDataSource, /\.filter\(row => Number\(row\.amount\) < 0\)/)
   assert.match(screenDataSource, /const monthlySourceBalances = buildMonthlySourceBalances/)
   assert.match(screenDataSource, /profileBreakdown: aggregateBalancesByProfile\(monthlySourceBalances, members\)/)
 })

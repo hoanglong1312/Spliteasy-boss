@@ -253,6 +253,9 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
     netBalance,
     paymentTarget: findAdminPaymentTarget(members, state),
+    payForRows: safeArray(profileBreakdown)
+      .filter(row => Number(row.amount) < 0)
+      .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),
     refundRows: safeArray(profileBreakdown)
       .filter(row => Number(row.amount) > 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || ''))
