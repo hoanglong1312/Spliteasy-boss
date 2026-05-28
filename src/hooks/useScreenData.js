@@ -371,6 +371,11 @@ function buildPendingExpenseApprovals(groups, members, currentUserId, currentUse
 }
 
 function buildPendingPaymentConfirmations(state) {
+  const members = safeArray(state?.members)
+  const currentMember = members.find(member => String(member?.id || '') === String(state?.currentUserId || '')) || {}
+  const currentName = normalizeName(currentMember?.displayName || currentMember?.name || state?.currentUserName || '')
+  const canReviewPayment = ['treasurer', 'admin', 'owner'].includes(String(currentMember?.role || '').toLowerCase()) || currentName.includes('long')
+  if (!canReviewPayment) return []
   return safeArray(state?.notifications)
     .filter(notification => {
       const type = String(notification?.type || '').toLowerCase()

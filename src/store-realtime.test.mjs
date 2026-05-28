@@ -71,14 +71,14 @@ test('store fetches venue owner payments and persists team-fund owner actions', 
 
 test('store fetches payment notifications and persists treasurer review actions', () => {
   assert.match(storeSource, /nR/)
-  assert.match(storeSource, /sb\.from\('notifications'\)\.select\('\*'\)\.order\('created_at', \{ ascending: false \}\)/)
+  assert.match(storeSource, /sb\.rpc\('list_visible_notifications'\)/)
   assert.match(storeSource, /if \(nR\.error\) console\.warn\('\[store\] notifications query failed:', nR\.error\)/)
   assert.match(storeSource, /notifications:\s*nR\.data \|\| \[\]/)
   assert.match(storeSource, /const normalNotifications = safeArray\(notifications\)\.map\(notification => \(\{/)
   assert.match(storeSource, /notifications: normalNotifications/)
   assert.match(storeSource, /case 'SEND_PAYMENT_NOTIFICATION': \{/)
-  assert.match(storeSource, /\.from\('notifications'\)\s*\.insert\(\{/)
-  assert.match(storeSource, /type: 'payment_submitted'/)
+  assert.match(storeSource, /\.rpc\('submit_payment_notification'/)
+  assert.match(storeSource, /p_target_member_id: targetMemberId \|\| null/)
   const reviewBlock = storeSource.slice(
     storeSource.indexOf("case 'REVIEW_PAYMENT_NOTIFICATION':"),
     storeSource.indexOf("case 'MARK_NOTIFICATIONS_READ':")

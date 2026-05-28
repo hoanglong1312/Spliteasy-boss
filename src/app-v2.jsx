@@ -1766,18 +1766,24 @@ export default function AppV2() {
     if (type === 'confirmPaymentSent') {
       const covered = Array.isArray(payload?.coveredMembers) ? payload.coveredMembers : []
       const names = [payload?.memberName, ...covered.map(row => row?.name)].filter(Boolean).join(', ')
-      await dispatch({
-        type: 'SEND_PAYMENT_NOTIFICATION',
-        targetMemberId: payload?.paymentTarget?.memberId || paymentNotificationTargetMemberId(state),
-        amount: payload?.amount,
-        memberName: payload?.memberName,
-        coveredMembers: covered,
-        transferDescription: payload?.transferDescription,
-        paymentTarget: payload?.paymentTarget,
-        monthLabel: homeData?.monthLabel,
-      })
-      await dispatch({ type: 'REFRESH' })
-      dispatch({ type: 'SHOW_TOAST', message: `Đã gửi báo thanh toán cho thủ quỹ: ${names || 'thành viên'}.` })
+      try {
+        await dispatch({
+          type: 'SEND_PAYMENT_NOTIFICATION',
+          targetMemberId: payload?.paymentTarget?.memberId || paymentNotificationTargetMemberId(state),
+          amount: payload?.amount,
+          memberName: payload?.memberName,
+          coveredMembers: covered,
+          transferDescription: payload?.transferDescription,
+          paymentTarget: payload?.paymentTarget,
+          monthLabel: homeData?.monthLabel,
+        })
+        await dispatch({ type: 'REFRESH' })
+        dispatch({ type: 'SHOW_TOAST', message: `Đã gửi báo thanh toán cho thủ quỹ: ${names || 'thành viên'}.` })
+      } catch (error) {
+        console.error('[app] confirmPaymentSent:', error)
+        dispatch({ type: 'SHOW_TOAST', message: 'Chưa gửi được báo thanh toán. Thử lại hoặc báo Long kiểm tra kết nối.' })
+        throw error
+      }
       return
     }
 

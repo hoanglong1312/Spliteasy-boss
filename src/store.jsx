@@ -616,7 +616,7 @@ async function fetchGroupData(token) {
     sb.from('pickleball_tickets').select('*').order('session_date', { ascending: true }),
     sb.from('pickleball_owner_payments').select('*').order('paid_at', { ascending: false }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
-    sb.from('notifications').select('*').order('created_at', { ascending: false }),
+    sb.rpc('list_visible_notifications'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
   ])
   if (mR.error) throw mR.error
@@ -1925,7 +1925,6 @@ export function AppProvider({ children }) {
       case 'SEND_PAYMENT_NOTIFICATION': {
         if (!sb || !state.currentUserId) return null
         const targetMemberId = action.targetMemberId || action.memberId || action.member_id
-        if (!targetMemberId) return null
         const amount = Number(action.amount) || 0
         const metadata = {
           status: 'pending',
@@ -1936,23 +1935,22 @@ export function AppProvider({ children }) {
           paymentTarget: action.paymentTarget || {},
           monthLabel: action.monthLabel || '',
         }
-        const { error } = await sb
-          .from('notifications')
-          .insert({
-            member_id: targetMemberId,
-            group_id: action.groupId || state.currentGroupId || null,
-            actor_member_id: state.currentUserId,
-            type: 'payment_submitted',
-            ref_type: 'settlement',
-            message: `${metadata.memberName} báo đã thanh toán ${formatVNDForMessage(amount)}`,
-            metadata,
-          })
+        const { data, error } = await sb.rpc('submit_payment_notification', {
+          p_target_member_id: targetMemberId || null,
+          p_group_id: action.groupId || state.currentGroupId || null,
+          p_amount: amount,
+          p_member_name: metadata.memberName,
+          p_covered_members: metadata.coveredMembers,
+          p_transfer_description: metadata.transferDescription,
+          p_payment_target: metadata.paymentTarget,
+          p_month_label: metadata.monthLabel,
+        })
         if (error) {
           console.error('[store] SEND_PAYMENT_NOTIFICATION:', error)
           throw error
         }
         await refresh()
-        return null
+        return data
       }
 
       case 'REVIEW_PAYMENT_NOTIFICATION': {

@@ -459,6 +459,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
 function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPayment, onConfirmRefund, onClose }) {
   const [copiedField, setCopiedField] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   if (!open) return null;
@@ -486,15 +487,21 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
     await navigator.clipboard.writeText(String(value || ''));
     setCopiedField(field);
   };
-  const confirmPayment = () => {
-    setPaymentConfirmed(true);
-    onConfirmPayment?.({
-      amount: amountToPay,
-      memberName: data?.memberName || 'Thành viên',
-      coveredMembers: selectedPayForRows,
-      transferDescription,
-      paymentTarget: target,
-    });
+  const confirmPayment = async () => {
+    if (paymentSubmitting || paymentConfirmed) return;
+    setPaymentSubmitting(true);
+    try {
+      await onConfirmPayment?.({
+        amount: amountToPay,
+        memberName: data?.memberName || 'Thành viên',
+        coveredMembers: selectedPayForRows,
+        transferDescription,
+        paymentTarget: target,
+      });
+      setPaymentConfirmed(true);
+    } finally {
+      setPaymentSubmitting(false);
+    }
   };
   const togglePayFor = (row) => {
     const key = String(row.profileId || row.name);
@@ -670,7 +677,7 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
                     textDecoration: 'none',
                   }}
                 >Lưu QR</a>
-                <button type="button" onClick={confirmPayment} style={{
+                <button type="button" onClick={confirmPayment} disabled={paymentSubmitting || paymentConfirmed} style={{
                   minHeight: 42,
                   borderRadius: 12,
                   background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
@@ -679,8 +686,9 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
                   fontSize: 12,
                   fontWeight: 900,
                   fontFamily: 'inherit',
-                  cursor: 'pointer',
-                }}>{paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
+                  cursor: paymentSubmitting || paymentConfirmed ? 'default' : 'pointer',
+                  opacity: paymentSubmitting ? 0.72 : 1,
+                }}>{paymentSubmitting ? 'Đang báo...' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
               </div>
             </div>
           ) : (
