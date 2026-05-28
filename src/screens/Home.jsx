@@ -300,22 +300,25 @@ function approvalButton(background, color) {
 }
 
 function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction }) {
-  if (!safeArray(sources).length) return null;
-  const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
+  const sourceRows = safeArray(sources);
+  const hasSources = sourceRows.length > 0;
+  const total = sourceRows.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
   const isNegativeTotal = totalBalance < 0;
   const isPositiveTotal = totalBalance > 0;
+  const isZeroTotal = !isNegativeTotal && !isPositiveTotal;
   const normalizedPaymentStatus = String(paymentStatus || '').toLowerCase();
   const paidConfirmed = normalizedPaymentStatus === 'confirmed';
   const paymentPending = normalizedPaymentStatus === 'pending';
-  const paymentChipLabel = paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : '💳 Thanh toán';
-  const paymentChipBg = paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
-  const paymentChipBorder = paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
-  const paymentChipColor = paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
-  const paymentDisabled = paidConfirmed || paymentPending;
+  const paymentChipLabel = isZeroTotal ? '0' : paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : '💳 Thanh toán';
+  const paymentChipBg = isZeroTotal ? 'rgba(148,163,184,0.12)' : paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
+  const paymentChipBorder = isZeroTotal ? 'rgba(148,163,184,0.24)' : paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
+  const paymentChipColor = isZeroTotal ? colors.textSecondary : paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
+  const paymentDisabled = isZeroTotal || paidConfirmed || paymentPending;
+  const displayBalanceLabel = isZeroTotal ? 'Số dư tháng này' : balanceLabel;
   return (
     <>
       <SectionLabel>Theo nguồn tiền</SectionLabel>
-      <Card style={{ padding: '14px 14px 6px' }}>
+      <Card style={{ padding: hasSources ? '14px 14px 6px' : 14 }}>
         <button
           type="button"
           aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
@@ -326,10 +329,10 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
             flexDirection: 'column',
             alignItems: 'flex-start',
             gap: 8,
-            padding: '0 0 12px',
-            marginBottom: 8,
+            padding: hasSources ? '0 0 12px' : 0,
+            marginBottom: hasSources ? 8 : 0,
             border: 'none',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: hasSources ? '1px solid rgba(255,255,255,0.08)' : 'none',
             background: 'transparent',
             color: 'inherit',
             cursor: paymentDisabled ? 'default' : 'pointer',
@@ -353,7 +356,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
                 textTransform: 'uppercase',
                 letterSpacing: '1.4px',
               }}>
-                {balanceLabel}
+                {displayBalanceLabel}
               </div>
               <div style={{
                 fontSize: 26,
@@ -384,7 +387,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
             Tổng hợp tất cả nguồn tiền tháng này
           </div>
         </button>
-        {sources.map((source, index) => {
+        {sourceRows.map((source, index) => {
           const amount = Number(source.amount) || 0;
           const isPickleball = source.sourceType === 'pickleball';
           const isNegative = amount < 0;

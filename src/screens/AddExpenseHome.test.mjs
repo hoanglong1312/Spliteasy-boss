@@ -589,11 +589,14 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(screenDataSource, /memberId: member\?\.id/);
   assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}[\s\S]*paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/);
   assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\)/);
+  assert.doesNotMatch(homeSource, /if \(!safeArray\(sources\)\.length\) return null/);
+  assert.match(homeSource, /const sourceRows = safeArray\(sources\)/);
+  assert.match(homeSource, /const paymentChipLabel = isZeroTotal \? '0'/);
+  assert.match(homeSource, /const paymentDisabled = isZeroTotal \|\| paidConfirmed \|\| paymentPending/);
+  assert.match(homeSource, /const displayBalanceLabel = isZeroTotal \? 'Số dư tháng này' : balanceLabel/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
   assert.match(homeSource, /formatVND\(Math\.abs\(totalBalance\)\)/);
   assert.match(homeSource, /justifyContent: 'space-between',[\s\S]*?alignItems: 'center',[\s\S]*?minHeight: 62/);
-  assert.match(homeSource, /const paymentChipLabel = paidConfirmed \? '✅ Đã thanh toán' : paymentPending \? '⏳ Chờ xác nhận' : '💳 Thanh toán'/);
-  assert.match(homeSource, /const paymentDisabled = paidConfirmed \|\| paymentPending/);
   assert.match(homeSource, /if \(!paymentDisabled\) onOpenPayment\?\.\(\)/);
   assert.match(homeSource, /padding: '8px 13px',[\s\S]*?fontSize: 12,[\s\S]*?\{paymentChipLabel\}/);
   assert.match(homeSource, /aria-label=\{isNegativeTotal \? `Xem \$\{owedTo\} quỹ cần kiểm tra` : 'Xem nguồn tiền'\}/);
