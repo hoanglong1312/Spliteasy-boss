@@ -170,6 +170,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         data={d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }}
         isTreasurer={isTreasurer}
         confirmedRefunds={confirmedRefunds}
+        onConfirmPayment={(payload) => onAction?.('confirmPaymentSent', payload)}
         onConfirmRefund={(row) => {
           const key = String(row.profileId || row.name || 'member');
           setConfirmedRefunds(prev => new Set([...prev, key]));
@@ -439,8 +440,9 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
   );
 }
 
-function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose }) {
-  const [copiedPayment, setCopiedPayment] = useState(false);
+function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPayment, onConfirmRefund, onClose }) {
+  const [copiedField, setCopiedField] = useState('');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   if (!open) return null;
@@ -463,17 +465,20 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
     amount: amountToPay,
     description: transferDescription,
   }) : '';
-  const paymentInfo = [
-    `So tien: ${formatVND(amountToPay)}`,
-    `Nguoi nhan: ${target.holder || 'Long'}`,
-    target.name || target.code ? `Ngan hang: ${target.name || target.code}` : '',
-    target.account ? `STK: ${target.account}` : '',
-    `Noi dung: ${transferDescription}`,
-  ].filter(Boolean).join('\n');
-  const copyPaymentInfo = async () => {
+  const copyPaymentField = async (field, value) => {
     if (!navigator?.clipboard) return;
-    await navigator.clipboard.writeText(paymentInfo);
-    setCopiedPayment(true);
+    await navigator.clipboard.writeText(String(value || ''));
+    setCopiedField(field);
+  };
+  const confirmPayment = () => {
+    setPaymentConfirmed(true);
+    onConfirmPayment?.({
+      amount: amountToPay,
+      memberName: data?.memberName || 'Thành viên',
+      coveredMembers: selectedPayForRows,
+      transferDescription,
+      paymentTarget: target,
+    });
   };
   const togglePayFor = (row) => {
     const key = String(row.profileId || row.name);
@@ -483,7 +488,8 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
       else next.add(key);
       return next;
     });
-    setCopiedPayment(false);
+    setCopiedField('');
+    setPaymentConfirmed(false);
   };
 
   return (
@@ -496,12 +502,41 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
           <div style={{ fontSize: 28, fontWeight: 950, color: '#fca5a5', marginTop: 6, ...type.mono }}>
             {formatVND(amountToPay)}
           </div>
-          <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4 }}>
-            Chuyển về {target.holder || 'Long'} · {target.name || target.code || 'Ngân hàng'} {target.account ? `· ${target.account}` : ''}
-          </div>
           {canShowQr && (
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 6, lineHeight: 1.4 }}>
-              Nội dung: {transferDescription}
+            <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
+              {[
+                ['amount', 'Số tiền', formatVND(amountToPay)],
+                ['holder', 'Người nhận', target.holder || 'Long'],
+                ['bank', 'Ngân hàng', target.name || target.code || 'Ngân hàng'],
+                ['account', 'STK', target.account],
+                ['description', 'Nội dung', transferDescription],
+              ].filter(([, , value]) => value).map(([field, label, value]) => (
+                <div key={field} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '74px 1fr auto',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 9px',
+                  borderRadius: 11,
+                  background: 'rgba(255,255,255,0.045)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>{label}</span>
+                  <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+                  <button type="button" onClick={() => copyPaymentField(field, value)} style={{
+                    border: 'none',
+                    borderRadius: 8,
+                    padding: '5px 7px',
+                    background: copiedField === field ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
+                    color: copiedField === field ? colors.brandLight : colors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: 900,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}>{copiedField === field ? 'Đã copy' : 'Copy'}</button>
+                </div>
+              ))}
             </div>
           )}
           {canShowQr && payForRows.length > 0 && (
@@ -600,17 +635,17 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
                     textDecoration: 'none',
                   }}
                 >Lưu QR</a>
-                <button type="button" onClick={copyPaymentInfo} style={{
+                <button type="button" onClick={confirmPayment} style={{
                   minHeight: 42,
                   borderRadius: 12,
-                  background: copiedPayment ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${copiedPayment ? 'rgba(129,140,248,0.38)' : 'rgba(255,255,255,0.12)'}`,
-                  color: copiedPayment ? colors.brandLight : colors.textPrimary,
+                  background: paymentConfirmed ? 'rgba(52,211,153,0.18)' : colors.brand,
+                  border: `1px solid ${paymentConfirmed ? 'rgba(52,211,153,0.34)' : 'rgba(129,140,248,0.42)'}`,
+                  color: paymentConfirmed ? '#6ee7b7' : '#fff',
                   fontSize: 12,
                   fontWeight: 900,
                   fontFamily: 'inherit',
                   cursor: 'pointer',
-                }}>{copiedPayment ? 'Đã sao chép' : 'Sao chép STK'}</button>
+                }}>{paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
               </div>
             </div>
           ) : (

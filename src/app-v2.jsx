@@ -1724,6 +1724,13 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'confirmPaymentSent') {
+      const covered = Array.isArray(payload?.coveredMembers) ? payload.coveredMembers : []
+      const names = [payload?.memberName, ...covered.map(row => row?.name)].filter(Boolean).join(', ')
+      dispatch({ type: 'SHOW_TOAST', message: `Đã ghi nhận báo thanh toán cho ${names || 'thành viên'}.` })
+      return
+    }
+
     const ACTION_TO_SCREEN = {
       addExpense:       'add-expense',
       payment:          'payment-flow',
