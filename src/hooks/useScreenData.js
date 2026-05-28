@@ -315,7 +315,7 @@ function paymentNoticesForMember(state, member, monthLabel) {
   return safeArray(state?.notifications)
     .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
     .filter(notification => String((notification?.metadata || {}).status || 'pending').toLowerCase() !== 'deleted')
-    .filter(notification => memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || '')))
+    .filter(notification => paymentNoticeCoversMember(notification, memberIds, profileId))
     .filter(notification => {
       const metadata = notification?.metadata || {}
       return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
@@ -323,12 +323,38 @@ function paymentNoticesForMember(state, member, monthLabel) {
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
 }
 
+function paymentNoticeCoversMember(notification, memberIds, profileId) {
+  if (memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || ''))) return true
+  const metadata = notification?.metadata || {}
+  const profileKey = String(profileId || '')
+  return safeArray(metadata.coveredMembers || metadata.covered_members).some(row => (
+    (profileKey && String(row?.profileId || row?.profile_id || '') === profileKey) ||
+    safeArray(row?.memberIds || row?.member_ids).some(id => memberIds.has(String(id))) ||
+    memberIds.has(String(row?.memberId || row?.member_id || ''))
+  )) || safeArray(metadata.coveredSources || metadata.covered_sources).some(source => (
+    (profileKey && String(source?.profileId || source?.profile_id || '') === profileKey) ||
+    memberIds.has(String(source?.memberId || source?.member_id || ''))
+  ))
+}
+
 function coveredSourcesForPayment(metadata, sourceBreakdown) {
+  const sourceProfileIds = new Set(safeArray(sourceBreakdown).map(source => String(source.profileId || source.profile_id || '')).filter(Boolean))
+  const sourceMemberIds = new Set(safeArray(sourceBreakdown).map(source => String(source.memberId || source.member_id || '')).filter(Boolean))
   const explicit = safeArray(metadata?.coveredSources || metadata?.covered_sources)
+    .filter(source => {
+      const profileId = String(source?.profileId || source?.profile_id || '')
+      const memberId = String(source?.memberId || source?.member_id || '')
+      if (profileId && sourceProfileIds.size > 0) return sourceProfileIds.has(profileId)
+      if (memberId && sourceMemberIds.size > 0) return sourceMemberIds.has(memberId)
+      return !profileId && !memberId
+    })
     .map(source => ({
       sourceId: source.sourceId || source.source_id,
       sourceType: source.sourceType || source.source_type || 'group',
       sourceLabel: source.sourceLabel || source.source_label || 'Nguồn tiền',
+      profileId: source.profileId || source.profile_id || '',
+      memberId: source.memberId || source.member_id || '',
+      memberName: source.memberName || source.member_name || '',
       amount: Number(source.amount) || 0,
     }))
     .filter(source => source.amount !== 0)
@@ -531,9 +557,16 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
     })
     .map(notification => {
       const metadata = notification.metadata || {}
-      const coveredSources = safeArray(metadata.coveredSources || metadata.covered_sources)
-      const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
       const memberName = metadata.memberName || notification.actorName || notification.actor_name || 'Thành viên'
+      const actorMemberId = notification.actorMemberId || notification.actor_member_id || ''
+      const actorProfileId = profileIdForMember(actorMemberId, state?.members)
+      const coveredSources = safeArray(metadata.coveredSources || metadata.covered_sources).map(source => ({
+        ...source,
+        profileId: source.profileId || source.profile_id || actorProfileId || '',
+        memberId: source.memberId || source.member_id || actorMemberId || '',
+        memberName: source.memberName || source.member_name || memberName,
+      }))
+      const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
       const names = [memberName, ...coveredMembers.map(row => row?.name)].filter(Boolean)
       const status = String(metadata.status || 'pending').toLowerCase()
       return {
@@ -3382,6 +3415,8 @@ function currentProfileSourceBreakdown(sourceBalances, currentUserId, members) {
         sourceId: row.sourceId || row.source_id,
         sourceType: row.sourceType || row.source_type || 'group',
         sourceLabel: row.sourceLabel || row.source_label || 'Nguồn tiền',
+        profileId,
+        memberId: row.memberId || row.member_id || currentUserId,
         amount: 0,
       }
       existing.amount += Number(row.amount) || 0
@@ -3416,6 +3451,9 @@ function aggregateBalancesByProfile(sourceBalances, members) {
       sourceId: row.sourceId || row.source_id,
       sourceType: row.sourceType || row.source_type || 'group',
       sourceLabel: row.sourceLabel || row.source_label || 'Nguồn tiền',
+      profileId,
+      memberId: row.memberId || row.member_id || '',
+      memberName: item.name,
       amount,
     })
   })

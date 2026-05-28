@@ -359,7 +359,11 @@ function PaymentRecordDetailSheet({ record, onClose }) {
           <Card key={`${source.sourceId || source.source_id || source.sourceLabel}-${index}`} style={{ padding: 12, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{source.sourceLabel || source.source_label || 'Nguồn tiền'}</div>
-              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>{source.sourceType || source.source_type || 'group'}</div>
+              {(source.memberName || source.member_name) && (
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                  {source.memberName || source.member_name}
+                </div>
+              )}
             </div>
             <div style={{ fontSize: 13, fontWeight: 950, color: '#fca5a5', ...type.mono }}>{formatVND(Math.abs(Number(source.amount) || 0))}</div>
           </Card>
@@ -664,7 +668,7 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
   const selectedPayForRows = payForRows.filter(row => selectedPayForIds.has(String(row.profileId || row.name)));
   const debtSources = safeArray(data?.sourceBreakdown).filter(source => Number(source.amount) < 0);
   const coveredSources = [
-    ...debtSources,
+    ...debtSources.map(source => ({ ...source, memberName: data?.memberName || 'Thành viên' })),
     ...selectedPayForRows.flatMap(row => safeArray(row.sources).filter(source => Number(source.amount) < 0).map(source => ({ ...source, profileId: row.profileId, memberName: row.name }))),
   ];
   const amountToPay = Math.max(0, Math.abs(netBalance)) + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);

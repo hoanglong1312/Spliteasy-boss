@@ -31,6 +31,27 @@ function loadHomeBuilder() {
   return context.__builders.buildHomeData
 }
 
+function loadPaymentManagementBuilder() {
+  const source = screenDataSource
+    .replace(/import \{ useEffect, useMemo, useRef, useState \} from 'react'\n/, '')
+    .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
+    .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
+    .replace('export function useScreenData', 'function useScreenData')
+  const context = {
+    Date,
+    Math,
+    Intl,
+    console,
+    fmtVNDFull: value => `${Number(value).toLocaleString('vi-VN')} ₫`,
+    groupBalance: () => ({}),
+    groupNet: () => 0,
+    pickleSummary: () => ({ memberOwes: {} }),
+    recentActivity: () => [],
+  }
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildPaymentManagementRecords }`, context)
+  return context.__builders.buildPaymentManagementRecords
+}
+
 function loadNotificationsBuilder() {
   const source = screenDataSource
     .replace(/import \{ useEffect, useMemo, useRef, useState \} from 'react'\n/, '')
@@ -159,6 +180,58 @@ test('confirmed payments only cover the sources included when the member paid', 
   assert.equal(data.sourceBreakdown[0].amount, -120000)
 })
 
+test('confirmed payments cover members paid for by another member', () => {
+  const buildHomeData = loadHomeBuilder()
+  const state = {
+    currentUserId: 'dai-member',
+    currentUserName: 'Đại',
+    members: [
+      { id: 'dai-member', groupId: 'g1', profileId: 'dai-profile', name: 'Đại' },
+      { id: 'cuong-member', groupId: 'g1', profileId: 'cuong-profile', name: 'Cường' },
+      { id: 'long-member', groupId: 'g1', profileId: 'long-profile', name: 'Long', role: 'treasurer' },
+    ],
+    groups: [
+      {
+        id: 'g1',
+        name: 'Lấy vk để trưởng thành',
+        members: ['dai-member', 'cuong-member', 'long-member'],
+        netByMember: { 'dai-member': -774479, 'cuong-member': -600000, 'long-member': 1374479 },
+        expenses: [],
+      },
+    ],
+    notifications: [
+      {
+        id: 'notice-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong-member',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 1374479,
+          memberName: 'Cường',
+          coveredMembers: [
+            { profileId: 'dai-profile', memberIds: ['dai-member'], name: 'Đại', amount: -774479 },
+          ],
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -600000, profileId: 'cuong-profile', memberName: 'Cường' },
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -774479, profileId: 'dai-profile', memberName: 'Đại' },
+          ],
+        },
+      },
+    ],
+    pickle: { sessions: [] },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildHomeData(state, 'dai-member', state.members, state.groups, state.pickle, state, '2026-05')
+
+  assert.equal(data.totalBalance, 0)
+  assert.equal(data.sourceBreakdown.length, 0)
+  assert.equal(data.paymentSummary.paidAmount, 774479)
+  assert.equal(data.paymentSummary.paymentStatus, 'confirmed')
+})
+
 test('home exposes a treasurer payment management zone with view and delete actions', () => {
   assert.match(screenDataSource, /paymentRecords: buildPaymentManagementRecords\(state, me, today\)/)
   assert.match(screenDataSource, /function buildPaymentManagementRecords\(state, currentMember, monthDate\) \{/)
@@ -167,6 +240,41 @@ test('home exposes a treasurer payment management zone with view and delete acti
   assert.match(homeSource, /function PaymentManagementZone\(\{ records, onAction \}\)/)
   assert.match(homeSource, /onAction\?\.\('deletePaymentNotice', record\)/)
   assert.match(homeSource, /onAction\?\.\('viewPaymentNotice', record\)/)
+})
+
+test('payment management detail sources fallback to payer name and hide technical source type', () => {
+  const buildPaymentManagementRecords = loadPaymentManagementBuilder()
+  const state = {
+    currentUserId: 'long-member',
+    currentUserName: 'Long',
+    members: [
+      { id: 'long-member', name: 'Long', role: 'treasurer' },
+      { id: 'cuong-member', name: 'Cường', profileId: 'cuong-profile' },
+    ],
+    notifications: [
+      {
+        id: 'notice-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong-member',
+        actorName: 'Cường',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 1168750,
+          memberName: 'Cường',
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -600000 },
+          ],
+        },
+      },
+    ],
+  }
+
+  const [record] = buildPaymentManagementRecords(state, state.members[0], '2026-05')
+
+  assert.equal(record.coveredSources[0].memberName, 'Cường')
+  assert.doesNotMatch(homeSource, /sourceType \|\| source\.source_type \|\| 'group'/)
 })
 
 test('home pending payment approvals render only for Long or payment reviewers', () => {
