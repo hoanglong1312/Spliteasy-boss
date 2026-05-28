@@ -48,15 +48,6 @@ function profilePhotoIdentityIds(memberId, profileId, members = []) {
   return Array.from(new Set(ids.map(String)))
 }
 
-function memberPinStorageKey(memberId) {
-  return `spliteasy_pin_${memberId || 'unknown'}`
-}
-
-function storedPinForMember(memberId) {
-  if (typeof localStorage === 'undefined' || !memberId) return ''
-  return localStorage.getItem(memberPinStorageKey(memberId)) || ''
-}
-
 function isPickleballActionGroup(group) {
   const explicit = String(group?.type || group?.kind || group?.groupType || group?.group_type || '').toLowerCase()
   return explicit === 'pickleball'
@@ -160,7 +151,7 @@ export default function AppV2() {
     const { token, member } = getStoredAuth()
     const memberId = member?.id
     return !!(
-      storedPinForMember(memberId) &&
+      member?.hasPin &&
       token &&
       memberId &&
       sessionStorage.getItem(PIN_UNLOCK_KEY) !== memberId
@@ -268,10 +259,26 @@ export default function AppV2() {
     return data.authToken
   }
 
-  function submitPin(value = pinInput) {
+  async function verifyMemberPin(memberId, pin) {
+    if (!memberId || !pin) return false
+    const { token } = getStoredAuth()
+    const sb = token ? createSupabase(token) : createSupabase()
+    const { data, error } = await sb.rpc('verify_member_pin', {
+      p_member_id: memberId,
+      p_pin: pin,
+    })
+    if (error || data?.error) {
+      console.error('[app] verifyMemberPin:', error || data)
+      return false
+    }
+    return data === true || data?.valid === true
+  }
+
+  async function submitPin(value = pinInput) {
     const pending = pendingPinSession
-    const stored = storedPinForMember(pending?.memberId || state.currentUserId)
-    if (value === stored) {
+    const memberId = pending?.memberId || state.currentUserId
+    const pinOk = await verifyMemberPin(memberId, value)
+    if (pinOk) {
       if (pending?.memberId) sessionStorage.setItem(PIN_UNLOCK_KEY, pending.memberId)
       if (!pending && state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
       setPendingPinSession(null)
@@ -304,7 +311,7 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      const requiresPin = payload?.hasPin || Boolean(storedPinForMember(payload?.memberId))
+      const requiresPin = Boolean(payload?.hasPin)
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
         setPendingPinSession(payload)
         setAwaitingPin(true)
@@ -327,6 +334,32 @@ export default function AppV2() {
       setStack([])
       setActiveTab('home')
       return
+    }
+
+    if (type === 'verifyPin') {
+      return verifyMemberPin(payload?.memberId || state.currentUserId, payload?.pin)
+    }
+
+    if (type === 'setPin') {
+      try {
+        await dispatch({ type: 'SET_MEMBER_PIN', pin: payload?.pin })
+        if (state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
+        return true
+      } catch (err) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Không lưu được PIN. Thử lại.' })
+        return false
+      }
+    }
+
+    if (type === 'removePin') {
+      try {
+        await dispatch({ type: 'RESET_MEMBER_PIN', memberId: state.currentUserId, pin: payload?.pin })
+        sessionStorage.removeItem(PIN_UNLOCK_KEY)
+        return true
+      } catch (err) {
+        dispatch({ type: 'SHOW_TOAST', message: 'PIN không đúng hoặc chưa xóa được.' })
+        return false
+      }
     }
 
     if (type === 'removeRecentSession') {
@@ -1489,11 +1522,6 @@ export default function AppV2() {
         groupId: result.group_id,
         memberName: result.member_name,
       })
-      const storedPin = storedPinForMember(result.member_id)
-      if (storedPin) {
-        setAwaitingPin(true)
-        return
-      }
       return
     }
 
@@ -1645,12 +1673,6 @@ export default function AppV2() {
       return
     }
 
-    if (type === 'removePin') {
-      sessionStorage.removeItem(PIN_UNLOCK_KEY)
-      console.log(type, payload)
-      return
-    }
-
     if ([
       'receive',
       'markAllRead',
@@ -1658,7 +1680,6 @@ export default function AppV2() {
       'editBank',
       'addBank',
       'changePin',
-      'setPin',
       'changeLanguage',
       'deleteAccount',
       'more',

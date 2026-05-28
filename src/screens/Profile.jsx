@@ -22,21 +22,16 @@ const BANK_SUGGESTIONS = [
   'PGBank',
 ];
 
-function memberPinStorageKey(memberId) {
-  return `spliteasy_pin_${memberId || 'unknown'}`;
-}
-
 export default function Profile({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const fileInputRef = useRef(null);
-  const pinKey = memberPinStorageKey(d.user.id);
   const [currentPhotoUrl, setCurrentPhotoUrl] = useState(d.user.photoUrl || '');
   const [avatarHover, setAvatarHover] = useState(false);
   const [editingBank, setEditingBank] = useState(false);
   const [bankName, setBankName] = useState(d.bank.bankName || d.bank.name || '');
   const [bankAccount, setBankAccount] = useState(d.bank.bankAccount || d.bank.account || '');
   const [bankOwner, setBankOwner] = useState(d.bank.accountName || d.bank.owner || d.user.name || '');
-  const [pinSet, setPinSet] = useState(() => !!localStorage.getItem(pinKey));
+  const [pinSet, setPinSet] = useState(() => Boolean(d.pin));
   const [pinSetupMode, setPinSetupMode] = useState(null);
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinSetupError, setPinSetupError] = useState('');
@@ -44,6 +39,10 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
   useEffect(() => {
     setCurrentPhotoUrl(d.user.photoUrl || '');
   }, [d.user.id, d.user.photoUrl]);
+
+  useEffect(() => {
+    setPinSet(Boolean(d.pin));
+  }, [d.user.id, d.pin]);
 
   useEffect(() => {
     setBankName(d.bank.bankName || d.bank.name || '');
@@ -95,31 +94,30 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
     setPinSetupError('');
   }
 
-  function submitPinSetup() {
-    const stored = localStorage.getItem(pinKey);
+  async function submitPinSetup() {
     if (pinSetupMode === 'set') {
       if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
-      localStorage.setItem(pinKey, pinInputValue);
+      const saved = await onAction?.('setPin', { pin: pinInputValue });
+      if (saved === false) { setPinSetupError('Không lưu được PIN. Thử lại.'); return; }
       setPinSet(true);
       cancelPinSetup();
-      onAction?.('setPin');
     } else if (pinSetupMode === 'remove') {
-      if (pinInputValue !== stored) { setPinSetupError('PIN không đúng.'); return; }
-      localStorage.removeItem(pinKey);
+      const removed = await onAction?.('removePin', { pin: pinInputValue });
+      if (removed === false) { setPinSetupError('PIN không đúng.'); return; }
       setPinSet(false);
       cancelPinSetup();
-      onAction?.('removePin');
     } else if (pinSetupMode === 'change-old') {
-      if (pinInputValue !== stored) { setPinSetupError('PIN hiện tại không đúng.'); return; }
+      const verified = await onAction?.('verifyPin', { pin: pinInputValue });
+      if (verified === false) { setPinSetupError('PIN hiện tại không đúng.'); return; }
       setPinSetupMode('change-new');
       setPinInputValue('');
       setPinSetupError('');
     } else if (pinSetupMode === 'change-new') {
       if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
-      localStorage.setItem(pinKey, pinInputValue);
+      const saved = await onAction?.('setPin', { pin: pinInputValue });
+      if (saved === false) { setPinSetupError('Không lưu được PIN. Thử lại.'); return; }
       setPinSet(true);
       cancelPinSetup();
-      onAction?.('setPin');
     }
   }
 

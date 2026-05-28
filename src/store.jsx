@@ -1390,6 +1390,17 @@ export function AppProvider({ children }) {
           toast: stateRef.current.toast || buildEmptyState().toast,
           _pickleRegenInProgress: stateRef.current._pickleRegenInProgress === true,
         }
+        const currentMember = safeArray(nextState.members).find(member => String(member.id) === String(nextState.currentUserId))
+        if (nextState.currentUserId) {
+          storeAuth(t, {
+            id: nextState.currentUserId,
+            groupId: nextState.currentGroupId,
+            name: nextState.currentUserName,
+            profileId: currentMember?.profileId || currentMember?.profile_id || '',
+            groupName: nextState.currentGroup?.name || '',
+            hasPin: currentMember?.hasPin === true || currentMember?.has_pin === true,
+          })
+        }
         stateRef.current = nextState
         setState(nextState)
       } else {
@@ -1602,6 +1613,7 @@ export function AppProvider({ children }) {
         if (!sb) return
         const { data, error } = await sb.rpc('reset_member_pin', {
           p_member_id: action.memberId ?? action.p_member_id,
+          p_pin: action.pin ?? action.p_pin,
         })
         if (error || data?.error) {
           const err = error || new Error(data.error)

@@ -6,10 +6,12 @@ const profileSource = readFileSync(new URL('./screens/Profile.jsx', import.meta.
 const settingsSource = readFileSync(new URL('./screens/Settings.jsx', import.meta.url), 'utf8')
 const screenDataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
+const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const primitiveSource = readFileSync(new URL('./primitives.jsx', import.meta.url), 'utf8')
 const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
 const pickleballMembersSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
 const memberDetailSource = readFileSync(new URL('./screens/MemberDetail.jsx', import.meta.url), 'utf8')
+const memberPinMigration = readFileSync(new URL('../supabase/migrations/20260528000001_member_pin_rpcs.sql', import.meta.url), 'utf8')
 
 test('Profile no longer exposes manual display color controls', () => {
   assert.doesNotMatch(profileSource, /Màu hiển thị/)
@@ -27,16 +29,27 @@ test('Profile removes redundant monthly stat cards from the personal settings su
   assert.doesNotMatch(profileSource, /formatVNDShort/)
 })
 
-test('Settings stores app PIN per member instead of globally per browser', () => {
-  assert.match(settingsSource, /function memberPinStorageKey\(memberId\)/)
-  assert.match(settingsSource, /const pinKey = memberPinStorageKey\(d\.memberId\)/)
-  assert.match(settingsSource, /localStorage\.getItem\(pinKey\)/)
-  assert.match(settingsSource, /localStorage\.setItem\(pinKey, pinInputValue\)/)
-  assert.match(settingsSource, /localStorage\.removeItem\(pinKey\)/)
+test('Profile persists app PIN through Supabase instead of localStorage', () => {
+  assert.match(profileSource, /const \[pinSet, setPinSet\] = useState\(\(\) => Boolean\(d\.pin\)\)/)
+  assert.match(profileSource, /useEffect\(\(\) => \{\s*setPinSet\(Boolean\(d\.pin\)\)/)
+  assert.match(profileSource, /await onAction\?\.\('setPin', \{ pin: pinInputValue \}\)/)
+  assert.match(profileSource, /await onAction\?\.\('verifyPin', \{ pin: pinInputValue \}\)/)
+  assert.match(profileSource, /await onAction\?\.\('removePin', \{ pin: pinInputValue \}\)/)
+  assert.doesNotMatch(profileSource, /localStorage\.getItem\(pinKey\)/)
+  assert.doesNotMatch(profileSource, /localStorage\.setItem\(pinKey, pinInputValue\)/)
+  assert.doesNotMatch(profileSource, /localStorage\.removeItem\(pinKey\)/)
   assert.doesNotMatch(settingsSource, /localStorage\.getItem\('spliteasy_pin'\)/)
   assert.doesNotMatch(settingsSource, /localStorage\.setItem\('spliteasy_pin'/)
   assert.doesNotMatch(settingsSource, /localStorage\.removeItem\('spliteasy_pin'\)/)
-  assert.match(screenDataSource, /memberId: state\?\.currentUserId/)
+  assert.match(screenDataSource, /pin: Boolean\(me\?\.hasPin \|\| me\?\.has_pin\)/)
+  assert.match(appSource, /if \(type === 'setPin'\)/)
+  assert.match(appSource, /if \(type === 'verifyPin'\)/)
+  assert.match(appSource, /if \(type === 'removePin'\)/)
+  assert.match(storeSource, /storeAuth\(t, \{[\s\S]*hasPin: currentMember\?\.hasPin === true \|\| currentMember\?\.has_pin === true/)
+  assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.set_member_pin\(p_pin text\)/)
+  assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.verify_member_pin\(p_member_id uuid, p_pin text\)/)
+  assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.reset_member_pin\(p_member_id uuid DEFAULT NULL, p_pin text DEFAULT NULL\)/)
+  assert.match(memberPinMigration, /UPDATE public\.members[\s\S]*pin_hash = encode\(digest\(p_pin \|\| ':' \|\| v_member_id::text, 'sha256'\), 'hex'\)/)
 })
 
 test('Profile owns account settings without opening the settings screen', () => {
