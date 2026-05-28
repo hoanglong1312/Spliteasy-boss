@@ -56,6 +56,7 @@ test('AppV2 sends payment confirmations to treasurer notifications', () => {
   assert.match(block, /dispatch\(\{\s*type: 'SEND_PAYMENT_NOTIFICATION'/)
   assert.match(block, /targetMemberId: payload\?\.paymentTarget\?\.memberId/)
   assert.match(block, /coveredMembers: covered/)
+  assert.match(block, /coveredSources/)
   assert.match(block, /await dispatch\(\{ type: 'REFRESH' \}\)/)
   assert.match(appSource, /if \(type === 'confirmPaymentNotice' \|\| type === 'rejectPaymentNotice'\)/)
   assert.match(appSource, /type: 'REVIEW_PAYMENT_NOTIFICATION'/)

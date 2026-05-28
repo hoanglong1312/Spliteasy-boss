@@ -591,9 +591,9 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\)/);
   assert.doesNotMatch(homeSource, /if \(!safeArray\(sources\)\.length\) return null/);
   assert.match(homeSource, /const sourceRows = safeArray\(sources\)/);
-  assert.match(homeSource, /const paymentChipLabel = isZeroTotal \? '0'/);
+  assert.match(homeSource, /const paymentChipLabel = paidConfirmed \? '✅ Đã thanh toán' : paymentPending \? '⏳ Chờ xác nhận' : isZeroTotal \? '0'/);
   assert.match(homeSource, /const paymentDisabled = isZeroTotal \|\| paidConfirmed \|\| paymentPending/);
-  assert.match(homeSource, /const displayBalanceLabel = isZeroTotal \? 'Số dư tháng này' : balanceLabel/);
+  assert.match(homeSource, /const displayBalanceLabel = paidConfirmed \? 'Đã thanh toán' : isZeroTotal \? 'Số dư tháng này' : balanceLabel/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
   assert.match(homeSource, /formatVND\(Math\.abs\(totalBalance\)\)/);
   assert.match(homeSource, /justifyContent: 'space-between',[\s\S]*?alignItems: 'center',[\s\S]*?minHeight: 62/);

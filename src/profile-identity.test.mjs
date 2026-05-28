@@ -184,7 +184,8 @@ test('screen data exposes profile aggregation helpers for home and monthly close
 
 test('home renders source breakdown for the current profile', () => {
   assert.match(screenDataSource, /currentProfileId: profileIdForMember\(currentUserId, members\)/)
-  assert.match(screenDataSource, /const sourceBreakdown = currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\)/)
+  assert.match(screenDataSource, /const rawSourceBreakdown = currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\)/)
+  assert.match(screenDataSource, /const sourceBreakdown = paymentSummary\.sourceBreakdown/)
   assert.match(screenDataSource, /function currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\) \{/)
   assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{d\.sourceBreakdown \|\| \[\]\}[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}[\s\S]*onOpenPayment=\{\(\) => setPaymentSheetOpen\(true\)\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/)
   assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\) \{/)

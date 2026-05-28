@@ -79,6 +79,7 @@ test('store fetches payment notifications and persists treasurer review actions'
   assert.match(storeSource, /case 'SEND_PAYMENT_NOTIFICATION': \{/)
   assert.match(storeSource, /\.rpc\('submit_payment_notification'/)
   assert.match(storeSource, /p_target_member_id: targetMemberId \|\| null/)
+  assert.match(storeSource, /p_covered_sources: metadata\.coveredSources/)
   const reviewBlock = storeSource.slice(
     storeSource.indexOf("case 'REVIEW_PAYMENT_NOTIFICATION':"),
     storeSource.indexOf("case 'MARK_NOTIFICATIONS_READ':")

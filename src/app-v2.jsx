@@ -1765,6 +1765,7 @@ export default function AppV2() {
 
     if (type === 'confirmPaymentSent') {
       const covered = Array.isArray(payload?.coveredMembers) ? payload.coveredMembers : []
+      const coveredSources = Array.isArray(payload?.coveredSources) ? payload.coveredSources : []
       const names = [payload?.memberName, ...covered.map(row => row?.name)].filter(Boolean).join(', ')
       try {
         await dispatch({
@@ -1773,6 +1774,7 @@ export default function AppV2() {
           amount: payload?.amount,
           memberName: payload?.memberName,
           coveredMembers: covered,
+          coveredSources,
           transferDescription: payload?.transferDescription,
           paymentTarget: payload?.paymentTarget,
           monthLabel: homeData?.monthLabel,

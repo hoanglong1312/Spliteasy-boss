@@ -208,11 +208,13 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const session = findNearestOpenSession(pickle, today)
   const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, state?.currentUserName)
   const pickleballBalance = buildMemberMonthBalance(pickleballState, pickle, monthSessions, pickleballMemberId).netBalance || 0
-  const totalBalance = expenseBalance + pickleballBalance
   const sourceBalances = buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, monthSessions, members, today)
-  const sourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
-  const profileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
   const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
+  const profileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
+  const paymentSummary = buildHomePaymentSummary(state, rawSourceBreakdown, profileBreakdown, members, me, today)
+  const sourceBreakdown = paymentSummary.sourceBreakdown
+  const totalBalance = paymentSummary.netBalance
 
   return {
     user: {
@@ -222,7 +224,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     },
     monthLabel: formatMonthLabel(today),
     totalBalance,
-    owedTo: expenseGroups.filter(group => groupNetForMember(group, currentUserId, members, state?.currentUserName) < 0).length + (pickleballBalance < 0 ? 1 : 0),
+    owedTo: sourceBreakdown.filter(source => Number(source.amount) < 0).length,
     pickleball: {
       sessionsAttended: monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length,
       sessionsTotal: monthSessions.length,
@@ -243,21 +245,27 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     pendingPayments: buildPendingPaymentConfirmations(state),
     sourceBreakdown,
     profileBreakdown,
-    paymentSummary: buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, today),
+    paymentSummary,
   }
 }
 
 function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate) {
-  const netBalance = safeArray(sourceBreakdown).reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const monthLabel = formatMonthLabel(monthDate)
+  const coverage = paymentCoverageForMember(state, me, monthLabel, sourceBreakdown)
+  const adjustedSources = applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources)
+  const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
+  const paymentStatus = netBalance < 0 && coverage.pendingAmount <= 0 ? '' : paymentNotice?.status || ''
   return {
     monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
     netBalance,
-    paymentStatus: paymentNotice?.status || '',
-    paymentStatusAmount: paymentNotice?.amount || 0,
-    paymentStatusLabel: paymentNotice?.label || '',
+    paidAmount: coverage.confirmedAmount,
+    pendingAmount: coverage.pendingAmount,
+    sourceBreakdown: adjustedSources,
+    paymentStatus,
+    paymentStatusAmount: paymentNotice?.amount || coverage.confirmedAmount || 0,
+    paymentStatusLabel: netBalance < 0 && coverage.confirmedAmount > 0 ? 'Cần nộp thêm' : paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     payForRows: safeArray(profileBreakdown)
       .filter(row => Number(row.amount) < 0)
@@ -272,7 +280,29 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   }
 }
 
-function latestPaymentNoticeForMember(state, member, monthLabel) {
+function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
+  const notices = paymentNoticesForMember(state, member, monthLabel)
+  const confirmedSources = []
+  let confirmedAmount = 0
+  let pendingAmount = 0
+
+  notices.forEach(notification => {
+    const metadata = notification?.metadata || {}
+    const status = String(metadata.status || 'pending').toLowerCase()
+    const amount = Math.abs(Number(metadata.amount) || 0)
+    const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown)
+    if (status === 'confirmed') {
+      confirmedSources.push(...coveredSources)
+      confirmedAmount += coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || amount
+    } else if (status === 'pending') {
+      pendingAmount += coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || amount
+    }
+  })
+
+  return { confirmedSources, confirmedAmount, pendingAmount }
+}
+
+function paymentNoticesForMember(state, member, monthLabel) {
   const memberId = member?.id || state?.currentUserId
   const profileId = member?.profileId || member?.profile_id || ''
   const memberIds = new Set(
@@ -281,7 +311,7 @@ function latestPaymentNoticeForMember(state, member, monthLabel) {
       .map(row => String(row.id))
   )
   if (memberId) memberIds.add(String(memberId))
-  const notices = safeArray(state?.notifications)
+  return safeArray(state?.notifications)
     .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
     .filter(notification => memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || '')))
     .filter(notification => {
@@ -289,6 +319,55 @@ function latestPaymentNoticeForMember(state, member, monthLabel) {
       return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
     })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
+}
+
+function coveredSourcesForPayment(metadata, sourceBreakdown) {
+  const explicit = safeArray(metadata?.coveredSources || metadata?.covered_sources)
+    .map(source => ({
+      sourceId: source.sourceId || source.source_id,
+      sourceType: source.sourceType || source.source_type || 'group',
+      sourceLabel: source.sourceLabel || source.source_label || 'Nguồn tiền',
+      amount: Number(source.amount) || 0,
+    }))
+    .filter(source => source.amount !== 0)
+  if (explicit.length > 0) return explicit
+
+  let remaining = Math.abs(Number(metadata?.amount) || 0)
+  if (remaining <= 0) return []
+  return safeArray(sourceBreakdown)
+    .filter(source => Number(source.amount) < 0)
+    .map(source => {
+      if (remaining <= 0) return null
+      const covered = Math.min(Math.abs(Number(source.amount) || 0), remaining)
+      remaining -= covered
+      return { ...source, amount: -covered }
+    })
+    .filter(Boolean)
+}
+
+function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
+  const coveredBySource = new Map()
+  safeArray(confirmedSources).forEach(source => {
+    const key = sourceKey(source)
+    coveredBySource.set(key, (coveredBySource.get(key) || 0) + Math.abs(Number(source.amount) || 0))
+  })
+  return safeArray(sourceBreakdown)
+    .map(source => {
+      const amount = Number(source.amount) || 0
+      if (amount >= 0) return source
+      const paid = coveredBySource.get(sourceKey(source)) || 0
+      const remaining = Math.min(0, amount + paid)
+      return { ...source, amount: remaining, paidAmount: Math.min(Math.abs(amount), paid) }
+    })
+    .filter(source => Number(source.amount) !== 0)
+}
+
+function sourceKey(source) {
+  return `${source?.sourceType || source?.source_type || 'group'}:${source?.sourceId || source?.source_id || source?.sourceLabel || source?.source_label || ''}`
+}
+
+function latestPaymentNoticeForMember(state, member, monthLabel) {
+  const notices = paymentNoticesForMember(state, member, monthLabel)
   const notice = notices[0]
   if (!notice) return null
   const metadata = notice.metadata || {}

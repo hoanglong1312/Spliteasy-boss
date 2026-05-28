@@ -32,7 +32,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
   const [confirmedRefunds, setConfirmedRefunds] = useState(() => new Set());
   const isNeg = d.totalBalance < 0;
-  const balanceLabel = isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
+  const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
   const pendingPayments = d.pendingPayments || [];
@@ -309,12 +309,12 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
   const normalizedPaymentStatus = String(paymentStatus || '').toLowerCase();
   const paidConfirmed = normalizedPaymentStatus === 'confirmed';
   const paymentPending = normalizedPaymentStatus === 'pending';
-  const paymentChipLabel = isZeroTotal ? '0' : paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : '💳 Thanh toán';
-  const paymentChipBg = isZeroTotal ? 'rgba(148,163,184,0.12)' : paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
-  const paymentChipBorder = isZeroTotal ? 'rgba(148,163,184,0.24)' : paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
-  const paymentChipColor = isZeroTotal ? colors.textSecondary : paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
+  const paymentChipLabel = paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : isZeroTotal ? '0' : '💳 Thanh toán';
+  const paymentChipBg = paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isZeroTotal ? 'rgba(148,163,184,0.12)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
+  const paymentChipBorder = paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isZeroTotal ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
+  const paymentChipColor = paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isZeroTotal ? colors.textSecondary : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
   const paymentDisabled = isZeroTotal || paidConfirmed || paymentPending;
-  const displayBalanceLabel = isZeroTotal ? 'Số dư tháng này' : balanceLabel;
+  const displayBalanceLabel = paidConfirmed ? 'Đã thanh toán' : isZeroTotal ? 'Số dư tháng này' : balanceLabel;
   return (
     <>
       <SectionLabel>Theo nguồn tiền</SectionLabel>
@@ -480,6 +480,11 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
   const qrBank = resolveVietQrBank(target);
   const payForRows = safeArray(data?.payForRows);
   const selectedPayForRows = payForRows.filter(row => selectedPayForIds.has(String(row.profileId || row.name)));
+  const debtSources = safeArray(data?.sourceBreakdown).filter(source => Number(source.amount) < 0);
+  const coveredSources = [
+    ...debtSources,
+    ...selectedPayForRows.flatMap(row => safeArray(row.sources).filter(source => Number(source.amount) < 0).map(source => ({ ...source, profileId: row.profileId, memberName: row.name }))),
+  ];
   const amountToPay = Math.max(0, Math.abs(netBalance)) + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
   const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
   const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
@@ -507,6 +512,7 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
         amount: amountToPay,
         memberName: data?.memberName || 'Thành viên',
         coveredMembers: selectedPayForRows,
+        coveredSources,
         transferDescription,
         paymentTarget: target,
       });
