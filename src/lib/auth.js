@@ -59,6 +59,15 @@ export function rememberRecentSession(member, token = '') {
   localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([nextSession, ...sessions].slice(0, 5)))
 }
 
+export function removeRecentSession(sessionToRemove) {
+  if (!sessionToRemove) return getRecentSessions()
+  const removeKey = sessionIdentityKey(sessionToRemove)
+  const sessions = getRecentSessions()
+    .filter(session => sessionIdentityKey(session) !== removeKey)
+  localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(sessions))
+  return sessions
+}
+
 function dedupeRecentSessions(sessions) {
   const seen = new Set()
   return (Array.isArray(sessions) ? sessions : [])

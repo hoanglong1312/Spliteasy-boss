@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
-import { getRecentSessions, getStoredAuth, joinGroup } from './lib/auth.js'
+import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
@@ -169,6 +169,7 @@ export default function AppV2() {
   const [pinError, setPinError] = useState('')
   const [pinInput, setPinInput] = useState('')
   const [pendingPinSession, setPendingPinSession] = useState(null)
+  const [, setRecentSessionVersion] = useState(0)
 
   useEffect(() => {
     if (!publicBillToken) return
@@ -325,6 +326,19 @@ export default function AppV2() {
       })
       setStack([])
       setActiveTab('home')
+      return
+    }
+
+    if (type === 'removeRecentSession') {
+      removeRecentSession(payload)
+      if (pendingPinSession?.memberId === payload?.memberId) {
+        setPendingPinSession(null)
+        setAwaitingPin(false)
+        setPinError('')
+        setPinInput('')
+      }
+      setRecentSessionVersion(version => version + 1)
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã xóa tài khoản gần đây trên máy này.' })
       return
     }
 

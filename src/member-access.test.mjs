@@ -20,6 +20,7 @@ test('local auth keeps recent member sessions after logout', () => {
 
 test('recent member sessions keep resumable tokens and collapse duplicate identities', () => {
   assert.match(authSource, /export function rememberRecentSession\(member, token = ''\)/)
+  assert.match(authSource, /export function removeRecentSession\(sessionToRemove\)/)
   assert.match(authSource, /authToken: token \|\| member\.authToken \|\| ''/)
   assert.match(authSource, /sessionIdentityKey\(session\)/)
   assert.match(authSource, /member\.profileId \|\| member\.profile_id/)
@@ -27,6 +28,7 @@ test('recent member sessions keep resumable tokens and collapse duplicate identi
   assert.match(authSource, /dedupeRecentSessions\(parsed\)/)
   assert.match(authSource, /localStorage\.setItem\(RECENT_SESSIONS_KEY, JSON\.stringify\(deduped\)\)/)
   assert.match(authSource, /\.filter\(session => sessionIdentityKey\(session\) !== nextKey\)/)
+  assert.match(authSource, /\.filter\(session => sessionIdentityKey\(session\) !== removeKey\)/)
   assert.match(authSource, /\.filter\(session => session\?\.memberId && session\?\.memberName\)/)
 })
 
@@ -50,7 +52,10 @@ test('AppV2 ignores manual invite codes when a member session is already active'
 })
 
 test('AppV2 resumes recent sessions with a saved token instead of showing a dead card', () => {
+  assert.match(appSource, /removeRecentSession/)
   assert.match(appSource, /if \(type === 'resumeRecentSession'\)/)
+  assert.match(appSource, /if \(type === 'removeRecentSession'\)/)
+  assert.match(appSource, /removeRecentSession\(payload\)/)
   assert.match(appSource, /resolveRecentSessionToken\(payload\)/)
   assert.match(appSource, /\.rpc\('resume_recent_member_session'/)
   assert.match(appSource, /type: 'LOGIN'[\s\S]*token: authToken/)
@@ -78,6 +83,8 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.match(joinGroupSource, /useState\(d\.joinCode \|\| d\.code \|\| ''\)/)
   assert.match(joinGroupSource, /Vào lại tài khoản gần đây/)
   assert.match(joinGroupSource, /onAction\?\.\('resumeRecentSession'/)
+  assert.match(joinGroupSource, /aria-label=\{`Xóa tài khoản gần đây \$\{session\.memberName \|\| 'Thành viên'\}`\}/)
+  assert.match(joinGroupSource, /onAction\?\.\('removeRecentSession', session\)/)
   assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
   assert.match(joinGroupSource, /Tên đã có cần link cá nhân hoặc PIN/)
   assert.match(joinGroupSource, /session\.groupName \|\| 'Bấm để vào lại'/)

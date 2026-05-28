@@ -128,34 +128,66 @@ export default function JoinGroup({ data, onAction }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {recentSessions.map(session => (
-                <button
+                <div
                   key={session.memberId}
-                  type="button"
-                  onClick={() => onAction?.('resumeRecentSession', session)}
                   style={{
                     width: '100%',
-                    padding: '12px 13px',
+                    padding: 0,
                     borderRadius: 12,
                     border: `1px solid ${colors.borderSubtle}`,
                     background: 'rgba(15,23,42,0.72)',
                     color: colors.textPrimary,
                     fontFamily: 'inherit',
-                    textAlign: 'left',
-                    cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
+                    overflow: 'hidden',
                   }}
                 >
-                  <Avatar initial={(session.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {session.groupName || 'Bấm để vào lại'}{session.hasPin ? ' · Có PIN' : ''}
+                  <button
+                    type="button"
+                    onClick={() => onAction?.('resumeRecentSession', session)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      padding: '12px 10px 12px 13px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: colors.textPrimary,
+                      fontFamily: 'inherit',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                  >
+                    <Avatar initial={(session.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {session.groupName || 'Bấm để vào lại'}{session.hasPin ? ' · Có PIN' : ''}
+                      </span>
                     </span>
-                  </span>
-                  <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>
-                </button>
+                    <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Xóa tài khoản gần đây ${session.memberName || 'Thành viên'}`}
+                    onClick={() => onAction?.('removeRecentSession', session)}
+                    style={{
+                      width: 42,
+                      alignSelf: 'stretch',
+                      border: 'none',
+                      borderLeft: `1px solid ${colors.borderSubtle}`,
+                      background: 'rgba(248,113,113,0.08)',
+                      color: '#fca5a5',
+                      fontSize: 18,
+                      fontWeight: 900,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                    }}
+                  >×</button>
+                </div>
               ))}
             </div>
           </Card>
