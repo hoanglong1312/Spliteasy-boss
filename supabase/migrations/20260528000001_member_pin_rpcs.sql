@@ -70,7 +70,7 @@ BEGIN
     RETURN jsonb_build_object('error', 'unauthorized');
   END IF;
 
-  IF NOT public.verify_member_pin(v_target_member_id, p_pin) THEN
+  IF p_pin IS NOT NULL AND NOT public.verify_member_pin(v_target_member_id, p_pin) THEN
     RETURN jsonb_build_object('error', 'invalid_pin');
   END IF;
 

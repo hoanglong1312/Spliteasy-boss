@@ -34,7 +34,8 @@ test('Profile persists app PIN through Supabase instead of localStorage', () => 
   assert.match(profileSource, /useEffect\(\(\) => \{\s*setPinSet\(Boolean\(d\.pin\)\)/)
   assert.match(profileSource, /await onAction\?\.\('setPin', \{ pin: pinInputValue \}\)/)
   assert.match(profileSource, /await onAction\?\.\('verifyPin', \{ pin: pinInputValue \}\)/)
-  assert.match(profileSource, /await onAction\?\.\('removePin', \{ pin: pinInputValue \}\)/)
+  assert.match(profileSource, /await onAction\?\.\('removePin'\)/)
+  assert.match(profileSource, /const pinRequiresInput = pinSetupMode !== 'remove'/)
   assert.doesNotMatch(profileSource, /localStorage\.getItem\(pinKey\)/)
   assert.doesNotMatch(profileSource, /localStorage\.setItem\(pinKey, pinInputValue\)/)
   assert.doesNotMatch(profileSource, /localStorage\.removeItem\(pinKey\)/)
@@ -49,6 +50,7 @@ test('Profile persists app PIN through Supabase instead of localStorage', () => 
   assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.set_member_pin\(p_pin text\)/)
   assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.verify_member_pin\(p_member_id uuid, p_pin text\)/)
   assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.reset_member_pin\(p_member_id uuid DEFAULT NULL, p_pin text DEFAULT NULL\)/)
+  assert.match(memberPinMigration, /IF p_pin IS NOT NULL AND NOT public\.verify_member_pin\(v_target_member_id, p_pin\) THEN/)
   assert.match(memberPinMigration, /UPDATE public\.members[\s\S]*pin_hash = encode\(digest\(p_pin \|\| ':' \|\| v_member_id::text, 'sha256'\), 'hex'\)/)
 })
 

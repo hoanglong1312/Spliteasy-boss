@@ -364,7 +364,7 @@ export default function AppV2() {
 
     if (type === 'removePin') {
       try {
-        await dispatch({ type: 'RESET_MEMBER_PIN', memberId: state.currentUserId, pin: payload?.pin })
+        await dispatch({ type: 'RESET_MEMBER_PIN', memberId: state.currentUserId })
         sessionStorage.removeItem(PIN_UNLOCK_KEY)
         return true
       } catch (err) {

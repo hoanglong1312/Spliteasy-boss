@@ -102,8 +102,8 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
       setPinSet(true);
       cancelPinSetup();
     } else if (pinSetupMode === 'remove') {
-      const removed = await onAction?.('removePin', { pin: pinInputValue });
-      if (removed === false) { setPinSetupError('PIN không đúng.'); return; }
+      const removed = await onAction?.('removePin');
+      if (removed === false) { setPinSetupError('Chưa xoá được PIN. Thử lại.'); return; }
       setPinSet(false);
       cancelPinSetup();
     } else if (pinSetupMode === 'change-old') {
@@ -120,6 +120,8 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
       cancelPinSetup();
     }
   }
+
+  const pinRequiresInput = pinSetupMode !== 'remove';
 
   return (
     <PhoneFrame>
@@ -286,27 +288,34 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
               {pinSetupMode === 'set' && 'Nhập mã PIN mới (6 số)'}
               {pinSetupMode === 'change-old' && 'Nhập PIN hiện tại để xác nhận'}
               {pinSetupMode === 'change-new' && 'Nhập PIN mới (6 số)'}
-              {pinSetupMode === 'remove' && 'Nhập PIN hiện tại để xoá'}
+              {pinSetupMode === 'remove' && 'Xác nhận xoá PIN bảo mật'}
             </div>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={pinInputValue}
-              onChange={e => {
-                setPinInputValue(e.target.value.replace(/\D/g, '').slice(0, 6));
-                setPinSetupError('');
-              }}
-              placeholder="● ● ● ● ● ●"
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                padding: '12px 14px', borderRadius: 10, fontSize: 18,
-                letterSpacing: '8px', textAlign: 'center',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                color: '#f1f5f9', fontFamily: 'inherit', outline: 'none',
-              }}
-            />
+            {pinSetupMode === 'remove' && (
+              <div style={{ fontSize: 12, lineHeight: 1.45, color: colors.textSecondary }}>
+                Sau khi xoá, lần đăng nhập sau sẽ không cần nhập PIN cho hồ sơ này.
+              </div>
+            )}
+            {pinRequiresInput && (
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={pinInputValue}
+                onChange={e => {
+                  setPinInputValue(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setPinSetupError('');
+                }}
+                placeholder="● ● ● ● ● ●"
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '12px 14px', borderRadius: 10, fontSize: 18,
+                  letterSpacing: '8px', textAlign: 'center',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  color: '#f1f5f9', fontFamily: 'inherit', outline: 'none',
+                }}
+              />
+            )}
             {pinSetupError && (
               <div style={{ fontSize: 11, color: '#fca5a5', marginTop: 8 }}>{pinSetupError}</div>
             )}
@@ -316,7 +325,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
                 flex: 1,
                 padding: 10,
                 fontSize: 12,
-                opacity: pinInputValue.length === 6 ? 1 : 0.4,
+                opacity: !pinRequiresInput || pinInputValue.length === 6 ? 1 : 0.4,
               }} onClick={submitPinSetup}>
                 {pinSetupMode === 'set' || pinSetupMode === 'change-new' ? 'Lưu PIN'
                   : pinSetupMode === 'remove' ? 'Xoá PIN' : 'Tiếp theo →'}
