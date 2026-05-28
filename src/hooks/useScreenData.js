@@ -249,10 +249,15 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
 
 function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate) {
   const netBalance = safeArray(sourceBreakdown).reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
+  const monthLabel = formatMonthLabel(monthDate)
+  const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
   return {
-    monthLabel: formatMonthLabel(monthDate),
+    monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
     netBalance,
+    paymentStatus: paymentNotice?.status || '',
+    paymentStatusAmount: paymentNotice?.amount || 0,
+    paymentStatusLabel: paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     payForRows: safeArray(profileBreakdown)
       .filter(row => Number(row.amount) < 0)
@@ -264,6 +269,34 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
         ...row,
         bank: bankData(findProfileMember(row.profileId, members), true),
       })),
+  }
+}
+
+function latestPaymentNoticeForMember(state, member, monthLabel) {
+  const memberId = member?.id || state?.currentUserId
+  const profileId = member?.profileId || member?.profile_id || ''
+  const memberIds = new Set(
+    safeArray(state?.members)
+      .filter(row => profileId && String(row?.profileId || row?.profile_id || '') === String(profileId))
+      .map(row => String(row.id))
+  )
+  if (memberId) memberIds.add(String(memberId))
+  const notices = safeArray(state?.notifications)
+    .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
+    .filter(notification => memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || '')))
+    .filter(notification => {
+      const metadata = notification?.metadata || {}
+      return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
+    })
+    .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
+  const notice = notices[0]
+  if (!notice) return null
+  const metadata = notice.metadata || {}
+  const status = String(metadata.status || 'pending').toLowerCase()
+  return {
+    status,
+    amount: Number(metadata.amount) || 0,
+    label: status === 'confirmed' ? 'Đã thanh toán' : status === 'rejected' ? 'Chưa nhận được' : 'Chờ xác nhận',
   }
 }
 
@@ -3332,16 +3365,24 @@ function toNotificationItem(notification, state) {
   const isExpense = type.includes('expense') || type.includes('chi')
   const isPayment = type.includes('payment') || type.includes('settlement')
   const metadata = notification?.metadata || {}
-  const isPendingPayment = isPayment && String(metadata.status || 'pending').toLowerCase() === 'pending'
+  const paymentStatus = String(metadata.status || 'pending').toLowerCase()
+  const isPendingPayment = isPayment && paymentStatus === 'pending'
+  const isOwnPayment = isPayment && String(notification?.actorMemberId || notification?.actor_member_id || '') === String(state?.currentUserId || '')
+  const paymentTitle = isOwnPayment && paymentStatus === 'confirmed'
+    ? `Long đã xác nhận thanh toán <strong>${escapeHtml(fmtVNDFull(metadata.amount || 0))}</strong>`
+    : isOwnPayment && paymentStatus === 'rejected'
+      ? `Long chưa nhận được thanh toán <strong>${escapeHtml(fmtVNDFull(metadata.amount || 0))}</strong>`
+      : notification?.titleHtml || notification?.title || notification?.message || 'Thông báo mới'
   return {
     id: notification?.id,
     unread: notification?.unread ?? notification?.read === false,
-    icon: notification?.icon || (isJoinRequest ? '👤' : isPickle ? '🏓' : isPayment ? '✅' : isExpense ? '💸' : '🔔'),
+    icon: notification?.icon || (isJoinRequest ? '👤' : isPickle ? '🏓' : isPayment ? (paymentStatus === 'rejected' ? '⚠️' : '✅') : isExpense ? '💸' : '🔔'),
     iconBg: notification?.iconBg || notification?.icon_bg || (isPickle ? 'rgba(52,211,153,0.10)' : 'rgba(99,102,241,0.12)'),
-    title: notification?.titleHtml || notification?.title || notification?.message || 'Thông báo mới',
-    sub: notification?.sub || notification?.subtitle || groupLabelById(state, notification?.groupId || notification?.group_id),
+    title: paymentTitle,
+    sub: notification?.sub || notification?.subtitle || (isOwnPayment && paymentStatus === 'confirmed' ? 'Khoản này đã được thủ quỹ ghi nhận' : groupLabelById(state, notification?.groupId || notification?.group_id)),
     when: notification?.when || relativeTimeLabel(notification?.createdAt || notification?.created_at || notification?.date),
     date: notification?.createdAt || notification?.created_at || notification?.date,
+    status: isPayment ? paymentStatus : notification?.status,
     actions: isJoinRequest ? 'joinRequest' : isPendingPayment ? 'paymentConfirmation' : notification?.actions,
   }
 }

@@ -65,6 +65,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
           totalBalance={d.totalBalance}
           balanceLabel={balanceLabel}
           owedTo={d.owedTo}
+          paymentStatus={d.paymentSummary?.paymentStatus}
           onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
         />
@@ -298,11 +299,19 @@ function approvalButton(background, color) {
   };
 }
 
-function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction }) {
+function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction }) {
   if (!safeArray(sources).length) return null;
   const total = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
   const isNegativeTotal = totalBalance < 0;
   const isPositiveTotal = totalBalance > 0;
+  const normalizedPaymentStatus = String(paymentStatus || '').toLowerCase();
+  const paidConfirmed = normalizedPaymentStatus === 'confirmed';
+  const paymentPending = normalizedPaymentStatus === 'pending';
+  const paymentChipLabel = paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : '💳 Thanh toán';
+  const paymentChipBg = paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
+  const paymentChipBorder = paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
+  const paymentChipColor = paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
+  const paymentDisabled = paidConfirmed || paymentPending;
   return (
     <>
       <SectionLabel>Theo nguồn tiền</SectionLabel>
@@ -310,7 +319,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
         <button
           type="button"
           aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
-          onClick={(event) => { event.stopPropagation(); onOpenPayment?.(); }}
+          onClick={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
           style={{
             width: '100%',
             display: 'flex',
@@ -323,7 +332,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
             borderBottom: '1px solid rgba(255,255,255,0.08)',
             background: 'transparent',
             color: 'inherit',
-            cursor: 'pointer',
+            cursor: paymentDisabled ? 'default' : 'pointer',
             fontFamily: 'inherit',
             textAlign: 'left',
           }}
@@ -360,15 +369,15 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
             <div style={{
               padding: '8px 13px',
               borderRadius: 100,
-              background: isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)',
-              border: `1px solid ${isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)'}`,
-              color: isNegativeTotal ? '#fca5a5' : '#6ee7b7',
+              background: paymentChipBg,
+              border: `1px solid ${paymentChipBorder}`,
+              color: paymentChipColor,
               fontSize: 12,
               fontWeight: 900,
               whiteSpace: 'nowrap',
               flexShrink: 0,
             }}>
-              💳 Thanh toán
+              {paymentChipLabel}
             </div>
           </div>
           <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: -2 }}>

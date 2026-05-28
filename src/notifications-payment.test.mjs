@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const notificationsSource = readFileSync(new URL('./screens/Notifications.jsx', import.meta.url), 'utf8')
 const screenDataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
+const homeSource = readFileSync(new URL('./screens/Home.jsx', import.meta.url), 'utf8')
 const migrationSource = readFileSync(new URL('../supabase/migrations/20260528000002_payment_notifications.sql', import.meta.url), 'utf8')
 const profileAwareMigrationSource = readFileSync(new URL('../supabase/migrations/20260528000005_profile_aware_payment_notifications.sql', import.meta.url), 'utf8')
 
@@ -13,12 +14,28 @@ test('payment confirmations are actionable from the notification bell', () => {
   assert.match(notificationsSource, /onRejectPayment=\{\(\) => onAction\?\.\('rejectPaymentNotice', n\)\}/)
   assert.match(notificationsSource, />Đã nhận<\/button>/)
   assert.match(notificationsSource, />Chưa nhận<\/button>/)
+  assert.match(notificationsSource, /function statusBadge\(status\) \{/)
+  assert.match(notificationsSource, /Đã xác nhận/)
 })
 
 test('notification data maps payment_submitted rows to payment actions', () => {
   assert.match(screenDataSource, /const isPayment = type\.includes\('payment'\) \|\| type\.includes\('settlement'\)/)
-  assert.match(screenDataSource, /title: notification\?\.titleHtml \|\| notification\?\.title \|\| notification\?\.message/)
+  assert.match(screenDataSource, /const paymentStatus = String\(metadata\.status \|\| 'pending'\)\.toLowerCase\(\)/)
+  assert.match(screenDataSource, /const paymentTitle = isOwnPayment/)
+  assert.match(screenDataSource, /notification\?\.titleHtml \|\| notification\?\.title \|\| notification\?\.message/)
   assert.match(screenDataSource, /actions: isJoinRequest \? 'joinRequest' : isPendingPayment \? 'paymentConfirmation' : notification\?\.actions/)
+  assert.match(screenDataSource, /Long đã xác nhận thanh toán/)
+  assert.match(screenDataSource, /status: isPayment \? paymentStatus : notification\?\.status/)
+})
+
+test('home payment summary exposes member payment confirmation status', () => {
+  assert.match(screenDataSource, /const paymentNotice = latestPaymentNoticeForMember\(state, me, monthLabel\)/)
+  assert.match(screenDataSource, /paymentStatus: paymentNotice\?\.status \|\| ''/)
+  assert.match(screenDataSource, /function latestPaymentNoticeForMember\(state, member, monthLabel\) \{/)
+  assert.match(homeSource, /paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/)
+  assert.match(homeSource, /paidConfirmed \? '✅ Đã thanh toán'/)
+  assert.match(homeSource, /paymentPending \? '⏳ Chờ xác nhận'/)
+  assert.match(homeSource, /if \(!paymentDisabled\) onOpenPayment\?\.\(\)/)
 })
 
 test('home pending payment approvals render only for Long or payment reviewers', () => {

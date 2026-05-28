@@ -587,12 +587,15 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(appSource, /if \(type === 'confirmPaymentSent'\)/);
   assert.match(appSource, /coveredMembers/);
   assert.match(screenDataSource, /memberId: member\?\.id/);
-  assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}/);
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction \}\)/);
+  assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}[\s\S]*paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\)/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
   assert.match(homeSource, /formatVND\(Math\.abs\(totalBalance\)\)/);
   assert.match(homeSource, /justifyContent: 'space-between',[\s\S]*?alignItems: 'center',[\s\S]*?minHeight: 62/);
-  assert.match(homeSource, /padding: '8px 13px',[\s\S]*?fontSize: 12,[\s\S]*?💳 Thanh toán/);
+  assert.match(homeSource, /const paymentChipLabel = paidConfirmed \? '✅ Đã thanh toán' : paymentPending \? '⏳ Chờ xác nhận' : '💳 Thanh toán'/);
+  assert.match(homeSource, /const paymentDisabled = paidConfirmed \|\| paymentPending/);
+  assert.match(homeSource, /if \(!paymentDisabled\) onOpenPayment\?\.\(\)/);
+  assert.match(homeSource, /padding: '8px 13px',[\s\S]*?fontSize: 12,[\s\S]*?\{paymentChipLabel\}/);
   assert.match(homeSource, /aria-label=\{isNegativeTotal \? `Xem \$\{owedTo\} quỹ cần kiểm tra` : 'Xem nguồn tiền'\}/);
   assert.match(homeSource, /setPaymentSheetOpen\(true\)/);
   assert.match(homeSource, /💳 Thanh toán/);
@@ -720,7 +723,7 @@ test('GroupDetail activity cards open expense detail for members', () => {
 
 test('Home source breakdown rows open their related module', () => {
   assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{d\.sourceBreakdown \|\| \[\]\}[\s\S]*onOpenPayment=\{\(\) => setPaymentSheetOpen\(true\)\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/);
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction \}\)/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\)/);
   assert.match(homeSource, /const openSource = \(\) => \{/);
   assert.match(homeSource, /if \(isPickleball\) \{\s*onAction\?\.\('tab', 'pickleball'\)/);
   assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/);

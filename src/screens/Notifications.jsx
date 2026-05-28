@@ -65,6 +65,7 @@ export default function Notifications({ data, onAction }) {
 
 function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayment, onApproveExpense, onRejectExpense }) {
   const unread = notif.unread;
+  const paymentStatus = String(notif.status || '').toLowerCase();
   const base = {
     display: 'flex', alignItems: 'flex-start', gap: 12,
     padding: '14px 14px', borderRadius: 12,
@@ -128,8 +129,27 @@ function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayme
       {unread && <ReadDot />}
       <IconCircle bg={notif.iconBg}>{notif.icon}</IconCircle>
       <Meta notif={notif} />
+      {paymentStatus && paymentStatus !== 'pending' && (
+        <div style={statusBadge(paymentStatus)}>{paymentStatus === 'confirmed' ? 'Đã xác nhận' : 'Chưa nhận'}</div>
+      )}
     </div>
   );
+}
+
+function statusBadge(status) {
+  const confirmed = status === 'confirmed';
+  return {
+    alignSelf: 'flex-start',
+    flexShrink: 0,
+    padding: '5px 8px',
+    borderRadius: 999,
+    background: confirmed ? 'rgba(52,211,153,0.14)' : 'rgba(248,113,113,0.14)',
+    border: `1px solid ${confirmed ? 'rgba(52,211,153,0.28)' : 'rgba(248,113,113,0.28)'}`,
+    color: confirmed ? '#6ee7b7' : '#fca5a5',
+    fontSize: 10,
+    fontWeight: 900,
+    whiteSpace: 'nowrap',
+  };
 }
 
 function Meta({ notif }) {
