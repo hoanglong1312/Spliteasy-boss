@@ -79,9 +79,14 @@ test('store fetches payment notifications and persists treasurer review actions'
   assert.match(storeSource, /case 'SEND_PAYMENT_NOTIFICATION': \{/)
   assert.match(storeSource, /\.from\('notifications'\)\s*\.insert\(\{/)
   assert.match(storeSource, /type: 'payment_submitted'/)
-  assert.match(storeSource, /case 'REVIEW_PAYMENT_NOTIFICATION': \{/)
-  assert.match(storeSource, /metadata: \{ \.\.\.notification\.metadata, status: action\.status \}/)
-  assert.match(storeSource, /is_read: true/)
+  const reviewBlock = storeSource.slice(
+    storeSource.indexOf("case 'REVIEW_PAYMENT_NOTIFICATION':"),
+    storeSource.indexOf("case 'MARK_NOTIFICATIONS_READ':")
+  )
+  assert.match(reviewBlock, /case 'REVIEW_PAYMENT_NOTIFICATION': \{/)
+  assert.match(reviewBlock, /metadata: \{ \.\.\.notification\.metadata, status: action\.status \}/)
+  assert.match(reviewBlock, /is_read: true/)
+  assert.doesNotMatch(reviewBlock, /\.eq\('member_id', state\.currentUserId\)/)
 })
 
 test('monthly pickleball config save persists schedule time aliases', () => {

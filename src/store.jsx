@@ -1968,7 +1968,6 @@ export function AppProvider({ children }) {
             read_at: new Date().toISOString(),
           })
           .eq('id', notificationId)
-          .eq('member_id', state.currentUserId)
           .select('id')
           .maybeSingle()
         if (error) {
