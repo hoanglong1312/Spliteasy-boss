@@ -1692,35 +1692,48 @@ function dedupeProfilesFromMembers(members, profiles = []) {
 }
 
 function buildSettleAllData(state) {
-  const group = currentGroup(state)
-  const members = currentGroupMembers(state)
-  const balanceMap = groupBalanceForMember(group, state?.currentUserId, safeArray(state?.members), state?.currentUserName)
+  const selectedYearMonth = state?.selectedYearMonth || monthKey(new Date())
+  const today = dateFromYearMonth(selectedYearMonth)
+  const groups = safeArray(state?.groups).map(safeGroup)
+  const expenseGroups = groups
+    .filter(group => groupKind(group) !== 'pickleball')
+    .map(group => groupWithMonthExpenses(group, today))
+  const members = safeArray(state?.members)
+  const pickle = state?.pickle || {}
+  const monthSessions = getStateMonthSessions(state, today)
+  const sourceBalances = buildHomeSourceBalances(state, expenseGroups, state, pickle, monthSessions, members, today)
+  const sources = currentProfileSourceBreakdown(sourceBalances, state?.currentUserId, members)
   const me = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
-  const debts = []
-  const credits = []
-
-  Object.entries(balanceMap).forEach(([memberId, rawAmount]) => {
-    const amount = Number(rawAmount) || 0
-    if (!amount) return
-    const member = members.find(item => String(item.id) === String(memberId)) || { id: memberId, name: memberName(memberId, members) }
-    const row = {
-      id: memberId,
-      initial: initials(member),
-      name: member.displayName || member.name || 'Thành viên',
-      sub: amount < 0 ? 'Cần thanh toán' : 'Cần thu',
-      amount: Math.abs(amount),
-    }
-    if (amount < 0) debts.push(row)
-    else credits.push(row)
-  })
+  const debts = sources
+    .filter(source => Number(source.amount) < 0)
+    .map(source => sourcePaymentRow(source, 'Cần nộp'))
+  const credits = sources
+    .filter(source => Number(source.amount) > 0)
+    .map(source => sourcePaymentRow(source, 'Cần thu'))
+  const netBalance = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
 
   return {
-    groupName: group.name || 'Nhóm',
-    netBalance: groupNetForMember(group, state?.currentUserId, safeArray(state?.members), state?.currentUserName),
+    groupName: 'Tất cả nguồn tiền',
+    monthLabel: formatMonthLabel(today),
+    netBalance,
     debts,
     credits,
     isTreasurer: me?.role === 'treasurer',
-    settlements: buildOptimizedSettlements(group, members),
+    settlements: [],
+    sources,
+    paymentTarget: bankData(me, true),
+  }
+}
+
+function sourcePaymentRow(source, sub) {
+  return {
+    id: `${source.sourceType || 'group'}:${source.sourceId || source.sourceLabel}`,
+    initial: initials({ name: source.sourceLabel }),
+    name: source.sourceLabel || 'Nguồn tiền',
+    sub,
+    amount: Math.abs(Number(source.amount) || 0),
+    rawAmount: Number(source.amount) || 0,
+    sourceType: source.sourceType || 'group',
   }
 }
 

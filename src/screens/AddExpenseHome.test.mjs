@@ -7,6 +7,7 @@ const groupDetailSource = readFileSync(new URL('./GroupDetail.jsx', import.meta.
 const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8');
 const expenseDetailSource = readFileSync(new URL('./ExpenseDetail.jsx', import.meta.url), 'utf8');
 const memberBillShareSource = readFileSync(new URL('./MemberBillShare.jsx', import.meta.url), 'utf8');
+const settleAllSource = readFileSync(new URL('./SettleAll.jsx', import.meta.url), 'utf8');
 const screenDataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 const primitivesSource = readFileSync(new URL('../primitives.jsx', import.meta.url), 'utf8');
@@ -55,7 +56,9 @@ test('AddExpense uses scroll date picker and supports receipt image previews', (
 
 test('GroupDetail menu, balances, and members tabs render real group data', () => {
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
-  assert.match(groupDetailSource, /onAction\?\.\('settle', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('settleAll'\)/);
+  assert.match(groupDetailSource, />💳 Thanh toán<\/Button>/);
+  assert.doesNotMatch(groupDetailSource, /⚡ Tất toán/);
   assert.match(groupDetailSource, /<GroupManagementPanel/);
   assert.match(groupDetailSource, /inviteCode=\{d\.inviteCode\}/);
   assert.match(groupDetailSource, /Sửa thông tin nhóm/);
@@ -105,6 +108,17 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Tên tài khoản/);
   assert.match(groupDetailSource, /Số tài khoản/);
   assert.match(screenDataSource, /balanceRows: groupMembers/);
+});
+
+test('SettleAll is a total payment screen with sources and QR', () => {
+  assert.match(screenDataSource, /function buildSettleAllData\(state\)/);
+  assert.match(screenDataSource, /const sourceBalances = buildHomeSourceBalances/);
+  assert.match(screenDataSource, /currentProfileSourceBreakdown\(sourceBalances, state\?\.currentUserId, members\)/);
+  assert.match(screenDataSource, /paymentTarget: bankData\(me, true\)/);
+  assert.match(settleAllSource, /Thanh toán tổng hợp/);
+  assert.match(settleAllSource, /Theo nguồn tiền/);
+  assert.match(settleAllSource, /QR nhận tiền/);
+  assert.match(settleAllSource, /generateQRUrl\(/);
 });
 
 test('GroupDetail lets group creators manage members without treasurer role', () => {
