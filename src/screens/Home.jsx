@@ -504,10 +504,29 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
           </div>
           {canShowQr && (
             <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
+              <div style={{
+                display: 'grid',
+                gap: 7,
+                padding: '9px 10px',
+                borderRadius: 11,
+                background: 'rgba(255,255,255,0.045)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                minWidth: 0,
+              }}>
+                <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Thông tin chủ tài khoản</span>
+                <div style={{ display: 'grid', gap: 5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '74px 1fr', gap: 8, alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Người nhận</span>
+                    <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.holder || 'Long'}</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '74px 1fr', gap: 8, alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Ngân hàng</span>
+                    <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.name || target.code || 'Ngân hàng'}</span>
+                  </div>
+                </div>
+              </div>
               {[
                 ['amount', 'Số tiền', formatVND(amountToPay)],
-                ['holder', 'Người nhận', target.holder || 'Long'],
-                ['bank', 'Ngân hàng', target.name || target.code || 'Ngân hàng'],
                 ['account', 'STK', target.account],
                 ['description', 'Nội dung', transferDescription],
               ].filter(([, , value]) => value).map(([field, label, value]) => (
@@ -627,9 +646,9 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
                     justifyContent: 'center',
                     minHeight: 42,
                     borderRadius: 12,
-                    background: 'rgba(52,211,153,0.16)',
-                    border: '1px solid rgba(52,211,153,0.32)',
-                    color: '#6ee7b7',
+                    background: 'rgba(59,130,246,0.18)',
+                    border: '1px solid rgba(96,165,250,0.42)',
+                    color: '#93c5fd',
                     fontSize: 12,
                     fontWeight: 900,
                     textDecoration: 'none',
@@ -638,9 +657,9 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
                 <button type="button" onClick={confirmPayment} style={{
                   minHeight: 42,
                   borderRadius: 12,
-                  background: paymentConfirmed ? 'rgba(52,211,153,0.18)' : colors.brand,
-                  border: `1px solid ${paymentConfirmed ? 'rgba(52,211,153,0.34)' : 'rgba(129,140,248,0.42)'}`,
-                  color: paymentConfirmed ? '#6ee7b7' : '#fff',
+                  background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
+                  border: `1px solid ${paymentConfirmed ? 'rgba(110,231,183,0.42)' : 'rgba(16,185,129,0.62)'}`,
+                  color: paymentConfirmed ? '#6ee7b7' : '#052e16',
                   fontSize: 12,
                   fontWeight: 900,
                   fontFamily: 'inherit',

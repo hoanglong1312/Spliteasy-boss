@@ -542,9 +542,18 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /Lưu QR/);
   assert.doesNotMatch(homeSource, /Sao chép STK/);
   assert.match(homeSource, /\['amount', 'Số tiền', formatVND\(amountToPay\)\]/);
+  assert.doesNotMatch(homeSource, /\['holder', 'Người nhận'/);
+  assert.doesNotMatch(homeSource, /\['bank', 'Ngân hàng'/);
+  assert.match(homeSource, />Thông tin chủ tài khoản<\/span>/);
+  assert.match(homeSource, />Người nhận<\/span>/);
+  assert.match(homeSource, />Ngân hàng<\/span>/);
+  assert.match(homeSource, /\{target\.holder \|\| 'Long'\}/);
+  assert.match(homeSource, /\{target\.name \|\| target\.code \|\| 'Ngân hàng'\}/);
   assert.match(homeSource, /\['account', 'STK', target\.account\]/);
   assert.match(homeSource, /\['description', 'Nội dung', transferDescription\]/);
   assert.match(homeSource, /onClick=\{\(\) => copyPaymentField\(field, value\)\}/);
+  assert.match(homeSource, /background: 'rgba\(59,130,246,0\.18\)'/);
+  assert.match(homeSource, /background: paymentConfirmed \? 'rgba\(16,185,129,0\.20\)' : '#10b981'/);
   assert.match(homeSource, /Xác nhận đã thanh toán/);
   assert.match(homeSource, /onConfirmPayment\?\.\(\{[\s\S]*amount: amountToPay,[\s\S]*coveredMembers: selectedPayForRows/);
   assert.match(homeSource, /const transferDescription = `\$\{paymentNames\.join\(', '\)\} - Thanh toan \$\{data\?\.monthLabel \|\| ''\}`\.trim\(\)/);
