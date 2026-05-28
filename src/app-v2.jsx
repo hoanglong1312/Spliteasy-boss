@@ -221,6 +221,20 @@ export default function AppV2() {
     return () => { alive = false }
   }, [memberAccessToken, dispatch])
 
+  useEffect(() => {
+    if (!awaitingPin || pendingPinSession) return
+    const { member } = getStoredAuth()
+    if (!member?.hasPin || !member?.id) return
+    let alive = true
+    checkMemberPinRequired(member.id).then(required => {
+      if (!alive || required) return
+      setAwaitingPin(false)
+      setPinError('')
+      setPinInput('')
+    })
+    return () => { alive = false }
+  }, [awaitingPin, pendingPinSession])
+
   async function openPersonalLinkHome(token) {
     if (!token) return
     const sb = createSupabase()
@@ -285,6 +299,20 @@ export default function AppV2() {
     return data === true || data?.valid === true
   }
 
+  async function checkMemberPinRequired(memberId) {
+    if (!memberId) return false
+    const { token } = getStoredAuth()
+    const sb = token ? createSupabase(token) : createSupabase()
+    const { data, error } = await sb.rpc('member_pin_required', {
+      p_member_id: memberId,
+    })
+    if (error || data?.error) {
+      console.error('[app] memberPinRequired:', error || data)
+      return true
+    }
+    return data === true || data?.required === true
+  }
+
   async function submitPin(value = pinInput) {
     const pending = pendingPinSession
     const memberId = pending?.memberId || state.currentUserId
@@ -322,7 +350,7 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      const requiresPin = Boolean(payload?.hasPin)
+      const requiresPin = Boolean(payload?.hasPin) && await checkMemberPinRequired(payload?.memberId)
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
         setPendingPinSession(payload)
         setAwaitingPin(true)

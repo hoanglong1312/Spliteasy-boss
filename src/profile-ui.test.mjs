@@ -47,11 +47,14 @@ test('Profile persists app PIN through Supabase instead of localStorage', () => 
   assert.match(appSource, /if \(type === 'verifyPin'\)/)
   assert.match(appSource, /if \(type === 'removePin'\)/)
   assert.match(storeSource, /storeAuth\(t, \{[\s\S]*hasPin: currentMember\?\.hasPin === true \|\| currentMember\?\.has_pin === true/)
+  assert.match(storeSource, /hasPin: memberHasPin\(m, profile\)/)
+  assert.match(storeSource, /function memberHasPin\(member, profile = null\)/)
   assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.set_member_pin\(p_pin text\)/)
   assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.verify_member_pin\(p_member_id uuid, p_pin text\)/)
   assert.match(memberPinMigration, /CREATE OR REPLACE FUNCTION public\.reset_member_pin\(p_member_id uuid DEFAULT NULL, p_pin text DEFAULT NULL\)/)
-  assert.match(memberPinMigration, /IF p_pin IS NOT NULL AND NOT public\.verify_member_pin\(v_target_member_id, p_pin\) THEN/)
-  assert.match(memberPinMigration, /UPDATE public\.members[\s\S]*pin_hash = encode\(digest\(p_pin \|\| ':' \|\| v_member_id::text, 'sha256'\), 'hex'\)/)
+  assert.match(memberPinMigration, /ALTER TABLE public\.profiles[\s\S]*ADD COLUMN IF NOT EXISTS pin_hash text/)
+  assert.match(memberPinMigration, /UPDATE public\.profiles[\s\S]*pin_hash = encode\(digest\(p_pin \|\| ':' \|\| v_profile_id::text, 'sha256'\), 'hex'\)/)
+  assert.match(memberPinMigration, /RETURN v_profile_hash = encode\(digest\(p_pin \|\| ':' \|\| v_profile_id::text, 'sha256'\), 'hex'\)/)
 })
 
 test('Profile owns account settings without opening the settings screen', () => {

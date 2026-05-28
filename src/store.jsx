@@ -582,11 +582,15 @@ function buildEmptyState() {
   }
 }
 
-function memberHasPin(member) {
-  if (typeof member.has_pin === 'boolean') return member.has_pin
-  if (typeof member.hasPin === 'boolean') return member.hasPin
-  if ('pin_hash' in member) return Boolean(member.pin_hash)
-  if ('pinHash' in member) return Boolean(member.pinHash)
+function memberHasPin(member, profile = null) {
+  if (typeof profile?.has_pin === 'boolean') return profile.has_pin
+  if (typeof profile?.hasPin === 'boolean') return profile.hasPin
+  if ('pin_hash' in (profile || {})) return Boolean(profile.pin_hash)
+  if ('pinHash' in (profile || {})) return Boolean(profile.pinHash)
+  if (typeof member?.has_pin === 'boolean') return member.has_pin
+  if (typeof member?.hasPin === 'boolean') return member.hasPin
+  if ('pin_hash' in (member || {})) return Boolean(member.pin_hash)
+  if ('pinHash' in (member || {})) return Boolean(member.pinHash)
   return false
 }
 
@@ -1184,6 +1188,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     bank_name: profile.bank_name || '',
     bank_account: profile.bank_account || '',
     bank_account_name: profile.bank_account_name || '',
+    hasPin: memberHasPin(null, profile),
+    has_pin: memberHasPin(null, profile),
     createdAt: profile.created_at,
     created_at: profile.created_at,
   }))
@@ -1220,8 +1226,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     bank_account_name: profile?.bank_account_name || m.bank_account_name || '',
     createdAt: m.created_at,
     created_at: m.created_at,
-    hasPin: memberHasPin(m),
-    has_pin: memberHasPin(m),
+    hasPin: memberHasPin(m, profile),
+    has_pin: memberHasPin(m, profile),
     }
   })
 
