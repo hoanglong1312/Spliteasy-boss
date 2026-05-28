@@ -604,6 +604,71 @@ test('group detail member transactions include participant shares and payer adva
   ])
 })
 
+test('group detail applies confirmed payment coverage but ignores deleted payment notices', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    groupType: 'expense',
+    name: 'Ăn uống',
+    members: ['dai', 'long'],
+    expenses: [
+      {
+        id: 'dinner',
+        groupId: 'expense-1',
+        title: 'Ăn tối',
+        amount: 1600000,
+        paidBy: 'long',
+        participants: ['dai', 'long'],
+        splits: [
+          { memberId: 'dai', amount: 800000 },
+          { memberId: 'long', amount: 800000 },
+        ],
+        status: 'approved',
+        date: '2026-05-12',
+      },
+    ],
+  }
+  const members = [
+    { id: 'dai', groupId: 'expense-1', profileId: 'dai-profile', name: 'Đại', isActive: true },
+    { id: 'long', groupId: 'expense-1', profileId: 'long-profile', name: 'Long', role: 'treasurer', isActive: true },
+  ]
+  const appState = {
+    currentUserId: 'dai',
+    currentUserName: 'Đại',
+    members,
+    notifications: [
+      {
+        id: 'pay-1',
+        type: 'payment_submitted',
+        actorMemberId: 'dai',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'deleted',
+          amount: 700000,
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'expense-1', sourceType: 'group', sourceLabel: 'Ăn uống', amount: -700000 },
+          ],
+        },
+      },
+    ],
+  }
+
+  const confirmedDetail = buildGroupDetailData(group, 'dai', members, 'Đại', '2026-05', [], {
+    ...appState,
+    notifications: [
+      {
+        ...appState.notifications[0],
+        metadata: { ...appState.notifications[0].metadata, status: 'confirmed' },
+      },
+    ],
+  })
+  const deletedDetail = buildGroupDetailData(group, 'dai', members, 'Đại', '2026-05', [], appState)
+
+  assert.equal(confirmedDetail.balance, -100000)
+  assert.equal(deletedDetail.balance, -800000)
+})
+
 test('group detail exposes treasurer payment target for member bill QR', () => {
   const { buildGroupDetailData } = loadScreenDataBuilders()
   const group = {

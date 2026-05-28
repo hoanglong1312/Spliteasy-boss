@@ -471,7 +471,7 @@ test('App uses one selectedYearMonth across home, groups, group detail, and pick
   assert.match(screenDataSource, /selectedYearMonth = monthKey\(new Date\(\)\)/);
   assert.match(screenDataSource, /buildHomeData\(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth\)/);
   assert.match(screenDataSource, /buildGroupsListData\(groups, currentUserId, members, currentUserName, selectedYearMonth\)/);
-  assert.match(screenDataSource, /buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles\)/);
+  assert.match(screenDataSource, /buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles, state\)/);
   assert.match(screenDataSource, /buildPickleballOverviewData\(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth\)/);
   assert.match(screenDataSource, /buildPickleballMembersData\(pickleballState, selectedYearMonth\)/);
   assert.match(screenDataSource, /buildMemberDetailData\(pickleballState, memberId, selectedYearMonth\)/);

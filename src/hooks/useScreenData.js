@@ -92,7 +92,7 @@ export function useScreenData() {
     const pickleballState = scopedPickleballState(state)
     const homeData = buildHomeData(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth)
     const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth)
-    const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles)
+    const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles, state)
     const pickleballOverviewData = buildPickleballOverviewData(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth)
     const pickleballCalendarData = buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth })
     const profileData = buildProfileData(me, state, pickle)
@@ -115,7 +115,7 @@ export function useScreenData() {
       newGroupData: buildNewGroupData(state),
       getGroupDetailData: (groupId) => {
         const group = safeArray(groups).find(g => g.id === groupId) || currentGroup
-        return buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles)
+        return buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles, state)
       },
       getSessionDetailData: (sessionId) => buildSessionDetailData(pickleballState, pickle, sessionId, currentUserId, members),
       getPickleballCalendarData: (params) => buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth, ...params }),
@@ -553,6 +553,22 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
 }
 
+function adjustedGroupNetForMember(group, memberId, groupMembers, state, monthDate) {
+  const rawAmount = groupNet(group, memberId)
+  if (!state || !safeArray(state?.notifications).length) return rawAmount
+  const member = safeArray(groupMembers).find(row => String(row?.id || '') === String(memberId || '')) || { id: memberId }
+  const source = {
+    sourceId: group.id,
+    sourceType: 'group',
+    sourceLabel: group.name || 'Nhóm',
+    memberId,
+    amount: rawAmount,
+  }
+  const coverage = paymentCoverageForMember({ ...state, members: safeArray(state?.members).length ? state.members : groupMembers }, member, formatMonthLabel(monthDate), [source])
+  const adjusted = applyConfirmedPaymentCoverage([source], coverage.confirmedSources)[0]
+  return Number(adjusted?.amount) || 0
+}
+
 function canReviewPendingExpensesForGroup(group, members, currentUserId, currentUserName) {
   const groupMembers = membersForGroup(group, members)
   const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(group, currentUserId, members, currentUserName)))
@@ -731,7 +747,7 @@ function stableHash(value) {
   return hash >>> 0
 }
 
-function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = []) {
+function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = [], appState = {}) {
   const g = safeGroup(group)
   const monthDate = dateFromYearMonth(selectedYearMonth)
   const monthlyGroup = groupWithMonthExpenses(g, monthDate)
@@ -742,9 +758,9 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
   const isGroupTreasurer = Boolean(isGroupCreator || currentGroupMember?.role === 'treasurer' || (Boolean(currentGroupMember) && isSoloExpenseGroup))
   const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
-  const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
+  const balance = adjustedGroupNetForMember(monthlyGroup, currentGroupMember?.id || currentUserId, groupMembers, appState, monthDate)
   const memberBalanceMap = Object.fromEntries(
-    groupMembers.map(member => [member.id, groupNet(monthlyGroup, member.id)])
+    groupMembers.map(member => [member.id, adjustedGroupNetForMember(monthlyGroup, member.id, groupMembers, appState, monthDate)])
   )
   const paymentTarget = buildGroupPaymentTarget(g, groupMembers)
   const activities = safeArray(monthlyGroup.expenses)

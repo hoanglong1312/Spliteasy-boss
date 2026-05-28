@@ -98,15 +98,15 @@ test('primary money screens share summary, search, section, and list primitives'
   assert.match(groupDetailSource, /ListCard/)
 })
 
-test('group detail data receives profile directory without free state references', () => {
-  assert.match(screenDataSource, /function buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = \[\]\)/)
-  assert.match(screenDataSource, /buildGroupDetailData\(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles\)/)
+test('group detail data receives profile directory and app state explicitly', () => {
+  assert.match(screenDataSource, /function buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = \[\], appState = \{\}\)/)
+  assert.match(screenDataSource, /buildGroupDetailData\(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles, state\)/)
   assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles, \{ mode: 'expense' \}\)/)
   const buildGroupDetailBlock = screenDataSource.slice(
     screenDataSource.indexOf('function buildGroupDetailData'),
     screenDataSource.indexOf('function buildGroupMemberCandidates')
   )
-  assert.doesNotMatch(buildGroupDetailBlock, /state\?\./)
+  assert.doesNotMatch(buildGroupDetailBlock, /[^p]state\?\./)
 })
 
 test('group detail distinguishes creator and treasurer roles in member rows', () => {
