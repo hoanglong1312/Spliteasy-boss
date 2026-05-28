@@ -545,6 +545,8 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction \}\)/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
   assert.match(homeSource, /formatVND\(Math\.abs\(totalBalance\)\)/);
+  assert.match(homeSource, /justifyContent: 'space-between',[\s\S]*?alignItems: 'center',[\s\S]*?minHeight: 62/);
+  assert.match(homeSource, /padding: '8px 13px',[\s\S]*?fontSize: 12,[\s\S]*?💳 Thanh toán/);
   assert.match(homeSource, /aria-label=\{isNegativeTotal \? `Xem \$\{owedTo\} quỹ cần kiểm tra` : 'Xem nguồn tiền'\}/);
   assert.match(homeSource, /setPaymentSheetOpen\(true\)/);
   assert.match(homeSource, /💳 Thanh toán/);

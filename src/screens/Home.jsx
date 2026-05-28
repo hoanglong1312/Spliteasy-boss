@@ -311,41 +311,51 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
             textAlign: 'left',
           }}
         >
-          <div style={{ minWidth: 0 }}>
-            <div style={{
-              fontSize: 10,
-              fontWeight: 850,
-              color: isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
-              textTransform: 'uppercase',
-              letterSpacing: '1.4px',
-            }}>
-              {balanceLabel}
+          <div style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            minHeight: 62,
+          }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontSize: 10,
+                fontWeight: 850,
+                color: isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
+                textTransform: 'uppercase',
+                letterSpacing: '1.4px',
+              }}>
+                {balanceLabel}
+              </div>
+              <div style={{
+                fontSize: 26,
+                fontWeight: 900,
+                marginTop: 5,
+                color: '#f8fafc',
+                whiteSpace: 'nowrap',
+                ...type.mono,
+              }}>
+                {formatVND(Math.abs(totalBalance))}
+              </div>
             </div>
             <div style={{
-              fontSize: 26,
+              padding: '8px 13px',
+              borderRadius: 100,
+              background: isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)',
+              border: `1px solid ${isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)'}`,
+              color: isNegativeTotal ? '#fca5a5' : '#6ee7b7',
+              fontSize: 12,
               fontWeight: 900,
-              marginTop: 5,
-              color: '#f8fafc',
               whiteSpace: 'nowrap',
-              ...type.mono,
+              flexShrink: 0,
             }}>
-              {formatVND(Math.abs(totalBalance))}
-            </div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-              Tổng hợp tất cả nguồn tiền tháng này
+              💳 Thanh toán
             </div>
           </div>
-          <div style={{
-            padding: '5px 9px',
-            borderRadius: 100,
-            background: isNegativeTotal ? 'rgba(248,113,113,0.13)' : 'rgba(52,211,153,0.13)',
-            border: `1px solid ${isNegativeTotal ? 'rgba(248,113,113,0.24)' : 'rgba(52,211,153,0.24)'}`,
-            color: isNegativeTotal ? '#fca5a5' : '#6ee7b7',
-            fontSize: 10,
-            fontWeight: 800,
-            whiteSpace: 'nowrap',
-          }}>
-            💳 Thanh toán
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: -2 }}>
+            Tổng hợp tất cả nguồn tiền tháng này
           </div>
         </button>
         {sources.map((source, index) => {
