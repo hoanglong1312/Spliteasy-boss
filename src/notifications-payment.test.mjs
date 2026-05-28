@@ -112,6 +112,16 @@ test('confirmed payments only cover the sources included when the member paid', 
   assert.equal(data.sourceBreakdown[0].amount, -120000)
 })
 
+test('home exposes a treasurer payment management zone with view and delete actions', () => {
+  assert.match(screenDataSource, /paymentRecords: buildPaymentManagementRecords\(state, me, today\)/)
+  assert.match(screenDataSource, /function buildPaymentManagementRecords\(state, currentMember, monthDate\) \{/)
+  assert.match(screenDataSource, /String\(metadata\.status \|\| 'pending'\) !== 'deleted'/)
+  assert.match(homeSource, /<PaymentManagementZone records=\{d\.paymentRecords \|\| \[\]\} onAction=\{onAction\} \/>/)
+  assert.match(homeSource, /function PaymentManagementZone\(\{ records, onAction \}\)/)
+  assert.match(homeSource, /onAction\?\.\('deletePaymentNotice', record\)/)
+  assert.match(homeSource, /onAction\?\.\('viewPaymentNotice', record\)/)
+})
+
 test('home pending payment approvals render only for Long or payment reviewers', () => {
   assert.match(screenDataSource, /function buildPendingPaymentConfirmations\(state\) \{/)
   assert.match(screenDataSource, /const canReviewPayment = \['treasurer', 'admin', 'owner'\]\.includes/)

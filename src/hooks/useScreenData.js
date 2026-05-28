@@ -243,6 +243,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
     pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
     pendingPayments: buildPendingPaymentConfirmations(state),
+    paymentRecords: buildPaymentManagementRecords(state, me, today),
     sourceBreakdown,
     profileBreakdown,
     paymentSummary,
@@ -313,6 +314,7 @@ function paymentNoticesForMember(state, member, monthLabel) {
   if (memberId) memberIds.add(String(memberId))
   return safeArray(state?.notifications)
     .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
+    .filter(notification => String((notification?.metadata || {}).status || 'pending').toLowerCase() !== 'deleted')
     .filter(notification => memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || '')))
     .filter(notification => {
       const metadata = notification?.metadata || {}
@@ -507,6 +509,45 @@ function buildPendingPaymentConfirmations(state) {
         amount,
         date: notification.createdAt || notification.created_at,
         transferDescription: metadata.transferDescription || '',
+      }
+    })
+    .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
+}
+
+function buildPaymentManagementRecords(state, currentMember, monthDate) {
+  const currentName = normalizeName(currentMember?.displayName || currentMember?.name || state?.currentUserName || '')
+  const canReviewPayment = ['treasurer', 'admin', 'owner'].includes(String(currentMember?.role || '').toLowerCase()) || currentName.includes('long')
+  if (!canReviewPayment) return []
+  const monthLabel = formatMonthLabel(monthDate)
+  return safeArray(state?.notifications)
+    .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
+    .filter(notification => {
+      const metadata = notification?.metadata || {}
+      return String(metadata.status || 'pending') !== 'deleted'
+    })
+    .filter(notification => {
+      const metadata = notification?.metadata || {}
+      return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
+    })
+    .map(notification => {
+      const metadata = notification.metadata || {}
+      const coveredSources = safeArray(metadata.coveredSources || metadata.covered_sources)
+      const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
+      const memberName = metadata.memberName || notification.actorName || notification.actor_name || 'Thành viên'
+      const names = [memberName, ...coveredMembers.map(row => row?.name)].filter(Boolean)
+      const status = String(metadata.status || 'pending').toLowerCase()
+      return {
+        id: notification.id,
+        notificationId: notification.id,
+        memberId: notification.actorMemberId || notification.actor_member_id || '',
+        memberName: names.join(', ') || memberName,
+        amount: Number(metadata.amount) || 0,
+        status,
+        date: notification.createdAt || notification.created_at,
+        monthLabel: metadata.monthLabel || monthLabel,
+        transferDescription: metadata.transferDescription || metadata.transfer_description || '',
+        coveredSources,
+        sourceSummary: coveredSources.length ? `${coveredSources.length} nguồn tiền` : 'Chưa rõ nguồn',
       }
     })
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))

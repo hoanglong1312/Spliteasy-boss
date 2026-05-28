@@ -30,6 +30,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(true);
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
+  const [paymentRecordDetail, setPaymentRecordDetail] = useState(null);
   const [confirmedRefunds, setConfirmedRefunds] = useState(() => new Set());
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
@@ -71,6 +72,8 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         />
 
         <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} onAction={onAction} />
+
+        <PaymentManagementZone records={d.paymentRecords || []} onAction={onAction} />
 
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
         <SearchInput
@@ -184,8 +187,187 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         }}
       />
 
+      <PaymentRecordDetailSheet
+        record={paymentRecordDetail}
+        onClose={() => setPaymentRecordDetail(null)}
+      />
+
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
+  );
+
+  function PaymentManagementZone({ records, onAction }) {
+    const [expanded, setExpanded] = useState(false);
+    const [confirmDeleteId, setConfirmDeleteId] = useState('');
+    const rows = safeArray(records);
+    if (!rows.length) return null;
+    const totalAmount = rows.reduce((sum, record) => sum + (Number(record.amount) || 0), 0);
+    return (
+      <section style={{ marginTop: 14 }}>
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(value => !value)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '11px 12px',
+            borderRadius: 14,
+            background: 'rgba(99,102,241,0.10)',
+            border: '1px solid rgba(129,140,248,0.26)',
+            color: 'inherit',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textAlign: 'left',
+          }}
+        >
+          <div style={{
+            width: 34,
+            height: 34,
+            borderRadius: 11,
+            background: 'rgba(99,102,241,0.18)',
+            border: '1px solid rgba(129,140,248,0.30)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16,
+            flexShrink: 0,
+          }}>💳</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: colors.brandLight, textTransform: 'uppercase' }}>
+              Quản lý thanh toán · {rows.length}
+            </div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Xem lại hoặc xóa báo thanh toán của member
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, color: colors.brandLight, ...type.mono }}>{formatVND(totalAmount)}</div>
+            <div style={{ fontSize: 18, color: colors.brandLight, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
+          </div>
+        </button>
+        {expanded && (
+          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+            {rows.map(record => {
+              const confirming = String(confirmDeleteId) === String(record.id);
+              return (
+              <div key={record.id} style={{
+                padding: 10,
+                borderRadius: 12,
+                background: confirming ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.035)',
+                border: `1px solid ${confirming ? 'rgba(248,113,113,0.24)' : 'rgba(129,140,248,0.18)'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.memberName}</div>
+                      <span style={paymentRecordStatusStyle(record.status)}>{paymentRecordStatusLabel(record.status)}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                      {record.monthLabel || 'Tháng này'} · {record.sourceSummary || 'Nguồn tiền'}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: '#fca5a5', marginTop: 6, ...type.mono }}>{formatVND(record.amount)}</div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, width: 66, flexShrink: 0 }}>
+                    <button type="button" onClick={() => { setPaymentRecordDetail(record); onAction?.('viewPaymentNotice', record); }} style={paymentRecordButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
+                    <button type="button" onClick={() => setConfirmDeleteId(record.id)} style={paymentRecordButton('rgba(248,113,113,0.16)', '#fca5a5')}>Xóa</button>
+                  </div>
+                </div>
+                {confirming && (
+                  <div style={{ marginTop: 9, paddingTop: 9, borderTop: '1px solid rgba(248,113,113,0.18)' }}>
+                    <div style={{ fontSize: 11, color: '#fecaca', lineHeight: 1.4, fontWeight: 700 }}>
+                      Xóa báo thanh toán này? Số dư của member sẽ tính lại như chưa thanh toán.
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                      <button type="button" onClick={() => setConfirmDeleteId('')} style={paymentRecordButton('rgba(255,255,255,0.07)', colors.textSecondary)}>Hủy</button>
+                      <button type="button" onClick={() => { setConfirmDeleteId(''); onAction?.('deletePaymentNotice', record); }} style={paymentRecordButton('#ef4444', '#fff')}>Xóa</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );})}
+          </div>
+        )}
+      </section>
+    );
+  }
+}
+
+function paymentRecordButton(background, color) {
+  return {
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 10,
+    padding: '8px 6px',
+    background,
+    color,
+    fontSize: 11,
+    fontWeight: 900,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+  };
+}
+
+function paymentRecordStatusLabel(status) {
+  const value = String(status || '').toLowerCase();
+  if (value === 'confirmed') return 'Đã nhận';
+  if (value === 'rejected') return 'Chưa nhận';
+  return 'Chờ duyệt';
+}
+
+function paymentRecordStatusStyle(status) {
+  const value = String(status || '').toLowerCase();
+  const isConfirmed = value === 'confirmed';
+  const isRejected = value === 'rejected';
+  return {
+    flexShrink: 0,
+    padding: '3px 6px',
+    borderRadius: 999,
+    background: isConfirmed ? 'rgba(52,211,153,0.16)' : isRejected ? 'rgba(248,113,113,0.14)' : 'rgba(245,158,11,0.14)',
+    color: isConfirmed ? '#6ee7b7' : isRejected ? '#fca5a5' : '#fcd34d',
+    fontSize: 9,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+  };
+}
+
+function PaymentRecordDetailSheet({ record, onClose }) {
+  if (!record) return null;
+  const sources = safeArray(record.coveredSources);
+  return (
+    <BottomSheet title="Chi tiết thanh toán" onClose={onClose}>
+      <Card style={{ padding: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Người báo thanh toán</div>
+            <div style={{ fontSize: 18, fontWeight: 950, color: colors.textPrimary, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.memberName}</div>
+          </div>
+          <span style={paymentRecordStatusStyle(record.status)}>{paymentRecordStatusLabel(record.status)}</span>
+        </div>
+        <div style={{ fontSize: 28, fontWeight: 950, color: '#fca5a5', marginTop: 12, ...type.mono }}>{formatVND(record.amount)}</div>
+        {record.transferDescription && (
+          <div style={{ marginTop: 10, padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Nội dung CK</div>
+            <div style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 750, marginTop: 4, lineHeight: 1.4 }}>{record.transferDescription}</div>
+          </div>
+        )}
+      </Card>
+      <SectionLabel>Nguồn đã thanh toán</SectionLabel>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {sources.length > 0 ? sources.map((source, index) => (
+          <Card key={`${source.sourceId || source.source_id || source.sourceLabel}-${index}`} style={{ padding: 12, display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{source.sourceLabel || source.source_label || 'Nguồn tiền'}</div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>{source.sourceType || source.source_type || 'group'}</div>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 950, color: '#fca5a5', ...type.mono }}>{formatVND(Math.abs(Number(source.amount) || 0))}</div>
+          </Card>
+        )) : (
+          <Card style={{ padding: 12, fontSize: 12, color: colors.textSecondary }}>Chưa có danh sách nguồn chi tiết.</Card>
+        )}
+      </div>
+    </BottomSheet>
   );
 }
 

@@ -1978,6 +1978,29 @@ export function AppProvider({ children }) {
         return data
       }
 
+      case 'DELETE_PAYMENT_NOTIFICATION': {
+        if (!sb || !state.currentUserId) return null
+        const notificationId = action.notificationId || action.id
+        if (!notificationId) return null
+        const notification = safeArray(stateRef.current?.notifications).find(item => String(item.id) === String(notificationId)) || {}
+        const { data, error } = await sb
+          .from('notifications')
+          .update({
+            metadata: { ...notification.metadata, status: 'deleted', deletedAt: new Date().toISOString(), deletedBy: state.currentUserId },
+            is_read: true,
+            read_at: new Date().toISOString(),
+          })
+          .eq('id', notificationId)
+          .select('id')
+          .maybeSingle()
+        if (error) {
+          console.error('[store] DELETE_PAYMENT_NOTIFICATION:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
       case 'MARK_NOTIFICATIONS_READ': {
         if (!sb || !state.currentUserId) return
         const { error } = await sb

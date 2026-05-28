@@ -1799,6 +1799,19 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'deletePaymentNotice') {
+      await dispatch({
+        type: 'DELETE_PAYMENT_NOTIFICATION',
+        notificationId: payload?.notificationId || payload?.id,
+      })
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã xóa báo thanh toán. Số dư sẽ được tính lại.' })
+      return
+    }
+
+    if (type === 'viewPaymentNotice') {
+      return
+    }
+
     if (type === 'markAllRead') {
       await dispatch({ type: 'MARK_NOTIFICATIONS_READ' })
       return
