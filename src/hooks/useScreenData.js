@@ -240,6 +240,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
     pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
+    pendingPayments: buildPendingPaymentConfirmations(state),
     sourceBreakdown,
     profileBreakdown,
     paymentSummary: buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, today),
@@ -366,6 +367,31 @@ function buildPendingExpenseApprovals(groups, members, currentUserId, currentUse
         }
       })
     ))
+    .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
+}
+
+function buildPendingPaymentConfirmations(state) {
+  return safeArray(state?.notifications)
+    .filter(notification => {
+      const type = String(notification?.type || '').toLowerCase()
+      const metadata = notification?.metadata || {}
+      return type.includes('payment') && String(metadata.status || 'pending').toLowerCase() === 'pending'
+    })
+    .map(notification => {
+      const metadata = notification.metadata || {}
+      const amount = Number(metadata.amount) || 0
+      const names = [metadata.memberName, ...safeArray(metadata.coveredMembers).map(row => row?.name)].filter(Boolean)
+      return {
+        id: notification.id,
+        notificationId: notification.id,
+        title: names.length ? names.join(', ') : 'Thành viên',
+        groupName: 'Thanh toán tổng hợp',
+        submittedByName: metadata.memberName || 'Thành viên',
+        amount,
+        date: notification.createdAt || notification.created_at,
+        transferDescription: metadata.transferDescription || '',
+      }
+    })
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
 }
 

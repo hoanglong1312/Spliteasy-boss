@@ -35,6 +35,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
   const balanceLabel = isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
+  const pendingPayments = d.pendingPayments || [];
   const visibleTransactions = d.transactions.filter(tx => {
     const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
     const statusMatches = statusFilter === 'all' || transactionStatus(tx) === statusFilter;
@@ -68,7 +69,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
           onAction={onAction}
         />
 
-        <PendingApprovalZone expenses={pendingExpenses} onAction={onAction} />
+        <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} onAction={onAction} />
 
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
         <SearchInput
@@ -187,10 +188,14 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
   );
 }
 
-function PendingApprovalZone({ expenses, onAction }) {
+function PendingApprovalZone({ expenses, payments, onAction }) {
   const [expanded, setExpanded] = useState(false);
-  if (!expenses.length) return null;
-  const totalAmount = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  const items = [
+    ...safeArray(expenses).map(expense => ({ ...expense, type: 'expense' })),
+    ...safeArray(payments).map(payment => ({ ...payment, type: 'payment' })),
+  ];
+  if (!items.length) return null;
+  const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   return (
     <section style={{ marginTop: 14 }}>
       <button
@@ -227,7 +232,7 @@ function PendingApprovalZone({ expenses, onAction }) {
         }}>⏳</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 12, fontWeight: 900, color: '#fcd34d', textTransform: 'uppercase' }}>
-            Cần duyệt · {expenses.length} chi tiêu
+            Cần duyệt · {items.length} việc
           </div>
           <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             Bấm để xem danh sách giao dịch đang chờ
@@ -240,24 +245,35 @@ function PendingApprovalZone({ expenses, onAction }) {
       </button>
       {expanded && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-          {expenses.map(expense => (
-            <div key={expense.id} style={{
+          {items.map(item => (
+            <div key={`${item.type}:${item.id}`} style={{
               padding: 10,
               borderRadius: 12,
-              background: 'rgba(255,255,255,0.035)',
-              border: '1px solid rgba(245,158,11,0.18)',
+              background: item.type === 'payment' ? 'rgba(52,211,153,0.055)' : 'rgba(255,255,255,0.035)',
+              border: `1px solid ${item.type === 'payment' ? 'rgba(52,211,153,0.22)' : 'rgba(245,158,11,0.18)'}`,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{expense.title}</div>
+                  <div style={{ fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
                   <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                    {expense.groupName} · {expense.submittedByName || 'Thành viên'} gửi
+                    {item.type === 'payment'
+                      ? `${item.groupName} · báo đã chuyển`
+                      : `${item.groupName} · ${item.submittedByName || 'Thành viên'} gửi`}
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 900, marginTop: 6, color: '#fcd34d', ...type.mono }}>{formatVND(expense.amount)}</div>
+                  <div style={{ fontSize: 14, fontWeight: 900, marginTop: 6, color: item.type === 'payment' ? '#6ee7b7' : '#fcd34d', ...type.mono }}>{formatVND(item.amount)}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 78, flexShrink: 0 }}>
-                  <button type="button" onClick={() => onAction?.('approveExpense', { expenseId: expense.id, groupId: expense.groupId })} style={approvalButton('#22c55e', '#052e16')}>Duyệt</button>
-                  <button type="button" onClick={() => onAction?.('rejectExpense', { expenseId: expense.id, groupId: expense.groupId })} style={approvalButton(colors.danger, '#fff')}>Từ chối</button>
+                  {item.type === 'payment' ? (
+                    <>
+                      <button type="button" onClick={() => onAction?.('confirmPaymentNotice', item)} style={approvalButton('#22c55e', '#052e16')}>Đã nhận</button>
+                      <button type="button" onClick={() => onAction?.('rejectPaymentNotice', item)} style={approvalButton(colors.danger, '#fff')}>Chưa nhận</button>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => onAction?.('approveExpense', { expenseId: item.id, groupId: item.groupId })} style={approvalButton('#22c55e', '#052e16')}>Duyệt</button>
+                      <button type="button" onClick={() => onAction?.('rejectExpense', { expenseId: item.id, groupId: item.groupId })} style={approvalButton(colors.danger, '#fff')}>Từ chối</button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

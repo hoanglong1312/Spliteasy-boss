@@ -514,18 +514,28 @@ test('Home activity list filters by title, status, and category', () => {
 
 test('Home renders a consolidated pending expense approval zone', () => {
   assert.match(screenDataSource, /pendingExpenses: buildPendingExpenseApprovals\(expenseGroups, members, currentUserId, state\?\.currentUserName\)/);
+  assert.match(screenDataSource, /pendingPayments: buildPendingPaymentConfirmations\(state\)/);
+  assert.match(screenDataSource, /function buildPendingPaymentConfirmations\(state\)/);
+  assert.match(screenDataSource, /type\.includes\('payment'\)/);
+  assert.match(screenDataSource, /String\(metadata\.status \|\| 'pending'\)\.toLowerCase\(\) === 'pending'/);
   assert.match(screenDataSource, /function buildPendingExpenseApprovals\(groups, members, currentUserId, currentUserName\)/);
   assert.match(screenDataSource, /filter\(group => canReviewPendingExpensesForGroup\(group, members, currentUserId, currentUserName\)\)/);
   assert.match(screenDataSource, /function canReviewPendingExpensesForGroup\(group, members, currentUserId, currentUserName\)/);
   assert.match(homeSource, /const pendingExpenses = d\.pendingExpenses \|\| \[\]/);
-  assert.match(homeSource, /<PendingApprovalZone expenses=\{pendingExpenses\} onAction=\{onAction\} \/>/);
-  assert.match(homeSource, /function PendingApprovalZone\(\{ expenses, onAction \}\)/);
+  assert.match(homeSource, /const pendingPayments = d\.pendingPayments \|\| \[\]/);
+  assert.match(homeSource, /<PendingApprovalZone expenses=\{pendingExpenses\} payments=\{pendingPayments\} onAction=\{onAction\} \/>/);
+  assert.match(homeSource, /function PendingApprovalZone\(\{ expenses, payments, onAction \}\)/);
   assert.match(homeSource, /const \[expanded, setExpanded\] = useState\(false\)/);
-  assert.match(homeSource, /Cần duyệt · \{expenses\.length\} chi tiêu/);
+  assert.match(homeSource, /const items = \[/);
+  assert.match(homeSource, /type: 'expense'/);
+  assert.match(homeSource, /type: 'payment'/);
+  assert.match(homeSource, /Cần duyệt · \{items\.length\}/);
   assert.match(homeSource, /aria-expanded=\{expanded\}/);
   assert.match(homeSource, /\{expanded && \(/);
-  assert.match(homeSource, /onAction\?\.\('approveExpense', \{ expenseId: expense\.id, groupId: expense\.groupId \}\)/);
-  assert.match(homeSource, /onAction\?\.\('rejectExpense', \{ expenseId: expense\.id, groupId: expense\.groupId \}\)/);
+  assert.match(homeSource, /onAction\?\.\('approveExpense', \{ expenseId: item\.id, groupId: item\.groupId \}\)/);
+  assert.match(homeSource, /onAction\?\.\('rejectExpense', \{ expenseId: item\.id, groupId: item\.groupId \}\)/);
+  assert.match(homeSource, /onAction\?\.\('confirmPaymentNotice', item\)/);
+  assert.match(homeSource, /onAction\?\.\('rejectPaymentNotice', item\)/);
 });
 
 test('Home hero review chip is an explicit settle-all action', () => {
