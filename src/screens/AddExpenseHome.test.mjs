@@ -544,11 +544,17 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /Sao chép STK/);
   assert.match(homeSource, /const transferDescription = `\$\{paymentNames\.join\(', '\)\} - Thanh toan \$\{data\?\.monthLabel \|\| ''\}`\.trim\(\)/);
   assert.match(homeSource, /const \[selectedPayForIds, setSelectedPayForIds\] = useState\(\(\) => new Set\(\)\)/);
+  assert.match(homeSource, /const \[payForExpanded, setPayForExpanded\] = useState\(false\)/);
   assert.match(homeSource, /const payForRows = safeArray\(data\?\.payForRows\)/);
   assert.match(homeSource, /const selectedPayForRows = payForRows\.filter\(row => selectedPayForIds\.has\(String\(row\.profileId \|\| row\.name\)\)\)/);
+  assert.match(homeSource, /const payForSummary = selectedPayForRows\.length/);
   assert.match(homeSource, /const amountToPay = Math\.max\(0, Math\.abs\(netBalance\)\) \+ selectedPayForRows\.reduce/);
   assert.match(homeSource, /paymentNames\.join\(', '\)/);
-  assert.match(homeSource, /Thanh toán hộ/);
+  assert.match(homeSource, /Thanh toán hộ người khác/);
+  assert.match(homeSource, /aria-expanded=\{payForExpanded\}/);
+  assert.match(homeSource, /setPayForExpanded\(value => !value\)/);
+  assert.match(homeSource, /\{payForExpanded && \(/);
+  assert.match(homeSource, /\{payForSummary\}/);
   assert.match(homeSource, /onClick=\{\(\) => togglePayFor\(row\)\}/);
   assert.match(homeSource, /Chờ thủ quỹ hoàn tiền/);
   assert.match(homeSource, /Cần hoàn tiền/);

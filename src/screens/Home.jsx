@@ -442,6 +442,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
 function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefund, onClose }) {
   const [copiedPayment, setCopiedPayment] = useState(false);
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
+  const [payForExpanded, setPayForExpanded] = useState(false);
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
   const target = data?.paymentTarget || {};
@@ -451,6 +452,9 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
   const amountToPay = Math.max(0, Math.abs(netBalance)) + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
   const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
   const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
+  const payForSummary = selectedPayForRows.length
+    ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0))}`
+    : 'Chưa chọn ai';
   const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${data?.monthLabel || ''}`.trim();
   const qrUrl = canShowQr ? generateQRUrl({
     bankId: qrBank.id,
@@ -502,48 +506,73 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmRefu
           )}
           {canShowQr && payForRows.length > 0 && (
             <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 10, fontWeight: 900, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '1px' }}>
-                Thanh toán hộ
-              </div>
-              <div style={{ display: 'grid', gap: 7, marginTop: 8 }}>
-                {payForRows.map(row => {
-                  const key = String(row.profileId || row.name);
-                  const active = selectedPayForIds.has(key);
-                  return (
-                    <button key={key} type="button" onClick={() => togglePayFor(row)} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 9,
-                      width: '100%',
-                      padding: '9px 10px',
-                      borderRadius: 12,
-                      border: `1px solid ${active ? 'rgba(52,211,153,0.38)' : 'rgba(255,255,255,0.10)'}`,
-                      background: active ? 'rgba(52,211,153,0.14)' : 'rgba(255,255,255,0.04)',
-                      color: colors.textPrimary,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}>
-                      <span style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: 6,
-                        border: `1px solid ${active ? '#6ee7b7' : 'rgba(255,255,255,0.22)'}`,
-                        background: active ? 'rgba(52,211,153,0.24)' : 'transparent',
+              <button
+                type="button"
+                aria-expanded={payForExpanded}
+                onClick={() => setPayForExpanded(value => !value)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '10px 11px',
+                  borderRadius: 13,
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  background: selectedPayForRows.length ? 'rgba(52,211,153,0.12)' : 'rgba(255,255,255,0.045)',
+                  color: colors.textPrimary,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 15, flexShrink: 0 }}>👥</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 12, fontWeight: 900 }}>Thanh toán hộ người khác</span>
+                  <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>{payForSummary}</span>
+                </span>
+                <span style={{ color: colors.textSecondary, fontSize: 16, lineHeight: 1 }}>{payForExpanded ? '⌃' : '⌄'}</span>
+              </button>
+              {payForExpanded && (
+                <div style={{ display: 'grid', gap: 7, marginTop: 8, maxHeight: 228, overflowY: 'auto', paddingRight: 2 }}>
+                  {payForRows.map(row => {
+                    const key = String(row.profileId || row.name);
+                    const active = selectedPayForIds.has(key);
+                    return (
+                      <button key={key} type="button" onClick={() => togglePayFor(row)} style={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#6ee7b7',
-                        fontSize: 12,
-                        fontWeight: 900,
-                        flexShrink: 0,
-                      }}>{active ? '✓' : ''}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
-                      <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 900, ...type.mono }}>{formatVND(Math.abs(Number(row.amount) || 0))}</span>
-                    </button>
-                  );
-                })}
-              </div>
+                        gap: 9,
+                        width: '100%',
+                        padding: '9px 10px',
+                        borderRadius: 12,
+                        border: `1px solid ${active ? 'rgba(52,211,153,0.38)' : 'rgba(255,255,255,0.10)'}`,
+                        background: active ? 'rgba(52,211,153,0.14)' : 'rgba(255,255,255,0.04)',
+                        color: colors.textPrimary,
+                        fontFamily: 'inherit',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}>
+                        <span style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 6,
+                          border: `1px solid ${active ? '#6ee7b7' : 'rgba(255,255,255,0.22)'}`,
+                          background: active ? 'rgba(52,211,153,0.24)' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#6ee7b7',
+                          fontSize: 12,
+                          fontWeight: 900,
+                          flexShrink: 0,
+                        }}>{active ? '✓' : ''}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
+                        <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 900, ...type.mono }}>{formatVND(Math.abs(Number(row.amount) || 0))}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
           {canShowQr ? (
