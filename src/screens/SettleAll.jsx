@@ -3,7 +3,6 @@
 import React from 'react';
 import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Hero, Avatar, SectionLabel } from '../primitives';
-import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 export default function SettleAll({ data, onAction }) {
   const d = data || DEMO;
@@ -13,16 +12,9 @@ export default function SettleAll({ data, onAction }) {
   const totalOwe = debts.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const totalCredit = credits.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const target = d.paymentTarget || {};
-  const qrBank = resolveVietQrBank(target);
-  const canShowReceiveQr = Number(d.netBalance) > 0 && Boolean(qrBank && target.account && target.holder);
-  const qrAmount = Math.max(0, Number(d.netBalance) || 0);
-  const qrUrl = canShowReceiveQr ? generateQRUrl({
-    bankId: qrBank.id,
-    account: target.account,
-    accountName: target.holder,
-    amount: qrAmount,
-    description: `THANH TOAN TONG HOP ${d.monthLabel || ''}`.trim(),
-  }) : '';
+  const hasRefundBank = Boolean(target.account && target.holder);
+  const refundAmount = Math.max(0, Number(d.netBalance) || 0);
+  const bankLabel = [target.name || target.code, target.account].filter(Boolean).join(' · ');
 
   return (
     <PhoneFrame>
@@ -64,28 +56,39 @@ export default function SettleAll({ data, onAction }) {
         </div>
 
         {Number(d.netBalance) > 0 && (
-          <Card style={{ marginTop: 12, padding: 14, borderColor: canShowReceiveQr ? 'rgba(52,211,153,0.25)' : 'rgba(251,191,36,0.28)' }}>
-            <div style={{ fontSize: 10, fontWeight: 900, color: canShowReceiveQr ? '#6ee7b7' : colors.warning, letterSpacing: '1px', textTransform: 'uppercase' }}>
-              QR nhận tiền
+          <Card style={{ marginTop: 12, padding: 14, borderColor: hasRefundBank ? 'rgba(52,211,153,0.25)' : 'rgba(251,191,36,0.28)' }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: hasRefundBank ? '#6ee7b7' : colors.warning, letterSpacing: '1px', textTransform: 'uppercase' }}>
+              Thông tin hoàn tiền
             </div>
-            {canShowReceiveQr ? (
+            {hasRefundBank ? (
               <>
-                <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 5 }}>
-                  {qrBank.shortName} · {target.account} · {formatVND(qrAmount)}
+                <div style={{ fontSize: 13, color: '#6ee7b7', marginTop: 7, fontWeight: 900 }}>
+                  Đã có STK để thủ quỹ hoàn tiền
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
-                  <img src={qrUrl} alt="QR nhận tiền" style={{ width: 190, height: 190, borderRadius: 14, background: '#fff', objectFit: 'cover' }} />
+                <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+                  <RefundInfoRow label="Số tiền cần hoàn" value={formatVND(refundAmount)} strong />
+                  <RefundInfoRow label="Ngân hàng / STK" value={bankLabel || 'Đã cập nhật'} />
+                  <RefundInfoRow label="Tên tài khoản" value={target.holder} />
                 </div>
               </>
             ) : (
               <div style={{ fontSize: 12, color: '#fde68a', marginTop: 7, lineHeight: 1.45, fontWeight: 700 }}>
-                Chưa có đủ thông tin ngân hàng. Cập nhật ngân hàng trong tab cá nhân để tạo QR nhận tiền.
+                Chưa có STK nhận tiền. Cập nhật ngân hàng trong tab cá nhân để thủ quỹ hoàn tiền.
               </div>
             )}
           </Card>
         )}
       </Screen>
     </PhoneFrame>
+  );
+}
+
+function RefundInfoRow({ label, value, strong = false }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'baseline' }}>
+      <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px' }}>{label}</div>
+      <div style={{ fontSize: strong ? 15 : 12, color: strong ? '#6ee7b7' : colors.textPrimary, fontWeight: 900, textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere', ...(strong ? type.mono : {}) }}>{value}</div>
+    </div>
   );
 }
 
@@ -120,16 +123,6 @@ function SourceRow({ source }) {
       </div>
     </Card>
   );
-}
-
-function resolveVietQrBank(bank = {}) {
-  const raw = String(bank.code || bank.name || '').trim().toLowerCase();
-  if (!raw || raw === '--') return null;
-  return BANK_LIST.find(item => (
-    item.id.toLowerCase() === raw ||
-    item.shortName.toLowerCase() === raw ||
-    item.name.toLowerCase() === raw
-  )) || { id: bank.code || bank.name, shortName: bank.name || bank.code };
 }
 
 const DEMO = {

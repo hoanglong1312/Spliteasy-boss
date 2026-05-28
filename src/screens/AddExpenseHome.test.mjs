@@ -110,15 +110,17 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(screenDataSource, /balanceRows: groupMembers/);
 });
 
-test('SettleAll is a total payment screen with sources and QR', () => {
+test('SettleAll shows refund bank readiness instead of QR when the member has surplus', () => {
   assert.match(screenDataSource, /function buildSettleAllData\(state\)/);
   assert.match(screenDataSource, /const sourceBalances = buildHomeSourceBalances/);
   assert.match(screenDataSource, /currentProfileSourceBreakdown\(sourceBalances, state\?\.currentUserId, members\)/);
   assert.match(screenDataSource, /paymentTarget: bankData\(me, true\)/);
   assert.match(settleAllSource, /Thanh toán tổng hợp/);
   assert.match(settleAllSource, /Theo nguồn tiền/);
-  assert.match(settleAllSource, /QR nhận tiền/);
-  assert.match(settleAllSource, /generateQRUrl\(/);
+  assert.match(settleAllSource, /Thông tin hoàn tiền/);
+  assert.match(settleAllSource, /Đã có STK để thủ quỹ hoàn tiền/);
+  assert.doesNotMatch(settleAllSource, /QR nhận tiền/);
+  assert.doesNotMatch(settleAllSource, /generateQRUrl\(/);
 });
 
 test('GroupDetail lets group creators manage members without treasurer role', () => {
