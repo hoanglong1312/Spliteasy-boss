@@ -69,6 +69,21 @@ test('store fetches venue owner payments and persists team-fund owner actions', 
   assert.match(storeSource, /total_amount: nextItems\.reduce/)
 })
 
+test('store fetches payment notifications and persists treasurer review actions', () => {
+  assert.match(storeSource, /nR/)
+  assert.match(storeSource, /sb\.from\('notifications'\)\.select\('\*'\)\.order\('created_at', \{ ascending: false \}\)/)
+  assert.match(storeSource, /if \(nR\.error\) console\.warn\('\[store\] notifications query failed:', nR\.error\)/)
+  assert.match(storeSource, /notifications:\s*nR\.data \|\| \[\]/)
+  assert.match(storeSource, /const normalNotifications = safeArray\(notifications\)\.map\(notification => \(\{/)
+  assert.match(storeSource, /notifications: normalNotifications/)
+  assert.match(storeSource, /case 'SEND_PAYMENT_NOTIFICATION': \{/)
+  assert.match(storeSource, /\.from\('notifications'\)\s*\.insert\(\{/)
+  assert.match(storeSource, /type: 'payment_submitted'/)
+  assert.match(storeSource, /case 'REVIEW_PAYMENT_NOTIFICATION': \{/)
+  assert.match(storeSource, /metadata: \{ \.\.\.notification\.metadata, status: action\.status \}/)
+  assert.match(storeSource, /is_read: true/)
+})
+
 test('monthly pickleball config save persists schedule time aliases', () => {
   const match = storeSource.match(/case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': \{[\s\S]*?\n      \}/)
   assert.ok(match, 'SAVE_PICKLEBALL_MONTHLY_CONFIG case is available')

@@ -576,6 +576,7 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /onAction\?\.\('confirmPaymentSent', payload\)/);
   assert.match(appSource, /if \(type === 'confirmPaymentSent'\)/);
   assert.match(appSource, /coveredMembers/);
+  assert.match(screenDataSource, /memberId: member\?\.id/);
   assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}/);
   assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, onOpenPayment, onAction \}\)/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);

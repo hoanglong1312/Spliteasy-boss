@@ -592,7 +592,7 @@ function memberHasPin(member) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, prR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, jR] = await Promise.all([
+  const [mR, prR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, jR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('profiles').select('*'),
     sb.from('groups').select('*'),
@@ -612,6 +612,7 @@ async function fetchGroupData(token) {
     sb.from('pickleball_tickets').select('*').order('session_date', { ascending: true }),
     sb.from('pickleball_owner_payments').select('*').order('paid_at', { ascending: false }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
+    sb.from('notifications').select('*').order('created_at', { ascending: false }),
     sb.from('join_requests').select('*').eq('status', 'pending'),
   ])
   if (mR.error) throw mR.error
@@ -628,6 +629,7 @@ async function fetchGroupData(token) {
   if (ptR.error) console.warn('[store] pickleball_tickets query failed:', ptR.error)
   if (popR.error) console.warn('[store] pickleball_owner_payments query failed:', popR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
+  if (nR.error) console.warn('[store] notifications query failed:', nR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   return {
     members:         mR.data || [],
@@ -649,6 +651,7 @@ async function fetchGroupData(token) {
     pickleballTickets: ptR.data || [],
     pickleballOwnerPayments: popR.data || [],
     disputeCount:    (dR.data || []).length,
+    notifications:   nR.data || [],
     joinRequests:    jR.data || [],
   }
 }
@@ -732,6 +735,11 @@ function normalizeMemberTokens(memberTokens = []) {
       return memberId ? { ...token, memberId, member_id: memberId } : null
     })
     .filter(Boolean)
+}
+
+function formatVNDForMessage(value) {
+  const amount = Number(value) || 0
+  return `${Math.round(amount).toLocaleString('vi-VN')} đ`
 }
 
 function isPickleAttendeeGuest(row = {}) {
@@ -910,6 +918,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     pickleballTickets = [],
     pickleballOwnerPayments = [],
     disputeCount,
+    notifications = [],
     joinRequests = [],
   } = raw
   const activeGroups = safeArray(groups).filter(group => !group.deleted_at && !group.deletedAt)
@@ -993,6 +1002,26 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     createdAt: p.created_at,
     created_at: p.created_at,
     payments: normalPeriodPayments.filter(pay => pay.periodId === p.id),
+  }))
+  const normalNotifications = safeArray(notifications).map(notification => ({
+    id: notification.id,
+    memberId: notification.member_id,
+    member_id: notification.member_id,
+    groupId: notification.group_id,
+    group_id: notification.group_id,
+    actorMemberId: notification.actor_member_id,
+    actor_member_id: notification.actor_member_id,
+    type: notification.type,
+    refType: notification.ref_type,
+    ref_type: notification.ref_type,
+    refId: notification.ref_id,
+    ref_id: notification.ref_id,
+    message: notification.message,
+    metadata: notification.metadata || {},
+    unread: notification.is_read === false,
+    read: notification.is_read === true,
+    createdAt: notification.created_at,
+    created_at: notification.created_at,
   }))
 
   const normalSessionItems = safeArray(pickleballSessionItems).map(item => {
@@ -1333,7 +1362,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
       externalTickets: normalTickets,
       ownerPayments: normalOwnerPayments,
     },
-    notifications: [],
+    notifications: normalNotifications,
     disputeCount: disputeCount || 0,
     toast: { visible: false, message: '' },
     _loading: false,
@@ -1883,6 +1912,78 @@ export function AppProvider({ children }) {
           broadcastChange('settlement_periods', 'UPDATE', { id: updatedPayment.period_id, status: 'closed' })
         }
         broadcastChange('period_payments', 'UPDATE', { id: action.paymentId })
+        await refresh()
+        break
+      }
+
+      case 'SEND_PAYMENT_NOTIFICATION': {
+        if (!sb || !state.currentUserId) return null
+        const targetMemberId = action.targetMemberId || action.memberId || action.member_id
+        if (!targetMemberId) return null
+        const amount = Number(action.amount) || 0
+        const metadata = {
+          status: 'pending',
+          amount,
+          memberName: action.memberName || state.currentUserName || 'Thành viên',
+          coveredMembers: safeArray(action.coveredMembers),
+          transferDescription: action.transferDescription || '',
+          paymentTarget: action.paymentTarget || {},
+          monthLabel: action.monthLabel || '',
+        }
+        const { error } = await sb
+          .from('notifications')
+          .insert({
+            member_id: targetMemberId,
+            group_id: action.groupId || state.currentGroupId || null,
+            actor_member_id: state.currentUserId,
+            type: 'payment_submitted',
+            ref_type: 'settlement',
+            message: `${metadata.memberName} báo đã thanh toán ${formatVNDForMessage(amount)}`,
+            metadata,
+          })
+        if (error) {
+          console.error('[store] SEND_PAYMENT_NOTIFICATION:', error)
+          throw error
+        }
+        await refresh()
+        return null
+      }
+
+      case 'REVIEW_PAYMENT_NOTIFICATION': {
+        if (!sb || !state.currentUserId) return null
+        const notificationId = action.notificationId || action.id
+        if (!notificationId) return null
+        const notification = safeArray(stateRef.current?.notifications).find(item => String(item.id) === String(notificationId)) || {}
+        const { data, error } = await sb
+          .from('notifications')
+          .update({
+            metadata: { ...notification.metadata, status: action.status },
+            is_read: true,
+            read_at: new Date().toISOString(),
+          })
+          .eq('id', notificationId)
+          .eq('member_id', state.currentUserId)
+          .select('id')
+          .maybeSingle()
+        if (error) {
+          console.error('[store] REVIEW_PAYMENT_NOTIFICATION:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
+      case 'MARK_NOTIFICATIONS_READ': {
+        if (!sb || !state.currentUserId) return
+        const { error } = await sb
+          .from('notifications')
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq('member_id', state.currentUserId)
+          .eq('is_read', false)
+        if (error) {
+          console.error('[store] MARK_NOTIFICATIONS_READ:', error)
+          throw error
+        }
         await refresh()
         break
       }

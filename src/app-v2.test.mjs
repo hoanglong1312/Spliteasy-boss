@@ -44,6 +44,20 @@ test('AppV2 renders the store toast as a fixed bottom overlay', () => {
   assert.match(appSource, /opacity: visible \? 1 : 0/)
 })
 
+test('AppV2 sends payment confirmations to treasurer notifications', () => {
+  const block = appSource.slice(
+    appSource.indexOf("if (type === 'confirmPaymentSent')"),
+    appSource.indexOf('const ACTION_TO_SCREEN')
+  )
+  assert.match(block, /dispatch\(\{\s*type: 'SEND_PAYMENT_NOTIFICATION'/)
+  assert.match(block, /targetMemberId: payload\?\.paymentTarget\?\.memberId/)
+  assert.match(block, /coveredMembers: covered/)
+  assert.match(block, /await dispatch\(\{ type: 'REFRESH' \}\)/)
+  assert.match(appSource, /if \(type === 'confirmPaymentNotice' \|\| type === 'rejectPaymentNotice'\)/)
+  assert.match(appSource, /type: 'REVIEW_PAYMENT_NOTIFICATION'/)
+  assert.match(appSource, /status: type === 'confirmPaymentNotice' \? 'confirmed' : 'rejected'/)
+})
+
 test('AppV2 renders a deactivated-member error state when no groups or members load', () => {
   assert.match(appSource, /const groups = state\.groups \|\| \[\]/)
   assert.match(appSource, /const members = state\.members \|\| \[\]/)

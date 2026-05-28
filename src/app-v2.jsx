@@ -65,6 +65,17 @@ function memberIdentityKey(member) {
   return String(member?.profileId || member?.profile_id || normalizeMemberName(member?.displayName || member?.name) || '').trim().toLowerCase()
 }
 
+function paymentNotificationTargetMemberId(state) {
+  const rows = safeArray(state?.members)
+  const moneyManagers = rows.filter(member => ['treasurer', 'admin', 'owner'].includes(String(member?.role || '').toLowerCase()))
+  return (
+    moneyManagers.find(member => normalizeMemberName(member?.displayName || member?.name).includes('long')) ||
+    moneyManagers[0] ||
+    rows.find(member => normalizeMemberName(member?.displayName || member?.name).includes('long')) ||
+    null
+  )?.id
+}
+
 function findDuplicatePickleballMemberForType(state, currentMember, groupId, targetType) {
   const key = memberIdentityKey(currentMember)
   if (!key || !groupId || !targetType) return null
@@ -1727,7 +1738,33 @@ export default function AppV2() {
     if (type === 'confirmPaymentSent') {
       const covered = Array.isArray(payload?.coveredMembers) ? payload.coveredMembers : []
       const names = [payload?.memberName, ...covered.map(row => row?.name)].filter(Boolean).join(', ')
-      dispatch({ type: 'SHOW_TOAST', message: `Đã ghi nhận báo thanh toán cho ${names || 'thành viên'}.` })
+      await dispatch({
+        type: 'SEND_PAYMENT_NOTIFICATION',
+        targetMemberId: payload?.paymentTarget?.memberId || paymentNotificationTargetMemberId(state),
+        amount: payload?.amount,
+        memberName: payload?.memberName,
+        coveredMembers: covered,
+        transferDescription: payload?.transferDescription,
+        paymentTarget: payload?.paymentTarget,
+        monthLabel: homeData?.monthLabel,
+      })
+      await dispatch({ type: 'REFRESH' })
+      dispatch({ type: 'SHOW_TOAST', message: `Đã gửi báo thanh toán cho thủ quỹ: ${names || 'thành viên'}.` })
+      return
+    }
+
+    if (type === 'confirmPaymentNotice' || type === 'rejectPaymentNotice') {
+      await dispatch({
+        type: 'REVIEW_PAYMENT_NOTIFICATION',
+        notificationId: payload?.id,
+        status: type === 'confirmPaymentNotice' ? 'confirmed' : 'rejected',
+      })
+      dispatch({ type: 'SHOW_TOAST', message: type === 'confirmPaymentNotice' ? 'Đã xác nhận nhận được thanh toán.' : 'Đã đánh dấu chưa nhận được thanh toán.' })
+      return
+    }
+
+    if (type === 'markAllRead') {
+      await dispatch({ type: 'MARK_NOTIFICATIONS_READ' })
       return
     }
 

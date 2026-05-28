@@ -1762,7 +1762,32 @@ function sourcePaymentRow(source, sub) {
 }
 
 function buildNotificationsData(state) {
-  const notifications = safeArray(state?.notifications).map(notification => toNotificationItem(notification, state))
+  const baseNotifications = safeArray(state?.notifications).map(notification => toNotificationItem(notification, state))
+  const joinNotifications = currentJoinRequests(state).map(request => ({
+    id: request.id,
+    unread: true,
+    icon: '👤',
+    iconBg: 'rgba(167,139,250,0.12)',
+    title: `<strong>${escapeHtml(request.name || 'Thành viên')}</strong> yêu cầu tham gia nhóm`,
+    sub: groupLabelById(state, request.groupId || request.group_id),
+    when: relativeTimeLabel(request.createdAt || request.created_at),
+    date: request.createdAt || request.created_at,
+    actions: 'joinRequest',
+  }))
+  const expenseNotifications = buildPendingExpenseApprovals(safeArray(state?.groups), safeArray(state?.members), state?.currentUserId, state?.currentUserName)
+    .map(expense => ({
+      id: expense.id,
+      unread: true,
+      icon: '💸',
+      iconBg: 'rgba(245,158,11,0.12)',
+      title: `<strong>${escapeHtml(expense.submittedByName || 'Thành viên')}</strong> thêm khoản chi <strong>${escapeHtml(fmtVNDFull(expense.amount || 0))}</strong>`,
+      sub: `${expense.title || 'Chi tiêu'} · ${expense.groupName || 'Nhóm chi tiêu'}`,
+      when: relativeTimeLabel(expense.date),
+      date: expense.createdAt || expense.date,
+      actions: 'expenseApproval',
+      groupId: expense.groupId,
+    }))
+  const notifications = [...baseNotifications, ...joinNotifications, ...expenseNotifications]
   return {
     filters: [
       { key: 'all', label: `Tất cả · ${notifications.length}` },
@@ -3042,6 +3067,8 @@ function bankData(member, primary = false) {
   const holder = member?.bankAccountName || member?.bank_account_name || member?.displayName || member?.name || ''
   const code = bankCode(bankName)
   return {
+    memberId: member?.id,
+    member_id: member?.id,
     name: bankName,
     number: account,
     account,
@@ -3272,16 +3299,19 @@ function toNotificationItem(notification, state) {
   const isJoinRequest = type.includes('join')
   const isPickle = type.includes('pickle')
   const isExpense = type.includes('expense') || type.includes('chi')
+  const isPayment = type.includes('payment') || type.includes('settlement')
+  const metadata = notification?.metadata || {}
+  const isPendingPayment = isPayment && String(metadata.status || 'pending').toLowerCase() === 'pending'
   return {
     id: notification?.id,
     unread: notification?.unread ?? notification?.read === false,
-    icon: notification?.icon || (isJoinRequest ? '👤' : isPickle ? '🏓' : isExpense ? '💸' : '🔔'),
+    icon: notification?.icon || (isJoinRequest ? '👤' : isPickle ? '🏓' : isPayment ? '✅' : isExpense ? '💸' : '🔔'),
     iconBg: notification?.iconBg || notification?.icon_bg || (isPickle ? 'rgba(52,211,153,0.10)' : 'rgba(99,102,241,0.12)'),
-    title: notification?.titleHtml || notification?.title || 'Thông báo mới',
+    title: notification?.titleHtml || notification?.title || notification?.message || 'Thông báo mới',
     sub: notification?.sub || notification?.subtitle || groupLabelById(state, notification?.groupId || notification?.group_id),
     when: notification?.when || relativeTimeLabel(notification?.createdAt || notification?.created_at || notification?.date),
     date: notification?.createdAt || notification?.created_at || notification?.date,
-    actions: isJoinRequest ? 'joinRequest' : notification?.actions,
+    actions: isJoinRequest ? 'joinRequest' : isPendingPayment ? 'paymentConfirmation' : notification?.actions,
   }
 }
 
@@ -3463,6 +3493,15 @@ function relativeTimeLabel(value) {
 
 function safeArray(value) {
   return Array.isArray(value) ? value : []
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function safeGroup(group) {

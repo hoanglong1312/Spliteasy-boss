@@ -49,6 +49,10 @@ export default function Notifications({ data, onAction }) {
                 <NotifItem key={i} notif={n}
                   onApprove={() => onAction?.('approveJoin', n.id)}
                   onReject={() => onAction?.('rejectJoin', n.id)}
+                  onConfirmPayment={() => onAction?.('confirmPaymentNotice', n)}
+                  onRejectPayment={() => onAction?.('rejectPaymentNotice', n)}
+                  onApproveExpense={() => onAction?.('approveExpense', { expenseId: n.id, groupId: n.groupId })}
+                  onRejectExpense={() => onAction?.('rejectExpense', { expenseId: n.id, groupId: n.groupId })}
                 />
               ))}
             </div>
@@ -59,7 +63,7 @@ export default function Notifications({ data, onAction }) {
   );
 }
 
-function NotifItem({ notif, onApprove, onReject }) {
+function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayment, onApproveExpense, onRejectExpense }) {
   const unread = notif.unread;
   const base = {
     display: 'flex', alignItems: 'flex-start', gap: 12,
@@ -82,6 +86,38 @@ function NotifItem({ notif, onApprove, onReject }) {
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={onApprove} style={approveBtn}>✓ Duyệt</button>
           <button onClick={onReject} style={rejectBtn}>✕ Từ chối</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (notif.actions === 'paymentConfirmation') {
+    return (
+      <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch' }}>
+        {unread && <ReadDot />}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <IconCircle bg={notif.iconBg}>{notif.icon}</IconCircle>
+          <Meta notif={notif} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={onConfirmPayment} style={approveBtn}>Đã nhận</button>
+          <button onClick={onRejectPayment} style={rejectBtn}>Chưa nhận</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (notif.actions === 'expenseApproval') {
+    return (
+      <div style={{ ...base, flexDirection: 'column', alignItems: 'stretch' }}>
+        {unread && <ReadDot />}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <IconCircle bg={notif.iconBg}>{notif.icon}</IconCircle>
+          <Meta notif={notif} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button onClick={onApproveExpense} style={approveBtn}>✓ Duyệt</button>
+          <button onClick={onRejectExpense} style={rejectBtn}>✕ Từ chối</button>
         </div>
       </div>
     );
