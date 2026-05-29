@@ -23,14 +23,16 @@ test('recent member sessions keep resumable tokens and collapse duplicate identi
   assert.match(authSource, /export function removeRecentSession\(sessionToRemove\)/)
   assert.match(authSource, /authToken: token \|\| member\.authToken \|\| ''/)
   assert.match(authSource, /sessionIdentityKey\(session\)/)
+  assert.match(authSource, /sessionIdentityKeys\(session\)/)
+  assert.match(authSource, /hasMatchingSessionIdentity\(session, nextSession\)/)
   assert.match(authSource, /member\.profileId \|\| member\.profile_id/)
-  assert.match(authSource, /if \(profileId\) return `profile:\$\{profileId\}`/)
-  assert.match(authSource, /if \(memberId\) return `member:\$\{memberId\}`/)
-  assert.match(authSource, /if \(name\) return `name:\$\{name\}`/)
+  assert.match(authSource, /if \(profileId\) keys\.push\(`profile:\$\{profileId\}`\)/)
+  assert.match(authSource, /if \(memberId\) keys\.push\(`member:\$\{memberId\}`\)/)
+  assert.match(authSource, /if \(name\) keys\.push\(`name:\$\{name\}`\)/)
   assert.match(authSource, /dedupeRecentSessions\(parsed\)/)
   assert.match(authSource, /localStorage\.setItem\(RECENT_SESSIONS_KEY, JSON\.stringify\(deduped\)\)/)
-  assert.match(authSource, /\.filter\(session => sessionIdentityKey\(session\) !== nextKey\)/)
-  assert.match(authSource, /\.filter\(session => sessionIdentityKey\(session\) !== removeKey\)/)
+  assert.match(authSource, /\.filter\(session => !hasMatchingSessionIdentity\(session, nextSession\)\)/)
+  assert.match(authSource, /\.filter\(session => !hasMatchingSessionIdentity\(session, sessionToRemove\)\)/)
   assert.match(authSource, /\.filter\(session => session\?\.memberId && session\?\.memberName\)/)
 })
 
@@ -78,8 +80,12 @@ test('AppV2 gates manual invite login behind the member PIN when required', () =
 
 test('recent session identity prefers profile id before falling back to names', () => {
   assert.match(authSource, /const profileId = String\(session\?\.profileId \|\| session\?\.profile_id \|\| ''\)\.trim\(\)/)
-  assert.match(authSource, /if \(profileId\) return `profile:\$\{profileId\}`[\s\S]*const memberId = String/)
-  assert.match(authSource, /if \(memberId\) return `member:\$\{memberId\}`[\s\S]*const name = String/)
+  assert.match(authSource, /if \(profileId\) keys\.push\(`profile:\$\{profileId\}`\)[\s\S]*const memberId = String/)
+  assert.match(authSource, /if \(memberId\) keys\.push\(`member:\$\{memberId\}`\)[\s\S]*const name = normalizedSessionName\(session\)/)
+  assert.match(authSource, /function sessionIdentityKeys\(session\)/)
+  assert.match(authSource, /keys\.push\(`profile:\$\{profileId\}`\)/)
+  assert.match(authSource, /keys\.push\(`name:\$\{name\}`\)/)
+  assert.match(authSource, /function hasMatchingSessionIdentity\(left, right\)/)
 })
 
 test('recent-session RPC can recreate auth from saved local profile metadata', () => {

@@ -53,17 +53,15 @@ export function rememberRecentSession(member, token = '') {
     hasPin: member.hasPin === true || member.has_pin === true,
     authToken: token || member.authToken || '',
   }
-  const nextKey = sessionIdentityKey(nextSession)
   const sessions = getRecentSessions()
-    .filter(session => sessionIdentityKey(session) !== nextKey)
+    .filter(session => !hasMatchingSessionIdentity(session, nextSession))
   localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([nextSession, ...sessions].slice(0, 5)))
 }
 
 export function removeRecentSession(sessionToRemove) {
   if (!sessionToRemove) return getRecentSessions()
-  const removeKey = sessionIdentityKey(sessionToRemove)
   const sessions = getRecentSessions()
-    .filter(session => sessionIdentityKey(session) !== removeKey)
+    .filter(session => !hasMatchingSessionIdentity(session, sessionToRemove))
   localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify(sessions))
   return sessions
 }
@@ -73,30 +71,44 @@ function dedupeRecentSessions(sessions) {
   return (Array.isArray(sessions) ? sessions : [])
     .filter(session => session?.memberId && session?.memberName)
     .filter(session => {
-      const key = sessionIdentityKey(session)
-      if (seen.has(key)) return false
-      seen.add(key)
+      const keys = sessionIdentityKeys(session)
+      if (keys.some(key => seen.has(key))) return false
+      keys.forEach(key => seen.add(key))
       return true
     })
     .slice(0, 5)
 }
 
 function sessionIdentityKey(session) {
+  return sessionIdentityKeys(session)[0] || 'member:'
+}
+
+function sessionIdentityKeys(session) {
+  const keys = []
   const profileId = String(session?.profileId || session?.profile_id || '').trim()
-  if (profileId) return `profile:${profileId}`
+  if (profileId) keys.push(`profile:${profileId}`)
 
   const memberId = String(session?.memberId || session?.id || '').trim()
-  if (memberId) return `member:${memberId}`
+  if (memberId) keys.push(`member:${memberId}`)
 
-  const name = String(session?.memberName || session?.name || '')
+  const name = normalizedSessionName(session)
+  if (name) keys.push(`name:${name}`)
+  return keys.length ? keys : ['member:']
+}
+
+function hasMatchingSessionIdentity(left, right) {
+  const rightKeys = new Set(sessionIdentityKeys(right))
+  return sessionIdentityKeys(left).some(key => rightKeys.has(key))
+}
+
+function normalizedSessionName(session) {
+  return String(session?.memberName || session?.name || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'd')
     .trim()
     .toLowerCase()
-  if (name) return `name:${name}`
-  return 'member:'
 }
 
 export function clearAuth({ keepRecent = true } = {}) {
