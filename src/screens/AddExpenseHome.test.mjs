@@ -545,7 +545,7 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.doesNotMatch(homeSource, />Chi tiết quỹ<\/Button>/);
   assert.match(homeSource, /paymentOpen = false/);
   assert.match(homeSource, /<PaymentSheet[\s\S]*open=\{paymentOpen \|\| paymentSheetOpen\}/);
-  assert.match(homeSource, /function PaymentSheet\(\{ open, data, isTreasurer, confirmedRefunds, onConfirmPayment, onConfirmRefund, onClose \}\)/);
+  assert.match(homeSource, /function PaymentSheet\(\{ open, data, paymentRecords = \[\], isTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose \}\)/);
   assert.match(homeSource, /Thanh toán về thủ quỹ/);
   assert.match(homeSource, /generateQRUrl\(/);
   assert.match(homeSource, /download=\"vietqr-thanh-toan\.png\"/);

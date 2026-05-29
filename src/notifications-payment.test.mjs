@@ -438,18 +438,24 @@ test('payment sheet includes identity on the current payer covered sources', () 
 
 test('treasurer payment sheet can choose refund members and show their QR', () => {
   assert.match(homeSource, /const \[selectedRefundKey, setSelectedRefundKey\] = useState\(''\)/)
+  assert.match(homeSource, /const \[refundExpanded, setRefundExpanded\] = useState\(false\)/)
   assert.match(homeSource, /const refundQrUrl = selectedRefund && refundQrBank && refundBank\.account && refundBank\.holder \? generateQRUrl/)
+  assert.match(homeSource, /aria-expanded=\{refundExpanded\}/)
+  assert.match(homeSource, /setRefundExpanded\(value => !value\)/)
+  assert.match(homeSource, /\{refundExpanded && \(/)
   assert.match(homeSource, /Chuyển trả cho \{selectedRefund\.name\}/)
   assert.match(homeSource, /alt=\{`QR nhận tiền của \$\{selectedRefund\.name\}`\}/)
   assert.match(homeSource, /Xác nhận đã chuyển/)
 })
 
-test('home exposes a treasurer payment management zone with view and delete actions', () => {
+test('payment sheet contains payment management records with view and delete actions', () => {
   assert.match(screenDataSource, /paymentRecords: buildPaymentManagementRecords\(state, me, today\)/)
   assert.match(screenDataSource, /function buildPaymentManagementRecords\(state, currentMember, monthDate\) \{/)
   assert.match(screenDataSource, /String\(metadata\.status \|\| 'pending'\) !== 'deleted'/)
-  assert.match(homeSource, /<PaymentManagementZone records=\{d\.paymentRecords \|\| \[\]\} onAction=\{onAction\} \/>/)
-  assert.match(homeSource, /function PaymentManagementZone\(\{ records, onAction \}\)/)
+  assert.doesNotMatch(homeSource, /<PaymentManagementZone records=\{d\.paymentRecords \|\| \[\]\} onAction=\{onAction\} \/>/)
+  assert.match(homeSource, /paymentRecords=\{d\.paymentRecords \|\| \[\]\}/)
+  assert.match(homeSource, /function PaymentManagementZone\(\{ records, onAction, onViewRecord \}\)/)
+  assert.match(homeSource, /<PaymentManagementZone[\s\S]*records=\{paymentRecords\}[\s\S]*onViewRecord=\{onViewPaymentRecord\}/)
   assert.match(homeSource, /onAction\?\.\('deletePaymentNotice', record\)/)
   assert.match(homeSource, /onAction\?\.\('viewPaymentNotice', record\)/)
 })

@@ -73,8 +73,6 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
 
         <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} onAction={onAction} />
 
-        <PaymentManagementZone records={d.paymentRecords || []} onAction={onAction} />
-
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
         <SearchInput
           value={filterText}
@@ -173,8 +171,11 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
       <PaymentSheet
         open={paymentOpen || paymentSheetOpen}
         data={d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }}
+        paymentRecords={d.paymentRecords || []}
         isTreasurer={isTreasurer}
         confirmedRefunds={confirmedRefunds}
+        onAction={onAction}
+        onViewPaymentRecord={setPaymentRecordDetail}
         onConfirmPayment={(payload) => onAction?.('confirmPaymentSent', payload)}
         onConfirmRefund={(row) => {
           const key = String(row.profileId || row.name || 'member');
@@ -195,104 +196,104 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
     </PhoneFrame>
   );
+}
 
-  function PaymentManagementZone({ records, onAction }) {
-    const [expanded, setExpanded] = useState(false);
-    const [confirmDeleteId, setConfirmDeleteId] = useState('');
-    const rows = safeArray(records);
-    if (!rows.length) return null;
-    const totalAmount = rows.reduce((sum, record) => sum + (Number(record.amount) || 0), 0);
-    return (
-      <section style={{ marginTop: 14 }}>
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpanded(value => !value)}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '11px 12px',
-            borderRadius: 14,
-            background: 'rgba(99,102,241,0.10)',
-            border: '1px solid rgba(129,140,248,0.26)',
-            color: 'inherit',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            textAlign: 'left',
-          }}
-        >
-          <div style={{
-            width: 34,
-            height: 34,
-            borderRadius: 11,
-            background: 'rgba(99,102,241,0.18)',
-            border: '1px solid rgba(129,140,248,0.30)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 16,
-            flexShrink: 0,
-          }}>💳</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 900, color: colors.brandLight, textTransform: 'uppercase' }}>
-              Quản lý thanh toán · {rows.length}
-            </div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Xem lại hoặc xóa báo thanh toán của member
-            </div>
+function PaymentManagementZone({ records, onAction, onViewRecord }) {
+  const [expanded, setExpanded] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState('');
+  const rows = safeArray(records);
+  if (!rows.length) return null;
+  const totalAmount = rows.reduce((sum, record) => sum + (Number(record.amount) || 0), 0);
+  return (
+    <section style={{ marginTop: 12 }}>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(value => !value)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '11px 12px',
+          borderRadius: 14,
+          background: 'rgba(99,102,241,0.10)',
+          border: '1px solid rgba(129,140,248,0.26)',
+          color: 'inherit',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          textAlign: 'left',
+        }}
+      >
+        <div style={{
+          width: 34,
+          height: 34,
+          borderRadius: 11,
+          background: 'rgba(99,102,241,0.18)',
+          border: '1px solid rgba(129,140,248,0.30)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 16,
+          flexShrink: 0,
+        }}>💳</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color: colors.brandLight, textTransform: 'uppercase' }}>
+            Quản lý thanh toán · {rows.length}
           </div>
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: colors.brandLight, ...type.mono }}>{formatVND(totalAmount)}</div>
-            <div style={{ fontSize: 18, color: colors.brandLight, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            Xem lại hoặc xóa báo thanh toán của member
           </div>
-        </button>
-        {expanded && (
-          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-            {rows.map(record => {
-              const confirming = String(confirmDeleteId) === String(record.id);
-              return (
-              <div key={record.id} style={{
-                padding: 10,
-                borderRadius: 12,
-                background: confirming ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.035)',
-                border: `1px solid ${confirming ? 'rgba(248,113,113,0.24)' : 'rgba(129,140,248,0.18)'}`,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.memberName}</div>
-                      <span style={paymentRecordStatusStyle(record.status)}>{paymentRecordStatusLabel(record.status)}</span>
-                    </div>
-                    <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                      {record.monthLabel || 'Tháng này'} · {record.sourceSummary || 'Nguồn tiền'}
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 900, color: '#fca5a5', marginTop: 6, ...type.mono }}>{formatVND(record.amount)}</div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color: colors.brandLight, ...type.mono }}>{formatVND(totalAmount)}</div>
+          <div style={{ fontSize: 18, color: colors.brandLight, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
+        </div>
+      </button>
+      {expanded && (
+        <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+          {rows.map(record => {
+            const confirming = String(confirmDeleteId) === String(record.id);
+            return (
+            <div key={record.id} style={{
+              padding: 10,
+              borderRadius: 12,
+              background: confirming ? 'rgba(248,113,113,0.07)' : 'rgba(255,255,255,0.035)',
+              border: `1px solid ${confirming ? 'rgba(248,113,113,0.24)' : 'rgba(129,140,248,0.18)'}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.memberName}</div>
+                    <span style={paymentRecordStatusStyle(record.status)}>{paymentRecordStatusLabel(record.status)}</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, width: 66, flexShrink: 0 }}>
-                    <button type="button" onClick={() => { setPaymentRecordDetail(record); onAction?.('viewPaymentNotice', record); }} style={paymentRecordButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
-                    <button type="button" onClick={() => setConfirmDeleteId(record.id)} style={paymentRecordButton('rgba(248,113,113,0.16)', '#fca5a5')}>Xóa</button>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                    {record.monthLabel || 'Tháng này'} · {record.sourceSummary || 'Nguồn tiền'}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#fca5a5', marginTop: 6, ...type.mono }}>{formatVND(record.amount)}</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 6, width: 66, flexShrink: 0 }}>
+                  <button type="button" onClick={() => { onViewRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={paymentRecordButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
+                  <button type="button" onClick={() => setConfirmDeleteId(record.id)} style={paymentRecordButton('rgba(248,113,113,0.16)', '#fca5a5')}>Xóa</button>
+                </div>
+              </div>
+              {confirming && (
+                <div style={{ marginTop: 9, paddingTop: 9, borderTop: '1px solid rgba(248,113,113,0.18)' }}>
+                  <div style={{ fontSize: 11, color: '#fecaca', lineHeight: 1.4, fontWeight: 700 }}>
+                    Xóa báo thanh toán này? Số dư của member sẽ tính lại như chưa thanh toán.
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+                    <button type="button" onClick={() => setConfirmDeleteId('')} style={paymentRecordButton('rgba(255,255,255,0.07)', colors.textSecondary)}>Hủy</button>
+                    <button type="button" onClick={() => { setConfirmDeleteId(''); onAction?.('deletePaymentNotice', record); }} style={paymentRecordButton('#ef4444', '#fff')}>Xóa</button>
                   </div>
                 </div>
-                {confirming && (
-                  <div style={{ marginTop: 9, paddingTop: 9, borderTop: '1px solid rgba(248,113,113,0.18)' }}>
-                    <div style={{ fontSize: 11, color: '#fecaca', lineHeight: 1.4, fontWeight: 700 }}>
-                      Xóa báo thanh toán này? Số dư của member sẽ tính lại như chưa thanh toán.
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-                      <button type="button" onClick={() => setConfirmDeleteId('')} style={paymentRecordButton('rgba(255,255,255,0.07)', colors.textSecondary)}>Hủy</button>
-                      <button type="button" onClick={() => { setConfirmDeleteId(''); onAction?.('deletePaymentNotice', record); }} style={paymentRecordButton('#ef4444', '#fff')}>Xóa</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );})}
-          </div>
-        )}
-      </section>
-    );
-  }
+              )}
+            </div>
+          );})}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function paymentRecordButton(background, color) {
@@ -508,6 +509,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
         <button
           type="button"
           aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
+          onPointerUp={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
           onClick={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
           style={{
             width: '100%',
@@ -654,13 +656,14 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
   );
 }
 
-function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPayment, onConfirmRefund, onClose }) {
+function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose }) {
   const [copiedField, setCopiedField] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
+  const [refundExpanded, setRefundExpanded] = useState(false);
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
   const target = data?.paymentTarget || {};
@@ -933,8 +936,54 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
 
       {isTreasurer && refundRows.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <SectionLabel>Cần hoàn tiền</SectionLabel>
-          <div style={{ display: 'grid', gap: 8 }}>
+          <button
+            type="button"
+            aria-expanded={refundExpanded}
+            onClick={() => setRefundExpanded(value => !value)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '11px 12px',
+              borderRadius: 14,
+              background: 'rgba(52,211,153,0.09)',
+              border: '1px solid rgba(52,211,153,0.24)',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: 11,
+              background: 'rgba(52,211,153,0.16)',
+              border: '1px solid rgba(52,211,153,0.30)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              flexShrink: 0,
+            }}>↩</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: '#6ee7b7', textTransform: 'uppercase' }}>
+                Cần hoàn tiền · {refundRows.length}
+              </div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Chọn member để xem STK hoặc QR chuyển lại
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: '#6ee7b7', ...type.mono }}>
+                {formatVND(refundRows.reduce((sum, row) => sum + Math.max(0, Number(row.amount) || 0), 0))}
+              </div>
+              <div style={{ fontSize: 18, color: '#6ee7b7', lineHeight: 1 }}>{refundExpanded ? '⌃' : '⌄'}</div>
+            </div>
+          </button>
+          {refundExpanded && (
+          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
             {refundRows.map(row => {
               const key = String(row.profileId || row.name || 'member');
               const done = confirmedRefunds?.has?.(key);
@@ -964,7 +1013,8 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
               );
             })}
           </div>
-          {selectedRefund && (
+          )}
+          {refundExpanded && selectedRefund && (
             <Card style={{ padding: 14, marginTop: 10, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
               <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>Chuyển trả cho {selectedRefund.name}</div>
               <div style={{ fontSize: 26, fontWeight: 950, color: '#6ee7b7', marginTop: 6, ...type.mono }}>{formatVND(refundAmount)}</div>
@@ -1016,6 +1066,10 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
             </Card>
           )}
         </div>
+      )}
+
+      {isTreasurer && (
+        <PaymentManagementZone records={paymentRecords} onAction={onAction} onViewRecord={onViewPaymentRecord} />
       )}
     </BottomSheet>
   );
