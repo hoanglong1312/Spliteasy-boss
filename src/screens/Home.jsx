@@ -1093,6 +1093,39 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   );
 }
 
+function PaymentInfoLine({ label, value, copyable = false, onCopy, copied = false }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: copyable ? '54px 1fr auto' : '54px 1fr',
+      gap: 7,
+      alignItems: 'center',
+      minWidth: 0,
+      padding: '7px 8px',
+      borderRadius: 10,
+      background: 'rgba(255,255,255,0.05)',
+      border: '1px solid rgba(255,255,255,0.08)',
+    }}>
+      <span style={{ fontSize: 9, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>{label}</span>
+      <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+      {copyable && (
+        <button type="button" onClick={onCopy} style={{
+          border: 'none',
+          borderRadius: 8,
+          padding: '5px 7px',
+          background: copied ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
+          color: copied ? colors.brandLight : colors.textSecondary,
+          fontSize: 10,
+          fontWeight: 900,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+        }}>{copied ? 'Đã copy' : 'Copy'}</button>
+      )}
+    </div>
+  );
+}
+
 function resolveVietQrBank(bank = {}) {
   const raw = String(bank.code || bank.name || '').trim().toLowerCase();
   if (!raw || raw === '--') return null;

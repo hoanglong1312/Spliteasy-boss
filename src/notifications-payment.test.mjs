@@ -445,6 +445,7 @@ test('treasurer payment sheet can choose refund members and show their QR', () =
   assert.match(homeSource, /aria-expanded=\{refundExpanded\}/)
   assert.match(homeSource, /setRefundExpanded\(value => !value\)/)
   assert.match(homeSource, /\{refundExpanded && \(/)
+  assert.match(homeSource, /function PaymentInfoLine\(\{ label, value, copyable = false, onCopy, copied = false \}\)/)
   assert.match(homeSource, /Chuyển trả cho \{selectedRefund\.name\}/)
   assert.match(homeSource, /alt=\{`QR nhận tiền của \$\{selectedRefund\.name\}`\}/)
   assert.match(homeSource, /Xác nhận đã chuyển/)
