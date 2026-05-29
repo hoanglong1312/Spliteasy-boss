@@ -439,6 +439,8 @@ test('payment sheet includes identity on the current payer covered sources', () 
 test('treasurer payment sheet can choose refund members and show their QR', () => {
   assert.match(homeSource, /const \[selectedRefundKey, setSelectedRefundKey\] = useState\(''\)/)
   assert.match(homeSource, /const \[refundExpanded, setRefundExpanded\] = useState\(false\)/)
+  assert.match(homeSource, /const selectedRefund = refundRows\.find\(row => String\(row\.profileId \|\| row\.name \|\| 'member'\) === selectedRefundKey\) \|\| null/)
+  assert.doesNotMatch(homeSource, /\|\| refundRows\[0\] \|\| null/)
   assert.match(homeSource, /const refundQrUrl = selectedRefund && refundQrBank && refundBank\.account && refundBank\.holder \? generateQRUrl/)
   assert.match(homeSource, /aria-expanded=\{refundExpanded\}/)
   assert.match(homeSource, /setRefundExpanded\(value => !value\)/)
@@ -449,7 +451,12 @@ test('treasurer payment sheet can choose refund members and show their QR', () =
 })
 
 test('positive-balance payment sheet links members to bank setup', () => {
+  assert.match(screenDataSource, /memberBank: bankData\(me, true\)/)
+  assert.match(homeSource, /const memberBank = data\?\.memberBank \|\| \{\}/)
+  assert.match(homeSource, /const memberBankReady = Boolean\(resolveVietQrBank\(memberBank\) && memberBank\.account && memberBank\.holder\)/)
+  assert.match(homeSource, /const needsBankSetup = netBalance > 0 && !memberBankReady/)
   assert.match(homeSource, /Cập nhật STK nhận tiền/)
+  assert.match(homeSource, /\{needsBankSetup && \(/)
   assert.match(homeSource, /onAction\?\.\('tab', 'profile'\)/)
   assert.match(homeSource, /onClose\?\.\(\)/)
 })

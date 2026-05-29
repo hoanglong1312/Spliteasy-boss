@@ -677,13 +677,16 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   ];
   const amountToPay = Math.max(0, Math.abs(netBalance)) + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
   const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
+  const memberBank = data?.memberBank || {};
+  const memberBankReady = Boolean(resolveVietQrBank(memberBank) && memberBank.account && memberBank.holder);
+  const needsBankSetup = netBalance > 0 && !memberBankReady;
   const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
   const payForSummary = selectedPayForRows.length
     ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0))}`
     : 'Chưa chọn ai';
   const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${data?.monthLabel || ''}`.trim();
   const refundRows = safeArray(data?.refundRows);
-  const selectedRefund = refundRows.find(row => String(row.profileId || row.name || 'member') === selectedRefundKey) || refundRows[0] || null;
+  const selectedRefund = refundRows.find(row => String(row.profileId || row.name || 'member') === selectedRefundKey) || null;
   const refundBank = selectedRefund?.bank || {};
   const refundQrBank = resolveVietQrBank(refundBank);
   const refundAmount = Math.max(0, Number(selectedRefund?.amount) || 0);
@@ -931,19 +934,21 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
           <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 5, lineHeight: 1.45 }}>
             Bạn đang dư tiền trong tháng này. Long sẽ xem danh sách cần hoàn ở giao diện thủ quỹ và chuyển khoản ngược lại.
           </div>
-          <button type="button" onClick={() => { onClose?.(); onAction?.('tab', 'profile'); }} style={{
-            width: '100%',
-            marginTop: 12,
-            minHeight: 42,
-            borderRadius: 12,
-            border: '1px solid rgba(52,211,153,0.38)',
-            background: 'rgba(52,211,153,0.14)',
-            color: '#6ee7b7',
-            fontSize: 12,
-            fontWeight: 900,
-            fontFamily: 'inherit',
-            cursor: 'pointer',
-          }}>Cập nhật STK nhận tiền</button>
+          {needsBankSetup && (
+            <button type="button" onClick={() => { onClose?.(); onAction?.('tab', 'profile'); }} style={{
+              width: '100%',
+              marginTop: 12,
+              minHeight: 42,
+              borderRadius: 12,
+              border: '1px solid rgba(52,211,153,0.38)',
+              background: 'rgba(52,211,153,0.14)',
+              color: '#6ee7b7',
+              fontSize: 12,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}>Cập nhật STK nhận tiền</button>
+          )}
         </Card>
       )}
 
