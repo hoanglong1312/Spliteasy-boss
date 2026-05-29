@@ -59,9 +59,9 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /onAction\?\.\('settleAll'\)/);
   assert.match(groupDetailSource, />💳 Thanh toán<\/Button>/);
   assert.doesNotMatch(groupDetailSource, /⚡ Tất toán/);
-  assert.match(groupDetailSource, /Gửi bill tháng/);
+  assert.doesNotMatch(groupDetailSource, /Gửi bill tháng/);
   assert.doesNotMatch(groupDetailSource, /Chốt sổ tháng/);
-  assert.match(groupDetailSource, /onAction\?\.\('closeMonth', \{ groupId: d\.id \}\)/);
+  assert.doesNotMatch(groupDetailSource, /onAction\?\.\('closeMonth', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /<GroupManagementPanel/);
   assert.match(groupDetailSource, /inviteCode=\{d\.inviteCode\}/);
   assert.match(groupDetailSource, /Sửa thông tin nhóm/);
