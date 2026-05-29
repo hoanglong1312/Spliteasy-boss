@@ -1018,15 +1018,17 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                       textAlign: 'left',
                       cursor: 'pointer',
                     }}>
-                      <Card style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, borderColor: selected ? 'rgba(110,231,183,0.36)' : undefined, background: selected ? 'rgba(52,211,153,0.08)' : undefined }}>
+                      <Card style={{ padding: '10px 12px', display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 10, borderColor: selected ? 'rgba(110,231,183,0.36)' : undefined, background: selected ? 'rgba(52,211,153,0.08)' : undefined }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary }}>{row.name}</div>
                           <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {row.bank?.name || 'Chưa có ngân hàng'} {row.bank?.account ? `· ${row.bank.account}` : ''}
                           </div>
-                          <div style={{ fontSize: 15, fontWeight: 950, color: '#6ee7b7', marginTop: 5, ...type.mono }}>{formatVND(row.amount)}</div>
                         </div>
-                        <div style={{ color: selected ? '#6ee7b7' : colors.textMuted, fontSize: 18 }}>{selected ? '⌃' : '›'}</div>
+                        <div style={{ display: 'grid', gap: 4, justifyItems: 'end', flexShrink: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 950, color: '#6ee7b7', ...type.mono }}>{formatVND(row.amount)}</div>
+                          <div style={{ color: selected ? '#6ee7b7' : colors.textMuted, fontSize: 18, lineHeight: 1 }}>{selected ? '⌃' : '›'}</div>
+                        </div>
                       </Card>
                     </button>
                     {selected && selectedRefund && (
@@ -1035,13 +1037,8 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                         <div style={{ fontSize: 22, fontWeight: 950, color: '#6ee7b7', marginTop: 4, ...type.mono }}>{formatVND(refundAmount)}</div>
                         {refundQrUrl ? (
                           <>
-                            <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 10, marginTop: 10, alignItems: 'center' }}>
-                              <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 96, height: 96, borderRadius: 12, background: '#fff', padding: 5 }} />
-                              <div style={{ minWidth: 0, display: 'grid', gap: 5 }}>
-                                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refundBank.holder || selectedRefund.name}</div>
-                                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refundBank.name || refundBank.code}</div>
-                                <div style={{ fontSize: 12, color: colors.textPrimary, fontWeight: 900, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refundBank.account}</div>
-                              </div>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+                              <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 150, height: 150, borderRadius: 14, background: '#fff', padding: 6 }} />
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 11 }}>
                               <a href={refundQrUrl} download={`hoan-tien-${selectedRefund.name || 'member'}.png`} style={{
