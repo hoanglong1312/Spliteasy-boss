@@ -80,13 +80,13 @@ export function useScreenData() {
   const selectedYearMonth = state?.selectedYearMonth || monthKey(new Date())
 
   const me = members.find(m => m.id === currentUserId)
-  const isTreasurer = me?.role === 'treasurer'
+  const isTreasurer = isManagerRole(me?.role)
   const pickleballGroup = state?.pickleballGroup || safeArray(groups).find(group => String(group.id) === String(state?.pickleballGroupId || ''))
   const pickleballMe = membersForGroup(pickleballGroup, members).find(member => (
     String(member.id) === String(currentUserId) ||
     sameName(member.name, currentUserName || me?.name)
   ))
-  const isPickleballTreasurer = pickleballMe?.role === 'treasurer'
+  const isPickleballTreasurer = isManagerRole(pickleballMe?.role)
 
   const screenData = useMemo(() => {
     const pickleballState = scopedPickleballState(state)
@@ -814,6 +814,10 @@ function isMemberGroupCreator(group, member) {
   )
 }
 
+function isManagerRole(role) {
+  return ['treasurer', 'admin', 'owner'].includes(String(role || '').toLowerCase())
+}
+
 function memberDisplayColor(member) {
   if (member?.color) return member.color
   const key = String(member?.profileId || member?.profile_id || member?.id || member?.name || '')
@@ -838,7 +842,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const currentMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
   const isGroupCreator = isMemberGroupCreator(g, currentGroupMember) || isMemberGroupCreator(g, currentMember)
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
-  const isGroupTreasurer = Boolean(isGroupCreator || currentGroupMember?.role === 'treasurer' || (Boolean(currentGroupMember) && isSoloExpenseGroup))
+  const isGroupTreasurer = Boolean(isGroupCreator || isManagerRole(currentGroupMember?.role) || (Boolean(currentGroupMember) && isSoloExpenseGroup))
   const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
   const balance = adjustedGroupNetForMember(monthlyGroup, currentGroupMember?.id || currentUserId, groupMembers, appState, monthDate)
   const memberBalanceMap = Object.fromEntries(

@@ -15,6 +15,7 @@ const memberBillShareMigration = readFileSync(new URL('../supabase/migrations/20
 const expenseGroupExpenseRpcMigration = readFileSync(new URL('../supabase/migrations/20260526000002_expense_group_expense_rpcs.sql', import.meta.url), 'utf8')
 const expenseGroupRoleRpcMigration = readFileSync(new URL('../supabase/migrations/20260526000003_expense_group_role_rpcs.sql', import.meta.url), 'utf8')
 const profileGroupIdsMigration = readFileSync(new URL('../supabase/migrations/20260526000004_profile_group_ids.sql', import.meta.url), 'utf8')
+const adminGroupManagementMigration = readFileSync(new URL('../supabase/migrations/20260529000002_admin_group_management.sql', import.meta.url), 'utf8')
 
 test('profiles migration creates central identity and links members', () => {
   assert.match(migrationSource, /CREATE TABLE IF NOT EXISTS public\.profiles/)
@@ -260,6 +261,15 @@ test('RLS group id helper includes same-profile expense groups for pickleball me
   assert.match(profileGroupIdsMigration, /lower\(m\.name\) = lower\(actor\.name\)/)
   assert.match(profileGroupIdsMigration, /g\.linked_pickleball_group_id = actor\.group_id/)
   assert.match(profileGroupIdsMigration, /m\.is_active IS NOT FALSE/)
+})
+
+test('admin group management migration exposes hidden groups and delete access to app admins', () => {
+  assert.match(adminGroupManagementMigration, /CREATE OR REPLACE FUNCTION public\.is_expense_group_admin/)
+  assert.match(adminGroupManagementMigration, /m\.role IN \('treasurer', 'admin', 'owner'\)/)
+  assert.match(adminGroupManagementMigration, /CREATE OR REPLACE FUNCTION public\.get_my_group_ids/)
+  assert.match(adminGroupManagementMigration, /actor\.role IN \('admin', 'owner'\)/)
+  assert.match(adminGroupManagementMigration, /g\.deleted_at IS NULL/)
+  assert.match(adminGroupManagementMigration, /UNION[\s\S]*SELECT group_id FROM admin_groups/)
 })
 
 test('expense group RPCs authorize the same profile across duplicate group memberships', () => {

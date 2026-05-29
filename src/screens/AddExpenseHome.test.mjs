@@ -70,16 +70,17 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /gridTemplateColumns: 'auto minmax\(0, 1fr\) auto'/);
   assert.match(groupDetailSource, /onCopyInviteCode=\{\(\) => onAction\?\.\('copyInviteCode', \{ inviteCode: d\.inviteCode \}\)\}/);
   assert.doesNotMatch(groupDetailSource, /⌨ Mã mời thủ công/);
-  assert.doesNotMatch(groupDetailSource, /aria-label="Xóa nhóm"/);
-  assert.doesNotMatch(groupDetailSource, /onDelete=\{\(\) => setDeleteConfirmGroup\(true\)\}/);
+  assert.match(groupDetailSource, /const canManageGroup = Boolean\(isTreasurer \|\| d\.isGroupCreator\)/);
+  assert.match(groupDetailSource, /\{canManageGroup \? <IconButton onClick=\{\(\) => setEditingGroup\(true\)\}>✎<\/IconButton> : <div style=\{\{ width: 44 \}\} \/>\}/);
+  assert.match(groupDetailSource, /const \[deleteConfirmGroup, setDeleteConfirmGroup\] = useState\(false\)/);
+  assert.match(groupDetailSource, />🗑️ Xóa nhóm<\/ActionButton>/);
   assert.doesNotMatch(groupDetailSource, /setMenuOpen/);
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
   assert.match(groupDetailSource, /onShare=\{\(\) => onAction\?\.\('createGroupInviteShare', \{ groupId: d\.id, inviteCode: d\.inviteCode \}\)\}/);
   assert.match(groupDetailSource, /action=\{<div[\s\S]*\{d\.emoji \|\| '👥'\}/);
-  assert.doesNotMatch(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
-  assert.doesNotMatch(groupDetailSource, /const \[deleteConfirmGroup, setDeleteConfirmGroup\] = useState\(false\)/);
-  assert.doesNotMatch(groupDetailSource, /<BottomSheet title="Xóa nhóm\?"/);
-  assert.doesNotMatch(groupDetailSource, /setDeleteConfirmGroup\(true\)/);
+  assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
+  assert.match(groupDetailSource, /<BottomSheet title="Xóa nhóm\?"/);
+  assert.match(groupDetailSource, /setDeleteConfirmGroup\(true\)/);
   assert.doesNotMatch(groupDetailSource, /window\.confirm\(`Xóa nhóm \$\{d\.name\}/);
   assert.doesNotMatch(groupDetailSource, /\{ key: 'balances', label: 'Số dư' \}/);
   assert.doesNotMatch(groupDetailSource, /activeTab === 'balances'/);
@@ -135,6 +136,7 @@ test('SettleAll shows refund bank readiness instead of QR when the member has su
 
 test('GroupDetail lets group creators manage members without treasurer role', () => {
   assert.match(groupDetailSource, /const canManageMembers = Boolean\(isTreasurer \|\| d\.isGroupCreator\)/);
+  assert.match(groupDetailSource, /const canManageGroup = Boolean\(isTreasurer \|\| d\.isGroupCreator\)/);
   assert.match(groupDetailSource, /const canAddMembers = true/);
   assert.match(groupDetailSource, /<MemberDetailPanel[\s\S]*isTreasurer=\{canManageMembers\}/);
   assert.match(groupDetailSource, /\{canAddMembers && \(\s*<Button variant="ghost"[\s\S]*\+ Thêm thành viên/);
@@ -491,7 +493,9 @@ test('GroupDetail uses group-specific treasurer role for normal expense groups',
   assert.match(screenDataSource, /const currentGroupMember = groupMembers\.find\(member => String\(member\.id\) === String\(memberIdForGroup\(g, currentUserId, members, currentUserName\)\)\)/);
   assert.match(screenDataSource, /const isGroupCreator = isMemberGroupCreator\(g, currentGroupMember\) \|\| isMemberGroupCreator\(g, currentMember\)/);
   assert.match(screenDataSource, /const isSoloExpenseGroup = groupMembers\.length === 1 && groupKind\(g\) !== 'pickleball'/);
-  assert.match(screenDataSource, /const isGroupTreasurer = Boolean\(isGroupCreator \|\| currentGroupMember\?\.role === 'treasurer' \|\| \(Boolean\(currentGroupMember\) && isSoloExpenseGroup\)\)/);
+  assert.match(screenDataSource, /function isManagerRole\(role\)/);
+  assert.match(screenDataSource, /\['treasurer', 'admin', 'owner'\]\.includes\(String\(role \|\| ''\)\.toLowerCase\(\)\)/);
+  assert.match(screenDataSource, /const isGroupTreasurer = Boolean\(isGroupCreator \|\| isManagerRole\(currentGroupMember\?\.role\) \|\| \(Boolean\(currentGroupMember\) && isSoloExpenseGroup\)\)/);
   assert.match(screenDataSource, /isTreasurer: isGroupTreasurer/);
   assert.match(appSource, /const detailData = route\.params\?\.groupId \? getGroupDetailData\(route\.params\.groupId\) : groupDetailData/);
   assert.match(appSource, /<GroupDetail data=\{detailData\} isTreasurer=\{detailData\?\.isTreasurer \?\? isTreasurer\} onAction=\{handle\} \/>/);

@@ -28,10 +28,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
     || groupTypeOptions.find(option => option.emoji === d.emoji)
     || groupTypeOptions.find(option => option.key === 'expense')
     || groupTypeOptions[0];
+  const canManageGroup = Boolean(isTreasurer || d.isGroupCreator);
   const canManageMembers = Boolean(isTreasurer || d.isGroupCreator);
   const canAddMembers = true;
   const [activeTab, setActiveTab] = useState('members');
   const [editingGroup, setEditingGroup] = useState(false);
+  const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
   const [groupDescription, setGroupDescription] = useState(d.description || '');
@@ -100,7 +102,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: colors.textMuted, textTransform: 'uppercase' }}>NHÓM</div>
             <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{d.name}</div>
           </div>
-          <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton>
+          {canManageGroup ? <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton> : <div style={{ width: 44 }} />}
         </div>
 
         <ModuleHero
@@ -264,14 +266,42 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       </Screen>
       )}
 
-      {editingGroup && (
+      {editingGroup && canManageGroup && (
         <BottomSheet title="Sửa thông tin nhóm" onClose={() => setEditingGroup(false)}>
           <form onSubmit={saveGroup}>
             <Field label="Tên nhóm" value={groupName} onChange={setGroupName} autoFocus />
             <GroupTypePicker value={groupTypeKey} options={groupTypeOptions} onChange={setGroupTypeKey} />
             <TextArea label="Mô tả nhóm" value={groupDescription} onChange={setGroupDescription} placeholder={selectedGroupType.descriptionPlaceholder} />
             <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu nhóm</Button>
+            <ActionButton
+              danger
+              type="button"
+              style={{ marginTop: 10 }}
+              onClick={() => {
+                setEditingGroup(false);
+                setDeleteConfirmGroup(true);
+              }}
+            >🗑️ Xóa nhóm</ActionButton>
           </form>
+        </BottomSheet>
+      )}
+
+      {deleteConfirmGroup && canManageGroup && (
+        <BottomSheet title="Xóa nhóm?" onClose={() => setDeleteConfirmGroup(false)}>
+          <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
+            Nhóm sẽ được ẩn khỏi danh sách hoạt động. Dữ liệu cũ vẫn giữ trong hệ thống để tránh mất lịch sử.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => setDeleteConfirmGroup(false)}>Hủy</Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={async () => {
+                await onAction?.('deleteGroup', { groupId: d.id });
+                setDeleteConfirmGroup(false);
+              }}
+            >Xác nhận</Button>
+          </div>
         </BottomSheet>
       )}
 
