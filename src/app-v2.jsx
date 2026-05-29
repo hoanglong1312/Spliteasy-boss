@@ -178,6 +178,8 @@ export default function AppV2() {
     let alive = true
     async function openBillLink() {
       setPublicBillLoading(true)
+      const openedHome = await openPersonalLinkHome(publicBillToken)
+      if (!alive || openedHome) return
       const sb = createSupabase()
       const { data, error } = await sb.rpc('get_member_bill_share', { p_token: publicBillToken })
       if (!alive) return

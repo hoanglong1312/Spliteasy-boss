@@ -835,7 +835,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
             >Sao chép</Button>
           </div>
           <div style={{ marginTop: 8, fontSize: 11, color: colors.textSecondary, lineHeight: 1.45 }}>
-            Link mở bill cá nhân trước. Member có thể vào app từ trang bill nếu cần.
+            Link mở thẳng trang chủ của member để xem tổng hợp, giao dịch và thanh toán.
           </div>
         </Card>
       )}
