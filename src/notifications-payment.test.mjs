@@ -448,6 +448,12 @@ test('treasurer payment sheet can choose refund members and show their QR', () =
   assert.match(homeSource, /Xác nhận đã chuyển/)
 })
 
+test('positive-balance payment sheet links members to bank setup', () => {
+  assert.match(homeSource, /Cập nhật STK nhận tiền/)
+  assert.match(homeSource, /onAction\?\.\('tab', 'profile'\)/)
+  assert.match(homeSource, /onClose\?\.\(\)/)
+})
+
 test('payment sheet contains payment management records with view and delete actions', () => {
   assert.match(screenDataSource, /paymentRecords: buildPaymentManagementRecords\(state, me, today\)/)
   assert.match(screenDataSource, /function buildPaymentManagementRecords\(state, currentMember, monthDate\) \{/)

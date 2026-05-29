@@ -931,6 +931,19 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
           <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 5, lineHeight: 1.45 }}>
             Bạn đang dư tiền trong tháng này. Long sẽ xem danh sách cần hoàn ở giao diện thủ quỹ và chuyển khoản ngược lại.
           </div>
+          <button type="button" onClick={() => { onClose?.(); onAction?.('tab', 'profile'); }} style={{
+            width: '100%',
+            marginTop: 12,
+            minHeight: 42,
+            borderRadius: 12,
+            border: '1px solid rgba(52,211,153,0.38)',
+            background: 'rgba(52,211,153,0.14)',
+            color: '#6ee7b7',
+            fontSize: 12,
+            fontWeight: 900,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}>Cập nhật STK nhận tiền</button>
         </Card>
       )}
 
