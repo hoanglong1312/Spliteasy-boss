@@ -121,7 +121,7 @@ test('payment review actions render only for treasurer notification viewers', ()
 
 test('home payment summary exposes member payment confirmation status', () => {
   assert.match(screenDataSource, /const paymentNotice = latestPaymentNoticeForMember\(state, me, monthLabel\)/)
-  assert.match(screenDataSource, /const paymentStatus = netBalance < 0 && coverage\.pendingAmount <= 0 \? '' : paymentNotice\?\.status \|\| ''/)
+  assert.match(screenDataSource, /const paymentStatus = netBalance > 0 \|\| \(netBalance < 0 && coverage\.pendingAmount <= 0\) \? '' : paymentNotice\?\.status \|\| ''/)
   assert.match(screenDataSource, /paymentStatus,/)
   assert.match(screenDataSource, /function latestPaymentNoticeForMember\(state, member, monthLabel\) \{/)
   assert.match(homeSource, /paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/)
@@ -230,6 +230,104 @@ test('confirmed payments cover members paid for by another member', () => {
   assert.equal(data.sourceBreakdown.length, 0)
   assert.equal(data.paymentSummary.paidAmount, 774479)
   assert.equal(data.paymentSummary.paymentStatus, 'confirmed')
+})
+
+test('new positive balances are not hidden by an older confirmed payment notice', () => {
+  const buildHomeData = loadHomeBuilder()
+  const state = {
+    currentUserId: 'dai-member',
+    currentUserName: 'Đại',
+    members: [
+      { id: 'dai-member', groupId: 'g1', profileId: 'dai-profile', name: 'Đại' },
+      { id: 'cuong-member', groupId: 'g1', profileId: 'cuong-profile', name: 'Cường' },
+    ],
+    groups: [
+      {
+        id: 'g1',
+        name: 'Lấy vk để trưởng thành',
+        members: ['dai-member', 'cuong-member'],
+        netByMember: { 'dai-member': 180000, 'cuong-member': -180000 },
+        expenses: [],
+      },
+    ],
+    notifications: [
+      {
+        id: 'notice-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong-member',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 774479,
+          memberName: 'Cường',
+          coveredMembers: [
+            { profileId: 'dai-profile', memberIds: ['dai-member'], name: 'Đại', amount: -774479 },
+          ],
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -774479, profileId: 'dai-profile', memberName: 'Đại' },
+          ],
+        },
+      },
+    ],
+    pickle: { sessions: [] },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildHomeData(state, 'dai-member', state.members, state.groups, state.pickle, state, '2026-05')
+
+  assert.equal(data.totalBalance, 180000)
+  assert.equal(data.sourceBreakdown[0].amount, 180000)
+  assert.equal(data.paymentSummary.paymentStatus, '')
+})
+
+test('confirmed payment coverage can reveal later payer credit in the same source', () => {
+  const buildHomeData = loadHomeBuilder()
+  const state = {
+    currentUserId: 'dai-member',
+    currentUserName: 'Đại',
+    members: [
+      { id: 'dai-member', groupId: 'g1', profileId: 'dai-profile', name: 'Đại' },
+      { id: 'cuong-member', groupId: 'g1', profileId: 'cuong-profile', name: 'Cường' },
+    ],
+    groups: [
+      {
+        id: 'g1',
+        name: 'Lấy vk để trưởng thành',
+        members: ['dai-member', 'cuong-member'],
+        netByMember: { 'dai-member': -594479, 'cuong-member': 594479 },
+        expenses: [],
+      },
+    ],
+    notifications: [
+      {
+        id: 'notice-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong-member',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 774479,
+          memberName: 'Cường',
+          coveredMembers: [
+            { profileId: 'dai-profile', memberIds: ['dai-member'], name: 'Đại', amount: -774479 },
+          ],
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -774479, profileId: 'dai-profile', memberName: 'Đại' },
+          ],
+        },
+      },
+    ],
+    pickle: { sessions: [] },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildHomeData(state, 'dai-member', state.members, state.groups, state.pickle, state, '2026-05')
+
+  assert.equal(data.totalBalance, 180000)
+  assert.equal(data.sourceBreakdown[0].amount, 180000)
+  assert.equal(data.paymentSummary.paymentStatus, '')
 })
 
 test('home exposes a treasurer payment management zone with view and delete actions', () => {

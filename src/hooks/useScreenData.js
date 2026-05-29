@@ -256,7 +256,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   const adjustedSources = applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources)
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
-  const paymentStatus = netBalance < 0 && coverage.pendingAmount <= 0 ? '' : paymentNotice?.status || ''
+  const paymentStatus = netBalance > 0 || (netBalance < 0 && coverage.pendingAmount <= 0) ? '' : paymentNotice?.status || ''
   return {
     monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
@@ -384,7 +384,7 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
       const amount = Number(source.amount) || 0
       if (amount >= 0) return source
       const paid = coveredBySource.get(sourceKey(source)) || 0
-      const remaining = Math.min(0, amount + paid)
+      const remaining = amount + paid
       return { ...source, amount: remaining, paidAmount: Math.min(Math.abs(amount), paid) }
     })
     .filter(source => Number(source.amount) !== 0)
@@ -3761,9 +3761,23 @@ function safeGroup(group) {
   return {
     ...(group || {}),
     members: safeArray(group?.members),
-    expenses: safeArray(group?.expenses),
+    expenses: safeArray(group?.expenses).map(normalizeExpenseForBalance),
     settlements: safeArray(group?.settlements),
     settlementPeriods: safeArray(group?.settlementPeriods),
+  }
+}
+
+function normalizeExpenseForBalance(expense) {
+  return {
+    ...(expense || {}),
+    paidBy: expense?.paidBy || expense?.paid_by_member_id || expense?.payerId || expense?.payer_id || '',
+    participants: safeArray(expense?.participants),
+    splits: safeArray(expense?.splits).map(split => ({
+      ...split,
+      memberId: split?.memberId || split?.member_id || '',
+      amount: Number(split?.amount) || 0,
+    })).filter(split => split.memberId),
+    date: expense?.date || expense?.expense_date || '',
   }
 }
 

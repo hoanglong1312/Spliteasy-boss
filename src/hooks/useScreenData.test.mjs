@@ -402,6 +402,44 @@ test('group detail member balances use payer positive and debtors negative signs
   })
 })
 
+test('home source balances normalize Supabase expense payer aliases', () => {
+  const { buildHomeData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'dai-member',
+    currentUserName: 'Đại',
+    members: [
+      { id: 'dai-member', groupId: 'g1', profileId: 'dai-profile', name: 'Đại' },
+      ...Array.from({ length: 9 }, (_, index) => ({ id: `m${index}`, groupId: 'g1', name: `Member ${index}` })),
+    ],
+    groups: [
+      {
+        id: 'g1',
+        name: 'Lấy vk để trưởng thành',
+        members: ['dai-member', ...Array.from({ length: 9 }, (_, index) => `m${index}`)],
+        expenses: [
+          {
+            id: 'expense-1',
+            title: 'sn',
+            amount: 200000,
+            paid_by_member_id: 'dai-member',
+            participants: ['dai-member', ...Array.from({ length: 9 }, (_, index) => `m${index}`)],
+            expense_date: '2026-05-29',
+            status: 'approved',
+          },
+        ],
+      },
+    ],
+    notifications: [],
+    pickle: { sessions: [] },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildHomeData(state, 'dai-member', state.members, state.groups, state.pickle, state, '2026-05')
+
+  assert.equal(data.totalBalance, 180000)
+  assert.equal(data.sourceBreakdown[0].amount, 180000)
+})
+
 test('group detail exposes monthly total spent and expense count for the summary card', () => {
   const { buildGroupDetailData } = loadScreenDataBuilders()
   const group = {
