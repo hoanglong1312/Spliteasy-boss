@@ -1001,87 +1001,86 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             </div>
           </button>
           {refundExpanded && (
-          <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
-            {refundRows.map(row => {
-              const key = String(row.profileId || row.name || 'member');
-              const done = confirmedRefunds?.has?.(key);
-              const selected = String(selectedRefund?.profileId || selectedRefund?.name || '') === key;
-              return (
-                <button key={key} type="button" onClick={() => setSelectedRefundKey(key)} style={{
-                  width: '100%',
-                  padding: 0,
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'inherit',
-                  fontFamily: 'inherit',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                }}>
-                <Card style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, borderColor: selected ? 'rgba(110,231,183,0.36)' : undefined, background: selected ? 'rgba(52,211,153,0.08)' : undefined }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary }}>{row.name}</div>
-                    <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                      {row.bank?.name || 'Chưa có ngân hàng'} {row.bank?.account ? `· ${row.bank.account}` : ''}
-                    </div>
-                    <div style={{ fontSize: 15, fontWeight: 950, color: '#6ee7b7', marginTop: 5, ...type.mono }}>{formatVND(row.amount)}</div>
-                  </div>
-                  <div style={{ color: selected ? '#6ee7b7' : colors.textMuted, fontSize: 18 }}>›</div>
-                </Card>
-                </button>
-              );
-            })}
-          </div>
-          )}
-          {refundExpanded && selectedRefund && (
-            <Card style={{ padding: 14, marginTop: 10, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
-              <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>Chuyển trả cho {selectedRefund.name}</div>
-              <div style={{ fontSize: 26, fontWeight: 950, color: '#6ee7b7', marginTop: 6, ...type.mono }}>{formatVND(refundAmount)}</div>
-              {refundQrUrl ? (
-                <>
-                  <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
-                    <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 116, height: 116, borderRadius: 14, background: '#fff', padding: 6, flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 7 }}>
-                      <PaymentInfoLine label="STK" value={refundBank.account} copyable onCopy={() => copyPaymentField('refund-account', refundBank.account)} copied={copiedField === 'refund-account'} />
-                      <PaymentInfoLine label="Số tiền" value={formatVND(refundAmount)} copyable onCopy={() => copyPaymentField('refund-amount', refundAmount)} copied={copiedField === 'refund-amount'} />
-                      <PaymentInfoLine label="Nội dung" value={refundDescription} copyable onCopy={() => copyPaymentField('refund-description', refundDescription)} copied={copiedField === 'refund-description'} />
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 8, lineHeight: 1.35 }}>
-                    {refundBank.holder} · {refundBank.name}
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-                    <a href={refundQrUrl} download={`hoan-tien-${selectedRefund.name || 'member'}.png`} style={{
-                      minHeight: 42,
-                      borderRadius: 12,
-                      background: 'rgba(99,102,241,0.16)',
-                      border: '1px solid rgba(129,140,248,0.35)',
-                      color: '#c4b5fd',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 12,
-                      fontWeight: 900,
-                      textDecoration: 'none',
-                    }}>Lưu QR</a>
-                    <button type="button" onClick={() => onConfirmRefund?.(selectedRefund)} disabled={confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member'))} style={{
-                      minHeight: 42,
-                      borderRadius: 12,
-                      background: confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? 'rgba(16,185,129,0.20)' : '#10b981',
-                      border: '1px solid rgba(16,185,129,0.62)',
-                      color: confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? '#6ee7b7' : '#052e16',
-                      fontSize: 12,
-                      fontWeight: 900,
+            <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>
+              {refundRows.map(row => {
+                const key = String(row.profileId || row.name || 'member');
+                const selected = String(selectedRefund?.profileId || selectedRefund?.name || '') === key;
+                const done = confirmedRefunds?.has?.(key);
+                return (
+                  <React.Fragment key={key}>
+                    <button type="button" onClick={() => setSelectedRefundKey(selected ? '' : key)} style={{
+                      width: '100%',
+                      padding: 0,
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'inherit',
                       fontFamily: 'inherit',
-                      cursor: confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? 'default' : 'pointer',
-                    }}>{confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? 'Đã chuyển' : 'Xác nhận đã chuyển'}</button>
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 12, color: '#fde68a', fontWeight: 750, lineHeight: 1.45, marginTop: 10 }}>
-                  Member này chưa có đủ thông tin ngân hàng để tạo QR nhận tiền.
-                </div>
-              )}
-            </Card>
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}>
+                      <Card style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, borderColor: selected ? 'rgba(110,231,183,0.36)' : undefined, background: selected ? 'rgba(52,211,153,0.08)' : undefined }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary }}>{row.name}</div>
+                          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {row.bank?.name || 'Chưa có ngân hàng'} {row.bank?.account ? `· ${row.bank.account}` : ''}
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 950, color: '#6ee7b7', marginTop: 5, ...type.mono }}>{formatVND(row.amount)}</div>
+                        </div>
+                        <div style={{ color: selected ? '#6ee7b7' : colors.textMuted, fontSize: 18 }}>{selected ? '⌃' : '›'}</div>
+                      </Card>
+                    </button>
+                    {selected && selectedRefund && (
+                      <Card style={{ padding: 12, marginTop: -2, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>Chuyển trả cho {selectedRefund.name}</div>
+                        <div style={{ fontSize: 22, fontWeight: 950, color: '#6ee7b7', marginTop: 4, ...type.mono }}>{formatVND(refundAmount)}</div>
+                        {refundQrUrl ? (
+                          <>
+                            <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: 10, marginTop: 10, alignItems: 'center' }}>
+                              <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 96, height: 96, borderRadius: 12, background: '#fff', padding: 5 }} />
+                              <div style={{ minWidth: 0, display: 'grid', gap: 5 }}>
+                                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refundBank.holder || selectedRefund.name}</div>
+                                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refundBank.name || refundBank.code}</div>
+                                <div style={{ fontSize: 12, color: colors.textPrimary, fontWeight: 900, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{refundBank.account}</div>
+                              </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 11 }}>
+                              <a href={refundQrUrl} download={`hoan-tien-${selectedRefund.name || 'member'}.png`} style={{
+                                minHeight: 38,
+                                borderRadius: 11,
+                                background: 'rgba(99,102,241,0.16)',
+                                border: '1px solid rgba(129,140,248,0.35)',
+                                color: '#c4b5fd',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 12,
+                                fontWeight: 900,
+                                textDecoration: 'none',
+                              }}>Lưu QR</a>
+                              <button type="button" onClick={() => onConfirmRefund?.(selectedRefund)} disabled={done} style={{
+                                minHeight: 38,
+                                borderRadius: 11,
+                                background: done ? 'rgba(16,185,129,0.20)' : '#10b981',
+                                border: '1px solid rgba(16,185,129,0.62)',
+                                color: done ? '#6ee7b7' : '#052e16',
+                                fontSize: 12,
+                                fontWeight: 900,
+                                fontFamily: 'inherit',
+                                cursor: done ? 'default' : 'pointer',
+                              }}>{done ? 'Đã chuyển' : 'Xác nhận đã chuyển'}</button>
+                            </div>
+                          </>
+                        ) : (
+                          <div style={{ fontSize: 12, color: '#fde68a', fontWeight: 750, lineHeight: 1.45, marginTop: 10 }}>
+                            Member này chưa có đủ thông tin ngân hàng để tạo QR nhận tiền.
+                          </div>
+                        )}
+                      </Card>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
           )}
         </div>
       )}
@@ -1090,39 +1089,6 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         <PaymentManagementZone records={paymentRecords} onAction={onAction} onViewRecord={onViewPaymentRecord} />
       )}
     </BottomSheet>
-  );
-}
-
-function PaymentInfoLine({ label, value, copyable = false, onCopy, copied = false }) {
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: copyable ? '54px 1fr auto' : '54px 1fr',
-      gap: 7,
-      alignItems: 'center',
-      minWidth: 0,
-      padding: '7px 8px',
-      borderRadius: 10,
-      background: 'rgba(255,255,255,0.05)',
-      border: '1px solid rgba(255,255,255,0.08)',
-    }}>
-      <span style={{ fontSize: 9, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>{label}</span>
-      <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
-      {copyable && (
-        <button type="button" onClick={onCopy} style={{
-          border: 'none',
-          borderRadius: 8,
-          padding: '5px 7px',
-          background: copied ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
-          color: copied ? colors.brandLight : colors.textSecondary,
-          fontSize: 10,
-          fontWeight: 900,
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
-        }}>{copied ? 'Đã copy' : 'Copy'}</button>
-      )}
-    </div>
   );
 }
 
