@@ -1,4 +1,4 @@
-// Spliteasy Boss — Chốt sổ tháng (thủ quỹ)
+// Spliteasy Boss — Gửi bill tháng (thủ quỹ)
 // Props: data { groupName, monthLabel, totalSpent, totalPaid, sessionsCount,
 //                expenseCount, categories[], members[], remainingCount }
 
@@ -17,7 +17,7 @@ const STATUS_BADGE = {
 export default function SettlementPeriod({ data, onAction }) {
   const d = data || DEMO;
   const profileBills = d.profileBills || [];
-  const paidPct = Math.round((d.totalPaid / d.totalSpent) * 100);
+  const paidPct = d.totalSpent > 0 ? Math.round((d.totalPaid / d.totalSpent) * 100) : 0;
   const remaining = d.members.filter((m) => m.status !== 'paid').length;
 
   return (
@@ -32,8 +32,8 @@ export default function SettlementPeriod({ data, onAction }) {
               color: colors.textMuted, textTransform: 'uppercase',
             }}>Thủ quỹ · {d.groupName}</div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 2 }}>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>Chốt sổ {d.monthLabel}</div>
-              <Badge tone="warn">⏳ Chưa chốt</Badge>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Gửi bill {d.monthLabel}</div>
+              <Badge tone="warn">📤 Bill tháng</Badge>
             </div>
           </div>
           <IconButton onClick={() => onAction?.('more')}>⋯</IconButton>
@@ -96,7 +96,7 @@ export default function SettlementPeriod({ data, onAction }) {
           ))}
         </Card>
 
-        <ProfileBillList bills={profileBills} />
+        <ProfileBillList bills={profileBills} onAction={onAction} />
 
         {/* Per member balance */}
         <SectionLabel action="cần thu">Số dư từng người · {d.members.length}</SectionLabel>
@@ -126,37 +126,35 @@ export default function SettlementPeriod({ data, onAction }) {
           </Button>
         </div>
 
-        {/* Warning */}
         <div style={{
-          marginTop: 10, padding: '12px 14px',
-          background: 'rgba(251,191,36,0.06)',
-          border: '1px solid rgba(251,191,36,0.25)',
-          borderRadius: 12, display: 'flex', gap: 10,
+          marginTop: 10,
+          padding: '12px 14px',
+          background: 'rgba(52,211,153,0.08)',
+          border: '1px solid rgba(52,211,153,0.22)',
+          borderRadius: 12,
+          fontSize: 11,
+          color: '#a7f3d0',
+          fontWeight: 650,
+          lineHeight: 1.5,
         }}>
-          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
-          <div style={{ fontSize: 11, color: '#fcd34d', fontWeight: 500, lineHeight: 1.5 }}>
-            Sau khi chốt sổ, <strong>không thể sửa</strong> các khoản chi {d.monthLabel.toLowerCase()}.
-            Còn <strong>{remaining} người</strong> chưa thanh toán đủ — họ sẽ chuyển sang quỹ nợ.
-          </div>
+          Link bill mở màn thanh toán nhanh có QR cho member cần nộp. Các khoản phát sinh sau đó vẫn được tính cho lần gửi bill tiếp theo.
         </div>
-
-        <Button block variant="brand" style={{ marginTop: 10 }} onClick={() => onAction?.('confirmClose')}>
-          🔒 Xác nhận chốt sổ
-        </Button>
       </Screen>
     </PhoneFrame>
   );
 }
 
-function ProfileBillList({ bills }) {
+function ProfileBillList({ bills, onAction }) {
   if (!bills.length) return null;
   return (
     <>
-      <SectionLabel>Bill tổng theo người</SectionLabel>
+      <SectionLabel>Bill tháng theo người</SectionLabel>
       <Card style={{ padding: '6px 14px' }}>
         {bills.map((bill, index) => {
           const amount = Number(bill.amount) || 0;
           const isPositive = amount > 0;
+          const sources = bill.sources || [];
+          const billSource = sources.find(source => source.sourceId && source.memberId) || sources[0] || {};
           return (
             <div key={bill.profileId || index} style={{
               padding: '12px 0',
@@ -175,8 +173,30 @@ function ProfileBillList({ bills }) {
                   ...type.mono,
                 }}>{isPositive ? '+' : ''}{formatVND(amount)}</div>
               </div>
+              <button
+                type="button"
+                onClick={() => onAction?.('createMemberBillShare', {
+                  groupId: billSource.sourceId,
+                  memberId: billSource.memberId,
+                })}
+                disabled={!billSource.sourceId || !billSource.memberId}
+                style={{
+                  width: '100%',
+                  marginTop: 10,
+                  padding: '9px 10px',
+                  borderRadius: 12,
+                  border: '1px solid rgba(99,102,241,0.28)',
+                  background: 'rgba(99,102,241,0.14)',
+                  color: '#c7d2fe',
+                  fontSize: 11,
+                  fontWeight: 850,
+                  fontFamily: 'inherit',
+                  cursor: billSource.sourceId && billSource.memberId ? 'pointer' : 'not-allowed',
+                  opacity: billSource.sourceId && billSource.memberId ? 1 : 0.55,
+                }}
+              >Copy bill</button>
               <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
-                {bill.sources.map((source, sourceIndex) => {
+                {sources.map((source, sourceIndex) => {
                   const sourceAmount = Number(source.amount) || 0;
                   return (
                     <div key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${sourceIndex}`} style={{

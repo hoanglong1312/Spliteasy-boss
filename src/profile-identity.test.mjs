@@ -203,10 +203,22 @@ test('monthly close renders one profile bill with source breakdown rows', () => 
   assert.match(screenDataSource, /function buildGlobalMonthlySourceBalances\(state, monthDate\) \{/)
   assert.match(screenDataSource, /function buildProfileBillRows\(sourceBalances, members\) \{/)
   assert.match(settlementSource, /const profileBills = d\.profileBills \|\| \[\]/)
-  assert.match(settlementSource, /<ProfileBillList bills=\{profileBills\} \/>/)
-  assert.match(settlementSource, /function ProfileBillList\(\{ bills \}\) \{/)
-  assert.match(settlementSource, /Bill tổng theo người/)
-  assert.match(settlementSource, /bill\.sources\.map/)
+  assert.match(settlementSource, /<ProfileBillList bills=\{profileBills\} onAction=\{onAction\} \/>/)
+  assert.match(settlementSource, /function ProfileBillList\(\{ bills, onAction \}\) \{/)
+  assert.match(settlementSource, /Bill tháng theo người/)
+  assert.match(settlementSource, /sources\.map/)
+})
+
+test('monthly bill screen replaces hard close with per-member bill sharing', () => {
+  assert.match(settlementSource, /Gửi bill \{d\.monthLabel\}/)
+  assert.match(settlementSource, /Bill tháng theo người/)
+  assert.match(settlementSource, /<ProfileBillList bills=\{profileBills\} onAction=\{onAction\} \/>/)
+  assert.match(settlementSource, /function ProfileBillList\(\{ bills, onAction \}\) \{/)
+  assert.match(settlementSource, /onAction\?\.\('createMemberBillShare'/)
+  assert.match(settlementSource, /Copy bill/)
+  assert.doesNotMatch(settlementSource, /Xác nhận chốt sổ/)
+  assert.doesNotMatch(settlementSource, /không thể sửa/)
+  assert.doesNotMatch(settlementSource, /confirmClose/)
 })
 
 test('settings hides profile link management from the app UI while keeping profile RPC handlers available', () => {

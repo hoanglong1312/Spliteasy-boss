@@ -125,7 +125,7 @@ test('member detail and group surface expose personal and group invite links', (
   assert.doesNotMatch(groupDetailSource, /setMenuOpen/)
 })
 
-test('member bill link opens the member home first and keeps bill as fallback', () => {
+test('member bill link opens the quick bill first and keeps app login as a secondary action', () => {
   const billShareSource = readFileSync(new URL('./screens/MemberBillShare.jsx', import.meta.url), 'utf8')
 
   assert.match(appSource, /p_purpose: 'member_bill'/)
@@ -135,7 +135,7 @@ test('member bill link opens the member home first and keeps bill as fallback', 
   assert.match(appSource, /setActiveTab\('home'\)/)
   assert.match(appSource, /setStack\(\[\]\)/)
   assert.match(appSource, /setPublicBillToken\(''\)/)
-  assert.match(appSource, /await openPersonalLinkHome\(publicBillToken\)/)
+  assert.doesNotMatch(appSource, /const openedHome = await openPersonalLinkHome\(publicBillToken\)/)
   assert.match(appSource, /\.rpc\('get_member_bill_share'/)
   assert.match(billShareSource, /export default function MemberBillShare\(\{ data, loading = false, onOpenApp \}\)/)
   assert.match(billShareSource, /Mở trang chính/)

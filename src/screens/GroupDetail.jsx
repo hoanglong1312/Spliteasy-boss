@@ -156,14 +156,23 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         {/* Treasurer actions */}
         {isTreasurer && (
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <div style={{
-              flex: 1, padding: '11px 12px', borderRadius: 12,
-              background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)',
-              display: 'flex', alignItems: 'center', gap: 8,
-              fontSize: 11, fontWeight: 600, color: '#c7d2fe', cursor: 'pointer',
-            }} onClick={() => onAction?.('closeMonth', { groupId: d.id })}>
-              <span style={{ fontSize: 14 }}>🔒</span> Chốt sổ tháng
-            </div>
+            <Button
+              variant="ghost"
+              style={{
+                flex: 1,
+                justifyContent: 'center',
+                padding: '11px 12px',
+                borderRadius: 12,
+                background: 'rgba(99,102,241,0.10)',
+                border: '1px solid rgba(99,102,241,0.25)',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#c7d2fe',
+              }}
+              onClick={() => onAction?.('closeMonth', { groupId: d.id })}
+            >
+              <span style={{ fontSize: 14 }}>📤</span> Gửi bill tháng
+            </Button>
           </div>
         )}
 

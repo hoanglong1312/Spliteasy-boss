@@ -59,6 +59,9 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /onAction\?\.\('settleAll'\)/);
   assert.match(groupDetailSource, />💳 Thanh toán<\/Button>/);
   assert.doesNotMatch(groupDetailSource, /⚡ Tất toán/);
+  assert.match(groupDetailSource, /Gửi bill tháng/);
+  assert.doesNotMatch(groupDetailSource, /Chốt sổ tháng/);
+  assert.match(groupDetailSource, /onAction\?\.\('closeMonth', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /<GroupManagementPanel/);
   assert.match(groupDetailSource, /inviteCode=\{d\.inviteCode\}/);
   assert.match(groupDetailSource, /Sửa thông tin nhóm/);
@@ -460,7 +463,7 @@ test('App supports public member bill tokens without requiring login', () => {
   assert.match(appSource, /import MemberBillShare from '\.\/screens\/MemberBillShare'/);
   assert.match(appSource, /useState\(\(\) => publicBillTokenFromLocation\(\)\)/);
   assert.match(appSource, /async function openPersonalLinkHome\(token\)/);
-  assert.match(appSource, /await openPersonalLinkHome\(publicBillToken\)/);
+  assert.doesNotMatch(appSource, /await openPersonalLinkHome\(publicBillToken\)/);
   assert.match(appSource, /setActiveTab\('home'\)/);
   assert.match(appSource, /\.rpc\('get_member_bill_share'/);
   assert.match(appSource, /if \(publicBillToken\)/);
