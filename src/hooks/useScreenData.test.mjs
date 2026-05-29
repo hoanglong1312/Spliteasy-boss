@@ -707,6 +707,70 @@ test('group detail applies confirmed payment coverage but ignores deleted paymen
   assert.equal(deletedDetail.balance, -800000)
 })
 
+test('group detail ignores unscoped payer coverage for members paid for by someone else', () => {
+  const { buildGroupDetailData } = loadScreenDataBuilders()
+  const group = {
+    id: 'expense-1',
+    name: 'Ăn uống',
+    members: ['dai', 'cuong', 'long'],
+    expenses: [
+      {
+        id: 'old-debt',
+        title: 'Khoản cũ',
+        amount: 774479,
+        paidBy: 'cuong',
+        participants: ['dai'],
+        splits: [{ memberId: 'dai', amount: 774479 }],
+        status: 'approved',
+        date: '2026-05-26',
+      },
+      {
+        id: 'new-advance',
+        title: 'sn',
+        amount: 200000,
+        paid_by_member_id: 'dai',
+        participants: ['dai', 'cuong', 'long'],
+        status: 'approved',
+        expense_date: '2026-05-29',
+      },
+    ],
+  }
+  const members = [
+    { id: 'dai', groupId: 'expense-1', profileId: 'dai-profile', name: 'Đại', isActive: true },
+    { id: 'cuong', groupId: 'expense-1', profileId: 'cuong-profile', name: 'Cường', isActive: true },
+    { id: 'long', groupId: 'expense-1', profileId: 'long-profile', name: 'Long', role: 'treasurer', isActive: true },
+  ]
+  const appState = {
+    currentUserId: 'dai',
+    currentUserName: 'Đại',
+    members,
+    notifications: [
+      {
+        id: 'pay-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 1374479,
+          memberName: 'Cường',
+          coveredMembers: [{ profileId: 'dai-profile', memberIds: ['dai'], name: 'Đại', amount: -774479 }],
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'expense-1', sourceType: 'group', sourceLabel: 'Ăn uống', amount: -600000 },
+            { sourceId: 'expense-1', sourceType: 'group', sourceLabel: 'Ăn uống', amount: -774479, profileId: 'dai-profile', memberName: 'Đại' },
+          ],
+        },
+      },
+    ],
+  }
+
+  const detail = buildGroupDetailData(group, 'dai', members, 'Đại', '2026-05', [], appState)
+  const dai = detail.members.find(member => member.id === 'dai')
+
+  assert.equal(dai.balance, 133333)
+})
+
 test('group detail exposes treasurer payment target for member bill QR', () => {
   const { buildGroupDetailData } = loadScreenDataBuilders()
   const group = {

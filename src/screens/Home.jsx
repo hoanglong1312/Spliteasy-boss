@@ -660,6 +660,7 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
+  const [selectedRefundKey, setSelectedRefundKey] = useState('');
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
   const target = data?.paymentTarget || {};
@@ -678,6 +679,19 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
     ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0))}`
     : 'Chưa chọn ai';
   const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${data?.monthLabel || ''}`.trim();
+  const refundRows = safeArray(data?.refundRows);
+  const selectedRefund = refundRows.find(row => String(row.profileId || row.name || 'member') === selectedRefundKey) || refundRows[0] || null;
+  const refundBank = selectedRefund?.bank || {};
+  const refundQrBank = resolveVietQrBank(refundBank);
+  const refundAmount = Math.max(0, Number(selectedRefund?.amount) || 0);
+  const refundDescription = selectedRefund ? `Hoan tien ${selectedRefund.name || 'thanh vien'} ${data?.monthLabel || ''}`.trim() : '';
+  const refundQrUrl = selectedRefund && refundQrBank && refundBank.account && refundBank.holder ? generateQRUrl({
+    bankId: refundQrBank.id,
+    account: refundBank.account,
+    accountName: refundBank.holder,
+    amount: refundAmount,
+    description: refundDescription,
+  }) : '';
   const qrUrl = canShowQr ? generateQRUrl({
     bankId: qrBank.id,
     account: target.account,
@@ -917,15 +931,26 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
         </Card>
       )}
 
-      {isTreasurer && safeArray(data?.refundRows).length > 0 && (
+      {isTreasurer && refundRows.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <SectionLabel>Cần hoàn tiền</SectionLabel>
           <div style={{ display: 'grid', gap: 8 }}>
-            {safeArray(data.refundRows).map(row => {
+            {refundRows.map(row => {
               const key = String(row.profileId || row.name || 'member');
               const done = confirmedRefunds?.has?.(key);
+              const selected = String(selectedRefund?.profileId || selectedRefund?.name || '') === key;
               return (
-                <Card key={key} style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button key={key} type="button" onClick={() => setSelectedRefundKey(key)} style={{
+                  width: '100%',
+                  padding: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  fontFamily: 'inherit',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}>
+                <Card style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 10, borderColor: selected ? 'rgba(110,231,183,0.36)' : undefined, background: selected ? 'rgba(52,211,153,0.08)' : undefined }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary }}>{row.name}</div>
                     <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
@@ -933,22 +958,63 @@ function PaymentSheet({ open, data, isTreasurer, confirmedRefunds, onConfirmPaym
                     </div>
                     <div style={{ fontSize: 15, fontWeight: 950, color: '#6ee7b7', marginTop: 5, ...type.mono }}>{formatVND(row.amount)}</div>
                   </div>
-                  <button type="button" onClick={() => onConfirmRefund?.(row)} disabled={done} style={{
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '9px 10px',
-                    background: done ? 'rgba(52,211,153,0.18)' : colors.brand,
-                    color: done ? '#6ee7b7' : '#fff',
-                    fontSize: 11,
-                    fontWeight: 900,
-                    fontFamily: 'inherit',
-                    cursor: done ? 'default' : 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}>{done ? 'Đã chuyển' : 'Xác nhận'}</button>
+                  <div style={{ color: selected ? '#6ee7b7' : colors.textMuted, fontSize: 18 }}>›</div>
                 </Card>
+                </button>
               );
             })}
           </div>
+          {selectedRefund && (
+            <Card style={{ padding: 14, marginTop: 10, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
+              <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>Chuyển trả cho {selectedRefund.name}</div>
+              <div style={{ fontSize: 26, fontWeight: 950, color: '#6ee7b7', marginTop: 6, ...type.mono }}>{formatVND(refundAmount)}</div>
+              {refundQrUrl ? (
+                <>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
+                    <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 116, height: 116, borderRadius: 14, background: '#fff', padding: 6, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 7 }}>
+                      <PaymentInfoLine label="STK" value={refundBank.account} copyable onCopy={() => copyPaymentField('refund-account', refundBank.account)} copied={copiedField === 'refund-account'} />
+                      <PaymentInfoLine label="Số tiền" value={formatVND(refundAmount)} copyable onCopy={() => copyPaymentField('refund-amount', refundAmount)} copied={copiedField === 'refund-amount'} />
+                      <PaymentInfoLine label="Nội dung" value={refundDescription} copyable onCopy={() => copyPaymentField('refund-description', refundDescription)} copied={copiedField === 'refund-description'} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 8, lineHeight: 1.35 }}>
+                    {refundBank.holder} · {refundBank.name}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+                    <a href={refundQrUrl} download={`hoan-tien-${selectedRefund.name || 'member'}.png`} style={{
+                      minHeight: 42,
+                      borderRadius: 12,
+                      background: 'rgba(99,102,241,0.16)',
+                      border: '1px solid rgba(129,140,248,0.35)',
+                      color: '#c4b5fd',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      textDecoration: 'none',
+                    }}>Lưu QR</a>
+                    <button type="button" onClick={() => onConfirmRefund?.(selectedRefund)} disabled={confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member'))} style={{
+                      minHeight: 42,
+                      borderRadius: 12,
+                      background: confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? 'rgba(16,185,129,0.20)' : '#10b981',
+                      border: '1px solid rgba(16,185,129,0.62)',
+                      color: confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? '#6ee7b7' : '#052e16',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      fontFamily: 'inherit',
+                      cursor: confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? 'default' : 'pointer',
+                    }}>{confirmedRefunds?.has?.(String(selectedRefund.profileId || selectedRefund.name || 'member')) ? 'Đã chuyển' : 'Xác nhận đã chuyển'}</button>
+                  </div>
+                </>
+              ) : (
+                <div style={{ fontSize: 12, color: '#fde68a', fontWeight: 750, lineHeight: 1.45, marginTop: 10 }}>
+                  Member này chưa có đủ thông tin ngân hàng để tạo QR nhận tiền.
+                </div>
+              )}
+            </Card>
+          )}
         </div>
       )}
     </BottomSheet>

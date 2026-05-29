@@ -379,10 +379,69 @@ test('paid-for member ignores unscoped payer sources in the same payment notice'
   assert.equal(data.sourceBreakdown[0].amount, 180000)
 })
 
+test('treasurer refund rows use payment-adjusted member balances', () => {
+  const buildHomeData = loadHomeBuilder()
+  const state = {
+    currentUserId: 'long-member',
+    currentUserName: 'Long',
+    members: [
+      { id: 'long-member', groupId: 'g1', profileId: 'long-profile', name: 'Long', role: 'treasurer' },
+      { id: 'dai-member', groupId: 'g1', profileId: 'dai-profile', name: 'Đại', bankName: 'Techcombank', bankAccount: '123', bankHolder: 'Dai' },
+      { id: 'cuong-member', groupId: 'g1', profileId: 'cuong-profile', name: 'Cường' },
+    ],
+    groups: [
+      {
+        id: 'g1',
+        name: 'Lấy vk để trưởng thành',
+        members: ['long-member', 'dai-member', 'cuong-member'],
+        netByMember: { 'long-member': 1194479, 'dai-member': -594479, 'cuong-member': -600000 },
+        expenses: [],
+      },
+    ],
+    notifications: [
+      {
+        id: 'notice-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong-member',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 1374479,
+          memberName: 'Cường',
+          coveredMembers: [
+            { profileId: 'dai-profile', memberIds: ['dai-member'], name: 'Đại', amount: -774479 },
+          ],
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -600000 },
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -774479, profileId: 'dai-profile', memberName: 'Đại' },
+          ],
+        },
+      },
+    ],
+    pickle: { sessions: [] },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildHomeData(state, 'long-member', state.members, state.groups, state.pickle, state, '2026-05')
+  const daiRefund = data.paymentSummary.refundRows.find(row => row.profileId === 'dai-profile')
+
+  assert.equal(daiRefund.amount, 180000)
+  assert.equal(data.paymentSummary.refundRows.some(row => row.profileId === 'cuong-profile'), false)
+})
+
 test('payment sheet includes identity on the current payer covered sources', () => {
   assert.match(homeSource, /debtSources\.map\(source => \(\{ \.\.\.source, memberName: data\?\.memberName \|\| 'Thành viên' \}\)\)/)
   assert.match(screenDataSource, /profileId,/)
   assert.match(screenDataSource, /memberId: row\.memberId \|\| row\.member_id \|\| currentUserId/)
+})
+
+test('treasurer payment sheet can choose refund members and show their QR', () => {
+  assert.match(homeSource, /const \[selectedRefundKey, setSelectedRefundKey\] = useState\(''\)/)
+  assert.match(homeSource, /const refundQrUrl = selectedRefund && refundQrBank && refundBank\.account && refundBank\.holder \? generateQRUrl/)
+  assert.match(homeSource, /Chuyển trả cho \{selectedRefund\.name\}/)
+  assert.match(homeSource, /alt=\{`QR nhận tiền của \$\{selectedRefund\.name\}`\}/)
+  assert.match(homeSource, /Xác nhận đã chuyển/)
 })
 
 test('home exposes a treasurer payment management zone with view and delete actions', () => {

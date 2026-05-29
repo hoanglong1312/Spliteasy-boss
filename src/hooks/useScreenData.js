@@ -211,7 +211,8 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const sourceBalances = buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, monthSessions, members, today)
   const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
-  const profileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
+  const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
+  const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
   const paymentSummary = buildHomePaymentSummary(state, rawSourceBreakdown, profileBreakdown, members, me, today)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
@@ -279,6 +280,25 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
         bank: bankData(findProfileMember(row.profileId, members), true),
       })),
   }
+}
+
+function adjustedProfileBreakdownForPayments(state, profileBreakdown, members, monthDate) {
+  const monthLabel = formatMonthLabel(monthDate)
+  return safeArray(profileBreakdown)
+    .map(row => {
+      const member = findProfileMember(row.profileId, members)
+      const coverage = paymentCoverageForMember(state, member, monthLabel, row.sources)
+      const sources = applyConfirmedPaymentCoverage(row.sources, coverage.confirmedSources)
+      const amount = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
+      return {
+        ...row,
+        amount,
+        sources,
+        paidAmount: coverage.confirmedAmount,
+        pendingAmount: coverage.pendingAmount,
+      }
+    })
+    .filter(row => Number(row.amount) !== 0)
 }
 
 function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
@@ -360,6 +380,8 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
     .filter(source => {
       const profileId = String(source?.profileId || source?.profile_id || '')
       const memberId = String(source?.memberId || source?.member_id || '')
+      if (profileId && scope.profileId && profileId === String(scope.profileId)) return true
+      if (memberId && scope.memberIds?.has(String(memberId))) return true
       if (profileId && sourceProfileIds.size > 0) return sourceProfileIds.has(profileId)
       if (memberId && sourceMemberIds.size > 0) return sourceMemberIds.has(memberId)
       return !profileId && !memberId && scope.isActor === true
