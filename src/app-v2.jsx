@@ -350,7 +350,7 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      const requiresPin = Boolean(payload?.hasPin) && await checkMemberPinRequired(payload?.memberId)
+      const requiresPin = await checkMemberPinRequired(payload?.memberId)
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
         setPendingPinSession(payload)
         setAwaitingPin(true)
@@ -1554,12 +1554,27 @@ export default function AppV2() {
 
     if (type === 'joinGroup') {
       const result = await joinGroup(payload.code, payload.memberName)
-      await dispatch({
-        type: 'LOGIN',
-        token: result.token,
+      const manualSession = {
+        authToken: result.token,
         memberId: result.member_id,
         groupId: result.group_id,
         memberName: result.member_name,
+        hasPin: true,
+      }
+      const requiresPin = await checkMemberPinRequired(manualSession.memberId)
+      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== manualSession.memberId) {
+        setPendingPinSession(manualSession)
+        setAwaitingPin(true)
+        setPinError('')
+        setPinInput('')
+        return
+      }
+      await dispatch({
+        type: 'LOGIN',
+        token: manualSession.authToken,
+        memberId: manualSession.memberId,
+        groupId: manualSession.groupId,
+        memberName: manualSession.memberName,
       })
       return
     }

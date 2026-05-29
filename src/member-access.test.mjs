@@ -24,6 +24,8 @@ test('recent member sessions keep resumable tokens and collapse duplicate identi
   assert.match(authSource, /authToken: token \|\| member\.authToken \|\| ''/)
   assert.match(authSource, /sessionIdentityKey\(session\)/)
   assert.match(authSource, /member\.profileId \|\| member\.profile_id/)
+  assert.match(authSource, /if \(profileId\) return `profile:\$\{profileId\}`/)
+  assert.match(authSource, /if \(memberId\) return `member:\$\{memberId\}`/)
   assert.match(authSource, /if \(name\) return `name:\$\{name\}`/)
   assert.match(authSource, /dedupeRecentSessions\(parsed\)/)
   assert.match(authSource, /localStorage\.setItem\(RECENT_SESSIONS_KEY, JSON\.stringify\(deduped\)\)/)
@@ -54,6 +56,8 @@ test('AppV2 ignores manual invite codes when a member session is already active'
 test('AppV2 resumes recent sessions with a saved token instead of showing a dead card', () => {
   assert.match(appSource, /removeRecentSession/)
   assert.match(appSource, /if \(type === 'resumeRecentSession'\)/)
+  assert.match(appSource, /const requiresPin = await checkMemberPinRequired\(payload\?\.memberId\)/)
+  assert.doesNotMatch(appSource, /const requiresPin = Boolean\(payload\?\.hasPin\) && await checkMemberPinRequired\(payload\?\.memberId\)/)
   assert.match(appSource, /if \(type === 'removeRecentSession'\)/)
   assert.match(appSource, /removeRecentSession\(payload\)/)
   assert.match(appSource, /resolveRecentSessionToken\(payload\)/)
@@ -62,6 +66,20 @@ test('AppV2 resumes recent sessions with a saved token instead of showing a dead
   assert.match(appSource, /memberId: payload\.memberId/)
   assert.match(appSource, /groupId: payload\.groupId/)
   assert.doesNotMatch(appSource, /Mở lại link cá nhân hoặc nhờ thủ quỹ gửi link mới để vào tài khoản này\./)
+})
+
+test('AppV2 gates manual invite login behind the member PIN when required', () => {
+  assert.match(appSource, /const manualSession = \{[\s\S]*authToken: result\.token[\s\S]*memberId: result\.member_id[\s\S]*groupId: result\.group_id[\s\S]*memberName: result\.member_name/)
+  assert.match(appSource, /const requiresPin = await checkMemberPinRequired\(manualSession\.memberId\)/)
+  assert.match(appSource, /setPendingPinSession\(manualSession\)/)
+  assert.match(appSource, /setAwaitingPin\(true\)/)
+  assert.match(appSource, /await dispatch\(\{[\s\S]*type: 'LOGIN'[\s\S]*token: manualSession\.authToken/)
+})
+
+test('recent session identity prefers profile id before falling back to names', () => {
+  assert.match(authSource, /const profileId = String\(session\?\.profileId \|\| session\?\.profile_id \|\| ''\)\.trim\(\)/)
+  assert.match(authSource, /if \(profileId\) return `profile:\$\{profileId\}`[\s\S]*const memberId = String/)
+  assert.match(authSource, /if \(memberId\) return `member:\$\{memberId\}`[\s\S]*const name = String/)
 })
 
 test('recent-session RPC can recreate auth from saved local profile metadata', () => {

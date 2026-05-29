@@ -82,6 +82,12 @@ function dedupeRecentSessions(sessions) {
 }
 
 function sessionIdentityKey(session) {
+  const profileId = String(session?.profileId || session?.profile_id || '').trim()
+  if (profileId) return `profile:${profileId}`
+
+  const memberId = String(session?.memberId || session?.id || '').trim()
+  if (memberId) return `member:${memberId}`
+
   const name = String(session?.memberName || session?.name || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -90,9 +96,7 @@ function sessionIdentityKey(session) {
     .trim()
     .toLowerCase()
   if (name) return `name:${name}`
-  const profileId = String(session?.profileId || session?.profile_id || '').trim()
-  if (profileId) return `profile:${profileId}`
-  return `member:${session?.memberId || ''}`
+  return 'member:'
 }
 
 export function clearAuth({ keepRecent = true } = {}) {
