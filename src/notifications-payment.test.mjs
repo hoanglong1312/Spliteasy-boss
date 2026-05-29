@@ -330,6 +330,61 @@ test('confirmed payment coverage can reveal later payer credit in the same sourc
   assert.equal(data.paymentSummary.paymentStatus, '')
 })
 
+test('paid-for member ignores unscoped payer sources in the same payment notice', () => {
+  const buildHomeData = loadHomeBuilder()
+  const state = {
+    currentUserId: 'dai-member',
+    currentUserName: 'Đại',
+    members: [
+      { id: 'dai-member', groupId: 'g1', profileId: 'dai-profile', name: 'Đại' },
+      { id: 'cuong-member', groupId: 'g1', profileId: 'cuong-profile', name: 'Cường' },
+    ],
+    groups: [
+      {
+        id: 'g1',
+        name: 'Lấy vk để trưởng thành',
+        members: ['dai-member', 'cuong-member'],
+        netByMember: { 'dai-member': -594479, 'cuong-member': 594479 },
+        expenses: [],
+      },
+    ],
+    notifications: [
+      {
+        id: 'notice-1',
+        type: 'payment_submitted',
+        actorMemberId: 'cuong-member',
+        createdAt: '2026-05-28T12:00:00Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 1374479,
+          memberName: 'Cường',
+          coveredMembers: [
+            { profileId: 'dai-profile', memberIds: ['dai-member'], name: 'Đại', amount: -774479 },
+          ],
+          monthLabel: 'Tháng 5 · 2026',
+          coveredSources: [
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -600000 },
+            { sourceId: 'g1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', amount: -774479, profileId: 'dai-profile', memberName: 'Đại' },
+          ],
+        },
+      },
+    ],
+    pickle: { sessions: [] },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildHomeData(state, 'dai-member', state.members, state.groups, state.pickle, state, '2026-05')
+
+  assert.equal(data.totalBalance, 180000)
+  assert.equal(data.sourceBreakdown[0].amount, 180000)
+})
+
+test('payment sheet includes identity on the current payer covered sources', () => {
+  assert.match(homeSource, /debtSources\.map\(source => \(\{ \.\.\.source, memberName: data\?\.memberName \|\| 'Thành viên' \}\)\)/)
+  assert.match(screenDataSource, /profileId,/)
+  assert.match(screenDataSource, /memberId: row\.memberId \|\| row\.member_id \|\| currentUserId/)
+})
+
 test('home exposes a treasurer payment management zone with view and delete actions', () => {
   assert.match(screenDataSource, /paymentRecords: buildPaymentManagementRecords\(state, me, today\)/)
   assert.match(screenDataSource, /function buildPaymentManagementRecords\(state, currentMember, monthDate\) \{/)

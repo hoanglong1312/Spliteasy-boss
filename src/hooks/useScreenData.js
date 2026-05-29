@@ -283,6 +283,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
 
 function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   const notices = paymentNoticesForMember(state, member, monthLabel)
+  const scope = paymentScopeForMember(state, member)
   const confirmedSources = []
   let confirmedAmount = 0
   let pendingAmount = 0
@@ -291,16 +292,31 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const metadata = notification?.metadata || {}
     const status = String(metadata.status || 'pending').toLowerCase()
     const amount = Math.abs(Number(metadata.amount) || 0)
-    const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown)
+    const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
+    const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)) }
+    const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
+    const scopedAmount = coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
     if (status === 'confirmed') {
       confirmedSources.push(...coveredSources)
-      confirmedAmount += coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || amount
+      confirmedAmount += scopedAmount
     } else if (status === 'pending') {
-      pendingAmount += coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || amount
+      pendingAmount += scopedAmount
     }
   })
 
   return { confirmedSources, confirmedAmount, pendingAmount }
+}
+
+function paymentScopeForMember(state, member) {
+  const memberId = member?.id || state?.currentUserId
+  const profileId = member?.profileId || member?.profile_id || profileIdForMember(memberId, state?.members) || ''
+  const memberIds = new Set(
+    safeArray(state?.members)
+      .filter(row => profileId && String(row?.profileId || row?.profile_id || '') === String(profileId))
+      .map(row => String(row.id))
+  )
+  if (memberId) memberIds.add(String(memberId))
+  return { memberId, profileId, memberIds }
 }
 
 function paymentNoticesForMember(state, member, monthLabel) {
@@ -337,7 +353,7 @@ function paymentNoticeCoversMember(notification, memberIds, profileId) {
   ))
 }
 
-function coveredSourcesForPayment(metadata, sourceBreakdown) {
+function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
   const sourceProfileIds = new Set(safeArray(sourceBreakdown).map(source => String(source.profileId || source.profile_id || '')).filter(Boolean))
   const sourceMemberIds = new Set(safeArray(sourceBreakdown).map(source => String(source.memberId || source.member_id || '')).filter(Boolean))
   const explicit = safeArray(metadata?.coveredSources || metadata?.covered_sources)
@@ -346,7 +362,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown) {
       const memberId = String(source?.memberId || source?.member_id || '')
       if (profileId && sourceProfileIds.size > 0) return sourceProfileIds.has(profileId)
       if (memberId && sourceMemberIds.size > 0) return sourceMemberIds.has(memberId)
-      return !profileId && !memberId
+      return !profileId && !memberId && scope.isActor === true
     })
     .map(source => ({
       sourceId: source.sourceId || source.source_id,
@@ -360,7 +376,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown) {
     .filter(source => source.amount !== 0)
   if (explicit.length > 0) return explicit
 
-  let remaining = Math.abs(Number(metadata?.amount) || 0)
+  let remaining = coveredMemberAmountForScope(metadata, scope) || (scope.isActor ? Math.abs(Number(metadata?.amount) || 0) : 0)
   if (remaining <= 0) return []
   return safeArray(sourceBreakdown)
     .filter(source => Number(source.amount) < 0)
@@ -371,6 +387,16 @@ function coveredSourcesForPayment(metadata, sourceBreakdown) {
       return { ...source, amount: -covered }
     })
     .filter(Boolean)
+}
+
+function coveredMemberAmountForScope(metadata, scope = {}) {
+  return safeArray(metadata?.coveredMembers || metadata?.covered_members)
+    .filter(row => (
+      (scope.profileId && String(row?.profileId || row?.profile_id || '') === String(scope.profileId)) ||
+      safeArray(row?.memberIds || row?.member_ids).some(id => scope.memberIds?.has(String(id))) ||
+      scope.memberIds?.has(String(row?.memberId || row?.member_id || ''))
+    ))
+    .reduce((sum, row) => sum + Math.abs(Number(row?.amount) || 0), 0)
 }
 
 function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
