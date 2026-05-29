@@ -686,6 +686,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     : 'Chưa chọn ai';
   const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${data?.monthLabel || ''}`.trim();
   const refundRows = safeArray(data?.refundRows);
+  const pendingPaymentRecords = safeArray(paymentRecords).filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const selectedRefund = refundRows.find(row => String(row.profileId || row.name || 'member') === selectedRefundKey) || null;
   const refundBank = selectedRefund?.bank || {};
   const refundQrBank = resolveVietQrBank(refundBank);
@@ -741,7 +742,24 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 
   return (
     <BottomSheet title="Thanh toán" onClose={onClose}>
-      {netBalance < 0 && (
+      {isTreasurer && (
+        <>
+          <TreasurerPaymentDashboard
+            data={data}
+            progressRows={data?.paymentProgress || []}
+            paymentRecords={paymentRecords}
+            pendingRecords={pendingPaymentRecords}
+            refundRows={refundRows}
+            confirmedRefunds={confirmedRefunds}
+            onAction={onAction}
+            onViewPaymentRecord={onViewPaymentRecord}
+            onConfirmRefund={onConfirmRefund}
+          />
+          <PaymentManagementZone records={paymentRecords} onAction={onAction} onViewRecord={onViewPaymentRecord} />
+        </>
+      )}
+
+      {!isTreasurer && netBalance < 0 && (
         <Card style={{ padding: 14, borderColor: canShowQr ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)' }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
             Thanh toán về thủ quỹ
@@ -923,7 +941,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         </Card>
       )}
 
-      {netBalance >= 0 && (
+      {!isTreasurer && netBalance >= 0 && (
         <Card style={{ padding: 14, borderColor: 'rgba(52,211,153,0.25)' }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
             Chờ thủ quỹ hoàn tiền
@@ -952,7 +970,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         </Card>
       )}
 
-      {isTreasurer && refundRows.length > 0 && (
+      {!isTreasurer && refundRows.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <button
             type="button"
@@ -1081,12 +1099,183 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
           )}
         </div>
       )}
-
-      {isTreasurer && (
-        <PaymentManagementZone records={paymentRecords} onAction={onAction} onViewRecord={onViewPaymentRecord} />
-      )}
     </BottomSheet>
   );
+}
+
+function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
+  const [unpaidExpanded, setUnpaidExpanded] = useState(true);
+  const [pendingExpanded, setPendingExpanded] = useState(true);
+  const [refundExpanded, setRefundExpanded] = useState(false);
+  const [selectedRefundKey, setSelectedRefundKey] = useState('');
+  const rows = safeArray(progressRows);
+  const pending = safeArray(pendingRecords);
+  const refunds = safeArray(refundRows);
+  const confirmedRows = rows.filter(row => String(row.status || '').toLowerCase() === 'confirmed');
+  const pendingRows = rows.filter(row => String(row.status || '').toLowerCase() === 'pending');
+  const unpaidRows = rows.filter(row => String(row.status || '').toLowerCase() === 'unpaid');
+  const selectedRefund = refunds.find(row => String(row.profileId || row.name || 'member') === selectedRefundKey) || null;
+  const refundBank = selectedRefund?.bank || {};
+  const refundQrBank = resolveVietQrBank(refundBank);
+  const refundAmount = Math.max(0, Number(selectedRefund?.amount) || 0);
+  const refundDescription = selectedRefund ? `Hoan tien ${selectedRefund.name || 'thanh vien'} ${data?.monthLabel || ''}`.trim() : '';
+  const refundQrUrl = selectedRefund && refundQrBank && refundBank.account && refundBank.holder ? generateQRUrl({
+    bankId: refundQrBank.id,
+    account: refundBank.account,
+    accountName: refundBank.holder,
+    amount: refundAmount,
+    description: refundDescription,
+  }) : '';
+  const totalNeedCollect = [...pendingRows, ...unpaidRows].reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
+  const totalRefund = refunds.reduce((sum, row) => sum + Math.max(0, Number(row.amount) || 0), 0);
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      <Card style={{ padding: 14, borderColor: 'rgba(59,130,246,0.24)', background: 'rgba(59,130,246,0.07)' }}>
+        <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>Tiến độ thu tiền</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end', marginTop: 8 }}>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 950, color: '#f8fafc', ...type.mono }}>{formatVND(totalNeedCollect)}</div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>Còn cần theo dõi trong {data?.monthLabel || 'tháng này'}</div>
+          </div>
+          <div style={{ fontSize: 11, fontWeight: 900, color: '#93c5fd' }}>{rows.length} member</div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 12 }}>
+          <ProgressStat label="Đã nhận" count={confirmedRows.length} color="#6ee7b7" />
+          <ProgressStat label="Chờ xác nhận" count={pendingRows.length || pending.length} color="#fcd34d" />
+          <ProgressStat label="Chưa thanh toán" count={unpaidRows.length} color="#fca5a5" />
+        </div>
+      </Card>
+
+      {pending.length > 0 && (
+        <DashboardSection
+          title={`Chờ duyệt · ${pending.length}`}
+          subtitle="Member đã bấm xác nhận thanh toán"
+          amount={pending.reduce((sum, record) => sum + (Number(record.amount) || 0), 0)}
+          icon="⏳"
+          color="#fcd34d"
+          expanded={pendingExpanded}
+          onToggle={() => setPendingExpanded(value => !value)}
+        >
+          {pending.map(record => (
+            <PaymentDashboardRow key={record.id} row={record} tone="pending">
+              <button type="button" onClick={() => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={miniDashButton('rgba(99,102,241,0.18)', colors.brandLight)}>Xem</button>
+              <button type="button" onClick={() => onAction?.('confirmPaymentNotice', record)} style={miniDashButton('#22c55e', '#052e16')}>Đã nhận</button>
+              <button type="button" onClick={() => onAction?.('rejectPaymentNotice', record)} style={miniDashButton(colors.danger, '#fff')}>Chưa nhận</button>
+            </PaymentDashboardRow>
+          ))}
+        </DashboardSection>
+      )}
+
+      <DashboardSection
+        title={`Còn chưa thanh toán · ${unpaidRows.length}`}
+        subtitle="Các member còn âm tiền sau khi trừ khoản đã nhận"
+        amount={unpaidRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0)}
+        icon="⌁"
+        color="#fca5a5"
+        expanded={unpaidExpanded}
+        onToggle={() => setUnpaidExpanded(value => !value)}
+      >
+        {unpaidRows.length > 0 ? unpaidRows.map(row => <PaymentDashboardRow key={row.profileId || row.name} row={row} tone="unpaid" />) : (
+          <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>Không còn ai cần nộp.</div>
+        )}
+      </DashboardSection>
+
+      {refunds.length > 0 && (
+        <DashboardSection
+          title={`Cần hoàn tiền · ${refunds.length}`}
+          subtitle="Chọn member để mở QR chuyển ngược lại"
+          amount={totalRefund}
+          icon="↩"
+          color="#6ee7b7"
+          expanded={refundExpanded}
+          onToggle={() => setRefundExpanded(value => !value)}
+        >
+          {refunds.map(row => {
+            const key = String(row.profileId || row.name || 'member');
+            const selected = String(selectedRefund?.profileId || selectedRefund?.name || '') === key;
+            const done = confirmedRefunds?.has?.(key);
+            return (
+              <React.Fragment key={key}>
+                <button type="button" onClick={() => setSelectedRefundKey(selected ? '' : key)} style={{ width: '100%', border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', padding: 0, cursor: 'pointer' }}>
+                  <PaymentDashboardRow row={{ ...row, amount: row.amount, sourceSummary: row.bank?.account ? `${row.bank?.name || 'Ngân hàng'} · ${row.bank.account}` : 'Chưa có STK nhận tiền' }} tone="refund" arrow={selected ? '⌃' : '›'} />
+                </button>
+                {selected && selectedRefund && (
+                  <Card style={{ padding: 12, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
+                    {refundQrUrl ? (
+                      <>
+                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                          <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 150, height: 150, borderRadius: 14, background: '#fff', padding: 6 }} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 11 }}>
+                          <a href={refundQrUrl} download={`hoan-tien-${selectedRefund.name || 'member'}.png`} style={dashLinkButton('rgba(99,102,241,0.16)', '#c4b5fd')}>Lưu QR</a>
+                          <button type="button" onClick={() => onConfirmRefund?.(selectedRefund)} disabled={done} style={miniDashButton(done ? 'rgba(16,185,129,0.20)' : '#10b981', done ? '#6ee7b7' : '#052e16')}>{done ? 'Đã chuyển' : 'Xác nhận đã chuyển'}</button>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#fde68a', fontWeight: 750, lineHeight: 1.45 }}>Member này chưa có đủ thông tin ngân hàng để tạo QR nhận tiền.</div>
+                    )}
+                  </Card>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </DashboardSection>
+      )}
+    </div>
+  );
+}
+
+function ProgressStat({ label, count, color }) {
+  return (
+    <div style={{ padding: 9, borderRadius: 12, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{ fontSize: 18, fontWeight: 950, color, ...type.mono }}>{count}</div>
+      <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 800, marginTop: 2 }}>{label}</div>
+    </div>
+  );
+}
+
+function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, children }) {
+  return (
+    <section>
+      <button type="button" aria-expanded={expanded} onClick={onToggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33`, color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        <div style={{ width: 34, height: 34, borderRadius: 11, background: `${color}20`, border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 900, color, textTransform: 'uppercase' }}>{title}</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 900, color, ...type.mono }}>{formatVND(amount)}</div>
+          <div style={{ fontSize: 18, color, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
+        </div>
+      </button>
+      {expanded && <div style={{ display: 'grid', gap: 8, marginTop: 8 }}>{children}</div>}
+    </section>
+  );
+}
+
+function PaymentDashboardRow({ row, tone = 'unpaid', arrow = '', children }) {
+  const color = tone === 'refund' ? '#6ee7b7' : tone === 'pending' ? '#fcd34d' : '#fca5a5';
+  return (
+    <Card style={{ padding: 10, display: 'grid', gridTemplateColumns: children ? '1fr auto' : '1fr auto', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.035)' }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.memberName || row.name}</div>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.sourceSummary || row.monthLabel || 'Nguồn tiền'}</div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 950, color, ...type.mono }}>{formatVND(Math.abs(Number(row.amount) || 0))}</div>
+        {children ? <div style={{ display: 'flex', gap: 5 }}>{children}</div> : <div style={{ color: colors.textMuted, fontSize: 17 }}>{arrow}</div>}
+      </div>
+    </Card>
+  );
+}
+
+function miniDashButton(background, color) {
+  return { border: 'none', borderRadius: 9, padding: '7px 7px', background, color, fontSize: 10, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' };
+}
+
+function dashLinkButton(background, color) {
+  return { minHeight: 38, borderRadius: 11, background, border: '1px solid rgba(129,140,248,0.35)', color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900, textDecoration: 'none' };
 }
 
 function resolveVietQrBank(bank = {}) {

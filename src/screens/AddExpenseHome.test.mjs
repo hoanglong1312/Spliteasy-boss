@@ -624,6 +624,24 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(appSource, /setHomePaymentOpen\(true\)/);
 });
 
+test('Home payment sheet gives treasurers a payment progress dashboard', () => {
+  assert.match(screenDataSource, /paymentProgress: buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel\)/);
+  assert.match(screenDataSource, /function buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel\)/);
+  assert.match(screenDataSource, /value === 'confirmed'/);
+  assert.match(screenDataSource, /value === 'pending'/);
+  assert.match(screenDataSource, /status: Number\(row\.pendingAmount\) > 0 \? 'pending' : 'unpaid'/);
+  assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{data\?\.paymentProgress \|\| \[\]\}[\s\S]*paymentRecords=\{paymentRecords\}/);
+  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund \}\)/);
+  assert.match(homeSource, /Tiến độ thu tiền/);
+  assert.match(homeSource, /Đã nhận/);
+  assert.match(homeSource, /Chờ xác nhận/);
+  assert.match(homeSource, /Chưa thanh toán/);
+  assert.match(homeSource, /Cần hoàn tiền/);
+  assert.match(homeSource, /Còn chưa thanh toán/);
+  assert.match(homeSource, /onAction\?\.\('confirmPaymentNotice', record\)/);
+  assert.match(homeSource, /onAction\?\.\('rejectPaymentNotice', record\)/);
+});
+
 test('GroupDetail no longer shows treasurer pending approval alert outside activity', () => {
   const groupDetailHeroSource = groupDetailSource.slice(
     groupDetailSource.indexOf('{/* Treasurer actions */}'),

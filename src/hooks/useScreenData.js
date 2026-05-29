@@ -270,6 +270,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     paymentStatusLabel: netBalance < 0 && coverage.confirmedAmount > 0 ? 'Cần nộp thêm' : paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     memberBank: bankData(me, true),
+    paymentProgress: buildPaymentProgressRows(profileBreakdown, members, state, monthLabel),
     payForRows: safeArray(profileBreakdown)
       .filter(row => Number(row.amount) < 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),
@@ -281,6 +282,80 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
         bank: bankData(findProfileMember(row.profileId, members), true),
       })),
   }
+}
+
+function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel) {
+  const rowsByProfile = new Map()
+  const putRow = (row) => {
+    const profileId = String(row.profileId || row.profile_id || row.memberId || row.member_id || row.name || '')
+    if (!profileId) return
+    const current = rowsByProfile.get(profileId)
+    const nextStatus = String(row.status || 'unpaid').toLowerCase()
+    const currentRank = paymentProgressStatusRank(current?.status)
+    const nextRank = paymentProgressStatusRank(nextStatus)
+    const amount = Math.abs(Number(row.amount) || 0)
+    if (!current || nextRank > currentRank || amount > Math.abs(Number(current.amount) || 0)) {
+      rowsByProfile.set(profileId, {
+        profileId,
+        memberIds: row.memberIds || row.member_ids || memberIdsForProfile(profileId, members),
+        name: row.name || row.memberName || row.member_name || findProfileMember(profileId, members)?.displayName || findProfileMember(profileId, members)?.name || 'Thành viên',
+        amount,
+        status: nextStatus,
+        sourceSummary: row.sourceSummary || row.source_summary || `${safeArray(row.sources).length || 1} nguồn tiền`,
+      })
+    }
+  }
+
+  safeArray(profileBreakdown)
+    .filter(row => Number(row.amount) < 0)
+    .forEach(row => putRow({
+      ...row,
+      amount: Math.abs(Number(row.amount) || 0),
+      status: Number(row.pendingAmount) > 0 ? 'pending' : 'unpaid',
+      sourceSummary: safeArray(row.sources).length ? `${safeArray(row.sources).length} nguồn tiền` : 'Nguồn tiền',
+    }))
+
+  safeArray(state?.notifications)
+    .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
+    .forEach(notification => {
+      const metadata = notification?.metadata || {}
+      const status = String(metadata.status || 'pending').toLowerCase()
+      if (status === 'deleted' || status === 'rejected') return
+      if (monthLabel && metadata.monthLabel && String(metadata.monthLabel) !== String(monthLabel)) return
+      const actorMemberId = notification.actorMemberId || notification.actor_member_id || ''
+      const actorProfileId = profileIdForMember(actorMemberId, members)
+      const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
+      if (coveredMembers.length > 0) {
+        coveredMembers.forEach(member => putRow({
+          profileId: member.profileId || member.profile_id || profileIdForMember(member.memberId || member.member_id, members),
+          memberId: member.memberId || member.member_id,
+          memberIds: member.memberIds || member.member_ids,
+          name: member.name || metadata.memberName,
+          amount: member.amount || metadata.amount,
+          status,
+          sourceSummary: 'Đã báo thanh toán',
+        }))
+        return
+      }
+      putRow({
+        profileId: actorProfileId,
+        memberId: actorMemberId,
+        name: metadata.memberName || notification.actorName || notification.actor_name,
+        amount: metadata.amount,
+        status,
+        sourceSummary: 'Đã báo thanh toán',
+      })
+    })
+
+  return [...rowsByProfile.values()]
+    .sort((a, b) => paymentProgressStatusRank(b.status) - paymentProgressStatusRank(a.status) || b.amount - a.amount || a.name.localeCompare(b.name, 'vi'))
+}
+
+function paymentProgressStatusRank(status) {
+  const value = String(status || '').toLowerCase()
+  if (value === 'confirmed') return 3
+  if (value === 'pending') return 2
+  return 1
 }
 
 function adjustedProfileBreakdownForPayments(state, profileBreakdown, members, monthDate) {
