@@ -1114,6 +1114,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   )
   const monthSessions = getStateMonthSessions(state, today)
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
+  const overviewScheduleTime = configuredPickleScheduleTime(state, currentYearMonth)
   const shouldAutoGenerate = !state?._pickleRegenInProgress && hasMissingGeneratedSessions(state, currentYearMonth, monthSessions, autoGenerateConfig)
   const completedSessions = monthSessions.filter(s => isDoneStatus(s?.status)).length
   const summary = pickleSummary(pickle || {})
@@ -1138,7 +1139,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
     monthLabel: formatMonthLabel(today),
     memberCount: activeMemberIds.length,
-    todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members) : null,
+    todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime) : null,
     progress: {
       attended: completedSessions,
       total: monthSessions.length || 1,
@@ -1788,8 +1789,7 @@ function buildPickleballSettingsData(state) {
     if (wantedDays.has(WEEK_LABELS_LOCAL[dt.getDay()])) calcSessions++
   }
   const sessionsCount = calcSessions > 0 ? calcSessions : Math.max(sessions.length, 1)
-  const scheduleTime = monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time ||
-    config?.scheduleTime || config?.schedule_time || config?.timeRange || group?.scheduleTime || '19:00 – 21:00'
+  const scheduleTime = configuredPickleScheduleTime(state, currentYearMonth, '19:00 – 21:00')
   const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
   const memberIds = billingMembers.map(m => m.id || m.member_id).filter(Boolean)
   const activeMonthlyMemberIds = memberIds
@@ -3245,6 +3245,15 @@ function currentMonthlyPickleConfig(state, yearMonth) {
     )) || {}
 }
 
+function configuredPickleScheduleTime(state, yearMonth, fallback = '') {
+  const group = currentGroup(state)
+  const config = currentPickleConfig(state)
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  return monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time ||
+    config?.scheduleTime || config?.schedule_time || config?.timeRange ||
+    group?.scheduleTime || group?.schedule_time || fallback
+}
+
 function normalizeWeekdays(value) {
   if (Array.isArray(value) && value.length > 0) return value.map(toWeekdayShort).filter(Boolean)
   if (typeof value === 'string' && value.trim()) return value.split(/[,\s]+/).map(toWeekdayShort).filter(Boolean)
@@ -4008,12 +4017,12 @@ function toTodaySessionCard(session, pickle, members) {
   }
 }
 
-function toOverviewSessionCard(session, pickle, members) {
+function toOverviewSessionCard(session, pickle, members, scheduleTime = '') {
   return {
     id: session.id,
     number: sessionNumber(session, uniqueSessions([...safeArray(pickle?.sessions), ...safeArray(pickle?.upcoming)])),
     statusLabel: isToday(sessionDate(session)) ? 'Hôm nay' : 'Buổi tới',
-    timeRange: sessionTimeRange(session),
+    timeRange: scheduleTime || sessionTimeRange(session),
     dateLabel: formatDayMonth(sessionDate(session)),
     venue: sessionCourt(session),
     present: sessionMemberIds(session).length,

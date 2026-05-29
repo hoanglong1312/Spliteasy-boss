@@ -419,3 +419,26 @@ test('overview exposes a dynamic next-session label for the progress card', () =
   const nextData = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'a', state.members)
   assert.equal(nextData.todaySession.statusLabel, 'Buổi tới')
 })
+
+test('overview session card uses the configured month schedule time', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'a',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', scheduleTime: '19:00 – 21:00' },
+    members: [
+      { id: 'a', groupId: 'g1', name: 'An', memberType: 'fixed', isActive: true },
+      { id: 'b', groupId: 'g1', name: 'Bình', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 0, schedule_time: '18:30 – 20:30' }],
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-21', status: 'scheduled', startTime: '19:00', attendees: ['a'] },
+      ],
+    },
+    _allPickle: { sessions: [], externalTickets: [] },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'a', state.members)
+  assert.equal(data.todaySession.timeRange, '18:30 – 20:30')
+})
