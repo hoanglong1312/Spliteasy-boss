@@ -153,12 +153,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         </ModuleHero>
 
-        <GroupManagementPanel
-          inviteCode={d.inviteCode}
-          onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
-          onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
-        />
-
         {/* Treasurer actions */}
         {isTreasurer && (
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -252,6 +246,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             )}
           </div>
         )}
+
+        <GroupManagementPanel
+          inviteCode={d.inviteCode}
+          onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
+          onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
+        />
       </Screen>
       )}
 

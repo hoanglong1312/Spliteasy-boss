@@ -110,6 +110,13 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(screenDataSource, /balanceRows: groupMembers/);
 });
 
+test('GroupDetail places the group invite share panel at the bottom of the page content', () => {
+  const managementPanelIndex = groupDetailSource.indexOf('<GroupManagementPanel')
+  const membersContentIndex = groupDetailSource.indexOf("{activeTab === 'members' &&")
+
+  assert.ok(managementPanelIndex > membersContentIndex)
+});
+
 test('SettleAll shows refund bank readiness instead of QR when the member has surplus', () => {
   assert.match(screenDataSource, /function buildSettleAllData\(state\)/);
   assert.match(screenDataSource, /const sourceBalances = buildHomeSourceBalances/);
