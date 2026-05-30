@@ -270,9 +270,6 @@ export default function AppV2() {
 
   // Returns { authToken, memberId, groupId, memberName } or null
   async function resolveRecentSessionToken(session) {
-    if (session?.authToken && session?.memberId) {
-      return { authToken: session.authToken, memberId: session.memberId, groupId: session.groupId, memberName: session.memberName }
-    }
     const sb = createSupabase()
 
     // Profile-based session: lookup member at runtime via profile_id + group_id
@@ -289,6 +286,7 @@ export default function AppV2() {
     }
 
     if (!session?.memberId) return null
+    // Always use RPC to get a fresh token — cached JWT may be expired
     const { data, error } = await sb.rpc('resume_recent_member_session', {
       p_member_id: session.memberId,
       p_member_name: session.memberName || '',
