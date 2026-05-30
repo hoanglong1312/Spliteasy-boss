@@ -48,7 +48,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
 
   return (
     <PhoneFrame>
-      <Screen style={{ paddingBottom: '72px' }}>
+      <Screen>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
           <div>
@@ -88,7 +88,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
             style={{
               flex: '0 0 auto',
               padding: '7px 13px',
-              borderRadius: 100,
+              borderRadius: 10,
               border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
               background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
               color: mineOnly ? '#6ee7b7' : colors.textSecondary,

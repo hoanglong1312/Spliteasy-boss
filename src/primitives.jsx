@@ -57,7 +57,7 @@ export function Screen({ children, style }) {
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
       boxSizing: 'border-box',
-      padding: '0 16px calc(110px + var(--safe-bottom, 0px))',
+      padding: '0 16px calc(90px + var(--safe-bottom, 0px))',
       ...style,
     }}>{children}</div>
   );
@@ -82,12 +82,12 @@ const TAB_ITEMS = [
 export function TabBar({ active = 'home', onChange, onFab }) {
   return (
     <div style={{
-      position: 'absolute', bottom: 0, left: 0, right: 0, height: 'calc(84px + var(--safe-bottom, 0px))',
+      position: 'absolute', bottom: 0, left: 0, right: 0, height: 'calc(68px + var(--safe-bottom, 0px))',
       background: 'rgba(7,8,15,0.9)',
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       borderTop: `1px solid ${colors.borderSubtle}`,
       display: 'flex', alignItems: 'flex-start',
-      padding: '10px 8px calc(24px + var(--safe-bottom, 0px))', zIndex: 20,
+      padding: '10px 8px calc(8px + var(--safe-bottom, 0px))', zIndex: 20,
     }}>
       {TAB_ITEMS.slice(0, 2).map(t => (
         <TabItem key={t.key} tabKey={t.key} label={t.label} active={active === t.key} onClick={() => onChange?.(t.key)} />

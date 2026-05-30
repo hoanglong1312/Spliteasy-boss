@@ -66,7 +66,7 @@ export const type = {
 export const radius = {
   card:   16,
   inner:  10,
-  hero:   20,
+  hero:   16,
   pill:   100,
   phone:  38,
 };
