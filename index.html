@@ -42,9 +42,7 @@
   * { box-sizing: border-box; }
   :root { --screen-top: 44px; --safe-bottom: 0px; --tab-bar-height: 68px; }
 @media (max-width: 500px) {
-  /* position:fixed on html+body prevents iOS Safari from scrolling window when keyboard opens */
-  html, body { position: fixed; width: 100%; overflow: hidden; }
-  :root { --screen-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
+:root { --screen-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
   [data-spliteasy-phone-frame] {
     width: 100% !important;
     height: 100dvh !important;

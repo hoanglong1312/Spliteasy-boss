@@ -173,6 +173,19 @@ export default function AppV2() {
   const [, setRecentSessionVersion] = useState(0)
   const [homePaymentOpen, setHomePaymentOpen] = useState(false)
 
+  // Reset iOS scroll when keyboard closes (visualViewport height increases)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    let prevHeight = vv.height
+    const onResize = () => {
+      if (vv.height > prevHeight) window.scrollTo(0, 0)
+      prevHeight = vv.height
+    }
+    vv.addEventListener('resize', onResize)
+    return () => vv.removeEventListener('resize', onResize)
+  }, [])
+
   useEffect(() => {
     if (!publicBillToken) return
     let alive = true
