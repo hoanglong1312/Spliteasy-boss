@@ -27,7 +27,7 @@ export default function SettleAll({ data, onAction }) {
             </div>
             <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>{d.monthLabel || d.groupName || 'Tháng này'}</div>
           </div>
-          <IconButton onClick={() => onAction?.('profile')}>💳</IconButton>
+          <IconButton onClick={() => onAction?.('tab', 'profile')}>💳</IconButton>
         </div>
 
         <Hero variant="violet">

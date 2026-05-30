@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
-import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession, clearPinnedSession } from './lib/auth.js'
+import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
@@ -442,13 +442,6 @@ export default function AppV2() {
       }
       setRecentSessionVersion(version => version + 1)
       dispatch({ type: 'SHOW_TOAST', message: 'Đã xóa tài khoản gần đây trên máy này.' })
-      return
-    }
-
-    if (type === 'clearPinnedSession') {
-      clearPinnedSession()
-      setRecentSessionVersion(version => version + 1)
-      dispatch({ type: 'SHOW_TOAST', message: 'Đã bỏ ghim đăng nhập nhanh.' })
       return
     }
 
