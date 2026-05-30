@@ -1887,7 +1887,7 @@ export default function AppV2() {
 
   if (publicBillToken) {
     return (
-      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
         <MemberBillShare data={publicBillData} loading={publicBillLoading} onOpenApp={() => openMemberBillInApp(publicBillToken)} />
       </div>
     )
@@ -1895,7 +1895,7 @@ export default function AppV2() {
 
   if (accessLinkLoading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#07080f', color: colors.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: type.family }}>
+      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f', color: colors.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: type.family }}>
         Đang mở link đăng nhập...
       </div>
     )
@@ -1903,7 +1903,7 @@ export default function AppV2() {
 
   if (awaitingPin) {
     return (
-      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
         <PinEntryScreen
           error={pinError}
           value={pinInput}
@@ -1916,7 +1916,7 @@ export default function AppV2() {
 
   if (!state.currentUserId) {
     return (
-      <div style={{ minHeight: '100vh', background: '#07080f' }}>
+      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
         <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
       </div>
     )
