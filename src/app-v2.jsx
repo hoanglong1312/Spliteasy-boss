@@ -1930,23 +1930,19 @@ export default function AppV2() {
     )
   }
 
-  if (awaitingPin) {
-    return (
-      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
-        <PinEntryScreen
-          error={pinError}
-          value={pinInput}
-          onChange={updatePinInput}
-          onSubmit={submitPin}
-        />
-      </div>
-    )
-  }
+  const pinProps = awaitingPin ? {
+    pinSession: pendingPinSession,
+    pinValue: pinInput,
+    pinError,
+    onPinChange: updatePinInput,
+    onPinSubmit: submitPin,
+    onPinCancel: () => { setAwaitingPin(false); setPendingPinSession(null); setPinError(''); setPinInput('') },
+  } : {}
 
   if (!state.currentUserId) {
     return (
       <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
-        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
+        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} {...pinProps} />
       </div>
     )
   }
@@ -2052,7 +2048,7 @@ export default function AppV2() {
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
-      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession() }} onAction={handle} />
+      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession() }} onAction={handle} {...pinProps} />
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />
       case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'new-group':           return <NewGroup data={newGroupData} onAction={handle} />

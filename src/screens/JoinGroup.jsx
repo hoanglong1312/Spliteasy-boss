@@ -6,7 +6,7 @@ import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink } fro
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel } from '../primitives';
 
-export default function JoinGroup({ data, onAction }) {
+export default function JoinGroup({ data, onAction, pinSession, pinValue = '', pinError = '', onPinChange, onPinSubmit, onPinCancel }) {
   const d = data || DEMO;
   const [code, setCode] = useState(d.joinCode || d.code || '');
   const [selected, setSelected] = useState(d.selectedName);
@@ -138,27 +138,77 @@ export default function JoinGroup({ data, onAction }) {
                   fontSize: 9, fontWeight: 800, letterSpacing: '1.2px',
                   color: '#fcd34d', textTransform: 'uppercase', marginBottom: 10,
                 }}>👑 Đăng nhập nhanh · Admin</div>
-                <button
-                  type="button"
-                  onClick={() => onAction?.('resumeRecentSession', pinnedSession)}
-                  style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 12,
-                    background: 'rgba(251,191,36,0.08)',
-                    border: '1px solid rgba(251,191,36,0.25)',
-                    color: colors.textPrimary, fontFamily: 'inherit', cursor: 'pointer',
-                    textAlign: 'left',
-                  }}
-                >
-                  <Avatar initial={(pinnedSession.memberName || 'A')[0]} size={38} color="rgba(251,191,36,0.25)" ring={false} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 15, fontWeight: 900 }}>{pinnedSession.memberName}</div>
-                    <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 2, fontWeight: 600 }}>
-                      {pinnedSession.groupName || 'Thủ quỹ'}{pinnedSession.hasPin ? ' · 🔐 PIN' : ''}
+                {(() => {
+                  const isPinnedPin = pinSession?.memberId === pinnedSession?.memberId
+                  return (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => !isPinnedPin && onAction?.('resumeRecentSession', pinnedSession)}
+                        style={{
+                          width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                          padding: '12px 14px', borderRadius: isPinnedPin ? '12px 12px 0 0' : 12,
+                          background: 'rgba(251,191,36,0.08)',
+                          border: '1px solid rgba(251,191,36,0.25)',
+                          borderBottom: isPinnedPin ? 'none' : undefined,
+                          color: colors.textPrimary, fontFamily: 'inherit', cursor: isPinnedPin ? 'default' : 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <Avatar initial={(pinnedSession.memberName || 'A')[0]} size={38} color="rgba(251,191,36,0.25)" ring={false} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 900 }}>{pinnedSession.memberName}</div>
+                          <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 2, fontWeight: 600 }}>
+                            {pinnedSession.groupName || 'Thủ quỹ'}{pinnedSession.hasPin ? ' · 🔐 PIN' : ''}
+                          </div>
+                        </div>
+                        {!isPinnedPin && <span style={{ fontSize: 20, color: '#fcd34d' }}>›</span>}
+                      </button>
+                      {isPinnedPin && (
+                        <div style={{
+                          borderRadius: '0 0 12px 12px',
+                          border: '1px solid rgba(251,191,36,0.25)',
+                          borderTop: '1px solid rgba(251,191,36,0.1)',
+                          background: 'rgba(251,191,36,0.04)',
+                          padding: '12px 14px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: 8,
+                        }}>
+                          <input
+                            type="password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            autoFocus
+                            value={pinValue}
+                            onChange={e => onPinChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
+                            placeholder="Nhập mã PIN"
+                            style={{
+                              width: '100%', fontSize: 15, padding: '9px 12px', borderRadius: 8,
+                              border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(251,191,36,0.3)'}`,
+                              background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
+                              fontFamily: 'inherit', outline: 'none', letterSpacing: '0.1em',
+                            }}
+                          />
+                          {pinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{pinError}</div>}
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button type="button" onClick={onPinCancel} style={{
+                              flex: 1, padding: '9px 0', borderRadius: 8,
+                              border: `1px solid ${colors.borderNormal}`, background: 'transparent',
+                              color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            }}>Hủy</button>
+                            <button type="button" onClick={onPinSubmit} style={{
+                              flex: 2, padding: '9px 0', borderRadius: 8,
+                              border: 'none', background: 'rgba(251,191,36,0.9)', color: '#000',
+                              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                            }}>Xác nhận</button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <span style={{ fontSize: 20, color: '#fcd34d' }}>›</span>
-                </button>
+                  )
+                })()}
               </div>
             )}
           </div>
@@ -187,68 +237,143 @@ export default function JoinGroup({ data, onAction }) {
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {recentSessions.map(session => (
-                <div
-                  key={session.memberId}
-                  style={{
-                    width: '100%',
-                    padding: 0,
-                    borderRadius: 12,
-                    border: `1px solid ${colors.borderSubtle}`,
-                    background: 'rgba(15,23,42,0.72)',
-                    color: colors.textPrimary,
-                    fontFamily: 'inherit',
-                    display: 'flex',
-                    alignItems: 'center',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onAction?.('resumeRecentSession', session)}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      padding: '12px 10px 12px 13px',
-                      border: 'none',
-                      background: 'transparent',
+              {recentSessions.map(session => {
+                const isPinRow = pinSession?.memberId === session.memberId
+                return (
+                  <div key={session.memberId} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    <div style={{
+                      width: '100%',
+                      padding: 0,
+                      borderRadius: isPinRow ? '12px 12px 0 0' : 12,
+                      border: `1px solid ${isPinRow ? 'rgba(99,102,241,0.5)' : colors.borderSubtle}`,
+                      borderBottom: isPinRow ? 'none' : undefined,
+                      background: isPinRow ? 'rgba(99,102,241,0.1)' : 'rgba(15,23,42,0.72)',
                       color: colors.textPrimary,
                       fontFamily: 'inherit',
-                      textAlign: 'left',
-                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
-                    }}
-                  >
-                    <Avatar initial={(session.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
-                      <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {session.groupName || 'Bấm để vào lại'}{session.hasPin ? ' · Có PIN' : ''}
-                      </span>
-                    </span>
-                    <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Xóa tài khoản gần đây ${session.memberName || 'Thành viên'}`}
-                    onClick={() => onAction?.('removeRecentSession', session)}
-                    style={{
-                      width: 42,
-                      alignSelf: 'stretch',
-                      border: 'none',
-                      borderLeft: `1px solid ${colors.borderSubtle}`,
-                      background: 'rgba(248,113,113,0.08)',
-                      color: '#fca5a5',
-                      fontSize: 18,
-                      fontWeight: 900,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                    }}
-                  >×</button>
-                </div>
-              ))}
+                      overflow: 'hidden',
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => !isPinRow && onAction?.('resumeRecentSession', session)}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          padding: '12px 10px 12px 13px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: colors.textPrimary,
+                          fontFamily: 'inherit',
+                          textAlign: 'left',
+                          cursor: isPinRow ? 'default' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                        }}
+                      >
+                        <Avatar initial={(session.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
+                          <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {session.groupName || 'Bấm để vào lại'}{session.hasPin ? ' · Có PIN' : ''}
+                          </span>
+                        </span>
+                        {!isPinRow && <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>}
+                      </button>
+                      {!isPinRow && (
+                        <button
+                          type="button"
+                          aria-label={`Xóa tài khoản gần đây ${session.memberName || 'Thành viên'}`}
+                          onClick={() => onAction?.('removeRecentSession', session)}
+                          style={{
+                            width: 42,
+                            alignSelf: 'stretch',
+                            border: 'none',
+                            borderLeft: `1px solid ${colors.borderSubtle}`,
+                            background: 'rgba(248,113,113,0.08)',
+                            color: '#fca5a5',
+                            fontSize: 18,
+                            fontWeight: 900,
+                            fontFamily: 'inherit',
+                            cursor: 'pointer',
+                          }}
+                        >×</button>
+                      )}
+                    </div>
+                    {isPinRow && (
+                      <div style={{
+                        borderRadius: '0 0 12px 12px',
+                        border: '1px solid rgba(99,102,241,0.5)',
+                        borderTop: '1px solid rgba(99,102,241,0.2)',
+                        background: 'rgba(99,102,241,0.06)',
+                        padding: '12px 13px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          maxLength={6}
+                          autoFocus
+                          value={pinValue}
+                          onChange={e => onPinChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
+                          placeholder="Nhập mã PIN"
+                          style={{
+                            width: '100%',
+                            fontSize: 15,
+                            padding: '9px 12px',
+                            borderRadius: 8,
+                            border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
+                            background: 'rgba(0,0,0,0.3)',
+                            color: colors.textPrimary,
+                            fontFamily: 'inherit',
+                            outline: 'none',
+                            letterSpacing: '0.1em',
+                          }}
+                        />
+                        {pinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{pinError}</div>}
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            type="button"
+                            onClick={onPinCancel}
+                            style={{
+                              flex: 1,
+                              padding: '9px 0',
+                              borderRadius: 8,
+                              border: `1px solid ${colors.borderNormal}`,
+                              background: 'transparent',
+                              color: colors.textSecondary,
+                              fontFamily: 'inherit',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >Hủy</button>
+                          <button
+                            type="button"
+                            onClick={onPinSubmit}
+                            style={{
+                              flex: 2,
+                              padding: '9px 0',
+                              borderRadius: 8,
+                              border: 'none',
+                              background: 'rgba(99,102,241,0.9)',
+                              color: '#fff',
+                              fontFamily: 'inherit',
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >Xác nhận</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </Card>
         )}
