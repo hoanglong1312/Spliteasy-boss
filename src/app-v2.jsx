@@ -391,6 +391,8 @@ export default function AppV2() {
         dispatch({ type: 'SHOW_TOAST', message: 'Không vào lại được tài khoản này. Nhờ thủ quỹ gửi link mới nếu tên đã bị xóa hoặc đổi.' })
         return
       }
+      setStack([])
+      setActiveTab('home')
       await dispatch({
         type: 'LOGIN',
         token: resolved.authToken,
@@ -398,8 +400,6 @@ export default function AppV2() {
         groupId: resolved.groupId,
         memberName: resolved.memberName,
       })
-      setStack([])
-      setActiveTab('home')
       return
     }
 
