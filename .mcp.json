@@ -1,13 +1,20 @@
 {
   "mcpServers": {
-    "codex": {
+    "chrome-devtools": {
       "type": "stdio",
-      "command": "codex",
+      "command": "/Users/giinlow./.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
       "args": [
-        "mcp-server"
+        "/usr/local/lib/node_modules/npm/bin/npx-cli.js",
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--isolated",
+        "--experimentalPageIdRouting",
+        "--no-usage-statistics",
+        "--no-performance-crux"
       ],
       "env": {
-        "NINEROUTER_API_KEY": "${NINEROUTER_API_KEY}"
+        "PATH": "/Users/giinlow./.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin:/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+        "npm_config_prefix": "/usr/local"
       }
     },
     "supabase": {

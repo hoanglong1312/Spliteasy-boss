@@ -205,13 +205,13 @@ test('member access link creator helper is profile-aware across duplicate member
 test('member bill link card is scoped to managers or the current member', () => {
   const memberDetailSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberDetailPanel'),
-    groupDetailSource.indexOf('function MiniBillStat')
+    groupDetailSource.indexOf('function BalanceBreakdownRow')
   )
 
   assert.match(memberDetailSource, /const canCreatePersonalLink = Boolean\(isTreasurer \|\| member\.isCurrentUser\)/)
   assert.match(memberDetailSource, /if \(!canCreatePersonalLink\) return/)
-  assert.match(memberDetailSource, /\{canCreatePersonalLink && \(\s*<Card style=\{\{ marginTop: 14 \}\}>/)
-  assert.match(memberDetailSource, /groupName=\{groupName\}/)
+  assert.match(memberDetailSource, /\{canCreatePersonalLink && \(\s*<Card style=\{\{ marginTop: 12 \}\}>/)
+  assert.match(groupDetailSource, /<MemberDetailPanel[\s\S]*?groupName=\{d\.name\}/)
 })
 
 test('member access links allow members to create their own bill link only', () => {

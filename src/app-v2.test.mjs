@@ -104,7 +104,12 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /if \(!isPickleballGroup\) return/)
   assert.match(appSource, /\.update\(\{ is_active: false \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
   assert.match(appSource, /if \(type === 'reactivateMember'\)/)
-  assert.match(appSource, /\.update\(isPickleballGroup \? \{ member_type: 'fixed', is_active: true \} : \{ expense_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
+  const reactivateBlock = appSource.slice(
+    appSource.indexOf("if (type === 'reactivateMember')"),
+    appSource.indexOf("if (type === 'addTicket')")
+  )
+  assert.match(reactivateBlock, /\.update\(\{ member_type: 'fixed', is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
+  assert.match(reactivateBlock, /\.rpc\('add_expense_group_member', \{[\s\S]*?p_group_id: targetGroupId,[\s\S]*?p_member_id: memberId,/)
 })
 
 test('AppV2 uses the profile-aware role RPC for expense groups', () => {

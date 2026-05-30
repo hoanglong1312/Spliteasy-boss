@@ -354,15 +354,16 @@ test('GroupDetail member detail exposes clear treasurer edit access', () => {
 test('GroupDetail member detail stacks the balance chip under identity on mobile', () => {
   const memberDetailSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberDetailPanel'),
-    groupDetailSource.indexOf('function MiniBillStat')
+    groupDetailSource.indexOf('function BalanceBreakdownRow')
   );
 
-  assert.match(memberDetailSource, /flexDirection: 'column'/);
-  assert.match(memberDetailSource, /width: '100%'/);
+  assert.match(memberDetailSource, /alignItems: 'baseline'/);
   assert.match(memberDetailSource, /justifyContent: 'space-between'/);
   assert.match(memberDetailSource, /overflow: 'hidden'/);
   assert.match(memberDetailSource, /textOverflow: 'ellipsis'/);
   assert.doesNotMatch(memberDetailSource, /minWidth: 108/);
+  assert.match(memberDetailSource, /<BalanceBreakdownRow label="Cần trả"/);
+  assert.match(memberDetailSource, /<BalanceBreakdownRow label="Đã ứng"/);
 });
 
 test('GroupDetail delete member does not depend on native confirm dialogs', () => {
@@ -392,7 +393,7 @@ test('GroupDetail hides member detail bank accounts from non-treasurers', () => 
   );
   assert.doesNotMatch(memberDetailSource, /canViewMemberBank/);
   assert.doesNotMatch(memberDetailSource, /Ẩn với thành viên khác/);
-  assert.match(memberDetailSource, /\{isTreasurer && \(\s*<Card style=\{\{ marginTop: 14 \}\}>\s*<SectionTitle>THÔNG TIN NHẬN HOÀN ỨNG<\/SectionTitle>/);
+  assert.match(memberDetailSource, /\{isTreasurer && \(\s*<Card style=\{\{ marginTop: 12 \}\}>\s*<SectionTitle>THÔNG TIN NHẬN HOÀN ỨNG<\/SectionTitle>/);
   assert.match(memberDetailSource, /<InfoLine label="Ngân hàng" value=\{member\.bankName \|\| 'Chưa cập nhật'\} \/>/);
   assert.match(memberDetailSource, /<InfoLine label="STK ngân hàng" value=\{member\.bankAccount \|\| 'Chưa cập nhật'\} \/>/);
   assert.match(screenDataSource, /isCurrentUser: String\(member\.id\) === String\(currentGroupMember\?\.id \|\| ''\)/);
@@ -406,7 +407,7 @@ test('Screen data excludes inactive memberships from group member lists', () => 
 test('GroupDetail member detail shows payer transactions for the selected month', () => {
   const memberDetailSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberDetailPanel'),
-    groupDetailSource.indexOf('function MiniBillStat')
+    groupDetailSource.indexOf('function BalanceBreakdownRow')
   );
   const memberTransactionSource = groupDetailSource.slice(
     groupDetailSource.indexOf('function MemberTransactionRow'),
@@ -422,7 +423,6 @@ test('GroupDetail member detail shows payer transactions for the selected month'
   assert.match(groupDetailSource, /placeholder="Tìm tên, ngày, loại chi phí, người trả\.\.\."/);
   assert.match(groupDetailSource, /transaction\.date/);
   assert.doesNotMatch(memberDetailSource, /<NetBillStat value=\{summary\.net\} \/>/);
-  assert.match(memberDetailSource, /gridTemplateColumns: '1fr 1fr'/);
   assert.doesNotMatch(memberDetailSource, /\{ key: 'settled', label: 'Cân bằng' \}/);
   assert.match(groupDetailSource, /function MemberTransactionRow\(\{ transaction, onOpen \}\)/);
   assert.doesNotMatch(groupDetailSource, /function NetBillStat\(\{ value \}\)/);
@@ -512,7 +512,7 @@ test('Store preserves expense group creator for group-level management', () => {
 });
 
 test('Home activity list filters by title, status, and category', () => {
-  assert.match(homeSource, /import React, \{ useState \} from 'react'/);
+  assert.match(homeSource, /import React, \{ useState, useEffect \} from 'react'/);
   assert.match(homeSource, /const \[filterText, setFilterText\] = useState\(''\)/);
   assert.match(homeSource, /const \[statusFilter, setStatusFilter\] = useState\('all'\)/);
   assert.match(homeSource, /const \[categoryFilter, setCategoryFilter\] = useState\('all'\)/);
@@ -632,14 +632,20 @@ test('Home payment sheet gives treasurers a payment progress dashboard', () => {
   assert.match(screenDataSource, /status: Number\(row\.pendingAmount\) > 0 \? 'pending' : 'unpaid'/);
   assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{data\?\.paymentProgress \|\| \[\]\}[\s\S]*paymentRecords=\{paymentRecords\}/);
   assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund \}\)/);
-  assert.match(homeSource, /Tiến độ thu tiền/);
+  assert.match(homeSource, /Tiến độ thu/);
   assert.match(homeSource, /Đã nhận/);
-  assert.match(homeSource, /Chờ xác nhận/);
-  assert.match(homeSource, /Chưa thanh toán/);
+  assert.match(homeSource, /Chờ duyệt/);
+  assert.match(homeSource, /Chưa thu/);
   assert.match(homeSource, /Cần hoàn tiền/);
   assert.match(homeSource, /Còn chưa thanh toán/);
   assert.match(homeSource, /onAction\?\.\('confirmPaymentNotice', record\)/);
   assert.match(homeSource, /onAction\?\.\('rejectPaymentNotice', record\)/);
+  assert.match(homeSource, /onSelect=\{\(\) => setShareMember\(\{[\s\S]*memberId: record\.memberId \|\| record\.member_id/);
+  assert.match(homeSource, /onSelect=\{\(\) => setShareMember\(\{[\s\S]*memberId: row\.linkMemberId \|\| row\.memberId/);
+  assert.match(homeSource, /function MemberShareLinkSheet\(\{ member, monthLabel, onAction, onClose \}\)/);
+  assert.match(homeSource, /onAction\?\.\('createMemberBillShare', \{ groupId: member\.groupId, memberId: member\.memberId, copy: false \}\)/);
+  assert.match(homeSource, /gridTemplateColumns: 'minmax\(0,1fr\) minmax\(0,1fr\) minmax\(0,1fr\)'/);
+  assert.match(homeSource, /maxHeight: 320, overflowY: 'auto'/);
 });
 
 test('GroupDetail no longer shows treasurer pending approval alert outside activity', () => {

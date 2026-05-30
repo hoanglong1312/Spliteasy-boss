@@ -77,6 +77,22 @@ export default function AddExpense({ data, onAction }) {
         opacity: 0.55,
       }} />
 
+      {/* Back button */}
+      <button
+        type="button"
+        aria-label="Quay lại"
+        onClick={() => onAction?.('back')}
+        style={{
+          position: 'absolute', top: 12, left: 16, zIndex: 30,
+          width: 38, height: 38, borderRadius: 12,
+          background: colors.inputBg,
+          border: `1px solid ${colors.borderSubtle}`,
+          color: colors.textPrimary,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, fontFamily: 'inherit', cursor: 'pointer',
+        }}
+      >←</button>
+
       <div style={{
         position: 'relative',
         height: '100%',

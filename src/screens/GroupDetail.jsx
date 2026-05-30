@@ -701,47 +701,31 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       </div>
 
       <Hero variant="emerald" glow={false} style={{ padding: 18, borderRadius: 20 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
-            <Avatar initial={member.initials} size={68} color={member.color} photoUrl={member.photoUrl} ring style={{ border: '4px solid rgba(7,8,15,0.85)', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 26, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-                {member.role === 'treasurer' && <Badge tone="warn">Thủ quỹ</Badge>}
-                <Badge tone="success">Thành viên</Badge>
-              </div>
-              <GroupNamePill groupName={groupName} />
-            </div>
-          </div>
-          <div style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            padding: '11px 12px',
-            borderRadius: 14,
-            background: 'rgba(7,8,15,0.36)',
-            border: '1px solid rgba(255,255,255,0.12)',
-          }}>
-            <div style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: '1px' }}>{balanceLabel}</div>
-            <div style={{ fontSize: 18, fontWeight: 950, color: balanceTone, whiteSpace: 'nowrap', ...type.mono }}>
-              {balanceAmountLabel}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          <Avatar initial={member.initials} size={56} color={member.color} photoUrl={member.photoUrl} ring style={{ border: '4px solid rgba(7,8,15,0.85)', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 22, fontWeight: 900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.name}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {member.role === 'treasurer' && <Badge tone="warn">THỦ QUỸ</Badge>}
+              <Badge tone="success">Thành viên</Badge>
             </div>
           </div>
         </div>
       </Hero>
 
-      <Card style={{ marginTop: 14 }}>
-        <SectionTitle>TỔNG QUAN GIAO DỊCH</SectionTitle>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-          <MiniBillStat label="Cần trả" value={summary.owes} tone={colors.danger} />
-          <MiniBillStat label="Đã ứng" value={summary.advanced} tone="#6ee7b7" />
+      <Card accent="finance" style={{ marginTop: 12 }}>
+        <SectionTitle>SỐ DƯ THÁNG NÀY</SectionTitle>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginTop: 10, minWidth: 0 }}>
+          <div style={{ fontSize: 26, fontWeight: 900, color: balanceTone, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...type.mono }}>{balanceAmountLabel}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: balanceTone, textTransform: 'uppercase', letterSpacing: '1px', textAlign: 'right', flexShrink: 0 }}>{balanceLabel}</div>
         </div>
+        <div style={{ height: 1, background: colors.borderSubtle, margin: '12px 0' }} />
+        <BalanceBreakdownRow label="Cần trả" amount={summary.owes} tone={colors.danger} />
+        <BalanceBreakdownRow label="Đã ứng" amount={summary.advanced} tone="#6ee7b7" />
       </Card>
 
       {isTreasurer && (
-        <Card style={{ marginTop: 14 }}>
+        <Card style={{ marginTop: 12 }}>
           <SectionTitle>THÔNG TIN NHẬN HOÀN ỨNG</SectionTitle>
           <InfoLine label="Ngân hàng" value={member.bankName || 'Chưa cập nhật'} />
           <InfoLine label="Chủ tài khoản" value={member.bankAccountName || 'Chưa cập nhật'} />
@@ -750,7 +734,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         </Card>
       )}
 
-      <Card style={{ marginTop: 14 }}>
+      <Card style={{ marginTop: 12 }}>
         <SectionTitle>GIAO DỊCH LIÊN QUAN</SectionTitle>
         <SearchInput
           value={transactionSearch}
@@ -784,7 +768,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       </Card>
 
       {canCreatePersonalLink && (
-        <Card style={{ marginTop: 14 }}>
+        <Card style={{ marginTop: 12 }}>
           <SectionTitle>LINK CÁ NHÂN</SectionTitle>
           <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
             <div style={{
@@ -820,7 +804,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
       {isTreasurer && (
         <Button
           variant="muted"
-          style={{ marginTop: 14, width: '100%', fontSize: 13 }}
+          style={{ marginTop: 12, width: '100%', fontSize: 13 }}
           onClick={() => setMemberActionsOpen(true)}
         >Tùy chọn khác</Button>
       )}
@@ -838,37 +822,11 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
   );
 }
 
-function GroupNamePill({ groupName }) {
-  if (!groupName) return null;
+function BalanceBreakdownRow({ label, amount, tone }) {
   return (
-    <div style={{
-      marginTop: 10,
-      display: 'inline-flex',
-      maxWidth: '100%',
-      padding: '6px 10px',
-      borderRadius: 999,
-      background: 'rgba(7,8,15,0.30)',
-      border: '1px solid rgba(255,255,255,0.12)',
-      color: '#d1fae5',
-      fontSize: 11,
-      fontWeight: 850,
-      lineHeight: 1.2,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-    }}>
-      {groupName}
-    </div>
-  );
-}
-
-function MiniBillStat({ label, value, tone, signed = false }) {
-  const amount = Number(value || 0);
-  const prefix = signed && amount > 0 ? '+' : signed && amount < 0 ? '-' : '';
-  return (
-    <div style={{ padding: 10, borderRadius: 12, background: colors.inputBg, border: `1px solid ${colors.borderSubtle}`, minWidth: 0 }}>
-      <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 800 }}>{label}</div>
-      <div style={{ marginTop: 5, fontSize: 14, fontWeight: 900, color: tone, whiteSpace: 'nowrap', ...type.mono }}>{prefix}{formatVND(Math.abs(amount))}</div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '8px 0', minWidth: 0 }}>
+      <span style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 700 }}>{label}</span>
+      <span style={{ fontSize: 14, fontWeight: 900, color: tone, whiteSpace: 'nowrap', ...type.mono }}>{formatVND(Math.abs(Number(amount) || 0))}</span>
     </div>
   );
 }
@@ -1010,7 +968,12 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
     if (selectedCandidates.length === 0 && !cleanName) return;
     for (const candidate of selectedCandidates) {
       if (candidate.isInactive) {
-        await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId });
+        await onAction?.('reactivateMember', {
+          memberId: candidate.memberId || candidate.id,
+          groupId,
+          name: candidate.name,
+          profileId: candidate.profileId || '',
+        });
         continue;
       }
       await onAction?.('addExpenseGroupMember', {

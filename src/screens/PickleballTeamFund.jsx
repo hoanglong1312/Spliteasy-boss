@@ -217,7 +217,9 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             {paymentDraft.items.map(item => {
               const key = paymentItemKey(item);
               const checked = selectedPaymentKeys.includes(key);
-              const canMarkItemPaid = !item.paid && Number(item.amount) > 0;
+              const hasAmount = Number(item.amount) > 0;
+              const canMarkItemPaid = !item.paid && hasAmount;
+              const selectable = !item.paid && hasAmount;
               return (
                 <div key={key} style={{
                   display: 'flex',
@@ -227,12 +229,13 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                   borderRadius: 10,
                   border: `1px solid ${item.paid ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
                   background: item.paid ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.035)',
-                  opacity: item.paid ? 0.72 : 1,
+                  opacity: item.paid ? 0.72 : !hasAmount ? 0.6 : 1,
                 }}>
                   <input
                     type="checkbox"
                     checked={checked}
-                    disabled={item.paid || Number(item.amount) <= 0}
+                    disabled={!selectable}
+                    style={{ cursor: selectable ? 'pointer' : 'not-allowed' }}
                     onChange={event => {
                       setSelectedPaymentKeys(keys => event.target.checked
                         ? [...keys, key]
@@ -244,7 +247,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 900 }}>{item.label}</div>
                     <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
-                      {item.yearMonth} · {item.paid ? 'Đã trả chủ sân' : 'Chưa chuyển'}
+                      {item.yearMonth} · {item.paid ? 'Đã trả chủ sân' : !hasAmount ? 'Chưa có khoản' : 'Chưa chuyển'}
                     </div>
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : colors.warning, ...type.mono }}>
@@ -285,6 +288,20 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                       </button>
                     </div>
                   ) : (
+                    !hasAmount ? (
+                      <div style={{
+                        padding: '6px 8px',
+                        borderRadius: 999,
+                        background: 'rgba(148,163,184,0.10)',
+                        color: colors.textSecondary,
+                        fontSize: 10,
+                        fontWeight: 900,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
+                      }}>
+                        Chưa có khoản
+                      </div>
+                    ) : (
                     <button
                       type="button"
                       disabled={!canMarkItemPaid || Boolean(itemSavingKey)}
@@ -305,6 +322,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     >
                       {itemSavingKey === key ? 'Đang lưu' : 'Xác nhận đã thanh toán'}
                     </button>
+                    )
                   )}
                 </div>
               );

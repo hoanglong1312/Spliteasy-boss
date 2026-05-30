@@ -842,6 +842,7 @@ function pickleDataGroupIds(allPickle) {
 function inferGroupType(group, pickleGroupIds = new Set()) {
   const explicit = String(group?.type || group?.kind || group?.group_type || '').toLowerCase()
   if (['pickleball', 'expense'].includes(explicit)) return explicit
+  if (group?.linkedPickleballGroupId || group?.linked_pickleball_group_id) return 'expense'
   const id = group?.id
   if (id && pickleGroupIds.has(String(id))) return 'pickleball'
   const text = `${group?.name || ''} ${group?.emoji || ''}`.toLowerCase()
