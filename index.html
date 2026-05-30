@@ -40,7 +40,7 @@
   .screen-anim-back { animation: st-back .32s cubic-bezier(.2,.7,.2,1) both; }
   .screen-anim-fade { animation: st-fade .24s ease-out both; }
   * { box-sizing: border-box; }
-  :root { --screen-top: 44px; }
+  :root { --screen-top: 44px; --safe-bottom: 0px; }
 @media (max-width: 500px) {
   :root { --screen-top: env(safe-area-inset-top); }
   [data-spliteasy-phone-frame] {
@@ -56,11 +56,20 @@
     display: none !important;
   }
 }
+@media (display-mode: standalone) {
+  :root { --safe-bottom: env(safe-area-inset-bottom); }
+}
 </style>
 </head>
 <body style="font-family: Geist, Inter, -apple-system, BlinkMacSystemFont, sans-serif">
 <div id="root"></div>
 
+<script>
+  /* iOS PWA (navigator.standalone) không bắt được bởi display-mode: standalone media query */
+  if (window.navigator.standalone === true) {
+    document.documentElement.style.setProperty('--safe-bottom', 'env(safe-area-inset-bottom)');
+  }
+</script>
 <script type="module" src="/src/main.jsx"></script>
 
 </body>
