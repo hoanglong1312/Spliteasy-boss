@@ -295,9 +295,14 @@ function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel) 
     const nextRank = paymentProgressStatusRank(nextStatus)
     const amount = Math.abs(Number(row.amount) || 0)
     if (!current || nextRank > currentRank || amount > Math.abs(Number(current.amount) || 0)) {
+      const memberIds = row.memberIds || row.member_ids || memberIdsForProfile(profileId, members)
+      const groupSource = safeArray(row.sources).find(source => (source?.sourceType || source?.source_type || 'group') === 'group')
       rowsByProfile.set(profileId, {
         profileId,
-        memberIds: row.memberIds || row.member_ids || memberIdsForProfile(profileId, members),
+        memberIds,
+        memberId: row.memberId || row.member_id || groupSource?.memberId || groupSource?.member_id || memberIds[0] || '',
+        linkGroupId: row.linkGroupId || groupSource?.sourceId || groupSource?.source_id || '',
+        linkMemberId: row.linkMemberId || groupSource?.memberId || groupSource?.member_id || memberIds[0] || '',
         name: row.name || row.memberName || row.member_name || findProfileMember(profileId, members)?.displayName || findProfileMember(profileId, members)?.name || 'Thành viên',
         amount,
         status: nextStatus,
@@ -2412,9 +2417,9 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
 function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment) {
   const waterSessions = monthSessions.filter(s => sessionWaterAmount(s) > 0).length
   return [
-    { icon: '🏸', label: 'Sân của bạn', amount: memberBalance.courtFee, sub: 'Phần của bạn' },
-    { icon: '💧', label: 'Nước của bạn', amount: memberBalance.waterFee, sub: `${waterSessions} buổi có nước` },
-    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: ticketAdjustment, sub: 'Qua quỹ team' },
+    { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' },
+    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước` },
+    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: -ticketAdjustment, sub: 'Qua quỹ team' },
   ]
 }
 

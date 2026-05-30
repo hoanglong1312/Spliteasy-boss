@@ -904,12 +904,13 @@ export default function AppV2() {
       if (!memberId || !targetGroupId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const { error } = await sb
-        .from('members')
-        .update({ expense_active: false })
-        .eq('id', memberId)
-        .eq('group_id', targetGroupId)
+      const { data: rpcResult, error } = await sb
+        .rpc('remove_expense_group_member', {
+          p_group_id: targetGroupId,
+          p_member_id: memberId,
+        })
       if (error) throw error
+      if (rpcResult?.error) throw new Error(rpcResult.error)
       await dispatch({ type: 'REFRESH' })
       return
     }
@@ -941,12 +942,36 @@ export default function AppV2() {
       const isPickleballGroup = isPickleballActionGroup(currentGroup)
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      const { error } = await sb
-        .from('members')
-        .update(isPickleballGroup ? { member_type: 'fixed', is_active: true } : { expense_active: true })
-        .eq('id', memberId)
-        .eq('group_id', targetGroupId)
-      if (error) throw error
+      if (isPickleballGroup) {
+        const { error } = await sb
+          .from('members')
+          .update({ member_type: 'fixed', is_active: true })
+          .eq('id', memberId)
+          .eq('group_id', targetGroupId)
+        if (error) {
+          console.error('[app] reactivateMember pickleball:', error)
+          dispatch({ type: 'SHOW_TOAST', message: `Không thêm lại được: ${error.message || 'lỗi không rõ'}` })
+          return
+        }
+      } else {
+        const target = safeArray(state.members).find(member => String(member.id) === String(memberId)) || {}
+        const memberName = String(payload?.name || target.displayName || target.name || '').trim() || 'Thành viên'
+        const { error, data } = await sb.rpc('add_expense_group_member', {
+          p_group_id: targetGroupId,
+          p_member_id: memberId,
+          p_name: memberName,
+          p_profile_id: target.profileId || target.profile_id || null,
+          p_bank_name: null,
+          p_bank_account: null,
+          p_bank_account_name: null,
+        })
+        if (error) {
+          console.error('[app] reactivateMember expense rpc:', error, { targetGroupId, memberId, memberName })
+          dispatch({ type: 'SHOW_TOAST', message: `Không thêm lại được: ${error.message || 'lỗi không rõ'}` })
+          return
+        }
+        console.log('[app] reactivateMember expense rpc ok:', data, { targetGroupId, memberId })
+      }
       await dispatch({ type: 'REFRESH' })
       return
     }
