@@ -32,7 +32,7 @@ export function PhoneFrame({ children, statusBar = true }) {
 
 export function StatusBar({ time = '9:41' }) {
   return (
-    <div style={{
+    <div data-spliteasy-status-bar style={{
       height: 44, display: 'flex', justifyContent: 'space-between',
       alignItems: 'center', padding: '0 24px',
       fontSize: 14, fontWeight: 600, color: colors.textPrimary,
@@ -48,7 +48,7 @@ export function Screen({ children, style }) {
   return (
     <div style={{
       position: 'absolute',
-      top: 44,
+      top: 'var(--screen-top, 44px)',
       bottom: 0,
       left: 0,
       right: 0,

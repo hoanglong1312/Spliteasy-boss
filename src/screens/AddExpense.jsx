@@ -63,7 +63,7 @@ export default function AddExpense({ data, onAction }) {
   const amountInputWidth = amount ? 220 : 54;
 
   return (
-    <div style={{
+    <div data-spliteasy-phone-frame style={{
       width: 375, height: 812, margin: '24px auto', position: 'relative',
       background: colors.shellBg, borderRadius: 38, overflow: 'hidden',
       border: `1px solid ${colors.borderNormal}`,
@@ -83,7 +83,7 @@ export default function AddExpense({ data, onAction }) {
         aria-label="Quay lại"
         onClick={() => onAction?.('back')}
         style={{
-          position: 'absolute', top: 12, left: 16, zIndex: 30,
+          position: 'absolute', top: 'calc(12px + env(safe-area-inset-top))', left: 16, zIndex: 30,
           width: 38, height: 38, borderRadius: 12,
           background: colors.inputBg,
           border: `1px solid ${colors.borderSubtle}`,
