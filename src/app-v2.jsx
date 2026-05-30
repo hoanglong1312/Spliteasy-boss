@@ -347,6 +347,9 @@ export default function AppV2() {
 
     if (pinOk) {
       if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
+      // Dismiss keyboard + reset iOS scroll before navigating
+      if (document.activeElement) document.activeElement.blur()
+      window.scrollTo(0, 0)
       setPendingPinSession(null)
       setAwaitingPin(false)
       setPinError('')
