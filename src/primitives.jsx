@@ -57,7 +57,7 @@ export function Screen({ children, style }) {
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
       boxSizing: 'border-box',
-      padding: '0 16px calc(90px + var(--safe-bottom, 0px))',
+      padding: '0 16px calc(110px + var(--safe-bottom, 0px))',
       ...style,
     }}>{children}</div>
   );
