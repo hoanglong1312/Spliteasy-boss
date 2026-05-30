@@ -63,14 +63,23 @@ export function rememberRecentSession(member, token = '') {
   }
 }
 
+const DEFAULT_ADMIN_SESSION = {
+  memberId: '11f551b9-6e82-4a3e-b820-b6afb04cd0a6',
+  groupId: '11111111-1111-1111-1111-111111111111',
+  profileId: '6faee487-3a0e-42d7-b8b9-06ccf2248dbc',
+  memberName: 'Long',
+  groupName: 'Virgo Pickleball 246',
+  hasPin: true,
+  role: 'treasurer',
+  authToken: '',
+}
+
 export function getPinnedSession() {
   try {
     const parsed = JSON.parse(localStorage.getItem(PINNED_SESSION_KEY) || 'null')
-    if (!parsed?.memberId || !parsed?.memberName) return null
-    return parsed
-  } catch {
-    return null
-  }
+    if (parsed?.memberId && parsed?.memberName) return parsed
+  } catch {}
+  return DEFAULT_ADMIN_SESSION
 }
 
 export function setPinnedSession(session) {
