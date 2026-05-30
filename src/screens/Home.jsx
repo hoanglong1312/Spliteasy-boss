@@ -83,10 +83,13 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         />
         <div style={{
           display: 'flex',
-          gap: 8,
+          gap: 6,
           overflowX: 'auto',
-          paddingBottom: 8,
-          marginBottom: 8,
+          paddingBottom: 10,
+          marginBottom: 4,
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+          WebkitOverflowScrolling: 'touch',
         }}>
           <button
             type="button"
@@ -130,8 +133,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
               </button>
             );
           })}
-        </div>
-        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '4px 2px', flexShrink: 0 }} />
           {CATEGORY_FILTERS.map(filter => {
             const active = categoryFilter === filter.key;
             return (
