@@ -347,14 +347,20 @@ export default function AppV2() {
 
     if (pinOk) {
       if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
-      // Dismiss keyboard + reset iOS scroll before navigating
+      // Blur first to start keyboard dismiss animation, then wait for it to finish
+      // before navigating — iOS re-scrolls viewport during keyboard dismiss (~300ms)
       if (document.activeElement) document.activeElement.blur()
-      window.scrollTo(0, 0)
-      setPendingPinSession(null)
-      setAwaitingPin(false)
       setPinError('')
       setPinInput('')
-      if (pending) handle('resumeRecentSession', { ...pending, hasPin: false })
+      const capturedPending = pending
+      setTimeout(() => {
+        window.scrollTo(0, 0)
+        document.documentElement.scrollTop = 0
+        document.body.scrollTop = 0
+        setPendingPinSession(null)
+        setAwaitingPin(false)
+        if (capturedPending) handle('resumeRecentSession', { ...capturedPending, hasPin: false })
+      }, 350)
     } else {
       setPinError('Mã PIN không đúng. Thử lại.')
       setPinInput('')
