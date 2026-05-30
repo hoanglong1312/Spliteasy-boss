@@ -198,7 +198,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                               border: `1px solid ${colors.borderNormal}`, background: 'transparent',
                               color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                             }}>Hủy</button>
-                            <button type="button" onClick={onPinSubmit} style={{
+                            <button type="button" onClick={() => onPinSubmit?.()} style={{
                               flex: 2, padding: '9px 0', borderRadius: 8,
                               border: 'none', background: 'rgba(251,191,36,0.9)', color: '#000',
                               fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -354,7 +354,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                           >Hủy</button>
                           <button
                             type="button"
-                            onClick={onPinSubmit}
+                            onClick={() => onPinSubmit?.()}
                             style={{
                               flex: 2,
                               padding: '9px 0',

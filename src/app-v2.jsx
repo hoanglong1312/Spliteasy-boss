@@ -1916,7 +1916,7 @@ export default function AppV2() {
 
   if (publicBillToken) {
     return (
-      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
+      <div style={{ minHeight: '100dvh', width: '100%', background: '#07080f' }}>
         <MemberBillShare data={publicBillData} loading={publicBillLoading} onOpenApp={() => openMemberBillInApp(publicBillToken)} />
       </div>
     )
@@ -1924,7 +1924,7 @@ export default function AppV2() {
 
   if (accessLinkLoading) {
     return (
-      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f', color: colors.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: type.family }}>
+      <div style={{ minHeight: '100dvh', width: '100%', background: '#07080f', color: colors.textPrimary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: type.family }}>
         Đang mở link đăng nhập...
       </div>
     )
@@ -1941,7 +1941,7 @@ export default function AppV2() {
 
   if (!state.currentUserId) {
     return (
-      <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
+      <div style={{ minHeight: '100dvh', width: '100%', background: '#07080f' }}>
         <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} {...pinProps} />
       </div>
     )
@@ -1966,7 +1966,7 @@ export default function AppV2() {
   if (state._error && !state._loading && state.currentUserId && groups.length === 0 && members.length === 0) {
     return (
       <div style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         background: colors.pageBg,
         color: colors.textPrimary,
         fontFamily: type.family,
@@ -2070,7 +2070,7 @@ export default function AppV2() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
+    <div style={{ minHeight: '100dvh', width: '100%', background: '#07080f' }}>
       {renderCurrent()}
       <ToastOverlay toast={state.toast} />
     </div>
