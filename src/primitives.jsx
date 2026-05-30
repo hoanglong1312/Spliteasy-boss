@@ -1,8 +1,9 @@
 // Spliteasy Boss — shared UI primitives
 // Drop into src/primitives.jsx. All styles inline per spec.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { House, Users, TennisBall, User, Bell } from '@phosphor-icons/react';
 import { colors, type, radius } from './tokens';
 
 /* ───────────────────────── Phone shell ───────────────────────── */
@@ -64,11 +65,18 @@ export function Screen({ children, style }) {
 
 /* ───────────────────────── Tab bar ───────────────────────── */
 
+const TAB_ICONS = {
+  home:       <House weight="fill" size={22} />,
+  groups:     <Users weight="fill" size={22} />,
+  pickleball: <TennisBall weight="fill" size={22} />,
+  profile:    <User weight="fill" size={22} />,
+};
+
 const TAB_ITEMS = [
-  { key: 'home',       icon: '🏠', label: 'Trang chủ' },
-  { key: 'groups',     icon: '👥', label: 'Nhóm' },
-  { key: 'pickleball', icon: '🏓', label: 'Pickleball' },
-  { key: 'profile',    icon: '👤', label: 'Cá nhân' },
+  { key: 'home',       label: 'Trang chủ' },
+  { key: 'groups',     label: 'Nhóm' },
+  { key: 'pickleball', label: 'Pickleball' },
+  { key: 'profile',    label: 'Cá nhân' },
 ];
 
 export function TabBar({ active = 'home', onChange, onFab }) {
@@ -82,7 +90,7 @@ export function TabBar({ active = 'home', onChange, onFab }) {
       padding: '10px 8px calc(24px + env(safe-area-inset-bottom))', zIndex: 20,
     }}>
       {TAB_ITEMS.slice(0, 2).map(t => (
-        <TabItem key={t.key} {...t} active={active === t.key} onClick={() => onChange?.(t.key)} />
+        <TabItem key={t.key} tabKey={t.key} label={t.label} active={active === t.key} onClick={() => onChange?.(t.key)} />
       ))}
       <button onClick={onFab} aria-label="Thêm" style={{
         width: 56, height: 56, borderRadius: '50%',
@@ -93,26 +101,34 @@ export function TabBar({ active = 'home', onChange, onFab }) {
         marginTop: -24, border: 'none', cursor: 'pointer',
       }}>+</button>
       {TAB_ITEMS.slice(2).map(t => (
-        <TabItem key={t.key} {...t} active={active === t.key} onClick={() => onChange?.(t.key)} />
+        <TabItem key={t.key} tabKey={t.key} label={t.label} active={active === t.key} onClick={() => onChange?.(t.key)} />
       ))}
     </div>
   );
 }
 
-function TabItem({ icon, label, active, onClick }) {
+function TabItem({ tabKey, label, active, onClick }) {
+  const [pressed, setPressed] = useState(false);
   return (
-    <button onClick={onClick} style={{
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-      padding: '6px 4px', fontSize: 10, fontWeight: 600,
-      color: active ? colors.brandLight : colors.textMuted,
-      letterSpacing: '0.2px', background: 'transparent', border: 'none',
-      fontFamily: 'inherit', cursor: 'pointer',
-    }}>
+    <button
+      onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      style={{
+        flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        padding: '6px 4px', fontSize: 10, fontWeight: 600,
+        color: active ? colors.brandLight : colors.textMuted,
+        letterSpacing: '0.2px', background: 'transparent', border: 'none',
+        fontFamily: 'inherit', cursor: 'pointer',
+        transform: pressed ? 'scale(0.88)' : 'scale(1)',
+        transition: 'transform 0.12s cubic-bezier(0.34,1.56,0.64,1)',
+      }}>
       <span style={{
-        fontSize: 20, lineHeight: 1,
-        filter: active ? 'none' : 'grayscale(1) brightness(0.6)',
-        textShadow: active ? '0 0 12px rgba(129,140,248,0.6)' : 'none',
-      }}>{icon}</span>
+        lineHeight: 1,
+        opacity: active ? 1 : 0.4,
+        filter: active ? 'drop-shadow(0 0 8px rgba(129,140,248,0.7))' : 'none',
+      }}>{TAB_ICONS[tabKey]}</span>
       {label}
     </button>
   );
@@ -413,16 +429,23 @@ export function ActionButton({ children, danger, tone = 'finance', icon, style, 
 }
 
 export function IconButton({ children, dot, style, ...rest }) {
+  const [pressed, setPressed] = useState(false);
   return (
-    <button style={{
-      width: 38, height: 38, borderRadius: 12,
-      background: colors.inputBg,
-      border: `1px solid ${colors.borderSubtle}`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 16, position: 'relative',
-      fontFamily: 'inherit', cursor: 'pointer', color: colors.textPrimary,
-      ...style,
-    }} {...rest}>
+    <button
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      style={{
+        width: 38, height: 38, borderRadius: 12,
+        background: colors.inputBg,
+        border: `1px solid ${colors.borderSubtle}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, position: 'relative',
+        fontFamily: 'inherit', cursor: 'pointer', color: colors.textPrimary,
+        transform: pressed ? 'scale(0.92)' : 'scale(1)',
+        transition: 'transform 0.12s cubic-bezier(0.34,1.56,0.64,1)',
+        ...style,
+      }} {...rest}>
       {children}
       {dot && <span style={{
         position: 'absolute', top: 8, right: 9, width: 7, height: 7, borderRadius: '50%',

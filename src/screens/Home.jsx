@@ -2,6 +2,7 @@
 // Props: data { user, monthLabel, totalBalance, owedTo, pickleball, groups, todaySession, transactions[] }
 
 import React, { useState, useEffect } from 'react';
+import { Bell } from '@phosphor-icons/react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card,
@@ -56,7 +57,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
               {d.user.dateLabel}
             </div>
           </div>
-          <IconButton dot={d.user.hasNotifications} onClick={() => onAction?.('notifications')}>🔔</IconButton>
+          <IconButton dot={d.user.hasNotifications} onClick={() => onAction?.('notifications')}><Bell size={18} weight="fill" /></IconButton>
         </div>
 
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
@@ -130,27 +131,32 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
             );
           })}
         </div>
-        <div style={{ marginBottom: 10 }}>
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '11px 12px',
-              background: colors.inputBg,
-              border: `1px solid ${colors.borderSubtle}`,
-              borderRadius: 12,
-              color: colors.textPrimary,
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: 'inherit',
-              outline: 'none',
-            }}
-          >
-            {CATEGORY_FILTERS.map(filter => (
-              <option key={filter.key} value={filter.key}>{filter.label}</option>
-            ))}
-          </select>
+        <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 8, marginBottom: 8 }}>
+          {CATEGORY_FILTERS.map(filter => {
+            const active = categoryFilter === filter.key;
+            return (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setCategoryFilter(filter.key)}
+                style={{
+                  flex: '0 0 auto',
+                  padding: '7px 11px',
+                  borderRadius: 100,
+                  border: `1px solid ${active ? 'rgba(245,158,11,0.55)' : colors.borderSubtle}`,
+                  background: active ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.03)',
+                  color: active ? '#fcd34d' : colors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
         </div>
         <ListCard>
           {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (

@@ -6,7 +6,7 @@ export const colors = {
   // Surfaces
   pageBg:        '#07080f',
   shellBg:       '#0c0e18',
-  cardSurface:   'rgba(255,255,255,0.04)',
+  cardSurface:   'rgba(255,255,255,0.07)',
   cardElevated:  'rgba(255,255,255,0.06)',
   inputBg:       'rgba(255,255,255,0.05)',
 
@@ -49,7 +49,7 @@ export const colors = {
 };
 
 export const type = {
-  family: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  family: "'Geist', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
   // Sizes / weights
   amountLg:  { fontSize: 34, fontWeight: 900, letterSpacing: '-1px' },
   amountMd:  { fontSize: 28, fontWeight: 900, letterSpacing: '-1px' },
@@ -58,7 +58,7 @@ export const type = {
   heading:   { fontSize: 13, fontWeight: 700 },
   body:      { fontSize: 12, fontWeight: 500, color: '#94a3b8' },
   // Tiny uppercase label
-  label:     { fontSize: 9, fontWeight: 700, textTransform: 'uppercase',
+  label:     { fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
                letterSpacing: '1.2px', color: '#475569' },
   mono:      { fontVariantNumeric: 'tabular-nums' },
 };
