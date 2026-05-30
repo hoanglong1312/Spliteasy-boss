@@ -2045,7 +2045,7 @@ export default function AppV2() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#07080f' }}>
+    <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
       {renderCurrent()}
       <ToastOverlay toast={state.toast} />
     </div>
