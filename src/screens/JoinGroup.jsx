@@ -21,6 +21,7 @@ export default function JoinGroup({ data, onAction }) {
   const memberName = (newName || selected || '').trim();
   const recentSessions = d.recentSessions || [];
   const [pinnedCleared, setPinnedCleared] = useState(false);
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
   const pinnedSession = pinnedCleared ? null : (d.pinnedSession || null);
   const inviteToken = d.inviteToken || '';
   const isInviteLinkFlow = Boolean(inviteToken);
@@ -108,50 +109,58 @@ export default function JoinGroup({ data, onAction }) {
 
         {/* Admin pinned session shortcut */}
         {pinnedSession && (
-          <div style={{
-            marginBottom: 14, padding: 14,
-            background: 'linear-gradient(135deg, rgba(251,191,36,0.10) 0%, rgba(99,102,241,0.08) 100%)',
-            border: '1px solid rgba(251,191,36,0.3)',
-            borderRadius: 16,
-          }}>
-            <div style={{
-              fontSize: 9, fontWeight: 800, letterSpacing: '1.2px',
-              color: '#fcd34d', textTransform: 'uppercase', marginBottom: 10,
-            }}>👑 Đăng nhập nhanh · Admin</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ marginBottom: 14 }}>
+            {!pinnedExpanded ? (
               <button
                 type="button"
-                onClick={() => onAction?.('resumeRecentSession', pinnedSession)}
+                onClick={() => setPinnedExpanded(true)}
                 style={{
-                  flex: 1, display: 'flex', alignItems: 'center', gap: 12,
-                  padding: '12px 14px', borderRadius: 12,
-                  background: 'rgba(251,191,36,0.08)',
-                  border: '1px solid rgba(251,191,36,0.25)',
-                  color: colors.textPrimary, fontFamily: 'inherit', cursor: 'pointer',
-                  textAlign: 'left',
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '9px 12px', borderRadius: 12,
+                  background: 'rgba(251,191,36,0.07)',
+                  border: '1px solid rgba(251,191,36,0.22)',
+                  color: '#fcd34d', fontFamily: 'inherit', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 700,
                 }}
               >
-                <Avatar initial={(pinnedSession.memberName || 'A')[0]} size={38} color="rgba(251,191,36,0.25)" ring={false} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 900 }}>{pinnedSession.memberName}</div>
-                  <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 2, fontWeight: 600 }}>
-                    {pinnedSession.groupName || 'Thủ quỹ'}{pinnedSession.hasPin ? ' · 🔐 PIN' : ''}
-                  </div>
-                </div>
-                <span style={{ fontSize: 20, color: '#fcd34d' }}>›</span>
+                <span>👑</span>
+                <span style={{ flex: 1, textAlign: 'left' }}>Đăng nhập nhanh · Admin</span>
+                <span style={{ fontSize: 16 }}>›</span>
               </button>
-              <button
-                type="button"
-                aria-label="Bỏ ghim đăng nhập nhanh"
-                onClick={() => { setPinnedCleared(true); onAction?.('clearPinnedSession'); }}
-                style={{
-                  width: 42, height: 64, borderRadius: 12,
-                  background: 'rgba(248,113,113,0.08)',
-                  border: '1px solid rgba(248,113,113,0.2)',
-                  color: '#fca5a5', fontSize: 18, fontFamily: 'inherit', cursor: 'pointer',
-                }}
-              >×</button>
-            </div>
+            ) : (
+              <div style={{
+                padding: 14,
+                background: 'linear-gradient(135deg, rgba(251,191,36,0.10) 0%, rgba(99,102,241,0.08) 100%)',
+                border: '1px solid rgba(251,191,36,0.3)',
+                borderRadius: 16,
+              }}>
+                <div style={{
+                  fontSize: 9, fontWeight: 800, letterSpacing: '1.2px',
+                  color: '#fcd34d', textTransform: 'uppercase', marginBottom: 10,
+                }}>👑 Đăng nhập nhanh · Admin</div>
+                <button
+                  type="button"
+                  onClick={() => onAction?.('resumeRecentSession', pinnedSession)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px', borderRadius: 12,
+                    background: 'rgba(251,191,36,0.08)',
+                    border: '1px solid rgba(251,191,36,0.25)',
+                    color: colors.textPrimary, fontFamily: 'inherit', cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <Avatar initial={(pinnedSession.memberName || 'A')[0]} size={38} color="rgba(251,191,36,0.25)" ring={false} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 900 }}>{pinnedSession.memberName}</div>
+                    <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 2, fontWeight: 600 }}>
+                      {pinnedSession.groupName || 'Thủ quỹ'}{pinnedSession.hasPin ? ' · 🔐 PIN' : ''}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 20, color: '#fcd34d' }}>›</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

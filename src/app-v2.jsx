@@ -334,12 +334,12 @@ export default function AppV2() {
   async function submitPin(value = pinInput) {
     const pending = pendingPinSession
     const profileId = pending?.profileId
-    const memberId = pending?.memberId || state.currentUserId
+    const useProfilePath = !!(pending?.profileId && !pending?.memberId)
+    const memberId = useProfilePath ? null : (pending?.memberId || state.currentUserId)
     const pinKey = memberId || profileId
 
     let pinOk = false
-    if (!memberId && profileId) {
-      // Profile-based session: verify via profile RPC
+    if (useProfilePath) {
       const sb = createSupabase()
       const { data, error } = await sb.rpc('verify_pin_by_profile', { p_profile_id: profileId, p_pin: value })
       pinOk = !error && data === true
