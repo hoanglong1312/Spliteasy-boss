@@ -5,6 +5,7 @@
 @~/.claude/templates/code-project.md
 @rules/supabase.md
 @rules/testing.md
+@rules/deploy.md
 @context/architecture.md
 @docs/architecture/identity-model.md
 
