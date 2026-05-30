@@ -83,6 +83,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         />
         <div style={{
           display: 'flex',
+          flexWrap: 'nowrap',
           gap: 6,
           overflowX: 'auto',
           paddingBottom: 10,
