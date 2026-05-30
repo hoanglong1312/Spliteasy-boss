@@ -173,17 +173,15 @@ export default function AppV2() {
   const [, setRecentSessionVersion] = useState(0)
   const [homePaymentOpen, setHomePaymentOpen] = useState(false)
 
-  // Reset iOS scroll when keyboard closes (visualViewport height increases)
+  // Reset iOS scroll when any input loses focus (keyboard closes)
+  // Double rAF: first frame catches initial scroll reset, second catches iOS re-scroll during keyboard animation
   useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-    let prevHeight = vv.height
-    const onResize = () => {
-      if (vv.height > prevHeight) window.scrollTo(0, 0)
-      prevHeight = vv.height
-    }
-    vv.addEventListener('resize', onResize)
-    return () => vv.removeEventListener('resize', onResize)
+    const onFocusOut = () => requestAnimationFrame(() => {
+      window.scrollTo(0, 0)
+      requestAnimationFrame(() => window.scrollTo(0, 0))
+    })
+    document.addEventListener('focusout', onFocusOut, true)
+    return () => document.removeEventListener('focusout', onFocusOut, true)
   }, [])
 
   useEffect(() => {

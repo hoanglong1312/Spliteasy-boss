@@ -42,8 +42,6 @@
   * { box-sizing: border-box; }
   :root { --screen-top: 44px; --safe-bottom: 0px; --tab-bar-height: 68px; }
 @media (max-width: 500px) {
-  /* position:fixed on #root: iOS keyboard cannot shift a fixed element, so window.scrollY won't move the UI */
-  #root { position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: auto; }
   :root { --screen-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
   [data-spliteasy-phone-frame] {
     width: 100% !important;
