@@ -185,7 +185,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                             onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
                             placeholder="Nhập mã PIN"
                             style={{
-                              width: '100%', fontSize: 15, padding: '9px 12px', borderRadius: 8,
+                              width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
                               border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(251,191,36,0.3)'}`,
                               background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
                               fontFamily: 'inherit', outline: 'none', letterSpacing: '0.1em',
@@ -323,7 +323,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                           placeholder="Nhập mã PIN"
                           style={{
                             width: '100%',
-                            fontSize: 15,
+                            fontSize: 16,
                             padding: '9px 12px',
                             borderRadius: 8,
                             border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
