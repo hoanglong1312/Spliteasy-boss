@@ -3,6 +3,7 @@ import { createSupabase } from './supabase.js'
 const TOKEN_KEY  = 'spliteasy_token'
 const MEMBER_KEY = 'spliteasy_member'
 const RECENT_SESSIONS_KEY = 'spliteasy_recent_sessions'
+const PINNED_SESSION_KEY = 'spliteasy_pinned_session'
 
 export function getStoredAuth() {
   try {
@@ -52,10 +53,47 @@ export function rememberRecentSession(member, token = '') {
     groupName: member.groupName || '',
     hasPin: member.hasPin === true || member.has_pin === true,
     authToken: token || member.authToken || '',
+    role: member.role || '',
   }
   const sessions = getRecentSessions()
     .filter(session => !hasMatchingSessionIdentity(session, nextSession))
   localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([nextSession, ...sessions].slice(0, 5)))
+  if (isTreasurerRole(nextSession.role)) {
+    setPinnedSession(nextSession)
+  }
+}
+
+export function getPinnedSession() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PINNED_SESSION_KEY) || 'null')
+    if (!parsed?.memberId || !parsed?.memberName) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function setPinnedSession(session) {
+  if (!session?.memberId) return
+  const payload = {
+    memberId: session.memberId,
+    groupId: session.groupId || '',
+    profileId: session.profileId || '',
+    memberName: session.memberName || '',
+    groupName: session.groupName || '',
+    hasPin: session.hasPin === true,
+    authToken: session.authToken || '',
+    role: session.role || '',
+  }
+  localStorage.setItem(PINNED_SESSION_KEY, JSON.stringify(payload))
+}
+
+export function clearPinnedSession() {
+  localStorage.removeItem(PINNED_SESSION_KEY)
+}
+
+function isTreasurerRole(role) {
+  return ['treasurer', 'admin', 'owner'].includes(String(role || '').toLowerCase())
 }
 
 export function removeRecentSession(sessionToRemove) {

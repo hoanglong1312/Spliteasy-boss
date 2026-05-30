@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
-import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession } from './lib/auth.js'
+import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession, clearPinnedSession } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
@@ -411,6 +411,13 @@ export default function AppV2() {
       }
       setRecentSessionVersion(version => version + 1)
       dispatch({ type: 'SHOW_TOAST', message: 'Đã xóa tài khoản gần đây trên máy này.' })
+      return
+    }
+
+    if (type === 'clearPinnedSession') {
+      clearPinnedSession()
+      setRecentSessionVersion(version => version + 1)
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã bỏ ghim đăng nhập nhanh.' })
       return
     }
 
@@ -1917,7 +1924,7 @@ export default function AppV2() {
   if (!state.currentUserId) {
     return (
       <div style={{ minHeight: '100vh', width: '100%', background: '#07080f' }}>
-        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
+        <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken, joinCode: groupJoinCode, accessLinkError }} onAction={handle} />
       </div>
     )
   }
@@ -2023,7 +2030,7 @@ export default function AppV2() {
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
-      case 'join-group':          return <JoinGroup data={getJoinGroupData()} onAction={handle} />
+      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession() }} onAction={handle} />
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />
       case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'new-group':           return <NewGroup data={newGroupData} onAction={handle} />
