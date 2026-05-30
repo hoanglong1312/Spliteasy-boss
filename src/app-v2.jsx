@@ -268,20 +268,36 @@ export default function AppV2() {
     }
   }
 
+  // Returns { authToken, memberId, groupId, memberName } or null
   async function resolveRecentSessionToken(session) {
-    if (session?.authToken) return session.authToken
-    if (!session?.memberId) return ''
-
+    if (session?.authToken && session?.memberId) {
+      return { authToken: session.authToken, memberId: session.memberId, groupId: session.groupId, memberName: session.memberName }
+    }
     const sb = createSupabase()
+
+    // Profile-based session: lookup member at runtime via profile_id + group_id
+    if (session?.profileId && !session?.memberId) {
+      const { data, error } = await sb.rpc('resume_session_by_profile', {
+        p_profile_id: session.profileId,
+        p_group_id: session.groupId,
+      })
+      if (error || data?.error || !data?.authToken) {
+        console.error('[app] resumeSessionByProfile:', error || data)
+        return null
+      }
+      return { authToken: data.authToken, memberId: data.memberId, groupId: data.groupId, memberName: data.memberName || session.memberName }
+    }
+
+    if (!session?.memberId) return null
     const { data, error } = await sb.rpc('resume_recent_member_session', {
       p_member_id: session.memberId,
       p_member_name: session.memberName || '',
     })
     if (error || data?.error || !data?.authToken) {
       console.error('[app] resumeRecentSession:', error || data)
-      return ''
+      return null
     }
-    return data.authToken
+    return { authToken: data.authToken, memberId: data.memberId || session.memberId, groupId: data.groupId || session.groupId, memberName: data.memberName || session.memberName }
   }
 
   async function verifyMemberPin(memberId, pin) {
@@ -299,13 +315,15 @@ export default function AppV2() {
     return data === true || data?.valid === true
   }
 
-  async function checkMemberPinRequired(memberId) {
+  async function checkMemberPinRequired(memberId, profileId) {
+    const sb = createSupabase()
+    if (!memberId && profileId) {
+      const { data, error } = await sb.rpc('profile_pin_required', { p_profile_id: profileId })
+      if (error) return true
+      return data === true
+    }
     if (!memberId) return false
-    const { token } = getStoredAuth()
-    const sb = token ? createSupabase(token) : createSupabase()
-    const { data, error } = await sb.rpc('member_pin_required', {
-      p_member_id: memberId,
-    })
+    const { data, error } = await sb.rpc('member_pin_required', { p_member_id: memberId })
     if (error || data?.error) {
       console.error('[app] memberPinRequired:', error || data)
       return true
@@ -315,11 +333,22 @@ export default function AppV2() {
 
   async function submitPin(value = pinInput) {
     const pending = pendingPinSession
+    const profileId = pending?.profileId
     const memberId = pending?.memberId || state.currentUserId
-    const pinOk = await verifyMemberPin(memberId, value)
+    const pinKey = memberId || profileId
+
+    let pinOk = false
+    if (!memberId && profileId) {
+      // Profile-based session: verify via profile RPC
+      const sb = createSupabase()
+      const { data, error } = await sb.rpc('verify_pin_by_profile', { p_profile_id: profileId, p_pin: value })
+      pinOk = !error && data === true
+    } else {
+      pinOk = await verifyMemberPin(memberId, value)
+    }
+
     if (pinOk) {
-      if (pending?.memberId) sessionStorage.setItem(PIN_UNLOCK_KEY, pending.memberId)
-      if (!pending && state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
+      if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
       setPendingPinSession(null)
       setAwaitingPin(false)
       setPinError('')
@@ -350,25 +379,26 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      const requiresPin = await checkMemberPinRequired(payload?.memberId)
-      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
+      const pinKey = payload?.memberId || payload?.profileId
+      const requiresPin = await checkMemberPinRequired(payload?.memberId, payload?.profileId)
+      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
         setPendingPinSession(payload)
         setAwaitingPin(true)
         setPinError('')
         setPinInput('')
         return
       }
-      const authToken = await resolveRecentSessionToken(payload)
-      if (!authToken) {
+      const resolved = await resolveRecentSessionToken(payload)
+      if (!resolved?.authToken) {
         dispatch({ type: 'SHOW_TOAST', message: 'Không vào lại được tài khoản này. Nhờ thủ quỹ gửi link mới nếu tên đã bị xóa hoặc đổi.' })
         return
       }
       await dispatch({
         type: 'LOGIN',
-        token: authToken,
-        memberId: payload.memberId,
-        groupId: payload.groupId,
-        memberName: payload.memberName,
+        token: resolved.authToken,
+        memberId: resolved.memberId,
+        groupId: resolved.groupId,
+        memberName: resolved.memberName,
       })
       setStack([])
       setActiveTab('home')
@@ -403,7 +433,8 @@ export default function AppV2() {
 
     if (type === 'removeRecentSession') {
       removeRecentSession(payload)
-      if (pendingPinSession?.memberId === payload?.memberId) {
+      if ((pendingPinSession?.memberId && pendingPinSession.memberId === payload?.memberId) ||
+          (pendingPinSession?.profileId && pendingPinSession.profileId === payload?.profileId)) {
         setPendingPinSession(null)
         setAwaitingPin(false)
         setPinError('')
