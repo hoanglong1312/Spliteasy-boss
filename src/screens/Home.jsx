@@ -81,85 +81,74 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
           placeholder="Tìm chi tiêu..."
           style={{ marginBottom: 8 }}
         />
-        <div style={{
-          display: 'flex',
-          flexWrap: 'nowrap',
-          gap: 6,
-          overflowX: 'auto',
-          paddingBottom: 10,
-          marginBottom: 4,
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-          WebkitOverflowScrolling: 'touch',
-        }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
           <button
             type="button"
             onClick={() => setMineOnly(value => !value)}
             style={{
               flex: '0 0 auto',
-              padding: '7px 11px',
+              padding: '7px 13px',
               borderRadius: 100,
               border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
               background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
               color: mineOnly ? '#6ee7b7' : colors.textSecondary,
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: 700,
               fontFamily: 'inherit',
               cursor: 'pointer',
               whiteSpace: 'nowrap',
             }}
           >Của tôi</button>
-          {STATUS_FILTERS.map(filter => {
-            const active = statusFilter === filter.key;
-            return (
-              <button
-                key={filter.key}
-                type="button"
-                onClick={() => setStatusFilter(filter.key)}
-                style={{
-                  flex: '0 0 auto',
-                  padding: '7px 11px',
-                  borderRadius: 100,
-                  border: `1px solid ${active ? 'rgba(99,102,241,0.55)' : colors.borderSubtle}`,
-                  background: active ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.03)',
-                  color: active ? colors.brandLight : colors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {filter.label}
-              </button>
-            );
-          })}
-          <div style={{ width: 1, background: 'rgba(255,255,255,0.1)', margin: '4px 2px', flexShrink: 0 }} />
-          {CATEGORY_FILTERS.map(filter => {
-            const active = categoryFilter === filter.key;
-            return (
-              <button
-                key={filter.key}
-                type="button"
-                onClick={() => setCategoryFilter(filter.key)}
-                style={{
-                  flex: '0 0 auto',
-                  padding: '7px 11px',
-                  borderRadius: 100,
-                  border: `1px solid ${active ? 'rgba(245,158,11,0.55)' : colors.borderSubtle}`,
-                  background: active ? 'rgba(245,158,11,0.16)' : 'rgba(255,255,255,0.03)',
-                  color: active ? '#fcd34d' : colors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {filter.label}
-              </button>
-            );
-          })}
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '7px 10px',
+              borderRadius: 10,
+              border: `1px solid ${statusFilter !== 'all' ? 'rgba(99,102,241,0.55)' : colors.borderSubtle}`,
+              background: statusFilter !== 'all' ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+              color: statusFilter !== 'all' ? colors.brandLight : colors.textSecondary,
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              outline: 'none',
+            }}
+          >
+            {STATUS_FILTERS.map(f => (
+              <option key={f.key} value={f.key} style={{ background: '#1e293b', color: '#e2e8f0' }}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            style={{
+              flex: 1,
+              padding: '7px 10px',
+              borderRadius: 10,
+              border: `1px solid ${categoryFilter !== 'all' ? 'rgba(245,158,11,0.55)' : colors.borderSubtle}`,
+              background: categoryFilter !== 'all' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)',
+              color: categoryFilter !== 'all' ? '#fcd34d' : colors.textSecondary,
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              appearance: 'none',
+              WebkitAppearance: 'none',
+              outline: 'none',
+            }}
+          >
+            {CATEGORY_FILTERS.map(f => (
+              <option key={f.key} value={f.key} style={{ background: '#1e293b', color: '#e2e8f0' }}>
+                {f.label}
+              </option>
+            ))}
+          </select>
         </div>
         <ListCard>
           {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (
