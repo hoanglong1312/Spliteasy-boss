@@ -10,6 +10,16 @@ Khi user nói "deploy", "lên production", "ship", "push lên" (không specify b
 
 Vercel project connect với GitHub repo, auto-deploy khi main thay đổi. Không cần lệnh Vercel riêng.
 
+## Fallback nếu Vercel không auto-deploy
+
+Nếu sau 2 phút push mà Vercel vẫn serve bundle cũ (kiểm tra bằng `curl -s <url> | grep assets/index`):
+
+```bash
+vercel --prod
+```
+
+Bypass GitHub webhook, deploy trực tiếp qua CLI. Root cause thường là Vercel-GitHub webhook broken → fix dứt điểm bằng cách disconnect/reconnect GitHub integration trong Vercel dashboard.
+
 ## Không hỏi lại khi
 
 - User đang ở feature branch và nói "deploy" → assume merge to main
