@@ -59,7 +59,7 @@ export default function GroupsList({ data, onAction }) {
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen tabBar>
         <ModuleHero
           tone="groups"
           eyebrow="QUẢN LÝ NHÓM"

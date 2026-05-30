@@ -48,7 +48,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen tabBar>
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
           <div>

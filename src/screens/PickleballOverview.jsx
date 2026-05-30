@@ -20,7 +20,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
 
   return (
     <PhoneFrame>
-      <Screen style={{ paddingBottom: '72px' }}>
+      <Screen tabBar>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '8px 0 16px' }}>
           <div>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: '#6ee7b7', textTransform: 'uppercase' }}>

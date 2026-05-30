@@ -125,7 +125,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen tabBar>
         <div style={{ display: 'flex', alignItems: 'center', padding: '8px 0 16px' }}>
           <h1 style={type.title}>Cá nhân</h1>
         </div>

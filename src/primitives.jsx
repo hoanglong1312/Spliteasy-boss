@@ -44,20 +44,21 @@ export function StatusBar({ time = '9:41' }) {
   );
 }
 
-export function Screen({ children, style }) {
+export function Screen({ children, style, tabBar = false }) {
   return (
     <div style={{
       position: 'absolute',
       top: 'var(--screen-top, 44px)',
-      bottom: 0,
+      bottom: tabBar ? 'calc(var(--tab-bar-height, 68px) + var(--safe-bottom, 0px))' : 0,
       left: 0,
       right: 0,
       minHeight: 0,
       overflowY: 'auto',
       overflowX: 'hidden',
       WebkitOverflowScrolling: 'touch',
+      overscrollBehavior: 'contain',
       boxSizing: 'border-box',
-      padding: '0 16px calc(var(--tab-bar-height, 68px) + var(--safe-bottom, 0px) + 12px)',
+      padding: tabBar ? '0 16px 12px' : '0 16px calc(var(--safe-bottom, 0px) + 12px)',
       ...style,
     }}>{children}</div>
   );
@@ -88,6 +89,7 @@ export function TabBar({ active = 'home', onChange, onFab }) {
       borderTop: `1px solid ${colors.borderSubtle}`,
       display: 'flex', alignItems: 'flex-start',
       padding: '10px 8px calc(8px + var(--safe-bottom, 0px))', zIndex: 20,
+      touchAction: 'manipulation',
     }}>
       {TAB_ITEMS.slice(0, 2).map(t => (
         <TabItem key={t.key} tabKey={t.key} label={t.label} active={active === t.key} onClick={() => onChange?.(t.key)} />
