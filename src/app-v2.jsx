@@ -173,15 +173,13 @@ export default function AppV2() {
   const [, setRecentSessionVersion] = useState(0)
   const [homePaymentOpen, setHomePaymentOpen] = useState(false)
 
-  // Reset iOS scroll when any input loses focus (keyboard closes)
-  // Double rAF: first frame catches initial scroll reset, second catches iOS re-scroll during keyboard animation
+  // iOS Safari bypasses body overflow:hidden and scrolls window when keyboard opens.
+  // This app never needs window-level scroll (all scrolling is inside Screen's overflow-y:auto).
+  // Always reset window.scrollY to 0 whenever iOS manages to scroll it.
   useEffect(() => {
-    const onFocusOut = () => requestAnimationFrame(() => {
-      window.scrollTo(0, 0)
-      requestAnimationFrame(() => window.scrollTo(0, 0))
-    })
-    document.addEventListener('focusout', onFocusOut, true)
-    return () => document.removeEventListener('focusout', onFocusOut, true)
+    const resetScroll = () => { if (window.scrollY !== 0) window.scrollTo(0, 0) }
+    window.addEventListener('scroll', resetScroll, { passive: true })
+    return () => window.removeEventListener('scroll', resetScroll)
   }, [])
 
   useEffect(() => {
