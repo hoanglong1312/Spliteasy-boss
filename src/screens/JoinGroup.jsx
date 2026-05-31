@@ -183,7 +183,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
               }}>
                 <input
                   ref={adminPinRef}
-                  type="tel"
+                  type="password"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={6}
@@ -195,7 +195,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                     width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
                     border: `1px solid ${adminError ? 'rgba(248,113,113,0.5)' : 'rgba(251,191,36,0.3)'}`,
                     background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
-                    fontFamily: 'inherit', outline: 'none', letterSpacing: '0.1em',
+                    fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
                     boxSizing: 'border-box',
                   }}
                 />
@@ -334,7 +334,8 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                             color: colors.textPrimary,
                             fontFamily: 'inherit',
                             outline: 'none',
-                            letterSpacing: '0.1em',
+                            letterSpacing: '0.2em',
+                            WebkitTextSecurity: 'disc',
                           }}
                         />
                         {pinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{pinError}</div>}
@@ -585,7 +586,22 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
             setJoinError('');
             if (!inviteToken && !code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
             if (!memberName) { setJoinError('Vui lòng chọn hoặc nhập tên của bạn.'); return; }
-            if (isInviteLinkFlow && selected && !newName) { setJoinError('Tên đã có cần link cá nhân hoặc PIN. Nhờ thủ quỹ gửi link vào app.'); return; }
+            if (isInviteLinkFlow && selected && !newName) {
+              // Existing member selected — try to resume their session
+              const allSessions = [...(d.recentSessions || [])];
+              if (longSession) allSessions.push(longSession);
+              const existingSession = allSessions.find(s => s.memberName === selected);
+              if (existingSession) {
+                if (existingSession.memberName === 'Long') {
+                  setAdminExpanded(true);
+                } else {
+                  await onAction?.('resumeRecentSession', existingSession);
+                }
+                return;
+              }
+              setJoinError('Tên đã có. Dùng link cá nhân của bạn để vào lại.');
+              return;
+            }
             setJoining(true);
             try {
               if (isInviteLinkFlow) {
