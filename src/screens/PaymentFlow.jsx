@@ -7,9 +7,17 @@ import {
   PhoneFrame, Screen, IconButton, Hero, Card, Button, Avatar,
   SectionLabel, Row,
 } from '../primitives';
+import { generateQRUrl } from '../lib/vietqr.js';
 
 export default function PaymentFlow({ data, step = 2, totalSteps = 3, onAction }) {
   const d = data || DEMO;
+  const qrUrl = generateQRUrl({
+    bankId: d.bank.code,
+    account: d.bank.account,
+    accountName: d.recipient.name,
+    amount: d.amount,
+    description: `Spliteasy ${d.recipient.name}`,
+  });
 
   return (
     <PhoneFrame>
@@ -87,7 +95,7 @@ export default function PaymentFlow({ data, step = 2, totalSteps = 3, onAction }
         </Card>
 
         <SectionLabel>Quét VietQR</SectionLabel>
-        <VietQRCard bank={d.bank} />
+        <VietQRCard bank={d.bank} qrUrl={qrUrl} />
 
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <Button variant="muted" style={{ flex: 1, fontSize: 12 }} onClick={() => onAction?.('copyAccount', d.bank.account)}>📋 Copy STK</Button>
@@ -101,7 +109,7 @@ export default function PaymentFlow({ data, step = 2, totalSteps = 3, onAction }
   );
 }
 
-function VietQRCard({ bank }) {
+function VietQRCard({ bank, qrUrl }) {
   return (
     <div style={{
       background: '#f8fafc', borderRadius: 16, padding: 18, textAlign: 'center',
@@ -123,7 +131,7 @@ function VietQRCard({ bank }) {
       </div>
 
       <div style={{ width: 200, height: 200, margin: '0 auto', borderRadius: 14, padding: 8, background: '#f8fafc' }}>
-        <QRGraphic />
+        <img src={qrUrl} style={{ width: '100%', height: '100%', borderRadius: 8 }} alt="QR chuyển khoản" />
       </div>
 
       <div style={{
@@ -132,43 +140,6 @@ function VietQRCard({ bank }) {
     </div>
   );
 }
-
-// Pseudo-QR — replace with a real generator in prod (e.g. https://img.vietqr.io/image/<bank>-<acc>-compact.png)
-function QRGraphic() {
-  return (
-    <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
-      <rect width="100" height="100" fill="#f8fafc" />
-      <g fill="#0f172a">
-        {/* Position markers */}
-        <rect x="4" y="4" width="22" height="22" />
-        <rect x="9" y="9" width="12" height="12" fill="#f8fafc" />
-        <rect x="12" y="12" width="6" height="6" fill="#0f172a" />
-        <rect x="74" y="4" width="22" height="22" />
-        <rect x="79" y="9" width="12" height="12" fill="#f8fafc" />
-        <rect x="82" y="12" width="6" height="6" fill="#0f172a" />
-        <rect x="4" y="74" width="22" height="22" />
-        <rect x="9" y="79" width="12" height="12" fill="#f8fafc" />
-        <rect x="12" y="82" width="6" height="6" fill="#0f172a" />
-        {/* Pattern */}
-        {QR_DOTS.map(([x, y], i) => <rect key={i} x={x} y={y} width="4" height="4" />)}
-      </g>
-      <rect x="40" y="40" width="20" height="20" fill="#f8fafc" />
-      <rect x="44" y="44" width="12" height="12" rx="2" fill="#6366f1" />
-    </svg>
-  );
-}
-
-const QR_DOTS = [
-  [32,6],[42,6],[56,6],[66,6],[30,14],[38,14],[50,14],[60,14],[34,22],[46,22],[54,22],[68,22],
-  [6,32],[14,32],[22,32],[30,32],[42,32],[56,32],[68,32],[80,32],[90,32],
-  [10,40],[20,40],[34,40],[46,40],[58,40],[74,40],[86,40],
-  [6,48],[18,48],[26,48],[38,48],[50,48],[62,48],[78,48],[88,48],
-  [14,56],[22,56],[42,56],[54,56],[64,56],[76,56],[84,56],
-  [8,64],[18,64],[32,64],[44,64],[60,64],[70,64],[82,64],[92,64],
-  [34,74],[44,74],[56,74],[68,74],
-  [30,82],[40,82],[52,82],[62,82],[72,82],[84,82],
-  [36,90],[48,90],[58,90],[70,90],[80,90],[92,90],
-];
 
 const DEMO = {
   recipient: { initial: 'M', name: 'Minh Trần', context: 'CLB Cầu Giấy + Ăn trưa T7' },
