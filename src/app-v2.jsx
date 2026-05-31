@@ -177,7 +177,12 @@ export default function AppV2() {
   // This app never needs window-level scroll (all scrolling is inside Screen's overflow-y:auto).
   // Always reset window.scrollY to 0 whenever iOS manages to scroll it.
   useEffect(() => {
-    const resetScroll = () => { if (window.scrollY !== 0) window.scrollTo(0, 0) }
+    const resetScroll = () => {
+      if (window.scrollY === 0) return
+      const active = document.activeElement
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return
+      window.scrollTo(0, 0)
+    }
     window.addEventListener('scroll', resetScroll, { passive: true })
     return () => window.removeEventListener('scroll', resetScroll)
   }, [])
