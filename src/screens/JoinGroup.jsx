@@ -178,10 +178,10 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                           gap: 8,
                         }}>
                           <input
-                            type="password"
+                            type="tel"
                             inputMode="numeric"
+                            pattern="[0-9]*"
                             maxLength={6}
-                            autoFocus
                             value={pinValue}
                             onChange={e => onPinChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
                             onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
@@ -315,10 +315,10 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                         gap: 8,
                       }}>
                         <input
-                          type="password"
+                          type="tel"
                           inputMode="numeric"
+                          pattern="[0-9]*"
                           maxLength={6}
-                          autoFocus
                           value={pinValue}
                           onChange={e => onPinChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
                           onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
