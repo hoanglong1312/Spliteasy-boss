@@ -19,10 +19,12 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [joinSent, setJoinSent] = useState(false);
   const lookupTimer = useRef(null);
   const memberName = (newName || selected || '').trim();
-  const recentSessions = d.recentSessions || [];
   const [pinnedCleared, setPinnedCleared] = useState(false);
   const [pinnedExpanded, setPinnedExpanded] = useState(false);
   const pinnedSession = pinnedCleared ? null : (d.pinnedSession || null);
+  // Exclude pinnedSession from recentSessions to prevent two autoFocus inputs
+  const pinnedMemberId = pinnedSession?.memberId
+  const recentSessions = (d.recentSessions || []).filter(s => !pinnedMemberId || s.memberId !== pinnedMemberId);
   const inviteToken = d.inviteToken || '';
   const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
