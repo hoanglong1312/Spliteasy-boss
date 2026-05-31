@@ -391,6 +391,32 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'adminPinLogin') {
+      const { pin, session } = payload || {}
+      const memberId = session?.memberId
+      const profileId = session?.profileId
+      const useProfilePath = !memberId && !!profileId
+      let pinOk = false
+      try {
+        if (useProfilePath) {
+          const sb = createSupabase()
+          const { data, error } = await sb.rpc('verify_pin_by_profile', { p_profile_id: profileId, p_pin: pin })
+          pinOk = !error && data === true
+        } else {
+          pinOk = await verifyMemberPin(memberId, pin)
+        }
+      } catch { pinOk = false }
+      if (!pinOk) return { error: 'wrong_pin' }
+      const pinKey = memberId || profileId
+      if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
+      const resolved = await resolveRecentSessionToken(session)
+      if (!resolved?.authToken) return { error: 'no_token' }
+      setStack([])
+      setActiveTab('home')
+      await dispatch({ type: 'LOGIN', token: resolved.authToken, memberId: resolved.memberId, groupId: resolved.groupId, memberName: resolved.memberName })
+      return { ok: true }
+    }
+
     if (type === 'resumeRecentSession') {
       const pinKey = payload?.memberId || payload?.profileId
       const requiresPin = await checkMemberPinRequired(payload?.memberId, payload?.profileId)

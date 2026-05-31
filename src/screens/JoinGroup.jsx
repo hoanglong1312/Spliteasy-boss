@@ -19,12 +19,14 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [joinSent, setJoinSent] = useState(false);
   const lookupTimer = useRef(null);
   const memberName = (newName || selected || '').trim();
-  const [pinnedCleared, setPinnedCleared] = useState(false);
-  const [pinnedExpanded, setPinnedExpanded] = useState(false);
-  const pinnedSession = pinnedCleared ? null : (d.pinnedSession || null);
-  // Exclude pinnedSession from recentSessions to prevent two autoFocus inputs
-  const pinnedMemberId = pinnedSession?.memberId
-  const recentSessions = (d.recentSessions || []).filter(s => !pinnedMemberId || s.memberId !== pinnedMemberId);
+  const [adminExpanded, setAdminExpanded] = useState(false);
+  const [adminError, setAdminError] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const adminPinRef = useRef(null);
+  // Long is the only admin — find from recentSessions or pinnedSession
+  const longSession = d.recentSessions?.find(s => s.memberName === 'Long')
+    || (d.pinnedSession?.memberName === 'Long' ? d.pinnedSession : null);
+  const recentSessions = (d.recentSessions || []).filter(s => s.memberName !== 'Long');
   const inviteToken = d.inviteToken || '';
   const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
@@ -84,6 +86,24 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
     return () => clearTimeout(lookupTimer.current);
   }, [code, inviteToken]);
 
+  const handleAdminLogin = async () => {
+    const pin = adminPinRef.current?.value || '';
+    if (!pin) { setAdminError('Nhập mã PIN'); return; }
+    setAdminLoading(true);
+    setAdminError('');
+    try {
+      const result = await onAction?.('adminPinLogin', { pin, session: longSession });
+      if (result?.error === 'wrong_pin') {
+        setAdminError('Sai mã PIN. Thử lại.');
+        if (adminPinRef.current) { adminPinRef.current.value = ''; adminPinRef.current.focus(); }
+      } else if (result?.error) {
+        setAdminError('Không đăng nhập được. Thử lại.');
+      }
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
   return (
     <PhoneFrame>
       <Screen>
@@ -109,112 +129,93 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           }} />
         </div>
 
-        {/* Admin pinned session shortcut */}
-        {pinnedSession && (
-          <div style={{ marginBottom: 14 }}>
-            {!pinnedExpanded ? (
-              <button
-                type="button"
-                onClick={() => setPinnedExpanded(true)}
-                style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '9px 12px', borderRadius: 12,
-                  background: 'rgba(251,191,36,0.07)',
-                  border: '1px solid rgba(251,191,36,0.22)',
-                  color: '#fcd34d', fontFamily: 'inherit', cursor: 'pointer',
-                  fontSize: 12, fontWeight: 700,
-                }}
-              >
-                <span>👑</span>
-                <span style={{ flex: 1, textAlign: 'left' }}>Đăng nhập nhanh · Admin</span>
-                <span style={{ fontSize: 16 }}>›</span>
-              </button>
-            ) : (
+        {/* Admin section — hardcoded Long, uncontrolled input */}
+        <div style={{ marginBottom: 14 }}>
+          {!adminExpanded ? (
+            <button
+              type="button"
+              onClick={() => { setAdminExpanded(true); setAdminError(''); }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                padding: '9px 12px', borderRadius: 12,
+                background: 'rgba(251,191,36,0.07)',
+                border: '1px solid rgba(251,191,36,0.22)',
+                color: '#fcd34d', fontFamily: 'inherit', cursor: 'pointer',
+                fontSize: 12, fontWeight: 700,
+              }}
+            >
+              <span>👑</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>Đăng nhập nhanh · Admin</span>
+              <span style={{ fontSize: 16 }}>›</span>
+            </button>
+          ) : (
+            <div style={{
+              padding: 14,
+              background: 'linear-gradient(135deg, rgba(251,191,36,0.10) 0%, rgba(99,102,241,0.08) 100%)',
+              border: '1px solid rgba(251,191,36,0.3)',
+              borderRadius: 16,
+            }}>
               <div style={{
-                padding: 14,
-                background: 'linear-gradient(135deg, rgba(251,191,36,0.10) 0%, rgba(99,102,241,0.08) 100%)',
-                border: '1px solid rgba(251,191,36,0.3)',
-                borderRadius: 16,
+                fontSize: 9, fontWeight: 800, letterSpacing: '1.2px',
+                color: '#fcd34d', textTransform: 'uppercase', marginBottom: 10,
+              }}>👑 Đăng nhập nhanh · Admin</div>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 14px', borderRadius: '12px 12px 0 0',
+                background: 'rgba(251,191,36,0.08)',
+                border: '1px solid rgba(251,191,36,0.25)', borderBottom: 'none',
               }}>
-                <div style={{
-                  fontSize: 9, fontWeight: 800, letterSpacing: '1.2px',
-                  color: '#fcd34d', textTransform: 'uppercase', marginBottom: 10,
-                }}>👑 Đăng nhập nhanh · Admin</div>
-                {(() => {
-                  const isPinnedPin = pinSession?.memberId === pinnedSession?.memberId
-                  return (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => !isPinnedPin && onAction?.('resumeRecentSession', pinnedSession)}
-                        style={{
-                          width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-                          padding: '12px 14px', borderRadius: isPinnedPin ? '12px 12px 0 0' : 12,
-                          background: 'rgba(251,191,36,0.08)',
-                          border: '1px solid rgba(251,191,36,0.25)',
-                          borderBottom: isPinnedPin ? 'none' : undefined,
-                          color: colors.textPrimary, fontFamily: 'inherit', cursor: isPinnedPin ? 'default' : 'pointer',
-                          textAlign: 'left',
-                        }}
-                      >
-                        <Avatar initial={(pinnedSession.memberName || 'A')[0]} size={38} color="rgba(251,191,36,0.25)" ring={false} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 15, fontWeight: 900 }}>{pinnedSession.memberName}</div>
-                          <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 2, fontWeight: 600 }}>
-                            {pinnedSession.groupName || 'Thủ quỹ'}{pinnedSession.hasPin ? ' · 🔐 PIN' : ''}
-                          </div>
-                        </div>
-                        {!isPinnedPin && <span style={{ fontSize: 20, color: '#fcd34d' }}>›</span>}
-                      </button>
-                      {isPinnedPin && (
-                        <div style={{
-                          borderRadius: '0 0 12px 12px',
-                          border: '1px solid rgba(251,191,36,0.25)',
-                          borderTop: '1px solid rgba(251,191,36,0.1)',
-                          background: 'rgba(251,191,36,0.04)',
-                          padding: '12px 14px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 8,
-                        }}>
-                          <input
-                            type="tel"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            maxLength={6}
-                            value={pinValue}
-                            onChange={e => onPinChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                            onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
-                            placeholder="Nhập mã PIN"
-                            style={{
-                              width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
-                              border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(251,191,36,0.3)'}`,
-                              background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
-                              fontFamily: 'inherit', outline: 'none', letterSpacing: '0.1em',
-                            }}
-                          />
-                          {pinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{pinError}</div>}
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button type="button" onClick={onPinCancel} style={{
-                              flex: 1, padding: '9px 0', borderRadius: 8,
-                              border: `1px solid ${colors.borderNormal}`, background: 'transparent',
-                              color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                            }}>Hủy</button>
-                            <button type="button" onClick={() => onPinSubmit?.()} style={{
-                              flex: 2, padding: '9px 0', borderRadius: 8,
-                              border: 'none', background: 'rgba(251,191,36,0.9)', color: '#000',
-                              fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                            }}>Xác nhận</button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
+                <Avatar initial="L" size={38} color="rgba(251,191,36,0.25)" ring={false} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: colors.textPrimary }}>Long</div>
+                  <div style={{ fontSize: 11, color: '#fcd34d', marginTop: 2, fontWeight: 600 }}>
+                    Thủ quỹ · 🔐 PIN
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+              <div style={{
+                borderRadius: '0 0 12px 12px',
+                border: '1px solid rgba(251,191,36,0.25)',
+                borderTop: '1px solid rgba(251,191,36,0.1)',
+                background: 'rgba(251,191,36,0.04)',
+                padding: '12px 14px',
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <input
+                  ref={adminPinRef}
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  defaultValue=""
+                  placeholder="Nhập mã PIN"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && !adminLoading && handleAdminLogin()}
+                  style={{
+                    width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
+                    border: `1px solid ${adminError ? 'rgba(248,113,113,0.5)' : 'rgba(251,191,36,0.3)'}`,
+                    background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
+                    fontFamily: 'inherit', outline: 'none', letterSpacing: '0.1em',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {adminError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{adminError}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button type="button" onClick={() => { setAdminExpanded(false); setAdminError(''); }} style={{
+                    flex: 1, padding: '9px 0', borderRadius: 8,
+                    border: `1px solid ${colors.borderNormal}`, background: 'transparent',
+                    color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}>Hủy</button>
+                  <button type="button" onClick={handleAdminLogin} disabled={adminLoading} style={{
+                    flex: 2, padding: '9px 0', borderRadius: 8,
+                    border: 'none', background: adminLoading ? 'rgba(251,191,36,0.5)' : 'rgba(251,191,36,0.9)', color: '#000',
+                    fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: adminLoading ? 'default' : 'pointer',
+                  }}>{adminLoading ? '...' : 'Xác nhận'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Invite code */}
         {recentSessions.length > 0 && (
