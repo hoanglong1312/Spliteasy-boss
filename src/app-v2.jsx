@@ -443,6 +443,23 @@ export default function AppV2() {
       })
       return
     }
+    if (type === 'joinGroup_direct') {
+      // Direct login for existing member via invite link (auto-login or after PIN verify)
+      const requiresPin = await checkMemberPinRequired(payload?.memberId)
+      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
+        sessionStorage.setItem(PIN_UNLOCK_KEY, payload?.memberId)
+      }
+      setStack([])
+      setActiveTab('home')
+      await dispatch({
+        type: 'LOGIN',
+        token: payload.token,
+        memberId: payload.memberId,
+        groupId: payload.groupId,
+        memberName: payload.memberName,
+      })
+      return
+    }
 
     if (type === 'verifyPin') {
       return verifyMemberPin(payload?.memberId || state.currentUserId, payload?.pin)

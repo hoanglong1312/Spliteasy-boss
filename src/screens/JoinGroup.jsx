@@ -2,7 +2,7 @@
 // Props: data { code, group, existingNames[], selectedName }
 
 import React, { useState, useEffect, useRef } from 'react';
-import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink } from '../lib/auth.js';
+import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, verifyPinForInviteLink, getTokenAfterPinVerify } from '../lib/auth.js';
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel } from '../primitives';
 
@@ -17,6 +17,11 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [lookupError, setLookupError] = useState('');
   const [looking, setLooking] = useState(false);
   const [joinSent, setJoinSent] = useState(false);
+  const [pinRequired, setPinRequired] = useState(false);
+  const [pinRequiredMemberId, setPinRequiredMemberId] = useState(null);
+  const [invitePinValue, setInvitePinValue] = useState('');
+  const [invitePinError, setInvitePinError] = useState('');
+  const [invitePinLoading, setInvitePinLoading] = useState(false);
   const lookupTimer = useRef(null);
   const memberName = (newName || selected || '').trim();
   const [adminExpanded, setAdminExpanded] = useState(false);
@@ -101,6 +106,34 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
       }
     } finally {
       setAdminLoading(false);
+    }
+  };
+
+  const handleInvitePinSubmit = async () => {
+    if (!invitePinValue.trim()) {
+      setInvitePinError('Nhập mã PIN để tiếp tục');
+      return;
+    }
+    setInvitePinLoading(true);
+    setInvitePinError('');
+    try {
+      const tokenData = await getTokenAfterPinVerify(pinRequiredMemberId, invitePinValue);
+      if (tokenData?.error === 'wrong_pin') {
+        setInvitePinError('Mã PIN không đúng');
+        setInvitePinLoading(false);
+        return;
+      }
+      // PIN verified — auto-login
+      await onAction?.('joinGroup_direct', {
+        token: tokenData.token,
+        memberId: tokenData.member_id,
+        groupId: tokenData.group_id,
+        memberName: tokenData.member_name,
+      });
+      setInvitePinLoading(false);
+    } catch (err) {
+      setInvitePinError(err?.message || 'Lỗi xác minh PIN. Thử lại.');
+      setInvitePinLoading(false);
     }
   };
 
@@ -580,6 +613,46 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           }}>Đã gửi yêu cầu tham gia. Chờ thủ quỹ duyệt trước khi xem dữ liệu nhóm.</div>
         )}
 
+        {pinRequired && (
+          <div style={{ marginTop: 10 }}>
+            <SectionLabel style={{ marginBottom: 8 }}>Xác nhận bằng mã PIN</SectionLabel>
+            <input
+              type="tel"
+              inputMode="numeric"
+              placeholder="Nhập mã PIN của bạn"
+              value={invitePinValue}
+              onChange={(e) => {
+                setInvitePinValue(e.target.value);
+                setInvitePinError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleInvitePinSubmit();
+              }}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: 16,
+                borderRadius: 8,
+                border: `1px solid ${invitePinError ? '#fc5c65' : colors.border}`,
+                marginBottom: invitePinError ? 6 : 10,
+                letterSpacing: '0.3em',
+              }}
+              disabled={invitePinLoading}
+            />
+            {invitePinError && (
+              <div style={{
+                marginBottom: 10, padding: '8px 12px',
+                background: 'rgba(248,113,113,0.1)',
+                border: '1px solid rgba(248,113,113,0.3)',
+                borderRadius: 8, fontSize: 12, color: '#fca5a5',
+              }}>{invitePinError}</div>
+            )}
+            <Button block variant="brand" onClick={handleInvitePinSubmit} disabled={invitePinLoading}>
+              {invitePinLoading ? '⏳ Kiểm tra...' : 'Xác nhận'}
+            </Button>
+          </div>
+        )}
+
         {hasGroupPreview && <Button block variant="brand" style={{ marginTop: 10, opacity: joining ? 0.6 : 1 }}
           onClick={async () => {
             if (joining) return;
@@ -608,7 +681,28 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
             setJoining(true);
             try {
               if (isInviteLinkFlow) {
-                await requestJoinByInviteLink(inviteToken, memberName);
+                const result = await requestJoinByInviteLink(inviteToken, memberName);
+                if (result?.status === 'existing_member') {
+                  // Auto-login — no approval needed
+                  await onAction?.('joinGroup_direct', {
+                    token: result.token,
+                    memberId: result.memberId,
+                    groupId: result.groupId,
+                    memberName: result.memberName,
+                  });
+                  setJoining(false);
+                  return;
+                }
+                if (result?.status === 'requires_pin') {
+                  // Show PIN input
+                  setPinRequired(true);
+                  setPinRequiredMemberId(result.memberId);
+                  setInvitePinValue('');
+                  setInvitePinError('');
+                  setJoining(false);
+                  return;
+                }
+                // status === 'pending' (new member)
                 setJoinSent(true);
                 setJoining(false);
                 return;

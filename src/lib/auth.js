@@ -207,3 +207,28 @@ export async function requestJoinByInviteLink(inviteToken, name) {
   if (data?.error) throw new Error(data.error)
   return data
 }
+
+// Verify PIN for invite link login (returns boolean)
+export async function verifyPinForInviteLink(memberId, pin) {
+  const sb = createSupabase()
+  const { data, error } = await sb.rpc('verify_member_pin', { p_member_id: memberId, p_pin: pin })
+  if (error) throw error
+  return data === true
+}
+
+// Get token after PIN verified for invite link (returns token + member/group info)
+export async function getTokenAfterPinVerify(memberId, pin) {
+  const sb = createSupabase()
+  
+  // Verify PIN first
+  const { data: pinOk, error: pinErr } = await sb.rpc('verify_member_pin', { p_member_id: memberId, p_pin: pin })
+  if (pinErr) throw pinErr
+  if (!pinOk) return { error: 'wrong_pin' }
+  
+  // PIN correct — issue new token using resume_recent_member_session RPC
+  const { data, error } = await sb.rpc('resume_recent_member_session', { p_member_id: memberId })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  
+  return data // { token, member_id, group_id, member_name }
+}
