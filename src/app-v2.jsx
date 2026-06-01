@@ -249,6 +249,18 @@ export default function AppV2() {
     return () => { alive = false }
   }, [awaitingPin, pendingPinSession])
 
+  // Auto-navigate to join-group when logged-in user opens invite link
+  useEffect(() => {
+    if (!groupInviteToken) return
+    if (!state.currentUserId) return  // already showing join screen at line 2000
+    if (state._loading) return
+    setStack(s => {
+      // Only push if join-group not already on stack
+      if (s.some(r => r.screen === 'join-group')) return s
+      return [{ screen: 'join-group' }]
+    })
+  }, [groupInviteToken, state.currentUserId, state._loading])
+
   async function openPersonalLinkHome(token) {
     if (!token) return
     const sb = createSupabase()
@@ -2106,7 +2118,7 @@ export default function AppV2() {
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
-      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession() }} onAction={handle} {...pinProps} />
+      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken }} onAction={handle} {...pinProps} />
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />
       case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'new-group':           return <NewGroup data={newGroupData} onAction={handle} />

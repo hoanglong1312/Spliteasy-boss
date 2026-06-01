@@ -46,6 +46,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
 
   useEffect(() => {
     if (!inviteToken) return;
+    if (d.group?.id) return;  // already have group data from logged-in state, skip lookup
     let alive = true;
     setLooking(true);
     setLookupError('');
