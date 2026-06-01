@@ -157,6 +157,8 @@ export default function AppV2() {
   // Keys must match TAB_ITEMS in primitives.jsx: 'home','groups','pickleball','profile'
   const [activeTab, setActiveTab] = useState('home')
   const [stack, setStack] = useState([])
+  const inviteTokenNavigated = useRef(false)
+  const joinCodeNavigated = useRef(false)
   const [awaitingPin, setAwaitingPin] = useState(() => {
     const { token, member } = getStoredAuth()
     const memberId = member?.id
@@ -254,6 +256,8 @@ export default function AppV2() {
     if (!groupInviteToken) return
     if (!state.currentUserId) return  // already showing join screen at line 2000
     if (state._loading) return
+    if (inviteTokenNavigated.current) return
+    inviteTokenNavigated.current = true
     setStack(s => {
       // Only push if join-group not already on stack
       if (s.some(r => r.screen === 'join-group')) return s
@@ -265,6 +269,8 @@ export default function AppV2() {
     if (!groupJoinCode) return
     if (!state.currentUserId) return
     if (state._loading) return
+    if (joinCodeNavigated.current) return
+    joinCodeNavigated.current = true
     setStack(s => {
       if (s.some(r => r.screen === 'join-group')) return s
       return [{ screen: 'join-group' }]
