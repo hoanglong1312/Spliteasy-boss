@@ -599,8 +599,11 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                 }
                 return;
               }
-              setJoinError('Tên đã có. Dùng link cá nhân của bạn để vào lại.');
-              return;
+              if (!isInviteLinkFlow) {
+                setJoinError('Tên đã có. Dùng link cá nhân của bạn để vào lại.');
+                return;
+              }
+              // invite link flow: fall through to requestJoinByInviteLink
             }
             setJoining(true);
             try {
