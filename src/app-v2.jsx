@@ -1725,6 +1725,8 @@ export default function AppV2() {
         setPinInput('')
         return
       }
+      setStack([])
+      setActiveTab('home')
       await dispatch({
         type: 'LOGIN',
         token: manualSession.authToken,
