@@ -586,7 +586,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
             setJoinError('');
             if (!inviteToken && !code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
             if (!memberName) { setJoinError('Vui lòng chọn hoặc nhập tên của bạn.'); return; }
-            if (isInviteLinkFlow && selected && !newName) {
+            if (selected && !newName) {
               // Existing member selected — try to resume their session
               const allSessions = [...(d.recentSessions || [])];
               if (longSession) allSessions.push(longSession);
@@ -611,6 +611,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                 return;
               }
               await onAction?.('joinGroup', { code: code.trim(), memberName });
+              setJoining(false);
             } catch (err) {
               setJoinError(err?.message || 'Mã mời không đúng hoặc kết nối có vấn đề. Thử lại.');
               setJoining(false);
