@@ -669,7 +669,9 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                 if (existingSession.memberName === 'Long') {
                   setAdminExpanded(true);
                 } else {
+                  setJoining(true);
                   await onAction?.('resumeRecentSession', existingSession);
+                  setJoining(false);
                 }
                 return;
               }
