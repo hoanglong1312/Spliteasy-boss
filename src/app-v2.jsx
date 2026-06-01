@@ -260,6 +260,17 @@ export default function AppV2() {
       return [{ screen: 'join-group' }]
     })
   }, [groupInviteToken, state.currentUserId, state._loading])
+  // Auto-navigate to join-group when logged-in user opens ?join=CODE link
+  useEffect(() => {
+    if (!groupJoinCode) return
+    if (!state.currentUserId) return
+    if (state._loading) return
+    setStack(s => {
+      if (s.some(r => r.screen === 'join-group')) return s
+      return [{ screen: 'join-group' }]
+    })
+  }, [groupJoinCode, state.currentUserId, state._loading])
+
 
   async function openPersonalLinkHome(token) {
     if (!token) return
@@ -1305,6 +1316,21 @@ export default function AppV2() {
     }
 
     if (type === 'createGroupInviteShare') {
+      const { token } = getStoredAuth()
+      const groupId = payload?.groupId || state.currentGroupId
+      if (token && groupId) {
+        try {
+          const sb = createSupabase(token)
+          const { data, error } = await sb.rpc('create_group_invite_link', { p_group_id: groupId })
+          if (!error && !data?.error && data?.urlToken) {
+            const url = `${window.location.origin}${window.location.pathname}?invite=${encodeURIComponent(data.urlToken)}`
+            if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {})
+            dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link mời nhóm.' })
+            return
+          }
+        } catch { /* fall through to code fallback */ }
+      }
+      // Fallback: plain invite code
       const inviteCode = String(payload?.inviteCode || payload?.invite_code || state.currentGroup?.inviteCode || state.currentGroup?.invite_code || '').trim().toUpperCase()
       if (!inviteCode) {
         dispatch({ type: 'SHOW_TOAST', message: 'Nhóm chưa có mã mời.' })
@@ -2118,7 +2144,7 @@ export default function AppV2() {
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
-      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken }} onAction={handle} {...pinProps} />
+      case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken, joinCode: groupJoinCode }} onAction={handle} {...pinProps} />
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />
       case 'session-detail':      return <SessionDetail data={getSessionDetailData(route.params?.sessionId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'new-group':           return <NewGroup data={newGroupData} onAction={handle} />

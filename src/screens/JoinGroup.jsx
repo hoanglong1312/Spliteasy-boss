@@ -673,7 +673,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                 }
                 return;
               }
-              if (!isInviteLinkFlow) {
+              if (!isInviteLinkFlow && !code.trim()) {
                 setJoinError('Tên đã có. Dùng link cá nhân của bạn để vào lại.');
                 return;
               }
