@@ -9,3 +9,7 @@ package-lock.json
 test-results/
 screenshots/
 .vercel
+.DS_Store
+.claude/
+.codegraph/
+.superpowers/.DS_Store
