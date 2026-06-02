@@ -20,7 +20,7 @@ test('recent session resume asks for the simple PIN input before login when PIN 
   assert.match(appSource, /const \[pendingPinSession, setPendingPinSession\] = useState\(null\)/)
   assert.match(appSource, /const requiresPin = await checkMemberPinRequired\(payload\?\.memberId\)/)
   assert.doesNotMatch(appSource, /const requiresPin = Boolean\(payload\?\.hasPin\) && await checkMemberPinRequired\(payload\?\.memberId\)/)
-  assert.match(appSource, /async function checkMemberPinRequired\(memberId\)/)
+  assert.match(appSource, /async function checkMemberPinRequired\(memberId, profileId\)/)
   assert.match(appSource, /\.rpc\('member_pin_required'/)
   assert.match(appSource, /if \(!awaitingPin \|\| pendingPinSession\) return/)
   assert.match(appSource, /setAwaitingPin\(false\)/)
@@ -29,10 +29,11 @@ test('recent session resume asks for the simple PIN input before login when PIN 
   assert.doesNotMatch(appSource, /localStorage\.getItem\('spliteasy_pin'\)/)
   assert.doesNotMatch(appSource, /memberPinStorageKey/)
   assert.match(appSource, /setPendingPinSession\(payload\)/)
-  assert.match(appSource, /if \(awaitingPin\)/)
-  assert.match(appSource, /const pinOk = await verifyMemberPin\(memberId, value\)/)
+  assert.match(appSource, /const useProfilePath = !!\(pending\?\.profileId && !pending\?\.memberId\)/)
+  assert.match(appSource, /if \(useProfilePath\) \{[\s\S]*?\.rpc\('verify_pin_by_profile'/)
+  assert.match(appSource, /pinOk = await verifyMemberPin\(memberId, value\)/)
   assert.match(appSource, /const pending = pendingPinSession[\s\S]*handle\('resumeRecentSession', \{ \.\.\.pending, hasPin: false \}\)/)
-  assert.ok(appSource.indexOf('if (awaitingPin)') < appSource.lastIndexOf('if (!state.currentUserId)'))
+  assert.ok(appSource.indexOf('async function submitPin') < appSource.lastIndexOf('if (!state.currentUserId)'))
 })
 
 test('AppV2 renders the store toast as a fixed bottom overlay', () => {
@@ -110,6 +111,18 @@ test('AppV2 wires member detail route and member management updates', () => {
   )
   assert.match(reactivateBlock, /\.update\(\{ member_type: 'fixed', is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/)
   assert.match(reactivateBlock, /\.rpc\('add_expense_group_member', \{[\s\S]*?p_group_id: targetGroupId,[\s\S]*?p_member_id: memberId,/)
+})
+
+test('AppV2 editMember verifies Supabase updates returned a row', () => {
+  const editMemberBlock = appSource.slice(
+    appSource.indexOf("if (type === 'editMember')"),
+    appSource.indexOf("if (type === 'linkProfile')")
+  )
+
+  assert.match(editMemberBlock, /const \{ data: updatedRows, error \} = profileId/)
+  assert.match(editMemberBlock, /\.from\('profiles'\)[\s\S]*?\.update\(profileUpdate\)[\s\S]*?\.eq\('id', profileId\)[\s\S]*?\.select\('id'\)/)
+  assert.match(editMemberBlock, /\.from\('members'\)[\s\S]*?\.update\(profileUpdate\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.select\('id'\)/)
+  assert.match(editMemberBlock, /if \(!safeArray\(updatedRows\)\.length\) throw new Error\(`Không thể cập nhật thành viên/)
 })
 
 test('AppV2 uses the profile-aware role RPC for expense groups', () => {

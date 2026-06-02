@@ -37,3 +37,16 @@ test('Pickleball member row does not nest quick action button inside another but
   assert.match(memberSource, /<div role="button" tabIndex=\{0\} onClick=\{\(\) => onAction\?\.\('memberDetail', \{ memberId: member\.id \}\)\}/);
   assert.doesNotMatch(memberSource, /return \(\s*<button type="button" onClick=\{\(\) => onAction\?\.\('memberDetail'/);
 });
+
+test('Pickleball member edit includes profile identity so profile-level name updates refresh rows', () => {
+  assert.match(memberSource, /await onAction\?\.\('editMember', \{[\s\S]*?memberId: editingMember\.id,[\s\S]*?profileId: editingMember\?\.profileId \|\| editingMember\?\.profile_id \|\| '',[\s\S]*?name,/);
+});
+
+test('AppV2 editMember mirrors profile name to membership row so pickleball refresh does not show stale fallback name', () => {
+  const editMemberBlock = appSource.slice(
+    appSource.indexOf("if (type === 'editMember')"),
+    appSource.indexOf("if (type === 'linkProfile')")
+  );
+
+  assert.match(editMemberBlock, /if \(profileId\) \{[\s\S]*?\.from\('members'\)[\s\S]*?\.update\(\{ name: profileUpdate\.name \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', member\?\.groupId \|\| member\?\.group_id\)/);
+});
