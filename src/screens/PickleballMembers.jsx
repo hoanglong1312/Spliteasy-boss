@@ -149,7 +149,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 
   return (
     <PhoneFrame>
-      <Screen style={{ background: colors.pageBg }}>
+      <Screen tabBar style={{ background: colors.pageBg }}>
         <ModuleHero
           tone="pickleball"
           eyebrow={`CLB PICKLEBALL · ${d.clubName}`}
@@ -404,7 +404,9 @@ function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
   const barColor = progressColor(pct);
 
   return (
-    <button type="button" onClick={() => onAction?.('memberDetail', { memberId: member.id })} style={{
+    <div role="button" tabIndex={0} onClick={() => onAction?.('memberDetail', { memberId: member.id })} onKeyDown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') onAction?.('memberDetail', { memberId: member.id });
+    }} style={{
       width: '100%',
       display: 'grid',
       gridTemplateColumns: '34px minmax(0, 1fr) 30px',
@@ -471,7 +473,7 @@ function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
       ) : (
         <span />
       )}
-    </button>
+    </div>
   );
 }
 

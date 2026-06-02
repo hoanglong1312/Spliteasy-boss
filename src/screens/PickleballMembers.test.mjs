@@ -28,3 +28,12 @@ test('Pickleball member add flow suggests and triggers inactive member reactivat
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/);
   assert.match(appSource, /\.update\(\{ member_type: 'fixed', is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
 });
+
+test('Pickleball members screen reserves tab bar space so bottom member remains reachable', () => {
+  assert.match(memberSource, /<Screen\s+tabBar\s+style=\{\{ background: colors\.pageBg \}\}>/);
+});
+
+test('Pickleball member row does not nest quick action button inside another button', () => {
+  assert.match(memberSource, /<div role="button" tabIndex=\{0\} onClick=\{\(\) => onAction\?\.\('memberDetail', \{ memberId: member\.id \}\)\}/);
+  assert.doesNotMatch(memberSource, /return \(\s*<button type="button" onClick=\{\(\) => onAction\?\.\('memberDetail'/);
+});
