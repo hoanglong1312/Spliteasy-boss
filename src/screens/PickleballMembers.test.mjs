@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const memberSource = readFileSync(new URL('./PickleballMembers.jsx', import.meta.url), 'utf8');
+const memberDetailSource = readFileSync(new URL('./MemberDetail.jsx', import.meta.url), 'utf8');
 const dataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 
@@ -38,15 +39,24 @@ test('Pickleball member row does not nest quick action button inside another but
   assert.doesNotMatch(memberSource, /return \(\s*<button type="button" onClick=\{\(\) => onAction\?\.\('memberDetail'/);
 });
 
-test('Pickleball member edit includes profile identity so profile-level name updates refresh rows', () => {
-  assert.match(memberSource, /await onAction\?\.\('editMember', \{[\s\S]*?memberId: editingMember\.id,[\s\S]*?profileId: editingMember\?\.profileId \|\| editingMember\?\.profile_id \|\| '',[\s\S]*?name,/);
+test('Pickleball member edit includes profile and group identity so profile-level name updates refresh rows', () => {
+  assert.match(memberSource, /await onAction\?\.\('editMember', \{[\s\S]*?memberId: editingMember\.id,[\s\S]*?profileId: editingMember\?\.profileId \|\| editingMember\?\.profile_id \|\| '',[\s\S]*?groupId: d\.groupId,[\s\S]*?name,/);
 });
 
-test('AppV2 editMember mirrors profile name to membership row so pickleball refresh does not show stale fallback name', () => {
+test('Pickleball member add candidates use pickleball membership semantics', () => {
+  assert.match(dataSource, /memberCandidates: buildGroupMemberCandidates\(currentGroup\(state\), state\?\.members, state\?\.profiles, \{ mode: 'pickleball' \}\)/);
+});
+
+test('Member detail edit includes profile and group identity so bottom sheet save targets the same member row', () => {
+  assert.match(memberDetailSource, /await onAction\?\.\('editMember', \{[\s\S]*?memberId: d\.id,[\s\S]*?profileId: d\?\.profileId \|\| d\?\.profile_id \|\| '',[\s\S]*?groupId: d\?\.groupId \|\| d\?\.group_id \|\| '',[\s\S]*?name,/);
+});
+
+test('AppV2 editMember falls back to membership row updates so pickleball refresh does not show stale names', () => {
   const editMemberBlock = appSource.slice(
     appSource.indexOf("if (type === 'editMember')"),
     appSource.indexOf("if (type === 'linkProfile')")
   );
 
-  assert.match(editMemberBlock, /if \(profileId\) \{[\s\S]*?\.from\('members'\)[\s\S]*?\.update\(\{ name: profileUpdate\.name \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', member\?\.groupId \|\| member\?\.group_id\)/);
+  assert.match(editMemberBlock, /const memberUpdate = \{[\s\S]*?name: profileUpdate\.name,[\s\S]*?bank_account: profileUpdate\.bank_account,[\s\S]*?bank_name: profileUpdate\.bank_name,[\s\S]*?bank_account_name: profileUpdate\.bank_account_name/);
+  assert.match(editMemberBlock, /if \(!safeArray\(updatedRows\)\.length\) \{[\s\S]*?\.from\('members'\)\.update\(memberUpdate\)\.eq\('id', memberId\)[\s\S]*?if \(targetGroupId\) request = request\.eq\('group_id', targetGroupId\)[\s\S]*?\.select\('id'\)/);
 });

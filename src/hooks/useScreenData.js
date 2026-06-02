@@ -1687,7 +1687,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
   const activeMembers = dedupeMemberRowsByProfileOrName(currentGroupMembers(state).filter(isActiveMember))
   const sessions = getStateMonthSessions(state, today)
   const joinRequests = currentJoinRequests(state)
-  const totalSessions = sessions.length || 1
+  const totalSessions = expectedPickleballSessionCountForMonth(state, monthKey(today), sessions)
   const fixedMembers = activeMembers.filter(member => memberType(member) === 'fixed')
   const casualMembers = dedupeMemberRowsByProfileOrName(activeMembers.filter(member => memberType(member) === 'casual'))
   const joinRequestRows = joinRequests.map(request => {
@@ -1723,7 +1723,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     fixedMembers: fixedRows,
     casualMembers: casualRows,
     allMembers: allMemberRows,
-    memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles),
+    memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles, { mode: 'pickleball' }),
     legacyGuests: buildGuestRows(sessions),
   }
 }
@@ -1774,6 +1774,33 @@ function buildMemberDetailData(state, memberId, selectedYearMonth) {
       bankAccount: member?.bankAccount || member?.bank_account || '',
     },
   }
+}
+
+function expectedPickleballSessionCountForMonth(state, yearMonth, sessions) {
+  const group = currentGroup(state)
+  const config = currentPickleConfig(state)
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const configuredWeekdays = normalizeIsoWeekdays(
+    monthlyConfig?.scheduleWeekdays ||
+    monthlyConfig?.schedule_weekdays ||
+    config?.scheduleWeekdays ||
+    config?.schedule_weekdays ||
+    config?.weekdays ||
+    config?.scheduleDays ||
+    config?.schedule_days ||
+    group?.scheduleWeekdays ||
+    group?.schedule_weekdays ||
+    group?.scheduleDays
+  )
+  if (configuredWeekdays.length > 0) {
+    const generationConfig = buildSessionGenerationConfig(state, yearMonth)
+    const expectedDates = generatedSessionDatesForMonth(yearMonth, {
+      ...generationConfig,
+      scheduleWeekdays: configuredWeekdays,
+    })
+    if (expectedDates.length > 0) return expectedDates.length
+  }
+  return sessions.length || 1
 }
 
 function buildPickleballTicketsData(state) {

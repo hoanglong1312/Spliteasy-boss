@@ -59,6 +59,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     if (!editingMember || !name) return;
     await onAction?.('editMember', {
       memberId: editingMember.id,
+      profileId: editingMember?.profileId || editingMember?.profile_id || '',
+      groupId: d.groupId,
       name,
       bankAccountName: editBankAccountName.trim(),
       bankName: editBankName,
