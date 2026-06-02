@@ -12,13 +12,11 @@ Vercel project connect với GitHub repo, auto-deploy khi main thay đổi. Khô
 
 ## Fallback nếu Vercel không auto-deploy
 
-Nếu sau 2 phút push mà Vercel vẫn serve bundle cũ (kiểm tra bằng `curl -s <url> | grep assets/index`):
+Webhook đã hoạt động (reconnect 2026-06-01). Nếu sau 2 phút push mà vẫn không thấy deployment mới:
 
 ```bash
 vercel --prod
 ```
-
-Bypass GitHub webhook, deploy trực tiếp qua CLI. Root cause thường là Vercel-GitHub webhook broken → fix dứt điểm bằng cách disconnect/reconnect GitHub integration trong Vercel dashboard.
 
 ## Không hỏi lại khi
 

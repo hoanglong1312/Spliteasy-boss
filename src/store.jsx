@@ -1197,15 +1197,16 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
   const profilesById = new Map(normalProfiles.map(profile => [String(profile.id), profile]))
   const normalMembers = members.map(m => {
     const profile = profilesById.get(String(m.profile_id || ''))
+    const memberName = String(m.name || profile?.name || '').trim()
     return {
     id: m.id,
     profileId: m.profile_id,
     profile_id: m.profile_id,
     groupId: m.group_id,
     group_id: m.group_id,
-    name: String(profile?.name || m.name || '').trim(),
-    short: profile?.short || m.short || String(profile?.name || m.name || '').trim().split(' ').pop(),
-    initials: profile?.initials || m.initials || String(profile?.name || m.name || '').trim().slice(0, 2).toUpperCase(),
+    name: memberName,
+    short: m.short || profile?.short || memberName.split(' ').pop(),
+    initials: m.initials || profile?.initials || memberName.slice(0, 2).toUpperCase(),
     color: profile?.color || m.color || '#574EFA',
     avatarUrl: profile?.avatar_url || m.avatar_url || '',
     avatar_url: profile?.avatar_url || m.avatar_url || '',

@@ -36,6 +36,8 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
     if (!name) return;
     await onAction?.('editMember', {
       memberId: d.id,
+      profileId: d?.profileId || d?.profile_id || '',
+      groupId: d?.groupId || d?.group_id || '',
       name,
       bankAccountName: editBankAccountName.trim(),
       bankName: editBankName,

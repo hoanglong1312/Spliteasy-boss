@@ -113,15 +113,15 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(reactivateBlock, /\.rpc\('add_expense_group_member', \{[\s\S]*?p_group_id: targetGroupId,[\s\S]*?p_member_id: memberId,/)
 })
 
-test('AppV2 editMember verifies Supabase updates returned a row', () => {
+test('AppV2 editMember falls back to membership update when profile RLS returns no rows', () => {
   const editMemberBlock = appSource.slice(
     appSource.indexOf("if (type === 'editMember')"),
     appSource.indexOf("if (type === 'linkProfile')")
   )
 
-  assert.match(editMemberBlock, /const \{ data: updatedRows, error \} = profileId/)
-  assert.match(editMemberBlock, /\.from\('profiles'\)[\s\S]*?\.update\(profileUpdate\)[\s\S]*?\.eq\('id', profileId\)[\s\S]*?\.select\('id'\)/)
-  assert.match(editMemberBlock, /\.from\('members'\)[\s\S]*?\.update\(profileUpdate\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.select\('id'\)/)
+  assert.match(editMemberBlock, /let updatedRows = \[\]/)
+  assert.match(editMemberBlock, /if \(profileId\) \{[\s\S]*?\.from\('profiles'\)[\s\S]*?\.update\(profileUpdate\)[\s\S]*?\.eq\('id', profileId\)[\s\S]*?\.select\('id'\)/)
+  assert.match(editMemberBlock, /if \(!safeArray\(updatedRows\)\.length\) \{[\s\S]*?\.from\('members'\)[\s\S]*?\.update\(memberUpdate\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)[\s\S]*?\.select\('id'\)/)
   assert.match(editMemberBlock, /if \(!safeArray\(updatedRows\)\.length\) throw new Error\(`Không thể cập nhật thành viên/)
 })
 

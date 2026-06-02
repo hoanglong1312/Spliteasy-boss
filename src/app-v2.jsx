@@ -904,20 +904,30 @@ export default function AppV2() {
       if (!('bankName' in (payload || {})) && !('bank_name' in (payload || {}))) delete profileUpdate.bank_name
       if (!('bankAccountName' in (payload || {})) && !('bank_account_name' in (payload || {}))) delete profileUpdate.bank_account_name
       const profileId = payload?.profileId || payload?.profile_id || member?.profileId || member?.profile_id
-      const { data: updatedRows, error } = profileId
-        ? await sb.from('profiles').update(profileUpdate).eq('id', profileId).select('id')
-        : await sb.from('members').update(profileUpdate).eq('id', memberId).select('id')
-      if (error) throw error
-      if (!safeArray(updatedRows).length) throw new Error(`Không thể cập nhật thành viên ${payload?.name || member?.name || memberId}. Kiểm tra quyền truy cập hoặc mã thành viên.`)
-      if (profileId) {
-        let request = sb
-          .from('members')
-          .update({ name: profileUpdate.name })
-          .eq('id', memberId)
-        if (member?.groupId || member?.group_id) request = request.eq('group_id', member?.groupId || member?.group_id)
-        const { error: memberNameError } = await request
-        if (memberNameError) throw memberNameError
+      const targetGroupId = payload?.groupId || payload?.group_id || member?.groupId || member?.group_id
+      const memberUpdate = {
+        name: profileUpdate.name,
+        bank_account: profileUpdate.bank_account,
+        bank_name: profileUpdate.bank_name,
+        bank_account_name: profileUpdate.bank_account_name,
       }
+      if (!('bank_account' in profileUpdate)) delete memberUpdate.bank_account
+      if (!('bank_name' in profileUpdate)) delete memberUpdate.bank_name
+      if (!('bank_account_name' in profileUpdate)) delete memberUpdate.bank_account_name
+      let updatedRows = []
+      if (profileId) {
+        const { data, error } = await sb.from('profiles').update(profileUpdate).eq('id', profileId).select('id')
+        if (error) throw error
+        updatedRows = data
+      }
+      if (!safeArray(updatedRows).length) {
+        let request = sb.from('members').update(memberUpdate).eq('id', memberId)
+        if (targetGroupId) request = request.eq('group_id', targetGroupId)
+        const { data, error } = await request.select('id')
+        if (error) throw error
+        updatedRows = data
+      }
+      if (!safeArray(updatedRows).length) throw new Error(`Không thể cập nhật thành viên ${payload?.name || member?.name || memberId}. Kiểm tra quyền truy cập hoặc mã thành viên.`)
       await dispatch({ type: 'REFRESH' })
       return
     }
