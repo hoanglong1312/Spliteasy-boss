@@ -515,7 +515,7 @@ test('members progress follows calendar attendance records', () => {
   assert.equal(rows.m2.progressPct, 50)
 })
 
-test('pickleball members progress uses full configured month schedule as denominator', () => {
+test('pickleball members progress counts only done sessions as denominator', () => {
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {
     currentGroupId: 'g1',
@@ -524,7 +524,10 @@ test('pickleball members progress uses full configured month schedule as denomin
     members: [{ id: 'm1', group_id: 'g1', name: 'An', member_type: 'fixed', is_active: true }],
     pickle: {
       monthlyConfigs: [{ group_id: 'g1', year_month: '2026-06', schedule_weekdays: [1, 3], schedule_start_day: '01/06/2026' }],
-      sessions: [{ id: 's1', group_id: 'g1', session_date: '2026-06-01', attendance: ['m1'] }],
+      sessions: [
+        { id: 's1', group_id: 'g1', session_date: '2026-06-01', status: 'done', attendance: ['m1'] },
+        { id: 's2', group_id: 'g1', session_date: '2026-06-03', status: 'scheduled', attendance: [] },
+      ],
     },
     _allPickle: { sessions: [] },
   }
@@ -533,8 +536,90 @@ test('pickleball members progress uses full configured month schedule as denomin
   const member = data.members.find(row => row.id === 'm1')
 
   assert.equal(member.sessionsAttended, 1)
-  assert.equal(member.sessionsTotal, 9)
-  assert.equal(member.progressPct, 11)
+  assert.equal(member.sessionsTotal, 1)
+  assert.equal(member.progressPct, 100)
+})
+
+test('pickleball members progress only counts confirmed sessions as denominator', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', type: 'pickleball' },
+    groups: [{ id: 'g1', name: 'CLB', type: 'pickleball' }],
+    members: [{ id: 'm1', group_id: 'g1', name: 'An', member_type: 'fixed', is_active: true }],
+    pickle: {
+      monthlyConfigs: [{ group_id: 'g1', year_month: '2026-06', sessions_count: 9 }],
+      sessions: [
+        { id: 's1', group_id: 'g1', session_date: '2026-06-01', status: 'done', attendance: ['m1'] },
+        { id: 's2', group_id: 'g1', session_date: '2026-06-08', status: 'scheduled', attendance: [] },
+      ],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state, '2026-06')
+  const member = data.members.find(row => row.id === 'm1')
+
+  assert.equal(member.sessionsAttended, 1)
+  assert.equal(member.sessionsTotal, 1)
+  assert.equal(member.progressPct, 100)
+})
+
+test('pickleball members progress is zero when selected month has no expected sessions', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', type: 'pickleball' },
+    groups: [{ id: 'g1', name: 'CLB', type: 'pickleball' }],
+    members: [{ id: 'm1', group_id: 'g1', name: 'An', member_type: 'fixed', is_active: true }],
+    pickle: {
+      monthlyConfigs: [{ group_id: 'g1', year_month: '2026-06' }],
+      sessions: [],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state, '2026-06')
+  const member = data.members.find(row => row.id === 'm1')
+
+  assert.equal(member.sessionsAttended, 0)
+  assert.equal(member.sessionsTotal, 0)
+  assert.equal(member.progressPct, 0)
+})
+
+test('pickleball members progress ignores scheduled empty sessions and caps moved overages', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', type: 'pickleball' },
+    groups: [{ id: 'g1', name: 'CLB', type: 'pickleball' }],
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', memberType: 'fixed', isActive: true },
+      { id: 'm2', groupId: 'g1', name: 'Binh', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-06', scheduleWeekdays: [1], scheduleStartDay: '01/06/2026' }],
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-06-01', status: 'completed', attendanceRecords: [{ memberId: 'm1', status: 'present' }] },
+        { id: 's2', groupId: 'g1', date: '2026-06-08', status: 'scheduled', attendanceRecords: [] },
+        { id: 's3', groupId: 'g1', date: '2026-06-15', status: 'moved', attendanceRecords: [{ memberId: 'm1', status: 'present' }, { memberId: 'm2', status: 'present' }] },
+        { id: 's4', groupId: 'g1', date: '2026-06-22', status: 'completed', attendanceRecords: [{ memberId: 'm1', status: 'present' }] },
+        { id: 's5', groupId: 'g1', date: '2026-06-29', status: 'completed', attendanceRecords: [{ memberId: 'm1', status: 'present' }] },
+        { id: 's6', groupId: 'g1', date: '2026-06-30', status: 'completed', attendanceRecords: [{ memberId: 'm1', status: 'present' }] },
+        { id: 's7', groupId: 'g1', date: '2026-06-30', status: 'completed', attendanceRecords: [{ memberId: 'm1', status: 'present' }] },
+      ],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state, '2026-06')
+  const rows = Object.fromEntries(data.members.map(member => [member.id, member]))
+
+  assert.equal(rows.m1.sessionsAttended, 5)
+  assert.equal(rows.m1.sessionsTotal, 5)
+  assert.equal(rows.m1.progressPct, 100)
+  assert.equal(rows.m2.sessionsAttended, 0)
+  assert.equal(rows.m2.progressPct, 0)
 })
 
 test('pickleball members data exposes existing profile candidates outside the club', () => {
@@ -640,6 +725,31 @@ test('calendar attendance chips use compact 34px avatar-style green and grey sta
   assert.match(calendarSource, /width: ATTENDANCE_CHIP_SIZE/)
   assert.match(calendarSource, /height: ATTENDANCE_CHIP_SIZE/)
   assert.doesNotMatch(calendarSource, /memberType: a\.memberType/)
+})
+
+test('calendar attendance chips show full member names under compact avatars', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'Đỗ Hoàng', memberType: 'fixed' },
+      { id: 'm2', groupId: 'g1', name: 'Long Nguyễn', memberType: 'fixed' },
+    ],
+    pickle: {
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-20', status: 'scheduled', attendees: ['m1'] },
+      ],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballCalendarData(state)
+
+  assert.deepEqual(Array.from(data.selectedSession.attendees, member => member.name), ['Đỗ Hoàng', 'Long Nguyễn'])
+  assert.match(calendarSource, /const ATTENDANCE_NAME_WIDTH = 44/)
+  assert.doesNotMatch(calendarSource, /const ATTENDANCE_NAME_WIDTH = 64/)
 })
 
 test('calendar legend and ticket styles distinguish my tickets from other tickets', () => {

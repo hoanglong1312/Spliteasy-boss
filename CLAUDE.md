@@ -23,6 +23,16 @@ git commit -m "[message Codex đề xuất]"
 
 **Browser Debugging:** Ưu tiên Browser/Playwright cho reproduce/verify UI. Dùng Chrome DevTools MCP khi cần console, network request/response, Supabase payload, storage hoặc performance. Nếu Playwright không chạy được trong Claude Code, Chrome DevTools MCP là fallback để kiểm tra localhost bằng Chrome profile tách biệt. MCP này chạy qua Node bundle của Codex runtime vì package yêu cầu Node `20.19.0+`.
 
+### Token Discipline Cho Bug Nhỏ
+
+Bug nhỏ (1-2 file, triệu chứng rõ, không cần DB/RLS/MCP) dùng fast path:
+1. Locate bằng `grep -n` / search targeted trước; không `Read` nguyên file source/test lớn.
+2. Chỉ `Read` với `offset` + `limit` quanh match, hoặc đọc file nhỏ dưới ~200 dòng.
+3. Nếu fix cần sửa `.jsx/.js/.sql`, ưu tiên giao Codex: root cause ngắn + file nghi ngờ + expected behavior + verification.
+4. Claude main chỉ tự sửa khi patch hẹp, file nhỏ, hoặc Codex fail 2+ lần cùng symptom.
+5. Test targeted trước; chỉ chạy full build/E2E sau khi fix xanh hoặc trước bàn giao.
+6. Không dùng codegraph/context rộng cho bug nhỏ trừ khi user hỏi kiến trúc/trace hoặc cần cross-file flow.
+
 ### Quality Gate — Bắt Buộc Trước Khi Bàn Giao User
 
 **Bước 1: Static Audit (Codex tự làm)**

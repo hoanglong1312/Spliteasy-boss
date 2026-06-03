@@ -142,12 +142,10 @@ test('store fetches profiles and merges profile fields into members', () => {
   assert.match(storeSource, /profiles: normalProfiles/)
 })
 
-test('ADD_MEMBER can link an existing profile or create a new profile first', () => {
+test('ADD_MEMBER links existing profile if provided, skips profile creation', () => {
   const addMemberBlock = storeSource.match(/case 'ADD_MEMBER': \{[\s\S]*?return newMember[\s\S]*?\n      \}/)?.[0] || ''
   assert.match(storeSource, /async function ensureProfileForMember\(sb, member\) \{/)
-  assert.match(storeSource, /if \(member\?\.profileId \|\| member\?\.profile_id\) return member\.profileId \|\| member\.profile_id/)
-  assert.match(storeSource, /\.from\('profiles'\)\s*\.insert\(/)
-  assert.match(addMemberBlock, /const profileId = await ensureProfileForMember\(sb, member\)/)
+  assert.match(addMemberBlock, /const profileId = member\?\.profileId \|\| member\?\.profile_id/)
   assert.match(addMemberBlock, /memberInsertRow\(groupId, \{ \.\.\.member, profileId \}, member\.role \|\| 'member'\)/)
 })
 

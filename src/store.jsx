@@ -2206,7 +2206,7 @@ export function AppProvider({ children }) {
         if (!sb) return
         const { member } = action
         const groupId = action.groupId || action.group_id || state.currentGroupId
-        const profileId = await ensureProfileForMember(sb, member)
+        const profileId = member?.profileId || member?.profile_id
         const insertRow = memberInsertRow(groupId, { ...member, profileId }, member.role || 'member')
         if (isUuid(member.id)) insertRow.id = member.id
         const { data: newMember, error } = await sb

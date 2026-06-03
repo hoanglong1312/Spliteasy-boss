@@ -6,6 +6,7 @@ const memberSource = readFileSync(new URL('./PickleballMembers.jsx', import.meta
 const memberDetailSource = readFileSync(new URL('./MemberDetail.jsx', import.meta.url), 'utf8');
 const dataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
+const storeSource = readFileSync(new URL('../store.jsx', import.meta.url), 'utf8');
 
 test('Pickleball member add flow validates typed names against active and inactive group members', () => {
   assert.match(dataSource, /allMembers: allMemberRows/);
@@ -13,7 +14,7 @@ test('Pickleball member add flow validates typed names against active and inacti
   assert.match(memberSource, /function findDuplicateMember\(name, members\)/);
   assert.match(memberSource, /String\(member\?\.name \|\| member\?\.displayName \|\| ''\)\.trim\(\)\.toLowerCase\(\)/);
   assert.match(memberSource, /Tên này đã tồn tại trong nhóm\. Vui lòng dùng tên khác\./);
-  assert.match(memberSource, /const duplicateMember = findDuplicateMember\(newMemberName, allMembers\)/);
+  assert.match(memberSource, /const duplicateMember = findDuplicateMember\(typedMemberName, allMembers\)/);
   assert.match(memberSource, /if \(duplicateMember && isActiveMember\(duplicateMember\)\)/);
   assert.match(memberSource, /await onAction\?\.\('addPickleballMember'/);
   assert.doesNotMatch(memberSource, /onAction\?\.\('addMember'/);
@@ -22,12 +23,30 @@ test('Pickleball member add flow validates typed names against active and inacti
 test('Pickleball member add flow suggests and triggers inactive member reactivation', () => {
   assert.match(memberSource, /const duplicateMemberInactive = duplicateMember && !isActiveMember\(duplicateMember\)/);
   assert.match(memberSource, /Thành viên '\{duplicateMember\.name\}' đang ở trạng thái chờ — bạn có muốn thêm lại không\?/);
-  assert.match(memberSource, />Thêm lại<\/Button>/);
+  assert.match(memberSource, /savingAction === 'reactivateMember' \? 'Đang lưu…' : 'Thêm lại'/);
   assert.match(memberSource, /await onAction\?\.\('reactivateMember', \{ memberId: duplicateMember\.id, groupId: d\.groupId \}\)/);
   assert.match(appSource, /if \(type === 'reactivateMember'\)/);
   assert.match(appSource, /const isPickleballGroup = isPickleballActionGroup\(currentGroup\)/);
   assert.doesNotMatch(appSource, /groupText\.includes\('pickle'\)/);
   assert.match(appSource, /\.update\(\{ member_type: 'fixed', is_active: true \}\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)/);
+});
+
+test('Pickleball async save buttons show pending text and disable while awaiting save', () => {
+  assert.match(memberSource, /const \[savingAction, setSavingAction\] = useState\(''\)/);
+  assert.match(memberSource, /setSavingAction\('addMember'\)[\s\S]*?finally \{[\s\S]*?setSavingAction\(''\)/);
+  assert.match(memberSource, /setSavingAction\('reactivateMember'\)[\s\S]*?finally \{[\s\S]*?setSavingAction\(''\)/);
+  assert.match(memberSource, /setSavingAction\('editMember'\)[\s\S]*?finally \{[\s\S]*?setSavingAction\(''\)/);
+  assert.match(memberSource, /setSavingAction\('deleteMember'\)[\s\S]*?finally \{[\s\S]*?setSavingAction\(''\)/);
+  assert.match(memberSource, /disabled=\{savingAction === 'addMember'\}/);
+  assert.match(memberSource, /savingAction === 'addMember' \? 'Đang lưu…'/);
+  assert.match(memberSource, /disabled=\{savingAction === 'editMember'\}/);
+  assert.match(memberSource, /savingAction === 'editMember' \? 'Đang lưu…' : 'Lưu thay đổi'/);
+  assert.match(memberSource, /disabled=\{savingAction === 'deleteMember'\}/);
+  assert.match(memberSource, /savingAction === 'deleteMember' \? 'Đang xóa…' : 'Xác nhận'/);
+  assert.match(memberSource, /\{savingAction && \(/);
+  assert.match(memberSource, /role="status"/);
+  assert.match(memberSource, /Đang xử lý…/);
+  assert.match(memberSource, /LoadingSpinner/);
 });
 
 test('Pickleball members screen reserves tab bar space so bottom member remains reachable', () => {
@@ -45,6 +64,34 @@ test('Pickleball member edit includes profile and group identity so profile-leve
 
 test('Pickleball member add candidates use pickleball membership semantics', () => {
   assert.match(dataSource, /memberCandidates: buildGroupMemberCandidates\(currentGroup\(state\), state\?\.members, state\?\.profiles, \{ mode: 'pickleball' \}\)/);
+});
+
+test('Pickleball plain member add uses search text instead of a separate new-name field', () => {
+  assert.match(memberSource, /const typedMemberName = candidateQuery\.trim\(\)/);
+  assert.match(memberSource, /const duplicateMember = findDuplicateMember\(typedMemberName, allMembers\)/);
+  assert.match(memberSource, /await onAction\?\.\('addPickleballMember', \{ groupId: d\.groupId, name: typedMemberName, profileId: '', type: newMemberType \}\)/);
+  assert.doesNotMatch(memberSource, /const \[newMemberName, setNewMemberName\]/);
+  assert.doesNotMatch(memberSource, /label=\{memberCandidates\.length > 0 \? 'Hoặc nhập tên mới' : 'Tên'\}/);
+});
+
+test('Pickleball exact typed candidate save uses that existing candidate', () => {
+  assert.match(memberSource, /const exactCandidateMatch = typedMemberName && memberCandidates\.find\(candidate => normalizeSearch\(candidate\?\.name\) === normalizeSearch\(typedMemberName\)\)/);
+  assert.match(memberSource, /const candidatesToAdd = selectedCandidates\.length > 0 \? selectedCandidates : exactCandidateMatch \? \[exactCandidateMatch\] : \[\]/);
+  assert.match(memberSource, /if \(savingAction \|\| \(candidatesToAdd\.length === 0 && !typedMemberName\)\) return/);
+  assert.match(memberSource, /for \(const candidate of candidatesToAdd\)/);
+  assert.match(memberSource, /if \(candidatesToAdd\.length === 0 && typedMemberName\)/);
+});
+
+test('Store ADD_MEMBER inserts plain pickleball members without creating profiles', () => {
+  const addMemberBlock = storeSource.slice(
+    storeSource.indexOf("case 'ADD_MEMBER':"),
+    storeSource.indexOf("case 'SAVE_PICKLEBALL_MONTHLY_CONFIG':")
+  );
+
+  assert.match(addMemberBlock, /const profileId = member\?\.profileId \|\| member\?\.profile_id/);
+  assert.match(addMemberBlock, /memberInsertRow\(groupId, \{ \.\.\.member, profileId \}, member\.role \|\| 'member'\)/);
+  assert.doesNotMatch(addMemberBlock, /ensureProfileForMember/);
+  assert.doesNotMatch(addMemberBlock, /\.from\('profiles'\)/);
 });
 
 test('Member detail edit includes profile and group identity so bottom sheet save targets the same member row', () => {

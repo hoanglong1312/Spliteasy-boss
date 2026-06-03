@@ -25,6 +25,7 @@ const CELL_STATE = {
 
 const DOT_COLOR = { attended: '#34d399', absent: '#f87171', missed: '#f87171', today: '#818cf8', ticket: '#fbbf24', ticketOther: 'rgba(251,191,36,0.55)' };
 const ATTENDANCE_CHIP_SIZE = 34;
+const ATTENDANCE_NAME_WIDTH = 44;
 
 export default function PickleballCalendar({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
@@ -1226,7 +1227,7 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
 
   if (a.kind === 'guest') {
     return (
-      <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ width: ATTENDANCE_NAME_WIDTH, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
         <div style={{
           width: ATTENDANCE_CHIP_SIZE,
           height: ATTENDANCE_CHIP_SIZE,
@@ -1271,14 +1272,14 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
           )}
         </div>
         <span style={{
-          width: '100%',
+          width: ATTENDANCE_NAME_WIDTH,
           color: '#93c5fd',
           fontSize: 9,
           fontWeight: 700,
           textAlign: 'center',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          lineHeight: 1.2,
         }}>
           {a.name}
         </span>
@@ -1287,7 +1288,7 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
   }
 
   return (
-    <div style={{ width: 44, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+    <div style={{ width: ATTENDANCE_NAME_WIDTH, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       <button
         type="button"
         onClick={onToggle}
@@ -1321,13 +1322,14 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
         minWidth: 0,
       }}>
         <span style={{
+          width: ATTENDANCE_NAME_WIDTH,
           color: active ? '#6ee7b7' : colors.textMuted,
           fontSize: 9,
           fontWeight: 700,
           textAlign: 'center',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          whiteSpace: 'normal',
+          wordBreak: 'break-word',
+          lineHeight: 1.2,
           minWidth: 0,
         }}>
           {a.name}

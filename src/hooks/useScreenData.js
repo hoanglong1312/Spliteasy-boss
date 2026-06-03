@@ -1685,9 +1685,9 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     is_active: member.is_active,
   }))
   const activeMembers = dedupeMemberRowsByProfileOrName(currentGroupMembers(state).filter(isActiveMember))
-  const sessions = getStateMonthSessions(state, today)
+  const sessions = getStateMonthSessions(state, today).filter(session => !isMovedSession(session))
+  const confirmedSessions = sessions.filter(s => isDoneStatus(s?.status))
   const joinRequests = currentJoinRequests(state)
-  const totalSessions = expectedPickleballSessionCountForMonth(state, monthKey(today), sessions)
   const fixedMembers = activeMembers.filter(member => memberType(member) === 'fixed')
   const casualMembers = dedupeMemberRowsByProfileOrName(activeMembers.filter(member => memberType(member) === 'casual'))
   const joinRequestRows = joinRequests.map(request => {
@@ -1700,8 +1700,8 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, state?.members))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, sessions, totalSessions, state?.members))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, confirmedSessions.length, state?.members))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, confirmedSessions.length, state?.members))
 
   return {
     groupId: currentGroup(state)?.id,
@@ -1780,6 +1780,7 @@ function expectedPickleballSessionCountForMonth(state, yearMonth, sessions) {
   const group = currentGroup(state)
   const config = currentPickleConfig(state)
   const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const configuredCount = Number(monthlyConfig?.sessionsCount ?? monthlyConfig?.sessions_count ?? config?.sessionsCount ?? config?.sessions_count ?? 0)
   const configuredWeekdays = normalizeIsoWeekdays(
     monthlyConfig?.scheduleWeekdays ||
     monthlyConfig?.schedule_weekdays ||
@@ -1800,7 +1801,8 @@ function expectedPickleballSessionCountForMonth(state, yearMonth, sessions) {
     })
     if (expectedDates.length > 0) return expectedDates.length
   }
-  return sessions.length || 1
+  if (configuredCount > 0) return configuredCount
+  return sessions.length
 }
 
 function buildPickleballTicketsData(state) {
@@ -2553,8 +2555,8 @@ function buildTicketFundSummary(state) {
 
 function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
   const sessionsAttended = attendanceByMemberId(sessions, member.id, members)
-  const sessionsTotal = totalSessions || sessions.length
-  const progressPct = sessionsTotal > 0 ? Math.round((sessionsAttended / sessionsTotal) * 100) : 0
+  const sessionsTotal = totalSessions ?? sessions.length
+  const progressPct = sessionsTotal > 0 ? Math.min(100, Math.round((sessionsAttended / sessionsTotal) * 100)) : 0
   const rank = calculateMemberRank(progressPct)
 
   return {
@@ -2702,7 +2704,7 @@ function memberExtrasShare(sessions, memberId, state, members = []) {
 
 function attendanceByMemberId(sessions, memberId, members = []) {
   return safeArray(sessions).filter(session => (
-    effectiveSessionMemberIds(session, members).some(id => String(id) === String(memberId))
+    effectiveSessionMemberIds(session, members, false).some(id => String(id) === String(memberId))
   )).length
 }
 
@@ -3021,17 +3023,8 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
 }
 
 function attendanceDisplayNames(members) {
-  const baseNames = safeArray(members).map(member => ({
-    id: String(member.id),
-    base: firstName(member.displayName || member.name),
-    full: compactMemberName(member),
-  }))
-  const counts = baseNames.reduce((map, item) => {
-    map.set(item.base, (map.get(item.base) || 0) + 1)
-    return map
-  }, new Map())
-  return baseNames.reduce((map, item) => {
-    map.set(item.id, counts.get(item.base) > 1 ? item.full : item.base)
+  return safeArray(members).reduce((map, member) => {
+    map.set(String(member.id), compactMemberName(member))
     return map
   }, new Map())
 }
@@ -4149,7 +4142,7 @@ function sessionNumber(session, sessions) {
 }
 
 function sessionMemberIds(session) {
-  return safeArray(session?.attendees || session?.attended)
+  return safeArray(session?.attendees || session?.attended || session?.attendance)
     .map(item => typeof item === 'object' ? (item.memberId || item.member_id || item.id) : item)
     .filter(Boolean)
 }
@@ -4167,18 +4160,19 @@ function sessionAttendanceRecords(session) {
     .filter(record => record.memberId)
 }
 
-function effectiveSessionMemberIds(session, members = []) {
+function effectiveSessionMemberIds(session, members = [], fallbackPresentMembers = true) {
   const memberIds = safeArray(members).map(member => member?.id || member?.member_id).filter(Boolean)
   const records = sessionAttendanceRecords(session)
-  if (records.length === 0 && memberIds.length > 0) return memberIds
+  const sessionIds = sessionMemberIds(session)
+  if (records.length === 0) return sessionIds.length > 0 ? sessionIds : isDoneStatus(session?.status) ? memberIds : []
 
   const absentIds = new Set(records.filter(record => record.status === 'absent').map(record => String(record.memberId)))
   const presentIds = new Set([
-    ...sessionMemberIds(session),
+    ...sessionIds,
     ...records.filter(record => record.status !== 'absent').map(record => record.memberId),
   ].map(String))
 
-  if (records.length > 0) {
+  if (fallbackPresentMembers || records.some(record => record.status === 'absent')) {
     memberIds.forEach(memberId => {
       if (!absentIds.has(String(memberId))) presentIds.add(String(memberId))
     })

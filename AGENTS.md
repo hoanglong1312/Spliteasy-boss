@@ -68,15 +68,19 @@
 | SYS | Silent failure: no error + 0 rows affected + data không đổi sau action | Claude Phase 1 trực tiếp |
 
 **Bug S — fast path:**
-1. Claude đọc symptom → viết fix instruction ngắn (file + expected behavior)
-2. Codex làm mini investigation trước khi fix:
+1. Claude/Codex locate bằng `grep -n` / search targeted trước; không đọc nguyên file source/test lớn.
+2. Chỉ `Read` với `offset` + `limit` quanh match, hoặc đọc file nhỏ dưới ~200 dòng.
+3. Claude đọc symptom → viết fix instruction ngắn (file + expected behavior).
+4. Codex làm mini investigation trước khi fix:
    ```
    Symptom: [mô tả bug]
    Suspect file(s): [1-2 file/pattern]
    Root cause: [nguyên nhân ngắn]
    Verification: [test/build/check sẽ chạy]
    ```
-3. Codex fix theo root cause đã tìm, chạy verification, commit
+5. Codex fix theo root cause đã tìm, chạy verification, commit.
+6. Test targeted trước; chỉ chạy full build/E2E sau khi fix xanh hoặc trước bàn giao.
+7. Không dùng codegraph/context rộng cho bug nhỏ trừ khi user hỏi kiến trúc/trace hoặc cần cross-file flow.
 
 **Bug M/L hoặc SYS:**
 - Claude giữ Phase 1 khi cần đọc đồng thời DB schema, RLS, Supabase data/state, React state/data flow, logs, hoặc MCP-only context.

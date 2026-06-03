@@ -21,20 +21,23 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const [editBankName, setEditBankName] = useState('');
   const [editBankAccount, setEditBankAccount] = useState('');
   const [showAddMember, setShowAddMember] = useState(false);
-  const [newMemberName, setNewMemberName] = useState('');
   const [newMemberType, setNewMemberType] = useState('fixed');
   const [addMemberError, setAddMemberError] = useState('');
   const [candidateQuery, setCandidateQuery] = useState('');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
+  const [savingAction, setSavingAction] = useState('');
 
   const fixedMembers = d.fixedMembers || d.members || [];
   const casualMembers = d.casualMembers || d.guests || [];
   const allMembers = d.allMembers || [];
   const memberCandidates = d.memberCandidates || [];
-  const duplicateMember = findDuplicateMember(newMemberName, allMembers);
+  const typedMemberName = candidateQuery.trim();
+  const duplicateMember = findDuplicateMember(typedMemberName, allMembers);
   const duplicateMemberInactive = duplicateMember && !isActiveMember(duplicateMember);
   const selectedCandidates = memberCandidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
+  const exactCandidateMatch = typedMemberName && memberCandidates.find(candidate => normalizeSearch(candidate?.name) === normalizeSearch(typedMemberName));
+  const candidatesToAdd = selectedCandidates.length > 0 ? selectedCandidates : exactCandidateMatch ? [exactCandidateMatch] : [];
   const filteredCandidateCards = memberCandidates.filter(candidate => {
     const normalizedQuery = normalizeSearch(candidateQuery);
     if (!normalizedQuery) return true;
@@ -56,63 +59,76 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   async function saveEdit(e) {
     e.preventDefault();
     const name = editName.trim();
-    if (!editingMember || !name) return;
-    await onAction?.('editMember', {
-      memberId: editingMember.id,
-      profileId: editingMember?.profileId || editingMember?.profile_id || '',
-      groupId: d.groupId,
-      name,
-      bankAccountName: editBankAccountName.trim(),
-      bankName: editBankName,
-      bankAccount: editBankAccount.trim(),
-    });
-    setEditingMember(null);
+    if (!editingMember || !name || savingAction) return;
+    setSavingAction('editMember');
+    try {
+      await onAction?.('editMember', {
+        memberId: editingMember.id,
+        profileId: editingMember?.profileId || editingMember?.profile_id || '',
+        groupId: d.groupId,
+        name,
+        bankAccountName: editBankAccountName.trim(),
+        bankName: editBankName,
+        bankAccount: editBankAccount.trim(),
+      });
+      setEditingMember(null);
+    } finally {
+      setSavingAction('');
+    }
   }
 
   async function saveNewMember(e) {
     e.preventDefault();
-    const name = newMemberName.trim();
-    if (selectedCandidates.length === 0 && !name) return;
+    if (savingAction || (candidatesToAdd.length === 0 && !typedMemberName)) return;
     if (duplicateMember && isActiveMember(duplicateMember)) {
       setAddMemberError('Tên này đã tồn tại trong nhóm. Vui lòng dùng tên khác.');
       return;
     }
-    if (duplicateMember) return;
-    for (const candidate of selectedCandidates) {
-      if (candidate.isInactive) {
-        await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId: d.groupId });
-        continue;
+    if (duplicateMember && candidatesToAdd.length === 0) return;
+    setSavingAction('addMember');
+    try {
+      for (const candidate of candidatesToAdd) {
+        if (candidate.isInactive) {
+          await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId: d.groupId });
+          continue;
+        }
+        await onAction?.('addPickleballMember', {
+          groupId: d.groupId,
+          name: candidate.name,
+          profileId: candidate?.profileId || candidate?.id || '',
+          type: newMemberType,
+          bankAccountName: candidate?.bankAccountName || '',
+          bankName: candidate?.bankName || '',
+          bankAccount: candidate?.bankAccount || '',
+        });
       }
-      await onAction?.('addPickleballMember', {
-        groupId: d.groupId,
-        name: candidate.name,
-        profileId: candidate?.profileId || candidate?.id || '',
-        type: newMemberType,
-        bankAccountName: candidate?.bankAccountName || '',
-        bankName: candidate?.bankName || '',
-        bankAccount: candidate?.bankAccount || '',
-      });
+      if (candidatesToAdd.length === 0 && typedMemberName) {
+        await onAction?.('addPickleballMember', { groupId: d.groupId, name: typedMemberName, profileId: '', type: newMemberType });
+      }
+      setNewMemberType('fixed');
+      setCandidateQuery('');
+      setSelectedCandidateIds([]);
+      setShowAddMember(false);
+    } finally {
+      setSavingAction('');
     }
-    if (name) {
-      await onAction?.('addPickleballMember', { groupId: d.groupId, name, profileId: '', type: newMemberType });
-    }
-    setNewMemberName('');
-    setNewMemberType('fixed');
-    setCandidateQuery('');
-    setSelectedCandidateIds([]);
-    setShowAddMember(false);
   }
 
   async function reactivateDuplicateMember() {
-    if (!duplicateMemberInactive) return;
-    await onAction?.('reactivateMember', { memberId: duplicateMember.id, groupId: d.groupId });
-    setNewMemberName('');
-    setAddMemberError('');
-    setShowAddMember(false);
+    if (!duplicateMemberInactive || savingAction) return;
+    setSavingAction('reactivateMember');
+    try {
+      await onAction?.('reactivateMember', { memberId: duplicateMember.id, groupId: d.groupId });
+      setCandidateQuery('');
+      setAddMemberError('');
+      setShowAddMember(false);
+    } finally {
+      setSavingAction('');
+    }
   }
 
-  function changeNewMemberName(value) {
-    setNewMemberName(value);
+  function changeCandidateQuery(value) {
+    setCandidateQuery(value);
     setAddMemberError('');
   }
 
@@ -144,9 +160,14 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   }
 
   async function confirmDeleteMember() {
-    if (!deleteConfirmMember) return;
-    await onAction?.('removePickleballMember', { memberId: deleteConfirmMember.id, groupId: data.groupId });
-    setDeleteConfirmMember(null);
+    if (!deleteConfirmMember || savingAction) return;
+    setSavingAction('deleteMember');
+    try {
+      await onAction?.('removePickleballMember', { memberId: deleteConfirmMember.id, groupId: data.groupId });
+      setDeleteConfirmMember(null);
+    } finally {
+      setSavingAction('');
+    }
   }
 
   return (
@@ -224,20 +245,13 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
               candidates={filteredCandidateCards}
               selectedIds={selectedCandidateIds}
               query={candidateQuery}
-              onQueryChange={setCandidateQuery}
+              onQueryChange={changeCandidateQuery}
               onToggle={toggleCandidate}
               sectionTitle={memberPickerSectionTitle(filteredCandidateCards)}
-              placeholder="Tìm vài ký tự để lọc thành viên"
-              emptyText="Không có thành viên phù hợp."
+              placeholder="Tìm thành viên hoặc nhập tên mới"
+              emptyText="Không có thành viên phù hợp. Bấm lưu để thêm tên mới."
               tone="pickleball"
               maxListHeight={220}
-            />
-            <Input
-              label={memberCandidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên'}
-              value={newMemberName}
-              onChange={e => changeNewMemberName(e.target.value)}
-              placeholder="Tên thành viên"
-              autoFocus
             />
             {addMemberError && (
               <div style={{ fontSize: 12, color: colors.danger, marginTop: 8, lineHeight: 1.4 }}>
@@ -257,12 +271,14 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
                 <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
                   Thành viên '{duplicateMember.name}' đang ở trạng thái chờ — bạn có muốn thêm lại không?
                 </div>
-                <Button type="button" variant="success" onClick={reactivateDuplicateMember}>Thêm lại</Button>
+                <Button type="button" variant="success" onClick={reactivateDuplicateMember} disabled={savingAction === 'reactivateMember'}>
+                  {savingAction === 'reactivateMember' ? 'Đang lưu…' : 'Thêm lại'}
+                </Button>
               </div>
             )}
             <TypeSwitch value={newMemberType} onChange={setNewMemberType} />
-            <Button block variant="success" style={{ marginTop: 14 }} type="submit">
-              {selectedCandidates.length > 0 ? `Lưu ${selectedCandidates.length + (newMemberName.trim() ? 1 : 0)} thành viên` : 'Lưu thành viên'}
+            <Button block variant="success" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember'}>
+              {savingAction === 'addMember' ? 'Đang lưu…' : selectedCandidates.length > 0 ? `Lưu ${selectedCandidates.length} thành viên` : 'Lưu thành viên'}
             </Button>
           </form>
         </BottomSheet>
@@ -293,7 +309,9 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
               onChange={e => setEditBankAccount(e.target.value)}
               placeholder="Chưa cập nhật"
             />
-            <Button block variant="success" style={{ marginTop: 14 }} type="submit">Lưu thay đổi</Button>
+            <Button block variant="success" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'editMember'}>
+              {savingAction === 'editMember' ? 'Đang lưu…' : 'Lưu thay đổi'}
+            </Button>
           </form>
         </BottomSheet>
       )}
@@ -305,13 +323,49 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" onClick={() => setDeleteConfirmMember(null)}>Hủy</Button>
-            <Button type="button" variant="danger" onClick={confirmDeleteMember}>Xác nhận</Button>
+            <Button type="button" variant="danger" onClick={confirmDeleteMember} disabled={savingAction === 'deleteMember'}>
+              {savingAction === 'deleteMember' ? 'Đang xóa…' : 'Xác nhận'}
+            </Button>
           </div>
         </BottomSheet>
       )}
 
       <TabBar active="pickleball" onChange={(key) => onAction?.('tab', key)} onFab={() => onAction?.('fab')} />
+      {savingAction && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+        </div>
+      )}
     </PhoneFrame>
+  );
+}
+
+const loadingOverlayStyle = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 40,
+  display: 'grid',
+  placeItems: 'center',
+  alignContent: 'center',
+  gap: 12,
+  background: 'rgba(15, 23, 42, 0.28)',
+  backdropFilter: 'blur(2px)',
+};
+
+function LoadingSpinner() {
+  return (
+    <>
+      <style>{`@keyframes pickleballLoadingSpin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{
+        width: 40,
+        height: 40,
+        borderRadius: '50%',
+        border: `4px solid rgba(255, 255, 255, 0.55)`,
+        borderTopColor: colors.pickleball,
+        animation: 'pickleballLoadingSpin 0.8s linear infinite',
+      }} />
+    </>
   );
 }
 
