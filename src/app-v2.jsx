@@ -320,8 +320,8 @@ export default function AppV2() {
   async function resolveRecentSessionToken(session) {
     const sb = createSupabase()
 
-    // Profile-based session: lookup member at runtime via profile_id + group_id
-    if (session?.profileId && !session?.memberId) {
+    // Profile-based session: always prefer profile_id + group_id lookup — avoids stale memberId / name-mismatch issues
+    if (session?.profileId) {
       const { data, error } = await sb.rpc('resume_session_by_profile', {
         p_profile_id: session.profileId,
         p_group_id: session.groupId,
@@ -423,13 +423,10 @@ export default function AppV2() {
       const { pin, session } = payload || {}
       const memberId = session?.memberId
       const profileId = session?.profileId
-      const useProfilePath = !memberId && !!profileId
       let pinOk = false
       try {
-        if (useProfilePath) {
-          const sb = createSupabase()
-          const { data, error } = await sb.rpc('verify_pin_by_profile', { p_profile_id: profileId, p_pin: pin })
-          pinOk = !error && data === true
+        if (profileId) {
+          pinOk = await verifyProfilePin(profileId, pin)
         } else {
           pinOk = await verifyMemberPin(memberId, pin)
         }
@@ -492,6 +489,9 @@ export default function AppV2() {
     }
 
     if (type === 'verifyPin') {
+      const _vpMember = safeArray(state?.members).find(m => String(m.id) === String(payload?.memberId || state.currentUserId))
+      const _vpProfileId = _vpMember?.profileId || _vpMember?.profile_id
+      if (_vpProfileId) return verifyProfilePin(_vpProfileId, payload?.pin)
       return verifyMemberPin(payload?.memberId || state.currentUserId, payload?.pin)
     }
 
