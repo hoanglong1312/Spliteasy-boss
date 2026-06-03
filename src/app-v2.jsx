@@ -1208,6 +1208,19 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'batchMarkAttendance') {
+      if (!isPickleballTreasurer) return
+      const sessionId = payload?.sessionId
+      const changes = payload?.changes
+      if (!sessionId || !changes?.length) return
+      await dispatch({
+        type: 'BATCH_MARK_PICKLEBALL_ATTENDANCE',
+        sessionId,
+        changes,
+      })
+      return
+    }
+
     if (type === 'completeSession') {
       if (!isPickleballTreasurer) return
       const sessionId = payload?.sessionId ?? payload?.id ?? payload

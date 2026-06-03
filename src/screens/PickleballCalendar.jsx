@@ -507,6 +507,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleNote, setRescheduleNote] = useState('');
   const [rescheduleError, setRescheduleError] = useState('');
+  const [localAttendance, setLocalAttendance] = useState({})
   const canManageSession = Boolean(isTreasurer && !session.isCompleted);
   const canEditCosts = canManageSession;
   const costDraftKey = `${session.id}:${session.costs?.waterAmount || 0}:${(session.costs?.extras || [])
@@ -527,6 +528,8 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
     setRescheduleNote('');
     setRescheduleError('');
   }, [session.id]);
+
+  useEffect(() => { setLocalAttendance({}) }, [session.id])
 
   const updateExtra = (id, patch) => {
     setExtras(prev => prev.map(extra => (
@@ -587,6 +590,13 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
       if (session.isCompleted) {
         await onAction?.('reopenSession', session.id);
       } else {
+        if (Object.keys(localAttendance).length > 0) {
+          await onAction?.('batchMarkAttendance', {
+            sessionId: session.id,
+            changes: Object.entries(localAttendance).map(([memberId, status]) => ({ memberId, status })),
+          })
+          setLocalAttendance({})
+        }
         await onAction?.('saveSessionCost', {
           sessionId: session.id,
           waterAmount: parseAmount(waterInput),
@@ -644,6 +654,11 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
     }
   }
 
+  const effectiveAttendees = session.attendees.map(a => ({
+    ...a,
+    kind: localAttendance[a.id] !== undefined ? localAttendance[a.id] : a.kind,
+  }))
+
   return (
     <Card accent="pickleball" style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -696,7 +711,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
               opacity: savingAction === 'toggleSession' ? 0.7 : 1,
             }}
           >
-            ● {savingAction === 'toggleSession' ? 'Đang xử lý…' : session.isCompleted ? 'Đã đánh' : 'Chưa chốt'}
+            ● {savingAction === 'toggleSession' ? 'Đang xử lý…' : session.isCompleted ? 'Đã đánh' : Object.keys(localAttendance).length > 0 ? `Chốt (${Object.keys(localAttendance).length})` : 'Chưa chốt'}
           </button>
         ) : (
           <Badge tone={session.status.tone}>● {session.status.label}</Badge>
@@ -810,7 +825,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-        {session.attendees.map(a => (
+        {effectiveAttendees.map(a => (
           <AttendChip
             key={a.id}
             a={a}
@@ -819,11 +834,10 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
             savingAction={savingAction}
             setSavingAction={setSavingAction}
             onAction={onAction}
-            onToggle={canManageSession && a.kind !== 'guest' ? () => onAction?.('markAttendance', {
-              sessionId: session.id,
-              memberId: a.id,
-              status: a.kind === 'present' ? 'absent' : 'present',
-            }) : undefined}
+            onToggle={canManageSession && a.kind !== 'guest' ? () => {
+              const currentKind = localAttendance[a.id] !== undefined ? localAttendance[a.id] : a.kind
+              setLocalAttendance(prev => ({ ...prev, [a.id]: currentKind === 'present' ? 'absent' : 'present' }))
+            } : undefined}
           />
         ))}
       </div>

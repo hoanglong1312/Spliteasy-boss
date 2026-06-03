@@ -2441,6 +2441,35 @@ export function AppProvider({ children }) {
         return data
       }
 
+      case 'BATCH_MARK_PICKLEBALL_ATTENDANCE': {
+        if (!sb) return
+        const { sessionId, changes } = action
+        if (!sessionId || !changes?.length) return
+        const session = findPickleSessionInState(stateRef.current, sessionId)
+        const sourceTable = session?.sourceTable || session?.source_table
+        if (sourceTable === 'pickleball_sessions') {
+          const { error } = await sb.from('pickleball_attendance').upsert(
+            changes.map(({ memberId, status }) => ({ session_id: sessionId, member_id: memberId, status })),
+            { onConflict: 'session_id,member_id' }
+          )
+          if (error) throw error
+        } else {
+          const { error } = await sb.from('pickle_attendees').upsert(
+            changes.map(({ memberId, status }) => ({
+              session_id: sessionId,
+              member_id: memberId,
+              attendee_type: 'member',
+              rsvp_status: status === 'present' ? 'going' : 'not_going',
+              attended: status === 'present',
+            })),
+            { onConflict: 'session_id,member_id' }
+          )
+          if (error) throw error
+        }
+        await refresh()
+        break
+      }
+
       case 'MARK_PICKLEBALL_ATTENDANCE': {
         if (!sb) return
         const { sessionId, memberId } = action
