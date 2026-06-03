@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
-import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession } from './lib/auth.js'
+import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession, getTokenAfterPinVerify, profilePinRequired, verifyProfilePin } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
@@ -63,6 +63,11 @@ function normalizeMemberName(value) {
 
 function memberIdentityKey(member) {
   return String(member?.profileId || member?.profile_id || normalizeMemberName(member?.displayName || member?.name) || '').trim().toLowerCase()
+}
+
+function currentProfileId(state) {
+  const me = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
+  return me?.profileId || me?.profile_id || ''
 }
 
 function paymentNotificationTargetMemberId(state) {
@@ -166,7 +171,7 @@ export default function AppV2() {
       member?.hasPin &&
       token &&
       memberId &&
-      sessionStorage.getItem(PIN_UNLOCK_KEY) !== memberId
+      sessionStorage.getItem(PIN_UNLOCK_KEY) !== (member?.profileId || member?.profile_id || memberId)
     )
   })
   const [pinError, setPinError] = useState('')
@@ -343,27 +348,24 @@ export default function AppV2() {
 
   async function verifyMemberPin(memberId, pin) {
     if (!memberId || !pin) return false
-    const { token } = getStoredAuth()
-    const sb = token ? createSupabase(token) : createSupabase()
-    const { data, error } = await sb.rpc('verify_member_pin', {
-      p_member_id: memberId,
-      p_pin: pin,
-    })
-    if (error || data?.error) {
-      console.error('[app] verifyMemberPin:', error || data)
+    const member = safeArray(state?.members).find(member => String(member.id) === String(memberId))
+    const profileId = member?.profileId || member?.profile_id
+    if (profileId) return verifyProfilePin(profileId, pin)
+    try {
+      const data = await getTokenAfterPinVerify(memberId, pin)
+      return !!data && !data.error
+    } catch (error) {
+      console.error('[app] verifyMemberPin:', error)
       return false
     }
-    return data === true || data?.valid === true
   }
 
   async function checkMemberPinRequired(memberId, profileId) {
-    const sb = createSupabase()
-    if (!memberId && profileId) {
-      const { data, error } = await sb.rpc('profile_pin_required', { p_profile_id: profileId })
-      if (error) return true
-      return data === true
+    if (profileId) {
+      return profilePinRequired(profileId)
     }
     if (!memberId) return false
+    const sb = createSupabase()
     const { data, error } = await sb.rpc('member_pin_required', { p_member_id: memberId })
     if (error || data?.error) {
       console.error('[app] memberPinRequired:', error || data)
@@ -377,7 +379,7 @@ export default function AppV2() {
     const profileId = pending?.profileId
     const useProfilePath = !!(pending?.profileId && !pending?.memberId)
     const memberId = useProfilePath ? null : (pending?.memberId || state.currentUserId)
-    const pinKey = memberId || profileId
+    const pinKey = profileId || memberId
 
     let pinOk = false
     if (useProfilePath) {
@@ -436,7 +438,7 @@ export default function AppV2() {
         }
       } catch { pinOk = false }
       if (!pinOk) return { error: 'wrong_pin' }
-      const pinKey = memberId || profileId
+      const pinKey = profileId || memberId
       if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
       const resolved = await resolveRecentSessionToken(session)
       if (!resolved?.authToken) return { error: 'no_token' }
@@ -447,7 +449,7 @@ export default function AppV2() {
     }
 
     if (type === 'resumeRecentSession') {
-      const pinKey = payload?.memberId || payload?.profileId
+      const pinKey = payload?.profileId || payload?.memberId
       const requiresPin = await checkMemberPinRequired(payload?.memberId, payload?.profileId)
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
         setPendingPinSession(payload)
@@ -475,8 +477,10 @@ export default function AppV2() {
     if (type === 'joinGroup_direct') {
       // Direct login for existing member via invite link (auto-login or after PIN verify)
       const requiresPin = await checkMemberPinRequired(payload?.memberId)
-      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== payload?.memberId) {
-        sessionStorage.setItem(PIN_UNLOCK_KEY, payload?.memberId)
+      const member = safeArray(state?.members).find(m => String(m.id) === String(payload?.memberId))
+      const pinKey = member?.profileId || member?.profile_id || payload?.memberId
+      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
+        sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
       }
       setStack([])
       setActiveTab('home')
@@ -497,7 +501,7 @@ export default function AppV2() {
     if (type === 'setPin') {
       try {
         await dispatch({ type: 'SET_MEMBER_PIN', pin: payload?.pin })
-        if (state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, state.currentUserId)
+        if (state.currentUserId) sessionStorage.setItem(PIN_UNLOCK_KEY, currentProfileId(state) || state.currentUserId)
         return true
       } catch (err) {
         dispatch({ type: 'SHOW_TOAST', message: 'Không lưu được PIN. Thử lại.' })
@@ -1738,7 +1742,9 @@ export default function AppV2() {
         hasPin: true,
       }
       const requiresPin = await checkMemberPinRequired(manualSession.memberId)
-      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== manualSession.memberId) {
+      const member = safeArray(state?.members).find(m => String(m.id) === String(manualSession.memberId))
+      const pinKey = member?.profileId || member?.profile_id || manualSession.memberId
+      if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
         setPendingPinSession(manualSession)
         setAwaitingPin(true)
         setPinError('')

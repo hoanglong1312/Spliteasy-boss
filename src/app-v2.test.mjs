@@ -21,11 +21,14 @@ test('recent session resume asks for the simple PIN input before login when PIN 
   assert.match(appSource, /const requiresPin = await checkMemberPinRequired\(payload\?\.memberId\)/)
   assert.doesNotMatch(appSource, /const requiresPin = Boolean\(payload\?\.hasPin\) && await checkMemberPinRequired\(payload\?\.memberId\)/)
   assert.match(appSource, /async function checkMemberPinRequired\(memberId, profileId\)/)
+  assert.match(appSource, /if \(profileId\) \{[\s\S]*?return profilePinRequired\(profileId\)/)
   assert.match(appSource, /\.rpc\('member_pin_required'/)
   assert.match(appSource, /if \(!awaitingPin \|\| pendingPinSession\) return/)
   assert.match(appSource, /setAwaitingPin\(false\)/)
   assert.match(appSource, /async function verifyMemberPin\(memberId, pin\)/)
-  assert.match(appSource, /\.rpc\('verify_member_pin'/)
+  assert.match(appSource, /const member = safeArray\(state\?\.members\)\.find\(member => String\(member\.id\) === String\(memberId\)\)/)
+  assert.match(appSource, /const profileId = member\?\.profileId \|\| member\?\.profile_id[\s\S]*?if \(profileId\) return verifyProfilePin\(profileId, pin\)/)
+  assert.match(appSource, /getTokenAfterPinVerify\(memberId, pin\)/)
   assert.doesNotMatch(appSource, /localStorage\.getItem\('spliteasy_pin'\)/)
   assert.doesNotMatch(appSource, /memberPinStorageKey/)
   assert.match(appSource, /setPendingPinSession\(payload\)/)
@@ -34,6 +37,16 @@ test('recent session resume asks for the simple PIN input before login when PIN 
   assert.match(appSource, /pinOk = await verifyMemberPin\(memberId, value\)/)
   assert.match(appSource, /const pending = pendingPinSession[\s\S]*handle\('resumeRecentSession', \{ \.\.\.pending, hasPin: false \}\)/)
   assert.ok(appSource.indexOf('async function submitPin') < appSource.lastIndexOf('if (!state.currentUserId)'))
+})
+
+test('PIN unlock session keys prefer profile identity over member identity', () => {
+  assert.match(appSource, /function currentProfileId\(state\) \{/)
+  assert.match(appSource, /sessionStorage\.getItem\(PIN_UNLOCK_KEY\) !== \(member\?\.profileId \|\| member\?\.profile_id \|\| memberId\)/)
+  assert.match(appSource, /const pinKey = profileId \|\| memberId/)
+  assert.doesNotMatch(appSource, /const pinKey = memberId \|\| profileId/)
+  assert.match(appSource, /sessionStorage\.setItem\(PIN_UNLOCK_KEY, currentProfileId\(state\) \|\| state\.currentUserId\)/)
+  assert.match(appSource, /const member = safeArray\(state\?\.members\)\.find\(m => String\(m\.id\) === String\(payload\?\.memberId\)\)/)
+  assert.match(appSource, /const pinKey = member\?\.profileId \|\| member\?\.profile_id \|\| payload\?\.memberId/)
 })
 
 test('AppV2 renders the store toast as a fixed bottom overlay', () => {

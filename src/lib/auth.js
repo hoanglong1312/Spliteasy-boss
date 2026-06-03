@@ -216,6 +216,22 @@ export async function verifyPinForInviteLink(memberId, pin) {
   return data === true
 }
 
+export async function verifyProfilePin(profileId, pin) {
+  if (!profileId || !pin) return false
+  const sb = createSupabase()
+  const { data, error } = await sb.rpc('verify_profile_pin', { p_profile_id: profileId, p_pin: pin })
+  if (error) return false
+  return !!data
+}
+
+export async function profilePinRequired(profileId) {
+  if (!profileId) return false
+  const sb = createSupabase()
+  const { data, error } = await sb.rpc('profile_pin_required', { p_profile_id: profileId })
+  if (error) return false
+  return !!data
+}
+
 // Get token after PIN verified for invite link (returns token + member/group info)
 export async function getTokenAfterPinVerify(memberId, pin) {
   const sb = createSupabase()
