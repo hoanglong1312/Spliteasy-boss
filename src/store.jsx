@@ -2206,7 +2206,25 @@ export function AppProvider({ children }) {
         if (!sb) return
         const { member } = action
         const groupId = action.groupId || action.group_id || state.currentGroupId
-        const profileId = member?.profileId || member?.profile_id
+        let profileId = member?.profileId || member?.profile_id
+        if (!profileId) {
+          const { short, initials } = memberNameParts(member?.name)
+          const { data: profileRow, error: profileError } = await sb
+            .from('profiles')
+            .insert({
+              name: String(member?.name || '').trim(),
+              short,
+              initials,
+              color: '#574EFA',
+              bank_name: member?.bankName ?? member?.bank_name ?? null,
+              bank_account: member?.bankAccount ?? member?.bank_account ?? null,
+              bank_account_name: member?.bankAccountName ?? member?.bank_account_name ?? null,
+            })
+            .select('id')
+            .single()
+          if (profileError) throw profileError
+          profileId = profileRow?.id
+        }
         const insertRow = memberInsertRow(groupId, { ...member, profileId }, member.role || 'member')
         if (isUuid(member.id)) insertRow.id = member.id
         const { data: newMember, error } = await sb

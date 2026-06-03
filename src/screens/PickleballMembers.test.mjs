@@ -82,16 +82,19 @@ test('Pickleball exact typed candidate save uses that existing candidate', () =>
   assert.match(memberSource, /if \(candidatesToAdd\.length === 0 && typedMemberName\)/);
 });
 
-test('Store ADD_MEMBER inserts plain pickleball members without creating profiles', () => {
+test('Store ADD_MEMBER creates a profile for plain pickleball members before inserting membership', () => {
   const addMemberBlock = storeSource.slice(
     storeSource.indexOf("case 'ADD_MEMBER':"),
     storeSource.indexOf("case 'SAVE_PICKLEBALL_MONTHLY_CONFIG':")
   );
 
-  assert.match(addMemberBlock, /const profileId = member\?\.profileId \|\| member\?\.profile_id/);
+  assert.match(addMemberBlock, /let profileId = member\?\.profileId \|\| member\?\.profile_id/);
+  assert.match(addMemberBlock, /if \(!profileId\) \{/);
+  assert.match(addMemberBlock, /const \{ short, initials \} = memberNameParts\(member\?\.name\)/);
+  assert.match(addMemberBlock, /\.from\('profiles'\)\s*\.insert\(\{[\s\S]*?name: String\(member\?\.name \|\| ''\)\.trim\(\),[\s\S]*?short,[\s\S]*?initials,[\s\S]*?color: '#574EFA',[\s\S]*?bank_name: member\?\.bankName \?\? member\?\.bank_name \?\? null,[\s\S]*?bank_account: member\?\.bankAccount \?\? member\?\.bank_account \?\? null,[\s\S]*?bank_account_name: member\?\.bankAccountName \?\? member\?\.bank_account_name \?\? null,[\s\S]*?\}\)\s*\.select\('id'\)\s*\.single\(\)/);
+  assert.match(addMemberBlock, /if \(profileError\) throw profileError/);
+  assert.match(addMemberBlock, /profileId = profileRow\?\.id/);
   assert.match(addMemberBlock, /memberInsertRow\(groupId, \{ \.\.\.member, profileId \}, member\.role \|\| 'member'\)/);
-  assert.doesNotMatch(addMemberBlock, /ensureProfileForMember/);
-  assert.doesNotMatch(addMemberBlock, /\.from\('profiles'\)/);
 });
 
 test('Member detail edit includes profile and group identity so bottom sheet save targets the same member row', () => {
