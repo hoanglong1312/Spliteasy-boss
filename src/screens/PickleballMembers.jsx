@@ -455,6 +455,7 @@ function MemberSection({ title, members, expanded, onExpand, isTreasurer, onMore
 }
 
 function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
+  const isCasual = member.type === 'casual';
   const pct = Number(member.progressPct) || 0;
   const rank = member.rank || {};
   const barColor = progressColor(pct);
@@ -487,9 +488,16 @@ function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}>{member.name}</span>
-          <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>
+          {!isCasual && <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>}
           {member.isTreasurer && <Badge tone="warn" style={{ padding: '2px 6px', fontSize: 9 }}>THỦ QUỸ</Badge>}
         </div>
+        {isCasual ? (
+          <div style={{ marginTop: 6 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, ...type.mono }}>
+              {member.sessionsAttended || 0} buổi
+            </span>
+          </div>
+        ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
           <div style={{
             height: 6,
@@ -509,6 +517,7 @@ function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
             {pct}% · {rank.label || member.rankLabel}
           </span>
         </div>
+        )}
       </div>
       {isTreasurer ? (
         <button type="button" aria-label={`Mở thao tác ${member.name}`} onClick={(e) => {
