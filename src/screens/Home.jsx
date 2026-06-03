@@ -34,6 +34,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
   const [paymentRecordDetail, setPaymentRecordDetail] = useState(null);
   const [confirmedRefunds, setConfirmedRefunds] = useState(() => new Set());
+  const [savingAction, setSavingAction] = useState('');
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const normalizedFilter = filterText.trim().toLowerCase();
@@ -73,7 +74,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
           onAction={onAction}
         />
 
-        <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} onAction={onAction} />
+        <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} savingAction={savingAction} setSavingAction={setSavingAction} onAction={onAction} />
 
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
         <SearchInput
@@ -173,6 +174,8 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         paymentRecords={d.paymentRecords || []}
         isTreasurer={isTreasurer}
         confirmedRefunds={confirmedRefunds}
+        savingAction={savingAction}
+        setSavingAction={setSavingAction}
         onAction={onAction}
         onViewPaymentRecord={setPaymentRecordDetail}
         onConfirmPayment={(payload) => onAction?.('confirmPaymentSent', payload)}
@@ -193,6 +196,12 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
       />
 
       <TabBar active="home" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
+      {savingAction && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+        </div>
+      )}
     </PhoneFrame>
   );
 }
@@ -375,9 +384,8 @@ function PaymentRecordDetailSheet({ record, onClose }) {
   );
 }
 
-function PendingApprovalZone({ expenses, payments, onAction }) {
+function PendingApprovalZone({ expenses, payments, savingAction, setSavingAction, onAction }) {
   const [expanded, setExpanded] = useState(false);
-  const [savingAction, setSavingAction] = useState('');
   const items = [
     ...safeArray(expenses).map(expense => ({ ...expense, type: 'expense' })),
     ...safeArray(payments).map(payment => ({ ...payment, type: 'payment' })),
@@ -666,10 +674,9 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
   );
 }
 
-function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose }) {
+function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, savingAction, setSavingAction, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose }) {
   const [copiedField, setCopiedField] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [savingAction, setSavingAction] = useState('');
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   if (!open) return null;

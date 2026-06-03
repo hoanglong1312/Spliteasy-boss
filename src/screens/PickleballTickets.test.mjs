@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const screenSource = readFileSync(new URL('./PickleballTickets.jsx', import.meta.url), 'utf8')
 const calendarSource = readFileSync(new URL('./PickleballCalendar.jsx', import.meta.url), 'utf8')
+const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8')
 
 test('PickleballTickets renders emerald tickets layout and treasurer actions', () => {
   assert.match(screenSource, /import React, \{ useEffect, useMemo, useState \} from 'react'/)
@@ -63,4 +64,58 @@ test('PickleballCalendar ticket sheet keeps member save errors visible', () => {
   assert.match(sheetSource, /setError\(ticketErrorMessage\(err\)\)/)
   assert.match(sheetSource, /function ticketErrorMessage\(err\)/)
   assert.match(sheetSource, /ticket_rls_denied/)
+})
+
+test('loading overlays render at PhoneFrame level for full-screen coverage', () => {
+  const ticketTopLevel = screenSource.slice(
+    screenSource.indexOf('export default function PickleballTickets'),
+    screenSource.indexOf('function TicketCard')
+  )
+  const ticketCard = screenSource.slice(
+    screenSource.indexOf('function TicketCard'),
+    screenSource.indexOf('function AttendeeChip')
+  )
+  const calendarTopLevel = calendarSource.slice(
+    calendarSource.indexOf('export default function PickleballCalendar'),
+    calendarSource.indexOf('function LegendChip')
+  )
+  const sessionPanel = calendarSource.slice(
+    calendarSource.indexOf('function SessionDetailPanel'),
+    calendarSource.indexOf('function AttendChip')
+  )
+  const ticketDayPanel = calendarSource.slice(
+    calendarSource.indexOf('function TicketDayPanel'),
+    calendarSource.indexOf('function AddTicketSheet')
+  )
+  const homeTopLevel = homeSource.slice(
+    homeSource.indexOf('export default function Home'),
+    homeSource.indexOf('function formatVND')
+  )
+  const pendingZone = homeSource.slice(
+    homeSource.indexOf('function PendingApprovalZone'),
+    homeSource.indexOf('function MonthSummary')
+  )
+  const paymentSheet = homeSource.slice(
+    homeSource.indexOf('function PaymentSheet'),
+    homeSource.indexOf('function MemberBalanceRow')
+  )
+
+  assert.match(ticketTopLevel, /const \[savingAction, setSavingAction\] = useState\(''\)/)
+  assert.match(ticketTopLevel, /<TicketCard[\s\S]*?savingAction=\{savingAction\}[\s\S]*?setSavingAction=\{setSavingAction\}/)
+  assert.match(ticketTopLevel, /\{savingAction && \([\s\S]*?style=\{loadingOverlayStyle\}[\s\S]*?Đang xử lý…[\s\S]*?\)\}[\s\S]*?<\/PhoneFrame>/)
+  assert.doesNotMatch(ticketCard, /style=\{loadingOverlayStyle\}/)
+
+  assert.match(calendarTopLevel, /const \[savingAction, setSavingAction\] = useState\(''\)/)
+  assert.match(calendarTopLevel, /<SessionDetailPanel[\s\S]*?savingAction=\{savingAction\}[\s\S]*?setSavingAction=\{setSavingAction\}/)
+  assert.match(calendarTopLevel, /<TicketDayPanel[\s\S]*?savingAction=\{savingAction\}[\s\S]*?setSavingAction=\{setSavingAction\}/)
+  assert.match(calendarTopLevel, /\{savingAction && \([\s\S]*?style=\{loadingOverlayStyle\}[\s\S]*?Đang xử lý…[\s\S]*?\)\}[\s\S]*?<\/PhoneFrame>/)
+  assert.doesNotMatch(sessionPanel, /const \[savingAction, setSavingAction\]/)
+  assert.doesNotMatch(ticketDayPanel, /const \[savingAction, setSavingAction\]/)
+
+  assert.match(homeTopLevel, /const \[savingAction, setSavingAction\] = useState\(''\)/)
+  assert.match(homeTopLevel, /<PendingApprovalZone[\s\S]*?savingAction=\{savingAction\}[\s\S]*?setSavingAction=\{setSavingAction\}/)
+  assert.match(homeTopLevel, /<PaymentSheet[\s\S]*?savingAction=\{savingAction\}[\s\S]*?setSavingAction=\{setSavingAction\}/)
+  assert.match(homeTopLevel, /\{savingAction && \([\s\S]*?style=\{loadingOverlayStyle\}[\s\S]*?Đang xử lý…[\s\S]*?\)\}[\s\S]*?<\/PhoneFrame>/)
+  assert.doesNotMatch(pendingZone, /const \[savingAction, setSavingAction\]/)
+  assert.doesNotMatch(paymentSheet, /const \[savingAction, setSavingAction\]/)
 })

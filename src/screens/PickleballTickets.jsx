@@ -116,9 +116,9 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
             <Card style={{ padding: 18, textAlign: 'center', color: colors.textSecondary, fontSize: 12, fontWeight: 700 }}>
               Chưa có vé lẻ trong tháng này
             </Card>
-          ) : visibleTickets.map(t => (
-            <TicketCard key={t.id} t={t} isTreasurer={isTreasurer} onAction={onAction} />
-          ))}
+            ) : visibleTickets.map(t => (
+              <TicketCard key={t.id} t={t} isTreasurer={isTreasurer} savingAction={savingAction} setSavingAction={setSavingAction} onAction={onAction} />
+            ))}
         </div>
         {savingAction && (
           <div role="status" aria-live="polite" style={loadingOverlayStyle}>
@@ -172,8 +172,7 @@ function SummaryBox({ tone, label, value }) {
   )
 }
 
-function TicketCard({ t, isTreasurer, onAction }) {
-  const [savingAction, setSavingAction] = useState('')
+function TicketCard({ t, isTreasurer, savingAction, setSavingAction, onAction }) {
   const isTeamFund = t.status === 'team_fund'
   const isPending = t.status === 'pending_review'
   const accentColor = isPending ? '#60a5fa' : isTeamFund ? '#a78bfa' : colors.warning
@@ -259,12 +258,6 @@ function TicketCard({ t, isTreasurer, onAction }) {
             >{savingAction === 'approveTicket' ? 'Đang xử lý…' : 'Duyệt'}</button>
           )}
           <button type="button" onClick={deleteTicket} disabled={savingAction === 'deleteTicket'} style={actionButtonStyle('danger')}>{savingAction === 'deleteTicket' ? 'Đang xóa…' : '🗑 Xoá'}</button>
-        </div>
-      )}
-      {savingAction && (
-        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
-          <LoadingSpinner />
-          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
         </div>
       )}
     </Card>

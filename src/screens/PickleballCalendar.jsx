@@ -33,6 +33,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
   const initialSession = d.selectedSession || (d.sessions || [])[0] || null;
   const [selectedDate, setSelectedDate] = useState(d.selectedSessionDate || initialSession?.date || '');
   const [selectedSessionId, setSelectedSessionId] = useState(initialSession?.id || null);
+  const [savingAction, setSavingAction] = useState('');
   const selectedSession = selectedSessionId
     ? ((d.sessions || []).find(session => String(session.id) === String(selectedSessionId)) ||
       (String(d.selectedSession?.id) === String(selectedSessionId) ? d.selectedSession : null))
@@ -115,6 +116,8 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             session={selectedSession}
             casualMembers={d.casualMembers || []}
             isTreasurer={isTreasurer}
+            savingAction={savingAction}
+            setSavingAction={setSavingAction}
             onAction={onAction}
           />
         )}
@@ -128,6 +131,8 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
               setTicketFormOpen(true);
             }}
             onEdit={setEditingTicket}
+            savingAction={savingAction}
+            setSavingAction={setSavingAction}
             onAction={onAction}
           />
         )}
@@ -155,6 +160,12 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
       )}
 
       <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
+      {savingAction && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+        </div>
+      )}
     </PhoneFrame>
   );
 }
@@ -220,8 +231,7 @@ function CalendarCell({ day, selected, onClick }) {
   );
 }
 
-function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, onAction }) {
-  const [savingAction, setSavingAction] = useState('');
+function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingAction, setSavingAction, onAction }) {
   const dateLabel = formatDayLabel(date);
   const total = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0);
   async function approveTicket(ticket) {
@@ -474,13 +484,12 @@ function ticketErrorMessage(err) {
   return map[code] || 'Không lưu được vé. Thử lại.';
 }
 
-function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction }) {
+function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAction, setSavingAction, onAction }) {
   const costRows = Array.isArray(session.costRows)
     ? session.costRows
     : Array.isArray(session.costs) ? session.costs : [];
   const [guestName, setGuestName] = useState('');
   const [guestFormOpen, setGuestFormOpen] = useState(false);
-  const [savingAction, setSavingAction] = useState('');
   const costMembers = (session.members || [])
     .filter(member => member.id)
     .map(member => ({
@@ -807,6 +816,8 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
             a={a}
             isTreasurer={canManageSession}
             sessionId={session.id}
+            savingAction={savingAction}
+            setSavingAction={setSavingAction}
             onAction={onAction}
             onToggle={canManageSession && a.kind !== 'guest' ? () => onAction?.('markAttendance', {
               sessionId: session.id,
@@ -1258,8 +1269,7 @@ function formatDayLabel(value) {
   return match ? `${match[3]}/${match[2]}` : String(value || '');
 }
 
-function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
-  const [savingAction, setSavingAction] = useState('');
+function AttendChip({ a, onToggle, isTreasurer, sessionId, savingAction, setSavingAction, onAction }) {
   const active = a.kind === 'present' || a.kind === 'guest';
 
   async function removeGuest() {
