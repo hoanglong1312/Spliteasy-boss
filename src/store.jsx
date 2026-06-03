@@ -2465,6 +2465,27 @@ export function AppProvider({ children }) {
           .update({ status: 'completed' })
           .eq('id', sessionId)
         if (error) throw error
+
+        if (table === 'pickle_sessions') {
+          const allMembers = safeArray(stateRef.current?.pickle?.fixedMembers)
+            .filter(m => m?.is_active !== false && m?.isActive !== false)
+          const existingRecords = safeArray(session?.attendanceRecords || session?.attendance_records)
+          const recordedMemberIds = new Set(existingRecords.map(r => String(r.memberId || r.member_id)))
+          const unrecordedMembers = allMembers.filter(m => !recordedMemberIds.has(String(m.id)))
+          if (unrecordedMembers.length > 0) {
+            await sb.from('pickle_attendees').upsert(
+              unrecordedMembers.map(m => ({
+                session_id: sessionId,
+                member_id: m.id,
+                attendee_type: 'member',
+                rsvp_status: 'going',
+                attended: true,
+              })),
+              { onConflict: 'session_id,member_id' }
+            )
+          }
+        }
+
         await refresh()
         break
       }

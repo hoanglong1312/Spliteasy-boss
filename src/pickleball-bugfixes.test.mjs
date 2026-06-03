@@ -509,8 +509,8 @@ test('members progress follows calendar attendance records', () => {
   const data = buildPickleballMembersData(state)
   const rows = Object.fromEntries(data.members.map(member => [member.id, member]))
 
-  assert.equal(rows.m1.sessionsAttended, 2)
-  assert.equal(rows.m1.progressPct, 100)
+  assert.equal(rows.m1.sessionsAttended, 1)
+  assert.equal(rows.m1.progressPct, 50)
   assert.equal(rows.m2.sessionsAttended, 1)
   assert.equal(rows.m2.progressPct, 50)
 })
@@ -749,6 +749,9 @@ test('treasurer can explicitly complete a session before calendar marks it atten
   assert.match(storeSource, /case 'COMPLETE_PICKLEBALL_SESSION':/)
   assert.match(storeSource, /case 'REOPEN_PICKLEBALL_SESSION':/)
   assert.match(storeSource, /\.update\(\{ status: 'completed' \}\)/)
+  assert.match(storeSource, /from\('pickle_attendees'\)\.upsert/)
+  assert.match(storeSource, /rsvp_status: 'going'/)
+  assert.match(storeSource, /attended: true/)
   assert.match(storeSource, /\.update\(\{ status: 'scheduled', notes: null \}\)/)
 })
 

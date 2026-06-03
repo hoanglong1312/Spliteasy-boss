@@ -2940,7 +2940,8 @@ function ticketIncludesCurrentUser(state, ticket) {
 function toCalendarSessionDetail(state, session, allSessions, today) {
   const pickle = state?.pickle || {}
   const groupMembers = currentGroupMembers(state).filter(isActiveMember)
-  const presentIds = effectiveSessionMemberIds(session, groupMembers)
+  const isFutureSession = dateKey(sessionDate(session) || '') > dateKey(today)
+  const presentIds = effectiveSessionMemberIds(session, groupMembers, !isFutureSession)
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
   const attendanceMembers = groupMembers.filter(member => memberType(member) === 'fixed')
@@ -4172,7 +4173,7 @@ function effectiveSessionMemberIds(session, members = [], fallbackPresentMembers
     ...records.filter(record => record.status !== 'absent').map(record => record.memberId),
   ].map(String))
 
-  if (fallbackPresentMembers || records.every(r => r.status === 'absent')) {
+  if (fallbackPresentMembers) {
     memberIds.forEach(memberId => {
       if (!absentIds.has(String(memberId))) presentIds.add(String(memberId))
     })
