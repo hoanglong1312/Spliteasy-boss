@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { colors, type } from '../tokens';
-import { Avatar, Button, Input } from '../primitives';
+import { Avatar, Button, Input, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
 const CATEGORY_OPTIONS = [
   { key: 'general', icon: '🧾', label: 'Chung' },
@@ -382,6 +382,12 @@ export default function AddExpense({ data, onAction }) {
           onChange={setDateLabel}
           onClose={() => setDatePickerOpen(false)}
         />
+      )}
+      {saving && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang lưu…</div>
+        </div>
       )}
     </div>
   );

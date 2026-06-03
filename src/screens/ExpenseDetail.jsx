@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, IconButton, Card, Hero, Button, Avatar, SectionLabel, BottomSheet,
+  LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const STATUS_PALETTE = {
@@ -24,6 +25,7 @@ export default function ExpenseDetail({ data, onAction }) {
   const status = STATUS_PALETTE[d.status] || STATUS_PALETTE.pending;
   const receiptImages = d.receiptImages || [];
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   return (
     <PhoneFrame>
@@ -214,15 +216,27 @@ export default function ExpenseDetail({ data, onAction }) {
               <Button
                 type="button"
                 variant="danger"
+                disabled={saving}
                 onClick={async () => {
-                  await onAction?.('deleteExpense', { expenseId: d.expenseId || d.id, groupId: d.groupId, returnToPrevious: true });
-                  setShowDeleteConfirm(false);
+                  setSaving(true);
+                  try {
+                    await onAction?.('deleteExpense', { expenseId: d.expenseId || d.id, groupId: d.groupId, returnToPrevious: true });
+                    setShowDeleteConfirm(false);
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
               >Xóa</Button>
             </div>
           </BottomSheet>
         )}
       </Screen>
+      {saving && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+        </div>
+      )}
     </PhoneFrame>
   );
 }
