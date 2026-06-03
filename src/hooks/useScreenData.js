@@ -1700,8 +1700,8 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, state?.members))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, state?.members))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, fixedMembers))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, []))
 
   return {
     groupId: currentGroup(state)?.id,
@@ -4172,7 +4172,7 @@ function effectiveSessionMemberIds(session, members = [], fallbackPresentMembers
     ...records.filter(record => record.status !== 'absent').map(record => record.memberId),
   ].map(String))
 
-  if (fallbackPresentMembers || records.every(r => r.status === 'absent')) {
+  if (fallbackPresentMembers || records.some(r => r.status === 'absent')) {
     memberIds.forEach(memberId => {
       if (!absentIds.has(String(memberId))) presentIds.add(String(memberId))
     })
