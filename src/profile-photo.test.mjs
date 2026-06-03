@@ -46,7 +46,7 @@ test('Supabase profile photos are reused by member lists and detail avatars', ()
   assert.match(screenDataSource, /safeArray\(allMembers\)[\s\S]*member\?\.profileId/)
   assert.match(screenDataSource, /photoUrl: memberPhotoUrl\(member, members\)/)
   assert.match(screenDataSource, /photoUrl: memberPhotoUrl\(me, state\?\.members\)/)
-  assert.match(screenDataSource, /toPickleballMemberRow\(member, confirmedSessions, confirmedSessions\.length, state\?\.members\)/)
+  assert.match(screenDataSource, /toPickleballMemberRow\(member, confirmedSessions, sessions\.length, state\?\.members\)/)
 })
 
 test('profile photo changes refresh screen data without a browser reload', () => {

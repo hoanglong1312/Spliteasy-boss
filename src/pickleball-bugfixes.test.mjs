@@ -515,7 +515,7 @@ test('members progress follows calendar attendance records', () => {
   assert.equal(rows.m2.progressPct, 50)
 })
 
-test('pickleball members progress counts only done sessions as denominator', () => {
+test('pickleball members progress: total = all sessions, attended = confirmed only', () => {
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {
     currentGroupId: 'g1',
@@ -536,11 +536,11 @@ test('pickleball members progress counts only done sessions as denominator', () 
   const member = data.members.find(row => row.id === 'm1')
 
   assert.equal(member.sessionsAttended, 1)
-  assert.equal(member.sessionsTotal, 1)
-  assert.equal(member.progressPct, 100)
+  assert.equal(member.sessionsTotal, 2)
+  assert.equal(member.progressPct, 50)
 })
 
-test('pickleball members progress only counts confirmed sessions as denominator', () => {
+test('pickleball members progress: scheduled sessions count in total regardless of config', () => {
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {
     currentGroupId: 'g1',
@@ -561,8 +561,8 @@ test('pickleball members progress only counts confirmed sessions as denominator'
   const member = data.members.find(row => row.id === 'm1')
 
   assert.equal(member.sessionsAttended, 1)
-  assert.equal(member.sessionsTotal, 1)
-  assert.equal(member.progressPct, 100)
+  assert.equal(member.sessionsTotal, 2)
+  assert.equal(member.progressPct, 50)
 })
 
 test('pickleball members progress is zero when selected month has no expected sessions', () => {
@@ -587,7 +587,7 @@ test('pickleball members progress is zero when selected month has no expected se
   assert.equal(member.progressPct, 0)
 })
 
-test('pickleball members progress ignores scheduled empty sessions and caps moved overages', () => {
+test('pickleball members progress excludes moved sessions from total, includes scheduled', () => {
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {
     currentGroupId: 'g1',
@@ -616,8 +616,8 @@ test('pickleball members progress ignores scheduled empty sessions and caps move
   const rows = Object.fromEntries(data.members.map(member => [member.id, member]))
 
   assert.equal(rows.m1.sessionsAttended, 5)
-  assert.equal(rows.m1.sessionsTotal, 5)
-  assert.equal(rows.m1.progressPct, 100)
+  assert.equal(rows.m1.sessionsTotal, 6)
+  assert.equal(rows.m1.progressPct, 83)
   assert.equal(rows.m2.sessionsAttended, 0)
   assert.equal(rows.m2.progressPct, 0)
 })

@@ -1700,8 +1700,8 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, confirmedSessions.length, state?.members))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, confirmedSessions.length, state?.members))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, state?.members))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, state?.members))
 
   return {
     groupId: currentGroup(state)?.id,
