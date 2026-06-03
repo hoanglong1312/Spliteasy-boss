@@ -1205,8 +1205,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     groupId: m.group_id,
     group_id: m.group_id,
     name: memberName,
-    short: m.short || profile?.short || memberName.split(' ').pop(),
-    initials: m.initials || profile?.initials || memberName.slice(0, 2).toUpperCase(),
+    short: profile?.short || memberName.split(' ').pop(),
+    initials: profile?.initials || memberName.slice(0, 2).toUpperCase(),
     color: profile?.color || m.color || '#574EFA',
     avatarUrl: profile?.avatar_url || m.avatar_url || '',
     avatar_url: profile?.avatar_url || m.avatar_url || '',
@@ -1623,10 +1623,13 @@ export function AppProvider({ children }) {
 
       case 'UPDATE_MEMBER_COLOR': {
         if (!sb) return
+        const _colorMember = safeArray(state.members).find(m => String(m.id) === String(state.currentUserId))
+        const _colorProfileId = _colorMember?.profileId || _colorMember?.profile_id
+        if (!_colorProfileId) return
         const { error } = await sb
-          .from('members')
+          .from('profiles')
           .update({ color: action.color })
-          .eq('id', state.currentUserId)
+          .eq('id', _colorProfileId)
         if (error) { console.error('[store] UPDATE_MEMBER_COLOR:', error); return }
         await refresh()
         break
@@ -1665,17 +1668,17 @@ export function AppProvider({ children }) {
         if (!sb || !state.currentUserId) return
         const bankInfo = action.bankInfo || action
         const member = safeArray(state.members).find(item => String(item.id) === String(state.currentUserId))
-        const table = member?.profileId || member?.profile_id ? 'profiles' : 'members'
-        const id = member?.profileId || member?.profile_id || state.currentUserId
+        const profileId = member?.profileId || member?.profile_id
+        if (!profileId) return
         const { error } = await sb
-          .from(table)
+          .from('profiles')
           .update({
-            ...(table === 'profiles' && bankInfo.name ? { name: bankInfo.name } : {}),
+            ...(bankInfo.name ? { name: bankInfo.name } : {}),
             bank_name: bankInfo.bankName ?? bankInfo.bank_name ?? null,
             bank_account: bankInfo.bankAccount ?? bankInfo.bank_account ?? null,
             bank_account_name: bankInfo.bankAccountName ?? bankInfo.bank_account_name ?? null,
           })
-          .eq('id', id)
+          .eq('id', profileId)
         if (error) {
           console.error('[store] UPDATE_BANK_INFO:', error)
           throw error
@@ -1689,12 +1692,11 @@ export function AppProvider({ children }) {
         const memberId = action.memberId || state.currentUserId
         const member = safeArray(state.members).find(item => String(item.id) === String(memberId)) || {}
         const profileId = action.profileId || action.profile_id || member.profileId || member.profile_id
-        const table = profileId ? 'profiles' : 'members'
-        const id = profileId || memberId
+        if (!profileId) return
         const { error } = await sb
-          .from(table)
+          .from('profiles')
           .update({ avatar_url: action.photoUrl || null })
-          .eq('id', id)
+          .eq('id', profileId)
         if (error) {
           console.error('[store] UPDATE_PROFILE_PHOTO:', error)
           throw error
