@@ -377,15 +377,12 @@ export default function AppV2() {
   async function submitPin(value = pinInput) {
     const pending = pendingPinSession
     const profileId = pending?.profileId
-    const useProfilePath = !!(pending?.profileId && !pending?.memberId)
-    const memberId = useProfilePath ? null : (pending?.memberId || state.currentUserId)
+    const memberId = pending?.memberId || state.currentUserId
     const pinKey = profileId || memberId
 
     let pinOk = false
-    if (useProfilePath) {
-      const sb = createSupabase()
-      const { data, error } = await sb.rpc('verify_pin_by_profile', { p_profile_id: profileId, p_pin: value })
-      pinOk = !error && data === true
+    if (profileId) {
+      pinOk = await verifyProfilePin(profileId, value)
     } else {
       pinOk = await verifyMemberPin(memberId, value)
     }
@@ -923,6 +920,10 @@ export default function AppV2() {
         const { data, error } = await sb.from('profiles').update(profileUpdate).eq('id', profileId).select('id')
         if (error) throw error
         updatedRows = data
+        // Sync members.name so resume_recent_member_session name check stays valid
+        if (profileUpdate.name && safeArray(updatedRows).length) {
+          await sb.from('members').update({ name: profileUpdate.name }).eq('profile_id', profileId)
+        }
       }
       if (!safeArray(updatedRows).length) {
         let request = sb.from('members').update(memberUpdate).eq('id', memberId)
