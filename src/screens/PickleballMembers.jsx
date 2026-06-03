@@ -140,18 +140,30 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   }
 
   async function changeType(member) {
+    if (savingAction) return;
     const type = member.type === 'casual' ? 'fixed' : 'casual';
     setQuickActionMember(null);
-    await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId });
+    setSavingAction('changeType');
+    try {
+      await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId });
+    } finally {
+      setSavingAction('');
+    }
   }
 
   async function changeRole(member) {
+    if (savingAction) return;
     const role = member.role === 'treasurer' ? 'member' : 'treasurer';
     setQuickActionMember(null);
     if (!window.confirm(role === 'treasurer'
       ? `Cấp quyền Thủ quỹ cho ${member.name}?`
       : `Thu quyền Thủ quỹ của ${member.name}?`)) return;
-    await onAction?.('setMemberRole', { memberId: member.id, groupId: d.groupId, role });
+    setSavingAction('changeRole');
+    try {
+      await onAction?.('setMemberRole', { memberId: member.id, groupId: d.groupId, role });
+    } finally {
+      setSavingAction('');
+    }
   }
 
   function deleteMember(member) {
