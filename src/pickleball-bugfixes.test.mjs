@@ -622,6 +622,40 @@ test('pickleball members progress excludes moved sessions from total, includes s
   assert.equal(rows.m2.progressPct, 0)
 })
 
+test('casual members not in attendance records are not counted present even when others are absent', () => {
+  const { buildPickleballMembersData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB', type: 'pickleball' },
+    groups: [{ id: 'g1', name: 'CLB', type: 'pickleball' }],
+    members: [
+      { id: 'm1', group_id: 'g1', name: 'Fixed', member_type: 'fixed', is_active: true },
+      { id: 'm2', group_id: 'g1', name: 'Absent', member_type: 'fixed', is_active: true },
+      { id: 'c1', group_id: 'g1', name: 'Hoang', member_type: 'casual', is_active: true },
+    ],
+    pickle: {
+      sessions: [
+        {
+          id: 's1', group_id: 'g1', session_date: '2026-06-01', status: 'done',
+          attendanceRecords: [
+            { memberId: 'm1', status: 'present' },
+            { memberId: 'm2', status: 'absent' },
+          ],
+        },
+      ],
+    },
+    _allPickle: { sessions: [] },
+  }
+
+  const data = buildPickleballMembersData(state, '2026-06')
+  const rows = Object.fromEntries([...data.members, ...data.guests].map(r => [r.id, r]))
+
+  assert.equal(rows.m1.sessionsAttended, 1)
+  assert.equal(rows.m2.sessionsAttended, 0)
+  assert.equal(rows.c1.sessionsAttended, 0)
+  assert.equal(rows.c1.progressPct, 0)
+})
+
 test('pickleball members data exposes existing profile candidates outside the club', () => {
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {
