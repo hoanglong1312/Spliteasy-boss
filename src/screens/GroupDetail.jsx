@@ -7,6 +7,7 @@ import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
   ModuleHero, ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
   MemberPicker,
+  LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -37,6 +38,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
   const [groupDescription, setGroupDescription] = useState(d.description || '');
+  const [savingAction, setSavingAction] = useState('');
   const [addingMember, setAddingMember] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
   const [memberMenu, setMemberMenu] = useState(null);
@@ -66,16 +68,68 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   async function saveGroup(e) {
     e.preventDefault();
     const name = groupName.trim();
-    if (!name) return;
-    await onAction?.('editGroup', {
+    if (!name || savingAction) return;
+    setSavingAction('saveGroup');
+    try {
+      await onAction?.('editGroup', {
       id: d.id,
       name,
       emoji: selectedGroupType.emoji || '👥',
       groupType: selectedGroupType.key,
       description: groupDescription.trim(),
       color: d.color || '#574EFA',
-    });
-    setEditingGroup(false);
+      });
+      setEditingGroup(false);
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+
+  async function deleteGroup() {
+    if (savingAction) return;
+    setSavingAction('deleteGroup');
+    try {
+      await onAction?.('deleteGroup', { groupId: d.id });
+      setDeleteConfirmGroup(false);
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  async function setMemberRole() {
+    if (!memberMenu || savingAction) return;
+    const role = memberMenu.role === 'treasurer' ? 'member' : 'treasurer';
+    if (!window.confirm(role === 'treasurer' ? `Cấp quyền thủ quỹ cho ${memberMenu.name}?` : `Thu quyền thủ quỹ của ${memberMenu.name}?`)) return;
+    setSavingAction('setMemberRole');
+    try {
+      await onAction?.('setMemberRole', { memberId: memberMenu.id, groupId: d.id, role });
+      setMemberMenu(null);
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  async function deleteExpense() {
+    if (!deleteConfirmExpense || savingAction) return;
+    setSavingAction('deleteExpense');
+    try {
+      await onAction?.('deleteExpense', { expenseId: deleteConfirmExpense.id });
+      setDeleteConfirmExpense(null);
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  async function removeMember() {
+    if (!deleteConfirmMember || savingAction) return;
+    setSavingAction('removeMember');
+    try {
+      await onAction?.('removeMemberFromGroup', { memberId: deleteConfirmMember.id, groupId: d.id });
+      setDeleteConfirmMember(null);
+    } finally {
+      setSavingAction('');
+    }
   }
 
   return (
@@ -273,11 +327,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <Button
               type="button"
               variant="danger"
-              onClick={async () => {
-                await onAction?.('deleteGroup', { groupId: d.id });
-                setDeleteConfirmGroup(false);
-              }}
-            >Xác nhận</Button>
+              onClick={deleteGroup}
+              disabled={savingAction === 'deleteGroup'}
+            >{savingAction === 'deleteGroup' ? 'Đang xóa…' : 'Xác nhận'}</Button>
           </div>
         </BottomSheet>
       )}
@@ -296,12 +348,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       {memberMenu && canManageMembers && (
         <BottomSheet title={memberMenu.name} onClose={() => setMemberMenu(null)}>
           <ActionButton onClick={() => { setEditingMember(memberMenu); setMemberMenu(null); }}>✏️ Sửa thành viên</ActionButton>
-          <ActionButton onClick={async () => {
-            const role = memberMenu.role === 'treasurer' ? 'member' : 'treasurer';
-            if (!window.confirm(role === 'treasurer' ? `Cấp quyền thủ quỹ cho ${memberMenu.name}?` : `Thu quyền thủ quỹ của ${memberMenu.name}?`)) return;
-            await onAction?.('setMemberRole', { memberId: memberMenu.id, groupId: d.id, role });
-            setMemberMenu(null);
-          }}>{memberMenu.role === 'treasurer' ? '💳 Thu quyền thủ quỹ' : '💳 Cấp quyền thủ quỹ'}</ActionButton>
+          <ActionButton onClick={setMemberRole}>{savingAction === 'setMemberRole' ? 'Đang xử lý…' : memberMenu.role === 'treasurer' ? '💳 Thu quyền thủ quỹ' : '💳 Cấp quyền thủ quỹ'}</ActionButton>
           <ActionButton danger onClick={() => {
             setDeleteConfirmMember(memberMenu);
             setMemberMenu(null);
@@ -329,10 +376,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <Button variant="ghost" onClick={() => setDeleteConfirmExpense(null)}>Hủy</Button>
-            <Button variant="danger" onClick={async () => {
-              await onAction?.('deleteExpense', { expenseId: deleteConfirmExpense.id });
-              setDeleteConfirmExpense(null);
-            }}>Xác nhận</Button>
+            <Button variant="danger" onClick={deleteExpense} disabled={savingAction === 'deleteExpense'}>{savingAction === 'deleteExpense' ? 'Đang xóa…' : 'Xác nhận'}</Button>
           </div>
         </BottomSheet>
       )}
@@ -347,11 +391,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <Button
               type="button"
               variant="danger"
-              onClick={async () => {
-                await onAction?.('removeMemberFromGroup', { memberId: deleteConfirmMember.id, groupId: d.id });
-                setDeleteConfirmMember(null);
-              }}
-            >Xác nhận</Button>
+              onClick={removeMember}
+              disabled={savingAction === 'removeMember'}
+            >{savingAction === 'removeMember' ? 'Đang xóa…' : 'Xác nhận'}</Button>
           </div>
         </BottomSheet>
       )}
@@ -366,6 +408,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
       )}
 
       {!selectedMember && <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />}
+      {savingAction && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+        </div>
+      )}
     </PhoneFrame>
   );
 }
@@ -950,6 +998,7 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
   const [inactiveCandidateQuery, setInactiveCandidateQuery] = useState('');
   const [activeCandidateQuery, setActiveCandidateQuery] = useState('');
   const [name, setName] = useState('');
+  const [savingAction, setSavingAction] = useState('');
   const selectedCandidates = candidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
   const inactiveCandidates = candidates.filter(candidate => candidate.isInactive);
   const activeCandidates = candidates.filter(candidate => !candidate.isInactive);
@@ -965,8 +1014,10 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
   async function save(e) {
     e.preventDefault();
     const cleanName = name.trim();
-    if (selectedCandidates.length === 0 && !cleanName) return;
-    for (const candidate of selectedCandidates) {
+    if ((selectedCandidates.length === 0 && !cleanName) || savingAction) return;
+    setSavingAction('addMember');
+    try {
+      for (const candidate of selectedCandidates) {
       if (candidate.isInactive) {
         await onAction?.('reactivateMember', {
           memberId: candidate.memberId || candidate.id,
@@ -992,7 +1043,10 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
         type: 'fixed',
       });
     }
-    onClose?.();
+      onClose?.();
+    } finally {
+      setSavingAction('');
+    }
   }
 
   function toggleCandidate(candidateId) {
@@ -1047,7 +1101,7 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
           autoFocus
           placeholder="Tên thành viên"
         />
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">{actionLabel}</Button>
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember'}>{savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}</Button>
       </form>
     </BottomSheet>
   );
@@ -1064,6 +1118,7 @@ function normalizeSearch(value) {
 }
 
 function EditMemberEditor({ title, member, onClose, onAction }) {
+  const [savingAction, setSavingAction] = useState('');
   const [name, setName] = useState(member?.name || '');
   const [bankAccountName, setBankAccountName] = useState(member?.bankAccountName || '');
   const [bankName, setBankName] = useState(member?.bankName || '');
@@ -1072,15 +1127,20 @@ function EditMemberEditor({ title, member, onClose, onAction }) {
   async function save(e) {
     e.preventDefault();
     const cleanName = name.trim();
-    if (!cleanName) return;
-    await onAction?.('editMember', {
+    if (!cleanName || savingAction) return;
+    setSavingAction('editMember');
+    try {
+      await onAction?.('editMember', {
       memberId: member.id,
       name: cleanName,
       bankAccountName: bankAccountName.trim(),
       bankName,
       bankAccount: bankAccount.trim(),
-    });
-    onClose?.();
+      });
+      onClose?.();
+    } finally {
+      setSavingAction('');
+    }
   }
 
   return (
@@ -1090,7 +1150,7 @@ function EditMemberEditor({ title, member, onClose, onAction }) {
         <Field label="Tên tài khoản" value={bankAccountName} onChange={setBankAccountName} placeholder="Tên trên tài khoản ngân hàng" />
         <BankSelect value={bankName} onChange={setBankName} />
         <Field label="Số tài khoản" value={bankAccount} onChange={setBankAccount} inputMode="numeric" placeholder="Chưa cập nhật" />
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu thành viên</Button>
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'editMember'}>{savingAction === 'editMember' ? 'Đang lưu…' : 'Lưu thành viên'}</Button>
       </form>
     </BottomSheet>
   );

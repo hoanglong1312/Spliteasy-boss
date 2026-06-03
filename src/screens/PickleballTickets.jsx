@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { colors, type, formatVNDShort } from '../tokens'
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Badge, SubTabs, Pill, PillRow, Avatar, Button, Input,
+  LoadingSpinner, loadingOverlayStyle,
 } from '../primitives'
 
 const EMPTY_DATA = {
@@ -35,6 +36,7 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
   const d = data || EMPTY_DATA
   const [activeFilter, setActiveFilter] = useState(d.activeFilter || d.filter || 'all')
   const [showForm, setShowForm] = useState(false)
+  const [savingAction, setSavingAction] = useState('')
   const visibleTickets = useMemo(() => {
     const tickets = d.tickets || []
     if (activeFilter === 'unpaid') return tickets.filter(t => t.status === 'unpaid')
@@ -44,8 +46,14 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
   }, [activeFilter, d.tickets])
 
   async function saveTicket(payload) {
-    await onAction?.('addTicket', payload)
-    setShowForm(false)
+    if (savingAction) return
+    setSavingAction('addTicket')
+    try {
+      await onAction?.('addTicket', payload)
+      setShowForm(false)
+    } finally {
+      setSavingAction('')
+    }
   }
 
   return (
@@ -112,6 +120,12 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
             <TicketCard key={t.id} t={t} isTreasurer={isTreasurer} onAction={onAction} />
           ))}
         </div>
+        {savingAction && (
+          <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+            <LoadingSpinner />
+            <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+          </div>
+        )}
       </Screen>
 
       {showForm && isTreasurer && (
@@ -159,6 +173,7 @@ function SummaryBox({ tone, label, value }) {
 }
 
 function TicketCard({ t, isTreasurer, onAction }) {
+  const [savingAction, setSavingAction] = useState('')
   const isTeamFund = t.status === 'team_fund'
   const isPending = t.status === 'pending_review'
   const accentColor = isPending ? '#60a5fa' : isTeamFund ? '#a78bfa' : colors.warning
@@ -167,12 +182,28 @@ function TicketCard({ t, isTreasurer, onAction }) {
   const memberCount = (t.memberIds || []).length
 
   async function deleteTicket() {
+    if (savingAction) return
     if (!window.confirm('Xoá vé lẻ này?')) return
-    await onAction?.('deleteTicket', { ticketId: t.id })
+    setSavingAction('deleteTicket')
+    try {
+      await onAction?.('deleteTicket', { ticketId: t.id })
+    } finally {
+      setSavingAction('')
+    }
+  }
+
+  async function approveTicket() {
+    if (savingAction) return
+    setSavingAction('approveTicket')
+    try {
+      await onAction?.('approveTicket', { ticketId: t.id, status: t.advancerId ? 'unpaid' : 'team_fund' })
+    } finally {
+      setSavingAction('')
+    }
   }
 
   return (
-    <Card style={{ padding: 16, borderColor: isPending ? 'rgba(96,165,250,0.28)' : isTeamFund ? 'rgba(167,139,250,0.25)' : 'rgba(251,191,36,0.25)' }}>
+    <Card style={{ padding: 16, borderColor: isPending ? 'rgba(96,165,250,0.28)' : isTeamFund ? 'rgba(167,139,250,0.25)' : 'rgba(251,191,36,0.25)', position: 'relative' }}>
       <div style={{
         position: 'absolute',
         top: 0,
@@ -222,11 +253,18 @@ function TicketCard({ t, isTreasurer, onAction }) {
           {isPending && (
             <button
               type="button"
-              onClick={() => onAction?.('approveTicket', { ticketId: t.id, status: t.advancerId ? 'unpaid' : 'team_fund' })}
+              onClick={approveTicket}
+              disabled={savingAction === 'approveTicket'}
               style={actionButtonStyle('success')}
-            >Duyệt</button>
+            >{savingAction === 'approveTicket' ? 'Đang xử lý…' : 'Duyệt'}</button>
           )}
-          <button type="button" onClick={deleteTicket} style={actionButtonStyle('danger')}>🗑 Xoá</button>
+          <button type="button" onClick={deleteTicket} disabled={savingAction === 'deleteTicket'} style={actionButtonStyle('danger')}>{savingAction === 'deleteTicket' ? 'Đang xóa…' : '🗑 Xoá'}</button>
+        </div>
+      )}
+      {savingAction && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
         </div>
       )}
     </Card>

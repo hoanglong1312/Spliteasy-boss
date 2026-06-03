@@ -2,7 +2,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
-import { PhoneFrame, Screen, TabBar, IconButton, Card, Button, Input, Avatar } from '../primitives';
+import {
+  PhoneFrame, Screen, TabBar, IconButton, Card, Button, Input, Avatar,
+  LoadingSpinner, loadingOverlayStyle,
+} from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
 export default function PickleballTeamFund({ data, isTreasurer = true, onAction }) {
@@ -27,6 +30,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const [saveState, setSaveState] = useState('');
   const [paymentState, setPaymentState] = useState('');
   const [itemSavingKey, setItemSavingKey] = useState('');
+  const [savingAction, setSavingAction] = useState('');
   const [paymentQrOpen, setPaymentQrOpen] = useState(false);
   const [ownerBankOpen, setOwnerBankOpen] = useState(false);
   const perSession = Math.round(courtFee / Math.max(Number(d.sessionsCount) || 1, 1));
@@ -61,9 +65,10 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
 
   async function markSinglePaymentItem(item) {
     const key = paymentItemKey(item);
-    if (item.paid || Number(item.amount) <= 0 || itemSavingKey) return;
+    if (item.paid || Number(item.amount) <= 0 || itemSavingKey || savingAction) return;
     setPaymentState('');
     setItemSavingKey(key);
+    setSavingAction('markOwnerPayment');
     try {
       await onAction?.('markOwnerPayment', {
         currentYearMonth: d.currentYearMonth,
@@ -85,15 +90,17 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
       setPaymentState('error');
     } finally {
       setItemSavingKey('');
+      setSavingAction('');
     }
   }
 
   async function unmarkSinglePaymentItem(item) {
     const payment = ownerPaymentForItem(ownerPayments, item);
     const key = paymentItemKey(item);
-    if (!payment?.id || itemSavingKey) return;
+    if (!payment?.id || itemSavingKey || savingAction) return;
     setPaymentState('');
     setItemSavingKey(key);
+    setSavingAction('unmarkOwnerPayment');
     try {
       await onAction?.('unmarkOwnerPayment', {
         paymentId: payment.id,
@@ -105,6 +112,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
       setPaymentState('error');
     } finally {
       setItemSavingKey('');
+      setSavingAction('');
     }
   }
 
@@ -115,7 +123,13 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           <Card>
             <div style={{ fontSize: 15, fontWeight: 900 }}>Chỉ thủ quỹ xem được quỹ team.</div>
           </Card>
-        </Screen>
+          {savingAction && (
+          <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+            <LoadingSpinner />
+            <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+          </div>
+        )}
+      </Screen>
         <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
       </PhoneFrame>
     );
@@ -177,6 +191,8 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             variant="success"
             style={{ marginTop: 12, padding: 12 }}
             onClick={async () => {
+              if (savingAction) return;
+              setSavingAction('saveTeamFundConfig');
               setSaveState('');
               try {
                 await onAction?.('saveTeamFundConfig', {
@@ -190,10 +206,13 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                 setSaveState('saved');
               } catch {
                 setSaveState('error');
+              } finally {
+                setSavingAction('');
               }
             }}
+            disabled={savingAction === 'saveTeamFundConfig'}
           >
-            Lưu cấu hình quỹ
+            {savingAction === 'saveTeamFundConfig' ? 'Đang lưu…' : 'Lưu cấu hình quỹ'}
           </Button>
         </Card>
 
@@ -385,6 +404,8 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                 disabled={!canGenerateQr}
                 style={{ marginTop: 12, padding: 12, opacity: canGenerateQr ? 1 : 0.55 }}
                 onClick={async () => {
+                  if (savingAction) return;
+                  setSavingAction('markOwnerPayment');
                   setPaymentState('');
                   try {
                     await onAction?.('markOwnerPayment', {
@@ -405,10 +426,12 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     setPaymentState('saved');
                   } catch {
                     setPaymentState('error');
+                  } finally {
+                    setSavingAction('');
                   }
                 }}
               >
-                Đánh dấu đã chuyển
+                {savingAction === 'markOwnerPayment' ? 'Đang xử lý…' : 'Đánh dấu đã chuyển'}
               </Button>
             </div>
           )}
@@ -465,6 +488,8 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                 variant="success"
                 style={{ marginTop: 12, padding: 12 }}
                 onClick={async () => {
+                  if (savingAction) return;
+                  setSavingAction('saveTeamFundConfig');
                   setSaveState('');
                   try {
                     await onAction?.('saveTeamFundConfig', {
@@ -478,10 +503,13 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     setSaveState('saved');
                   } catch {
                     setSaveState('error');
+                  } finally {
+                    setSavingAction('');
                   }
                 }}
+                disabled={savingAction === 'saveTeamFundConfig'}
               >
-                Lưu STK chủ sân
+                {savingAction === 'saveTeamFundConfig' ? 'Đang lưu…' : 'Lưu STK chủ sân'}
               </Button>
             </div>
           )}
@@ -655,6 +683,12 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           </div>
         </Card>
 
+        {savingAction && (
+          <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+            <LoadingSpinner />
+            <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+          </div>
+        )}
       </Screen>
 
       <TabBar active="pickleball" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />

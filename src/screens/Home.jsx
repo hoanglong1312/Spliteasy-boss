@@ -7,6 +7,7 @@ import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card,
   SectionLabel, SearchInput, SectionHeader, ListCard, BottomSheet,
+  LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
@@ -376,14 +377,25 @@ function PaymentRecordDetailSheet({ record, onClose }) {
 
 function PendingApprovalZone({ expenses, payments, onAction }) {
   const [expanded, setExpanded] = useState(false);
+  const [savingAction, setSavingAction] = useState('');
   const items = [
     ...safeArray(expenses).map(expense => ({ ...expense, type: 'expense' })),
     ...safeArray(payments).map(payment => ({ ...payment, type: 'payment' })),
   ];
+  async function handleApproval(action, payload) {
+    if (savingAction) return;
+    setSavingAction(action);
+    try {
+      await onAction?.(action, payload);
+    } finally {
+      setSavingAction('');
+    }
+  }
+
   if (!items.length) return null;
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   return (
-    <section style={{ marginTop: 14 }}>
+    <section style={{ marginTop: 14, position: 'relative' }}>
       <button
         type="button"
         aria-expanded={expanded}
@@ -451,13 +463,13 @@ function PendingApprovalZone({ expenses, payments, onAction }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: 78, flexShrink: 0 }}>
                   {item.type === 'payment' ? (
                     <>
-                      <button type="button" onClick={() => onAction?.('confirmPaymentNotice', item)} style={approvalButton('#22c55e', '#052e16')}>Đã nhận</button>
-                      <button type="button" onClick={() => onAction?.('rejectPaymentNotice', item)} style={approvalButton(colors.danger, '#fff')}>Chưa nhận</button>
+                      <button type="button" onClick={() => handleApproval('confirmPaymentNotice', item)} disabled={savingAction === 'confirmPaymentNotice'} style={approvalButton('#22c55e', '#052e16')}>{savingAction === 'confirmPaymentNotice' ? 'Đang xử lý…' : 'Đã nhận'}</button>
+                      <button type="button" onClick={() => handleApproval('rejectPaymentNotice', item)} disabled={savingAction === 'rejectPaymentNotice'} style={approvalButton(colors.danger, '#fff')}>{savingAction === 'rejectPaymentNotice' ? 'Đang xử lý…' : 'Chưa nhận'}</button>
                     </>
                   ) : (
                     <>
-                      <button type="button" onClick={() => onAction?.('approveExpense', { expenseId: item.id, groupId: item.groupId })} style={approvalButton('#22c55e', '#052e16')}>Duyệt</button>
-                      <button type="button" onClick={() => onAction?.('rejectExpense', { expenseId: item.id, groupId: item.groupId })} style={approvalButton(colors.danger, '#fff')}>Từ chối</button>
+                      <button type="button" onClick={() => handleApproval('approveExpense', { expenseId: item.id, groupId: item.groupId })} disabled={savingAction === 'approveExpense'} style={approvalButton('#22c55e', '#052e16')}>{savingAction === 'approveExpense' ? 'Đang xử lý…' : 'Duyệt'}</button>
+                      <button type="button" onClick={() => handleApproval('rejectExpense', { expenseId: item.id, groupId: item.groupId })} disabled={savingAction === 'rejectExpense'} style={approvalButton(colors.danger, '#fff')}>{savingAction === 'rejectExpense' ? 'Đang xử lý…' : 'Từ chối'}</button>
                     </>
                   )}
                 </div>
@@ -657,7 +669,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
 function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose }) {
   const [copiedField, setCopiedField] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [savingAction, setSavingAction] = useState('');
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   if (!open) return null;
@@ -696,8 +708,8 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     setCopiedField(field);
   };
   const confirmPayment = async () => {
-    if (paymentSubmitting || paymentConfirmed) return;
-    setPaymentSubmitting(true);
+    if (savingAction || paymentConfirmed) return;
+    setSavingAction('confirmPayment');
     try {
       await onConfirmPayment?.({
         amount: amountToPay,
@@ -709,7 +721,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
       });
       setPaymentConfirmed(true);
     } finally {
-      setPaymentSubmitting(false);
+      setSavingAction('');
     }
   };
   const togglePayFor = (row) => {
@@ -903,7 +915,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                     textDecoration: 'none',
                   }}
                 >Lưu QR</a>
-                <button type="button" onClick={confirmPayment} disabled={paymentSubmitting || paymentConfirmed} style={{
+                <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed} style={{
                   minHeight: 42,
                   borderRadius: 12,
                   background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
@@ -912,9 +924,9 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                   fontSize: 12,
                   fontWeight: 900,
                   fontFamily: 'inherit',
-                  cursor: paymentSubmitting || paymentConfirmed ? 'default' : 'pointer',
-                  opacity: paymentSubmitting ? 0.72 : 1,
-                }}>{paymentSubmitting ? 'Đang báo...' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
+                  cursor: savingAction === 'confirmPayment' || paymentConfirmed ? 'default' : 'pointer',
+                  opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
+                }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
               </div>
             </div>
           ) : (

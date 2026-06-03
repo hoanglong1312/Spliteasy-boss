@@ -5,6 +5,7 @@ import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, Card, Badge, SubTabs, Avatar, Stat, Button, Input,
   ModuleHero, ActionButton, SearchInput, StatGrid, BottomSheet, MemberPicker,
+  LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -350,34 +351,6 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
         </div>
       )}
     </PhoneFrame>
-  );
-}
-
-const loadingOverlayStyle = {
-  position: 'absolute',
-  inset: 0,
-  zIndex: 40,
-  display: 'grid',
-  placeItems: 'center',
-  alignContent: 'center',
-  gap: 12,
-  background: 'rgba(15, 23, 42, 0.28)',
-  backdropFilter: 'blur(2px)',
-};
-
-function LoadingSpinner() {
-  return (
-    <>
-      <style>{`@keyframes pickleballLoadingSpin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{
-        width: 40,
-        height: 40,
-        borderRadius: '50%',
-        border: `4px solid rgba(255, 255, 255, 0.55)`,
-        borderTopColor: colors.pickleball,
-        animation: 'pickleballLoadingSpin 0.8s linear infinite',
-      }} />
-    </>
   );
 }
 

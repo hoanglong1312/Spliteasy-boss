@@ -6,6 +6,34 @@ import { createPortal } from 'react-dom';
 import { House, Users, TennisBall, User, Bell } from '@phosphor-icons/react';
 import { colors, type, radius } from './tokens';
 
+export const loadingOverlayStyle = {
+  position: 'absolute',
+  inset: 0,
+  zIndex: 40,
+  display: 'grid',
+  placeItems: 'center',
+  alignContent: 'center',
+  gap: 12,
+  background: 'rgba(15, 23, 42, 0.28)',
+  backdropFilter: 'blur(2px)',
+};
+
+export function LoadingSpinner() {
+  return (
+    <>
+      <style>{`@keyframes pickleballLoadingSpin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{
+        width: 40,
+        height: 40,
+        borderRadius: '50%',
+        border: `4px solid rgba(255, 255, 255, 0.55)`,
+        borderTopColor: colors.pickleball,
+        animation: 'pickleballLoadingSpin 0.8s linear infinite',
+      }} />
+    </>
+  );
+}
+
 /* ───────────────────────── Phone shell ───────────────────────── */
 
 export function PhoneFrame({ children, statusBar = true }) {

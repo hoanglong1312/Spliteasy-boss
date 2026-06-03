@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Input,
+  LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const DAYS_OF_WEEK = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -220,10 +221,31 @@ function CalendarCell({ day, selected, onClick }) {
 }
 
 function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, onAction }) {
+  const [savingAction, setSavingAction] = useState('');
   const dateLabel = formatDayLabel(date);
   const total = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0);
+  async function approveTicket(ticket) {
+    if (savingAction) return;
+    setSavingAction('approveTicket');
+    try {
+      await onAction?.('approveTicket', { ticketId: ticket.id, status: ticket.advancerId ? 'unpaid' : 'team_fund' });
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  async function deleteTicket(ticket) {
+    if (savingAction) return;
+    setSavingAction('deleteTicket');
+    try {
+      await onAction?.('deleteTicket', { ticketId: ticket.id });
+    } finally {
+      setSavingAction('');
+    }
+  }
+
   return (
-    <Card accent="pickleball" style={{ marginTop: 16, borderColor: 'rgba(251,191,36,0.28)' }}>
+    <Card accent="pickleball" style={{ marginTop: 16, borderColor: 'rgba(251,191,36,0.28)', position: 'relative' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', letterSpacing: '1px', textTransform: 'uppercase' }}>
@@ -270,12 +292,12 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, onAction })
                   {ticket.status === 'pending_review' && (
                     <button
                       type="button"
-                      onClick={() => onAction?.('approveTicket', { ticketId: ticket.id, status: ticket.advancerId ? 'unpaid' : 'team_fund' })}
+                      onClick={() => approveTicket(ticket)} disabled={savingAction === 'approveTicket'}
                       style={ticketActionStyle('success')}
-                    >Duyệt</button>
+                    >{savingAction === 'approveTicket' ? 'Đang xử lý…' : 'Duyệt'}</button>
                   )}
                   <button type="button" onClick={() => onEdit?.(ticket)} style={ticketActionStyle('neutral')}>Sửa</button>
-                  <button type="button" onClick={() => onAction?.('deleteTicket', { ticketId: ticket.id })} style={ticketActionStyle('danger')}>Xóa</button>
+                  <button type="button" onClick={() => deleteTicket(ticket)} disabled={savingAction === 'deleteTicket'} style={ticketActionStyle('danger')}>{savingAction === 'deleteTicket' ? 'Đang xóa…' : 'Xóa'}</button>
                 </div>
               )}
             </div>
@@ -458,7 +480,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
     : Array.isArray(session.costs) ? session.costs : [];
   const [guestName, setGuestName] = useState('');
   const [guestFormOpen, setGuestFormOpen] = useState(false);
-  const [submittingGuest, setSubmittingGuest] = useState(false);
+  const [savingAction, setSavingAction] = useState('');
   const costMembers = (session.members || [])
     .filter(member => member.id)
     .map(member => ({
@@ -471,7 +493,6 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
   const [extrasOpen, setExtrasOpen] = useState(false);
   const [waterOpen, setWaterOpen] = useState(false);
   const [extras, setExtras] = useState([]);
-  const [savingSessionToggle, setSavingSessionToggle] = useState(false);
   const [costSaveState, setCostSaveState] = useState('');
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState('');
@@ -536,34 +557,47 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
     })
     .filter(extra => extra.amount > 0);
   const saveSessionCosts = async (sourceExtras = extras) => {
+    if (savingAction) return;
+    setSavingAction('saveSessionCost');
     setCostSaveState('');
-    await onAction?.('saveSessionCost', {
-      sessionId: session.id,
-      waterAmount: parseAmount(waterInput),
-      extras: cleanedExtras(sourceExtras),
-    });
-    setCostSaveState('saved');
+    try {
+      await onAction?.('saveSessionCost', {
+        sessionId: session.id,
+        waterAmount: parseAmount(waterInput),
+        extras: cleanedExtras(sourceExtras),
+      });
+      setCostSaveState('saved');
+    } finally {
+      setSavingAction('');
+    }
   };
   const toggleSessionCompletion = async () => {
-    if (savingSessionToggle || !session.canComplete) return;
-    setSavingSessionToggle(true);
+    if (savingAction || !session.canComplete) return;
+    setSavingAction('toggleSession');
     try {
       if (session.isCompleted) {
         await onAction?.('reopenSession', session.id);
       } else {
-        await saveSessionCosts();
+        await onAction?.('saveSessionCost', {
+          sessionId: session.id,
+          waterAmount: parseAmount(waterInput),
+          extras: cleanedExtras(extras),
+        });
+        setCostSaveState('saved');
         await onAction?.('completeSession', session.id);
       }
     } catch (err) {
       console.error('[PickleballCalendar] toggleSessionCompletion:', err);
       setCostSaveState('error');
     } finally {
-      setSavingSessionToggle(false);
+      setSavingAction('');
     }
   };
   const saveReschedule = async (event) => {
     event.preventDefault();
+    if (savingAction) return;
     if (!session.canReschedule || !rescheduleDate) return;
+    setSavingAction('rescheduleSession');
     setRescheduleError('');
     try {
       await onAction?.('rescheduleSession', {
@@ -579,14 +613,16 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
         : message === 'reschedule_same_date'
         ? 'Ngày mới phải khác ngày hiện tại.'
         : 'Chưa dời được buổi. Thử lại sau.')
+    } finally {
+      setSavingAction('');
     }
   };
 
   async function addGuest(event) {
     event.preventDefault();
     const name = guestName.trim();
-    if (!name || submittingGuest) return;
-    setSubmittingGuest(true);
+    if (!name || savingAction) return;
+    setSavingAction('addGuest');
     try {
       await onAction?.('addGuest', {
         sessionId: session.id,
@@ -595,7 +631,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
       setGuestName('');
       setGuestFormOpen(false);
     } finally {
-      setSubmittingGuest(false);
+      setSavingAction('');
     }
   }
 
@@ -634,7 +670,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
           <button
             type="button"
             aria-pressed={session.isCompleted}
-            disabled={savingSessionToggle}
+            disabled={savingAction === 'toggleSession'}
             onClick={toggleSessionCompletion}
             style={{
               border: 'none',
@@ -647,11 +683,11 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
               fontWeight: 900,
               fontFamily: 'inherit',
               lineHeight: 1.1,
-              cursor: savingSessionToggle ? 'default' : 'pointer',
-              opacity: savingSessionToggle ? 0.7 : 1,
+              cursor: savingAction === 'toggleSession' ? 'default' : 'pointer',
+              opacity: savingAction === 'toggleSession' ? 0.7 : 1,
             }}
           >
-            ● {savingSessionToggle ? 'Đang lưu' : session.isCompleted ? 'Đã đánh' : 'Chưa chốt'}
+            ● {savingAction === 'toggleSession' ? 'Đang xử lý…' : session.isCompleted ? 'Đã đánh' : 'Chưa chốt'}
           </button>
         ) : (
           <Badge tone={session.status.tone}>● {session.status.label}</Badge>
@@ -758,8 +794,8 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
               {rescheduleError}
             </div>
           )}
-          <Button type="submit" variant="muted" disabled={!rescheduleDate} style={{ padding: 10, borderRadius: 10, fontSize: 12 }}>
-            Lưu ngày mới
+          <Button type="submit" variant="muted" disabled={!rescheduleDate || savingAction === 'rescheduleSession'} style={{ padding: 10, borderRadius: 10, fontSize: 12 }}>
+            {savingAction === 'rescheduleSession' ? 'Đang lưu…' : 'Lưu ngày mới'}
           </Button>
         </form>
       )}
@@ -822,8 +858,8 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, onAction
             inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 700 }}
             style={{ marginTop: 0 }}
           />
-          <Button type="submit" disabled={submittingGuest} variant="muted" style={{ padding: '10px 12px', borderRadius: 10, fontSize: 12 }}>
-            Thêm
+          <Button type="submit" disabled={!guestName.trim() || savingAction === 'addGuest'} variant="muted" style={{ padding: '10px 12px', borderRadius: 10, fontSize: 12 }}>
+            {savingAction === 'addGuest' ? 'Đang lưu…' : 'Thêm'}
           </Button>
         </form>
       )}
@@ -1223,7 +1259,18 @@ function formatDayLabel(value) {
 }
 
 function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
+  const [savingAction, setSavingAction] = useState('');
   const active = a.kind === 'present' || a.kind === 'guest';
+
+  async function removeGuest() {
+    if (savingAction) return;
+    setSavingAction('removeGuest');
+    try {
+      await onAction?.('removeGuest', { sessionId, attendeeId: a.id });
+    } finally {
+      setSavingAction('');
+    }
+  }
 
   if (a.kind === 'guest') {
     return (
@@ -1247,7 +1294,7 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, onAction }) {
           {isTreasurer && (
             <button
               type="button"
-              onClick={() => onAction?.('removeGuest', { sessionId, attendeeId: a.id })}
+              onClick={removeGuest} disabled={savingAction === 'removeGuest'}
               style={{
                 position: 'absolute',
                 right: -4,

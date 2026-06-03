@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { colors, type } from '../tokens';
-import { Button, Input } from '../primitives';
+import { Button, Input, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
 const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
 const ISO_WEEKDAY_LABELS = ['', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
@@ -50,6 +50,7 @@ export default function PickleballSettings({ data, onAction }) {
   const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(d.timeRange));
   const [startDate, setStartDate] = useState(d.startDate || '');
   const [clubName, setClubName] = useState(d.clubName || '');
+  const [savingAction, setSavingAction] = useState('');
 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
 
@@ -66,6 +67,23 @@ export default function PickleballSettings({ data, onAction }) {
     borderRadius: 10, padding: '10px 8px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
     fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
   };
+
+  async function saveSettings() {
+    if (savingAction) return;
+    setSavingAction('save');
+    try {
+      await onAction?.('save', {
+        weekdays: Array.from(weekdays),
+        autoGen,
+        currentYearMonth: d.currentYearMonth,
+        startDate,
+        scheduleTime: `${timeStart} – ${timeEnd}`,
+        clubName,
+      });
+    } finally {
+      setSavingAction('');
+    }
+  }
 
   return (
     <div data-spliteasy-phone-frame style={{
@@ -217,17 +235,18 @@ export default function PickleballSettings({ data, onAction }) {
             <Toggle on={autoGen} onChange={setAutoGen} />
           </div>
 
-          <Button block variant="brand" style={{ marginTop: 8 }} onClick={() => onAction?.('save', {
-            weekdays: Array.from(weekdays),
-            autoGen,
-            currentYearMonth: d.currentYearMonth,
-            startDate,
-            scheduleTime: `${timeStart} – ${timeEnd}`,
-            clubName,
-          })}>💾 Lưu cài đặt</Button>
+          <Button block variant="brand" style={{ marginTop: 8 }} onClick={saveSettings} disabled={savingAction === 'save'}>
+            {savingAction === 'save' ? 'Đang lưu…' : '💾 Lưu cài đặt'}
+          </Button>
           </div>
         </div>
       </div>
+      {savingAction && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: colors.textPrimary }}>Đang xử lý…</div>
+        </div>
+      )}
     </div>
   );
 }
