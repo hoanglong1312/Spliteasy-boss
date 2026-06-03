@@ -4172,7 +4172,7 @@ function effectiveSessionMemberIds(session, members = [], fallbackPresentMembers
     ...records.filter(record => record.status !== 'absent').map(record => record.memberId),
   ].map(String))
 
-  if (fallbackPresentMembers || records.some(r => r.status === 'absent')) {
+  if (fallbackPresentMembers || records.every(r => r.status === 'absent')) {
     memberIds.forEach(memberId => {
       if (!absentIds.has(String(memberId))) presentIds.add(String(memberId))
     })
