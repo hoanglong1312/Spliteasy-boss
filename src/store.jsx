@@ -1197,7 +1197,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
   const profilesById = new Map(normalProfiles.map(profile => [String(profile.id), profile]))
   const normalMembers = members.map(m => {
     const profile = profilesById.get(String(m.profile_id || ''))
-    const memberName = String(m.name || profile?.name || '').trim()
+    const memberName = String(profile?.name || m.name || '').trim()
     return {
     id: m.id,
     profileId: m.profile_id,
