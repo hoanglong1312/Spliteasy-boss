@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, verifyPinForInviteLink, getTokenAfterPinVerify } from '../lib/auth.js';
 import { colors, type } from '../tokens';
-import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel } from '../primitives';
+import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
 export default function JoinGroup({ data, onAction, pinSession, pinValue = '', pinError = '', onPinChange, onPinSubmit, onPinCancel }) {
   const d = data || DEMO;
@@ -733,6 +733,12 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           </span>
         </div>}
       </Screen>
+      {(joining || adminLoading || invitePinLoading) && (
+        <div role="status" aria-live="polite" style={loadingOverlayStyle}>
+          <LoadingSpinner />
+          <div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div>
+        </div>
+      )}
     </PhoneFrame>
   );
 }
