@@ -148,7 +148,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           }}
         />
       ) : (
-      <Screen>
+      <Screen tabBar style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
+        {/* FIXED TOP: Nav header */}
+        <div style={{ flexShrink: 0, padding: '0 16px' }}>
         {/* Nav header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
@@ -289,7 +291,10 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
 
-        <div style={{ position: 'sticky', bottom: 0, background: colors.pageBg, paddingTop: 4, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 }}>
+        </div>
+
+        {/* FIXED BOTTOM: GroupManagementPanel */}
+        <div style={{ flexShrink: 0, padding: '0 16px 8px' }}>
           <GroupManagementPanel
             inviteCode={d.inviteCode}
             onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}

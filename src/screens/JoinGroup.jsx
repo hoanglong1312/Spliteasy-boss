@@ -140,7 +140,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
 
   return (
     <PhoneFrame>
-      <Screen>
+      <Screen style={{ paddingBottom: 24 }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0 14px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
