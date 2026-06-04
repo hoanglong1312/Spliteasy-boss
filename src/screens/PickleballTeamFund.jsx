@@ -94,6 +94,35 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
     }
   }
 
+  async function handleConfirmSelected() {
+    if (savingAction || selectedPaymentItems.length === 0) return;
+    setSavingAction('markOwnerPayment');
+    setPaymentState('');
+    try {
+      await onAction?.('markOwnerPayment', {
+        currentYearMonth: d.currentYearMonth,
+        paidAt: new Date().toISOString().slice(0, 10),
+        totalAmount: selectedPaymentTotal,
+        bankSnapshot: {
+          ownerName: venueOwnerName,
+          bankName: selectedBank?.shortName || venueBankName,
+          bankId: qrBankId,
+          bankAccount: venueBankAccount,
+        },
+        items: selectedPaymentItems,
+        note: paymentNote,
+      });
+      setPaymentNote('');
+      setPaymentQrOpen(false);
+      setPaymentState('saved');
+      setSelectedPaymentKeys([]);
+    } catch {
+      setPaymentState('error');
+    } finally {
+      setSavingAction('');
+    }
+  }
+
   async function unmarkSinglePaymentItem(item) {
     const payment = ownerPaymentForItem(ownerPayments, item);
     const key = paymentItemKey(item);
@@ -235,66 +264,58 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {paymentDraft.items.map(item => {
               const key = paymentItemKey(item);
-              const checked = selectedPaymentKeys.includes(key);
+              const selected = selectedPaymentKeys.includes(key);
               const hasAmount = Number(item.amount) > 0;
-              const canMarkItemPaid = !item.paid && hasAmount;
               const selectable = !item.paid && hasAmount;
+              const dimmed = !hasAmount && !item.paid;
+              const payment = ownerPaymentForItem(ownerPayments, item);
+              let borderColor = colors.borderSubtle;
+              let bgColor = 'rgba(255,255,255,0.035)';
+              if (item.paid) { borderColor = 'rgba(52,211,153,0.28)'; bgColor = 'rgba(52,211,153,0.04)'; }
+              else if (selected) { borderColor = 'rgba(96,165,250,0.55)'; bgColor = 'rgba(96,165,250,0.07)'; }
               return (
                 <div
                   key={key}
                   onClick={() => {
                     if (itemSavingKey || savingAction) return;
-                    if (item.paid) {
-                      unmarkSinglePaymentItem(item);
-                    } else if (hasAmount) {
-                      markSinglePaymentItem(item);
-                    }
+                    if (!hasAmount && !item.paid) return;
+                    setSelectedPaymentKeys(keys =>
+                      keys.includes(key) ? keys.filter(v => v !== key) : [...keys, key]
+                    );
+                    setPaymentState('');
+                    setPaymentQrOpen(false);
                   }}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 9,
-                    padding: '10px 10px',
+                    padding: '10px 12px',
                     borderRadius: 10,
-                    border: `1px solid ${item.paid ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
-                    background: 'rgba(255,255,255,0.035)',
-                    opacity: !hasAmount ? 0.6 : (itemSavingKey && itemSavingKey !== key ? 0.55 : 1),
-                    cursor: (canMarkItemPaid || item.paid) && !itemSavingKey ? 'pointer' : 'default',
+                    border: `1px solid ${borderColor}`,
+                    background: bgColor,
+                    opacity: dimmed ? 0.55 : (itemSavingKey && itemSavingKey !== key ? 0.55 : 1),
+                    cursor: (selectable || item.paid) && !itemSavingKey ? 'pointer' : 'default',
+                    transition: 'border-color 0.15s, background 0.15s',
                   }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={!selectable}
-                    style={{ cursor: selectable ? 'pointer' : 'not-allowed', flexShrink: 0 }}
-                    onClick={e => e.stopPropagation()}
-                    onChange={event => {
-                      setSelectedPaymentKeys(keys => event.target.checked
-                        ? [...keys, key]
-                        : keys.filter(value => value !== key));
-                      setPaymentState('');
-                      setPaymentQrOpen(false);
-                    }}
-                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {item.label}
                     </div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1, whiteSpace: 'nowrap' }}>
-                      {item.yearMonth} · {item.paid ? 'Đã trả chủ sân' : !hasAmount ? 'Chưa có khoản' : 'Chưa chuyển'}
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap' }}>
+                      {item.yearMonth} · {item.paid ? 'Đã chuyển khoản' : !hasAmount ? 'Chưa có khoản' : 'Đã có số liệu, chưa CK'}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : (hasAmount ? colors.warning : colors.textSecondary), ...type.mono }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0, marginLeft: 10 }}>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: item.paid ? '#6ee7b7' : (hasAmount ? colors.warning : colors.textSecondary), ...type.mono }}>
                       {formatVND(item.amount || 0)}
                     </div>
                     {item.paid ? (
-                      <div style={{ fontSize: 9, color: '#6ee7b7', fontWeight: 900 }}>
-                        {itemSavingKey === key ? '…' : '✓ Đã xác nhận'}
+                      <div style={{ fontSize: 9, color: '#6ee7b7', fontWeight: 800 }}>
+                        {payment?.paidAt ? formatPaymentDate(payment.paidAt) : '✓ Đã xác nhận'}
                       </div>
                     ) : hasAmount ? (
-                      <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700 }}>
-                        {itemSavingKey === key ? 'Đang lưu…' : 'Bấm để xác nhận'}
+                      <div style={{ fontSize: 9, color: selected ? '#93c5fd' : colors.textSecondary, fontWeight: 700 }}>
+                        {selected ? 'Đã chọn' : 'Bấm để chọn'}
                       </div>
                     ) : null}
                   </div>
@@ -316,15 +337,24 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
               {paymentState === 'saved' ? 'Đã ghi nhận giao dịch chuyển chủ sân.' : 'Chưa lưu được giao dịch. Thử lại sau.'}
             </div>
           )}
-          <Button
-            block
-            variant="success"
-            disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0}
-            style={{ marginTop: 12, padding: 12, opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 ? 0.55 : 1 }}
-            onClick={() => setPaymentQrOpen(true)}
-          >
-            Thanh toán
-          </Button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <Button
+              variant="ghost"
+              disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 || !!savingAction}
+              style={{ flex: 1, padding: '12px 8px', fontSize: 13, whiteSpace: 'nowrap', opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 || !!savingAction ? 0.55 : 1 }}
+              onClick={handleConfirmSelected}
+            >
+              {savingAction === 'markOwnerPayment' ? 'Đang xử lý…' : 'Xác nhận đã chuyển'}
+            </Button>
+            <Button
+              variant="success"
+              disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0}
+              style={{ flex: 1, padding: '12px 8px', fontSize: 13, whiteSpace: 'nowrap', opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 ? 0.55 : 1 }}
+              onClick={() => setPaymentQrOpen(true)}
+            >
+              Thanh toán
+            </Button>
+          </div>
 
           {paymentQrOpen && (
             <div style={{
