@@ -1119,7 +1119,7 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
                 }}
               >
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                  <span style={{ fontSize: 18 }}>{candidate.isInactive ? '↩️' : '🏓'}</span>
+                  <span style={{ fontSize: 18 }}>{candidate.isInactive ? '↩️' : candidate.isPickleball ? '🏓' : '👤'}</span>
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.name}</span>
                     {candidate.isInactive && <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: colors.textSecondary }}>Thêm lại vào nhóm</span>}

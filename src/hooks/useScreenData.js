@@ -971,7 +971,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     pendingExpenses,
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
-    memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense' }),
+    memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense', groups: appState?.groups }),
     paymentTarget,
     members: groupMembers.map(member => {
       const memberTransactions = buildMemberTransactions(g, member.id, selectedYearMonth, groupMembers)
@@ -1013,7 +1013,9 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   }
 }
 
-function buildGroupMemberCandidates(group, members, profiles = [], options = {}) {
+function buildGroupMemberCandidates(group, members, profiles = [], options = {}, groups = []) {
+  const allGroups = safeArray(options.groups || groups)
+  const pickleballGroupIds = new Set(allGroups.filter(g => groupKind(g) === 'pickleball' || g.linkedPickleballGroupId || g.linked_pickleball_group_id).map(g => g.id))
   const currentMembers = allMembersForGroup(group, members)
   const mode = options.mode || groupKind(group)
   const blockingCurrentMembers = mode === 'pickleball'
@@ -1065,6 +1067,7 @@ function buildGroupMemberCandidates(group, members, profiles = [], options = {})
       bankName: member.bankName || member.bank_name || '',
       bankAccount: member.bankAccount || member.bank_account || '',
       bankAccountName: member.bankAccountName || member.bank_account_name || '',
+      isPickleball: pickleballGroupIds.size > 0 && pickleballGroupIds.has(String(member.groupId || member.group_id || '')),
     }))
     .filter(member => {
       const key = String(member.profileId || member.id || '')
@@ -1722,7 +1725,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     fixedMembers: fixedRows,
     casualMembers: casualRows,
     allMembers: allMemberRows,
-    memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles, { mode: 'pickleball' }),
+    memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles, { mode: 'pickleball', groups: state?.groups }),
     legacyGuests: buildGuestRows(sessions),
   }
 }
