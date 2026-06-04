@@ -274,38 +274,28 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               onChange={event => setMemberSearch(event.target.value)}
               placeholder="Tìm thành viên..."
             />
-            <div
-              style={{
-                overflowY: 'auto',
-                maxHeight: 'calc(100dvh - 280px)',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
-                paddingRight: 2,
-                WebkitOverflowScrolling: 'touch',
-              }}
-            >
-              {visibleMembers.map(member => (
-                <MemberRow
-                  key={member.id}
-                  member={member}
-                  isTreasurer={canManageMembers}
-                  onOpen={setSelectedMember}
-                  onMore={setMemberMenu}
-                />
-              ))}
-              {visibleMembers.length === 0 && (
-                <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
-              )}
-            </div>
+            {visibleMembers.map(member => (
+              <MemberRow
+                key={member.id}
+                member={member}
+                isTreasurer={canManageMembers}
+                onOpen={setSelectedMember}
+                onMore={setMemberMenu}
+              />
+            ))}
+            {visibleMembers.length === 0 && (
+              <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
+            )}
           </div>
         )}
 
-        <GroupManagementPanel
-          inviteCode={d.inviteCode}
-          onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
-          onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
-        />
+        <div style={{ position: 'sticky', bottom: 0, background: colors.pageBg, paddingTop: 4, marginLeft: -16, marginRight: -16, paddingLeft: 16, paddingRight: 16 }}>
+          <GroupManagementPanel
+            inviteCode={d.inviteCode}
+            onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
+            onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
+          />
+        </div>
       </Screen>
       )}
 
