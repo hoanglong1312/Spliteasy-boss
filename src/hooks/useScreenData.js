@@ -972,8 +972,13 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
     memberCandidates: buildGroupMemberCandidates(g, members.filter(m => {
-      const expenseGroupIds = new Set(safeArray(appState?.groups).filter(gr => groupKind(gr) !== 'pickleball').map(gr => gr.id))
-      return expenseGroupIds.size === 0 || expenseGroupIds.has(m.groupId || m.group_id)
+      const isPickleballExpenseGroup = Boolean(g.linkedPickleballGroupId || g.linked_pickleball_group_id)
+      const relevantGroupIds = new Set(safeArray(appState?.groups).filter(gr =>
+        isPickleballExpenseGroup
+          ? (groupKind(gr) === 'pickleball' || gr.linkedPickleballGroupId || gr.linked_pickleball_group_id)
+          : (groupKind(gr) !== 'pickleball' && !gr.linkedPickleballGroupId && !gr.linked_pickleball_group_id)
+      ).map(gr => gr.id))
+      return relevantGroupIds.size === 0 || relevantGroupIds.has(m.groupId || m.group_id)
     }), profiles, { mode: 'expense' }),
     paymentTarget,
     members: groupMembers.map(member => {
@@ -1727,8 +1732,10 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     casualMembers: casualRows,
     allMembers: allMemberRows,
     memberCandidates: buildGroupMemberCandidates(currentGroup(state), safeArray(state?.members).filter(m => {
-      const pickleGroupIds = new Set(safeArray(state?.groups).filter(gr => groupKind(gr) === 'pickleball').map(gr => gr.id))
-      return pickleGroupIds.size === 0 || pickleGroupIds.has(m.groupId || m.group_id)
+      const pickleEcosystemIds = new Set(safeArray(state?.groups).filter(gr =>
+        groupKind(gr) === 'pickleball' || gr.linkedPickleballGroupId || gr.linked_pickleball_group_id
+      ).map(gr => gr.id))
+      return pickleEcosystemIds.size === 0 || pickleEcosystemIds.has(m.groupId || m.group_id)
     }), state?.profiles, { mode: 'pickleball' }),
     legacyGuests: buildGuestRows(sessions),
   }
