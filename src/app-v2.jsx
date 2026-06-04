@@ -200,12 +200,11 @@ export default function AppV2() {
     async function openBillLink() {
       setPublicBillLoading(true)
       const openedHome = await openPersonalLinkHome(publicBillToken)
-      if (!alive || openedHome) return
-      const sb = createSupabase()
-      const { data, error } = await sb.rpc('get_member_bill_share', { p_token: publicBillToken })
       if (!alive) return
-      setPublicBillData(error ? { error: 'invalid_token' } : data)
-      setPublicBillLoading(false)
+      if (!openedHome) {
+        setPublicBillData({ error: 'invalid_token' })
+        setPublicBillLoading(false)
+      }
     }
     openBillLink()
     return () => { alive = false }
@@ -1329,7 +1328,7 @@ export default function AppV2() {
       const { data, error } = await sb.rpc('create_member_access_link', {
         p_group_id: payload?.groupId,
         p_member_id: payload?.memberId,
-        p_purpose: 'member_bill',
+        p_purpose: 'member_login',
       })
       if (error || data?.error) {
         const billShareError = error?.message || data?.error || 'Không tạo được link chia sẻ.'
