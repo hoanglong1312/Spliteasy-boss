@@ -34,6 +34,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const canAddMembers = true;
   const [activeTab, setActiveTab] = useState('members');
   const [inviteExpanded, setInviteExpanded] = useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
@@ -213,14 +214,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
         </div>
 
-        {/* FIXED: Search + Add button for members tab */}
+        {/* FIXED: Search for members tab */}
         {activeTab === 'members' && (
-          <div style={{ flexShrink: 0, padding: '4px 16px 6px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {canAddMembers && (
-              <Button variant="ghost" style={{ fontSize: 12 }} onClick={() => setAddingMember(true)}>
-                + Thêm thành viên
-              </Button>
-            )}
+          <div style={{ flexShrink: 0, padding: '4px 16px 6px' }}>
             <SearchInput
               value={memberSearch}
               onChange={event => setMemberSearch(event.target.value)}
@@ -432,7 +428,24 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
       )}
 
-      {!selectedMember && <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />}
+      {!selectedMember && fabOpen && (
+        <div
+          style={{ position: 'absolute', inset: 0, zIndex: 15, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-end', padding: '0 20px', paddingBottom: 'calc(var(--tab-bar-height, 68px) + 16px)', background: 'rgba(0,0,0,0.45)' }}
+          onClick={() => setFabOpen(false)}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }} onClick={e => e.stopPropagation()}>
+            {canAddMembers && (
+              <button type="button" onClick={() => { setFabOpen(false); setAddingMember(true); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 24, background: colors.shellBg, border: `1px solid ${colors.borderSubtle}`, color: colors.textPrimary, fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', whiteSpace: 'nowrap' }}>
+                <span>👤</span> Thêm thành viên
+              </button>
+            )}
+            <button type="button" onClick={() => { setFabOpen(false); onAction?.('addExpense', { groupId: d.id }); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 24, background: colors.brand, border: 'none', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,0.5)', whiteSpace: 'nowrap' }}>
+              <span>✏️</span> Thêm chi tiêu
+            </button>
+          </div>
+        </div>
+      )}
+      {!selectedMember && <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => setFabOpen(f => !f)} />}
       {savingAction && (
         <div role="status" aria-live="polite" style={loadingOverlayStyle}>
           <LoadingSpinner />
