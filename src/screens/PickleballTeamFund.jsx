@@ -95,21 +95,22 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   }
 
   async function handleConfirmSelected() {
-    if (savingAction || selectedPaymentItems.length === 0) return;
+    const unpaidSelected = selectedPaymentItems.filter(item => !item.paid);
+    if (savingAction || unpaidSelected.length === 0) return;
     setSavingAction('markOwnerPayment');
     setPaymentState('');
     try {
       await onAction?.('markOwnerPayment', {
         currentYearMonth: d.currentYearMonth,
         paidAt: new Date().toISOString().slice(0, 10),
-        totalAmount: selectedPaymentTotal,
+        totalAmount: unpaidSelected.reduce((s, i) => s + (Number(i.amount) || 0), 0),
         bankSnapshot: {
           ownerName: venueOwnerName,
           bankName: selectedBank?.shortName || venueBankName,
           bankId: qrBankId,
           bankAccount: venueBankAccount,
         },
-        items: selectedPaymentItems,
+        items: unpaidSelected,
         note: paymentNote,
       });
       setPaymentNote('');
@@ -278,7 +279,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                   key={key}
                   onClick={() => {
                     if (itemSavingKey || savingAction) return;
-                    if (!hasAmount && !item.paid) return;
+                    if (!hasAmount || item.paid) return;
                     setSelectedPaymentKeys(keys =>
                       keys.includes(key) ? keys.filter(v => v !== key) : [...keys, key]
                     );
@@ -293,7 +294,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     border: `1px solid ${borderColor}`,
                     background: bgColor,
                     opacity: dimmed ? 0.55 : (itemSavingKey && itemSavingKey !== key ? 0.55 : 1),
-                    cursor: (selectable || item.paid) && !itemSavingKey ? 'pointer' : 'default',
+                    cursor: selectable && !itemSavingKey ? 'pointer' : 'default',
                     transition: 'border-color 0.15s, background 0.15s',
                   }}
                 >
