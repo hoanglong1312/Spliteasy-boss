@@ -194,6 +194,27 @@ export function useScreenData() {
   return screenData
 }
 
+function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth) {
+  if (selectedYearMonth !== monthKey(new Date())) return null
+  const prevYearMonth = shiftMonthKey(selectedYearMonth, -1)
+  const prevDate = dateFromYearMonth(prevYearMonth)
+  const prevExpenseGroups = safeGroups
+    .filter(group => groupKind(group) !== 'pickleball')
+    .map(group => groupWithMonthExpenses(group, prevDate))
+  const prevExpenseBalance = prevExpenseGroups.reduce((sum, group) => (
+    sum + groupNetForMember(group, currentUserId, members, state?.currentUserName)
+  ), 0)
+  const prevSessions = getStateMonthSessions(pickleballState, prevDate)
+  const prevPickleBalance = buildMemberMonthBalance(pickleballState, pickle, prevSessions, pickleballMemberId).netBalance || 0
+  const prevTotal = prevExpenseBalance + prevPickleBalance
+  if (prevTotal >= 0) return null
+  return {
+    yearMonth: prevYearMonth,
+    label: formatMonthLabel(prevDate),
+    balance: prevTotal,
+  }
+}
+
 function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state, selectedYearMonth = monthKey(new Date())) {
   const today = dateFromYearMonth(selectedYearMonth)
   const safeGroups = safeArray(groups).map(safeGroup)
@@ -216,6 +237,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const paymentSummary = buildHomePaymentSummary(state, rawSourceBreakdown, profileBreakdown, members, me, today)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
+  const prevMonthUnpaid = buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth)
 
   return {
     user: {
@@ -248,6 +270,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     sourceBreakdown,
     profileBreakdown,
     paymentSummary,
+    prevMonthUnpaid,
   }
 }
 
