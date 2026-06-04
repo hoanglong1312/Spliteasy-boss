@@ -55,6 +55,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const selectedGroupType = groupTypeOptions.find(option => option.key === groupTypeKey) || groupTypeOptions[0];
   const currentMemberRow = (d.members || []).find(member => String(member.id) === String(d.currentMemberId || '')) || null;
   const visibleMembers = (d.members || []).filter(member => {
+    if ((member.memberTransactions || []).length === 0) return false;
     const query = normalizeSearch(memberSearch);
     if (!query) return true;
     return normalizeSearch(`${member.name} ${member.bankName} ${member.bankAccount}`).includes(query);

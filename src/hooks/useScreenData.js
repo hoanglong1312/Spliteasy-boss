@@ -996,7 +996,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         memberTransactionSummary: summarizeMemberTransactions(memberTransactions),
         paymentTarget,
       }
-    }),
+    }).sort((a, b) => a.name.localeCompare(b.name, 'vi')),
     balanceRows: groupMembers
       .map(member => ({
         id: member.id,
@@ -1009,7 +1009,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         amount: memberBalanceMap[member.id] || 0,
       }))
       .filter(row => row.amount !== 0)
-      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)),
+      .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.name.localeCompare(b.name, 'vi')),
   }
 }
 
@@ -1703,7 +1703,9 @@ function buildPickleballMembersData(state, selectedYearMonth) {
   })
 
   const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, fixedMembers))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
   const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, []))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
 
   return {
     groupId: currentGroup(state)?.id,
