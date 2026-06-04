@@ -1197,7 +1197,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
   const profilesById = new Map(normalProfiles.map(profile => [String(profile.id), profile]))
   const normalMembers = members.map(m => {
     const profile = profilesById.get(String(m.profile_id || ''))
-    const memberName = String(profile?.name || m.name || '').trim()
+    const memberName = String(profile?.name || '').trim()
     return {
     id: m.id,
     profileId: m.profile_id,
@@ -1207,11 +1207,11 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     name: memberName,
     short: profile?.short || memberName.split(' ').pop(),
     initials: profile?.initials || memberName.slice(0, 2).toUpperCase(),
-    color: profile?.color || m.color || '#574EFA',
-    avatarUrl: profile?.avatar_url || m.avatar_url || '',
-    avatar_url: profile?.avatar_url || m.avatar_url || '',
-    photoUrl: profile?.avatar_url || m.avatar_url || '',
-    photo_url: profile?.avatar_url || m.avatar_url || '',
+    color: profile?.color || '#574EFA',
+    avatarUrl: profile?.avatar_url || '',
+    avatar_url: profile?.avatar_url || '',
+    photoUrl: profile?.avatar_url || '',
+    photo_url: profile?.avatar_url || '',
     role: m.role,
     memberType: m.member_type || 'fixed',
     member_type: m.member_type || 'fixed',
@@ -1220,12 +1220,12 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     is_active: m.is_active !== false,
     expenseActive: m.expense_active ?? !['casual', 'guest', 'vanglai', 'vãng lai'].includes(String(m.member_type || 'fixed').toLowerCase()),
     expense_active: m.expense_active ?? !['casual', 'guest', 'vanglai', 'vãng lai'].includes(String(m.member_type || 'fixed').toLowerCase()),
-    bankName: profile?.bank_name || m.bank_name || '',
-    bankAccount: profile?.bank_account || m.bank_account || '',
-    bankAccountName: profile?.bank_account_name || m.bank_account_name || '',
-    bank_name: profile?.bank_name || m.bank_name || '',
-    bank_account: profile?.bank_account || m.bank_account || '',
-    bank_account_name: profile?.bank_account_name || m.bank_account_name || '',
+    bankName: profile?.bank_name || '',
+    bankAccount: profile?.bank_account || '',
+    bankAccountName: profile?.bank_account_name || '',
+    bank_name: profile?.bank_name || '',
+    bank_account: profile?.bank_account || '',
+    bank_account_name: profile?.bank_account_name || '',
     createdAt: m.created_at,
     created_at: m.created_at,
     hasPin: memberHasPin(m, profile),

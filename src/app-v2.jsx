@@ -896,43 +896,30 @@ export default function AppV2() {
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const member = safeArray(state?.members).find(item => String(item.id) === String(memberId))
-      const profileUpdate = {
-        name: payload?.name,
-        bank_account: payload?.bankAccount ?? payload?.bank_account,
-        bank_name: payload?.bankName ?? payload?.bank_name,
-        bank_account_name: payload?.bankAccountName ?? payload?.bank_account_name,
-      }
-      if (!('bankName' in (payload || {})) && !('bank_name' in (payload || {}))) delete profileUpdate.bank_name
-      if (!('bankAccountName' in (payload || {})) && !('bank_account_name' in (payload || {}))) delete profileUpdate.bank_account_name
       const profileId = payload?.profileId || payload?.profile_id || member?.profileId || member?.profile_id
-      const targetGroupId = payload?.groupId || payload?.group_id || member?.groupId || member?.group_id
-      const memberUpdate = {
-        name: profileUpdate.name,
-        bank_account: profileUpdate.bank_account,
-        bank_name: profileUpdate.bank_name,
-        bank_account_name: profileUpdate.bank_account_name,
+      if (!profileId) throw new Error('Member không có profile — không thể cập nhật.')
+      
+      const profileUpdate = {}
+      if (payload?.name !== undefined) profileUpdate.name = payload.name
+      if (payload?.bankAccount !== undefined || payload?.bank_account !== undefined) {
+        profileUpdate.bank_account = payload?.bankAccount ?? payload?.bank_account
       }
-      if (!('bank_account' in profileUpdate)) delete memberUpdate.bank_account
-      if (!('bank_name' in profileUpdate)) delete memberUpdate.bank_name
-      if (!('bank_account_name' in profileUpdate)) delete memberUpdate.bank_account_name
-      let updatedRows = []
-      if (profileId) {
-        const { data, error } = await sb.from('profiles').update(profileUpdate).eq('id', profileId).select('id')
+      if (payload?.bankName !== undefined || payload?.bank_name !== undefined) {
+        profileUpdate.bank_name = payload?.bankName ?? payload?.bank_name
+      }
+      if (payload?.bankAccountName !== undefined || payload?.bank_account_name !== undefined) {
+        profileUpdate.bank_account_name = payload?.bankAccountName ?? payload?.bank_account_name
+      }
+      
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error } = await sb.from('profiles').update(profileUpdate).eq('id', profileId)
         if (error) throw error
-        updatedRows = data
         // Sync members.name across ALL groups via SECURITY DEFINER RPC (bypasses RLS)
-        if (profileUpdate.name && safeArray(updatedRows).length) {
+        if (profileUpdate.name) {
           await sb.rpc('sync_member_names_for_profile', { p_profile_id: profileId, p_name: profileUpdate.name })
         }
       }
-      if (!safeArray(updatedRows).length) {
-        let request = sb.from('members').update(memberUpdate).eq('id', memberId)
-        if (targetGroupId) request = request.eq('group_id', targetGroupId)
-        const { data, error } = await request.select('id')
-        if (error) throw error
-        updatedRows = data
-      }
-      if (!safeArray(updatedRows).length) throw new Error(`Không thể cập nhật thành viên ${payload?.name || member?.name || memberId}. Kiểm tra quyền truy cập hoặc mã thành viên.`)
+      
       await dispatch({ type: 'REFRESH' })
       return
     }
