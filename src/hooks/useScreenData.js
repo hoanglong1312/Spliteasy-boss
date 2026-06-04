@@ -205,7 +205,7 @@ function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle,
     sum + groupNetForMember(group, currentUserId, members, state?.currentUserName)
   ), 0)
   const prevSessions = getStateMonthSessions(pickleballState, prevDate)
-  const prevPickleBalance = buildMemberMonthBalance(pickleballState, pickle, prevSessions, pickleballMemberId).netBalance || 0
+  const prevPickleBalance = buildMemberMonthBalance(pickleballState, pickle, prevSessions, pickleballMemberId, prevDate).netBalance || 0
   const prevTotal = prevExpenseBalance + prevPickleBalance
   if (prevTotal >= 0) return null
   return {
@@ -228,7 +228,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const summary = pickleSummary(pickle || {})
   const session = findNearestOpenSession(pickle, today)
   const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, state?.currentUserName)
-  const pickleballBalance = buildMemberMonthBalance(pickleballState, pickle, monthSessions, pickleballMemberId).netBalance || 0
+  const pickleballBalance = buildMemberMonthBalance(pickleballState, pickle, monthSessions, pickleballMemberId, today).netBalance || 0
   const sourceBalances = buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, monthSessions, members, today)
   const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
@@ -1234,13 +1234,13 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
   const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
-  const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId)
-  const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId)
+  const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId, today)
+  const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId, today)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
-  const ticketStats = buildTicketMonthStats(state)
-  const ticketFund = buildTicketFundSummary(state)
+  const ticketStats = buildTicketMonthStats(state, today)
+  const ticketFund = buildTicketFundSummary(state, today)
   const teamFundOverview = buildPickleballTeamFundData(state, currentYearMonth)
-  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentPickleballMemberId)
+  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentPickleballMemberId, today)
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentPickleballMemberId, summary, ticketAmount, memberBalance)
   const currentMember = members.find(member => String(member.id || member.member_id) === String(currentPickleballMemberId))
   const ticketAdjustment = -ticketAmount
@@ -1295,11 +1295,11 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const nextMonthlyConfig = currentMonthlyPickleConfig(state, nextYearMonth)
   const monthSessions = getStateMonthSessions(state, today)
-  const ticketStats = buildTicketMonthStats(state)
-  const ticketFund = buildTicketFundSummary(state)
+  const ticketStats = buildTicketMonthStats(state, today)
+  const ticketFund = buildTicketFundSummary(state, today)
   const teamFundDirectTotal = ticketFund.teamFundTotal || 0
-  const ticketRows = buildTeamFundTicketRows(state)
-  const ticketParticipantRows = buildTeamFundTicketParticipantRows(state)
+  const ticketRows = buildTeamFundTicketRows(state, today)
+  const ticketParticipantRows = buildTeamFundTicketParticipantRows(state, today)
   const currentFixedMembers = currentGroupMembers(state)
     .filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
@@ -1316,7 +1316,7 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
     { key: 'water', label: 'Tiền nước', yearMonth: currentYearMonth, amount: waterTotal },
     { key: 'extras', label: 'Phát sinh', yearMonth: currentYearMonth, amount: extrasTotal },
     { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: teamFundDirectTotal },
-    { key: 'next_court', label: 'Tiền sân tháng sau', yearMonth: nextYearMonth, amount: nextCourtFeeTotal },
+    { key: 'next_court', label: 'Tiền sân tháng này', yearMonth: currentYearMonth, amount: courtFeeTotal },
   ].map(item => ({
     ...item,
     paid: ownerPaymentCoversItem(ownerPayments, item.key, item.yearMonth),
@@ -1359,7 +1359,7 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
         key: 'court',
         label: 'Tiền sân',
         amount: courtFeeTotal,
-        paidToOwner: isPaidToOwner(monthlyConfig) || ownerPaymentCoversItem(ownerPayments, 'court', currentYearMonth),
+        paidToOwner: isPaidToOwner(monthlyConfig) || ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth),
       },
       {
         key: 'water',
@@ -1385,8 +1385,8 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
   }
 }
 
-function buildTeamFundTicketRows(state) {
-  return currentMonthTicketsForState(state)
+function buildTeamFundTicketRows(state, date) {
+  return monthTicketsForState(state, date || new Date())
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
     .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))
     .map((ticket, index) => {
@@ -1439,9 +1439,9 @@ function buildTicketLedgerRows(ticket, state) {
   return rows
 }
 
-function buildTeamFundTicketParticipantRows(state) {
+function buildTeamFundTicketParticipantRows(state, date) {
   const memberMap = new Map()
-  currentMonthTicketsForState(state)
+  monthTicketsForState(state, date || new Date())
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
     .forEach(ticket => {
       buildTicketLedgerRows(ticket, state).forEach(item => {
@@ -2538,11 +2538,11 @@ function personalTicketAdjustment(ticket, memberId) {
   return memberIds.some(id => String(id) === String(memberId)) ? per : 0
 }
 
-function buildTicketFundSummary(state) {
+function buildTicketFundSummary(state, date) {
   const rows = currentGroupMembers(state)
     .filter(isActiveMember)
     .map(member => {
-      const ticketNet = memberTicketBalance(state, member.id) - memberTeamFundTicketShare(state, member.id)
+      const ticketNet = memberTicketBalance(state, member.id, date) - memberTeamFundTicketShare(state, member.id, date)
       const amount = Math.round(-ticketNet)
       return {
         memberId: member.id,
@@ -2561,7 +2561,7 @@ function buildTicketFundSummary(state) {
       return a.amount - b.amount
     })
 
-  const tickets = currentMonthTicketsForState(state)
+  const tickets = monthTicketsForState(state, date || new Date())
   const unpaidCount = tickets.filter(ticket => ticketStatus(ticket) === 'unpaid').length
   const teamFundCount = tickets.filter(ticket => ticketStatus(ticket) === 'team_fund').length
   const teamFundTotal = tickets
@@ -2649,12 +2649,12 @@ function calculateMemberRank(progressPct) {
   return { icon: '🥶', label: 'Hay vắng', tone: 'danger' }
 }
 
-function buildMemberMonthBalance(state, pickle, sessions, memberId) {
+function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const members = currentGroupMembers(state).filter(isActiveMember)
   const fixedMembers = members.filter(member => memberType(member) === 'fixed')
   const casualMembers = members.filter(member => memberType(member) === 'casual')
   const fixedMemberCount = Math.max(fixedMembers.length, 1)
-  const currentYearMonth = monthKey(new Date())
+  const currentYearMonth = monthKey(date || new Date())
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? pickle?.monthlyCourtFee ?? pickle?.monthly_court_fee ?? 0)
   const configuredSessionCount = Number(monthlyConfig?.sessionsCount ?? monthlyConfig?.sessions_count ?? 0)
@@ -2670,7 +2670,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId) {
   const rebatePerFixed = fixedMemberCount > 0 ? casualCharges.reduce((sum, row) => sum + row.amount, 0) / fixedMemberCount : 0
   const member = members.find(row => String(row.id) === String(memberId))
   const ownerPayments = currentGroupOwnerPayments(state)
-  const courtConfirmed = ownerPaymentCoversItem(ownerPayments, 'court', currentYearMonth)
+  const courtConfirmed = ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth)
   const courtFeeShare = courtFeeTotal / fixedMemberCount
   const fixedNetCost = Math.max(courtFeeShare - rebatePerFixed, 0)
   const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
@@ -2679,8 +2679,8 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId) {
     : 0
   const waterFee = memberWaterShare(sessions, memberId, members)
   const extras = memberExtrasShare(sessions, memberId, state, members)
-  const ticketShare = memberTeamFundTicketShare(state, memberId)
-  const p2pBalance = memberTicketBalance(state, memberId)
+  const ticketShare = memberTeamFundTicketShare(state, memberId, date)
+  const p2pBalance = memberTicketBalance(state, memberId, date)
   const netBalance = Math.round(p2pBalance - courtFee - waterFee - extras - ticketShare)
   const totalOwed = Math.max(-netBalance, 0)
 
@@ -4306,8 +4306,8 @@ function perPersonCourtFee(pickle, monthSessions) {
   return Math.round(courtFee / monthSessions.length / memberCount)
 }
 
-function memberTicketBalance(state, memberId) {
-  return currentMonthTicketsForState(state).reduce((sum, ticket) => {
+function memberTicketBalance(state, memberId, date) {
+  return monthTicketsForState(state, date || new Date()).reduce((sum, ticket) => {
     if (ticketStatus(ticket) !== 'unpaid') return sum
     const memberIds = ticketMemberIds(ticket)
     if (!memberIds.some(id => String(id) === String(memberId))) {
@@ -4325,8 +4325,8 @@ function memberTicketBalance(state, memberId) {
   }, 0)
 }
 
-function memberTeamFundTicketShare(state, memberId) {
-  return currentMonthTicketsForState(state).reduce((sum, ticket) => {
+function memberTeamFundTicketShare(state, memberId, date) {
+  return monthTicketsForState(state, date || new Date()).reduce((sum, ticket) => {
     if (ticketStatus(ticket) !== 'team_fund') return sum
     const memberIds = ticketMemberIds(ticket)
     if (!memberIds.some(id => String(id) === String(memberId))) return sum
@@ -4353,8 +4353,8 @@ function monthTicketsForState(state, date) {
   })
 }
 
-function buildTicketMonthStats(state) {
-  const rows = currentMonthTicketsForState(state).map((ticket, index) => toTicketRow(ticket, index, state))
+function buildTicketMonthStats(state, date) {
+  const rows = monthTicketsForState(state, date || new Date()).map((ticket, index) => toTicketRow(ticket, index, state))
   const approvedRows = rows.filter(ticket => ticket.status !== 'pending_review')
   const unpaid = rows.filter(ticket => ticket.status === 'unpaid')
   const pending = rows.filter(ticket => ticket.status === 'pending_review')

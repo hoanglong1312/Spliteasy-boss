@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildHomeData, buildNewGroupData, buildPickleballMembersData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildHomeData, buildNewGroupData, buildPickleballMembersData, buildPickleballOverviewData, buildPickleballTeamFundData }`, context)
   return context.__builders
 }
 
@@ -304,6 +304,81 @@ test('linked pickleball expense groups stay visible after choosing a sport icon'
 
   assert.deepEqual(data.groups.map(group => group.id), ['expense-1'])
   assert.equal(data.groups[0].isLinkedPickleballExpenseGroup, true)
+})
+
+test('team fund uses next_court payments for current court fee rows', () => {
+  const { buildPickleballTeamFundData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball', members: ['long', 'minh'] },
+    members: [
+      { id: 'long', groupId: 'pickle-1', name: 'Long', memberType: 'fixed', isActive: true },
+      { id: 'minh', groupId: 'pickle-1', name: 'Minh', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      monthlyCourtFee: 1200000,
+      monthlyConfigs: [{ yearMonth: '2026-06', courtFee: 1200000, sessionsCount: 4 }],
+      sessions: [],
+      ownerPayments: [{ groupId: 'pickle-1', items: [{ key: 'next_court', yearMonth: '2026-06', amount: 1200000 }] }],
+    },
+  }
+
+  const data = buildPickleballTeamFundData(state, '2026-06')
+  const courtRow = data.costRows.find(row => row.key === 'court')
+
+  assert.equal(courtRow.paidToOwner, true)
+})
+
+test('team fund payment draft labels current month court fee', () => {
+  const { buildPickleballTeamFundData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball', members: ['long'] },
+    members: [{ id: 'long', groupId: 'pickle-1', name: 'Long', memberType: 'fixed', isActive: true }],
+    pickle: {
+      monthlyCourtFee: 1200000,
+      monthlyConfigs: [
+        { yearMonth: '2026-06', courtFee: 1200000, sessionsCount: 4 },
+        { yearMonth: '2026-07', courtFee: 1500000, sessionsCount: 4 },
+      ],
+      sessions: [],
+    },
+  }
+
+  const data = buildPickleballTeamFundData(state, '2026-06')
+  const courtItem = data.paymentDraft.items.find(item => item.key === 'next_court')
+
+  assert.equal(courtItem.label, 'Tiền sân tháng này')
+  assert.equal(courtItem.yearMonth, '2026-06')
+  assert.equal(courtItem.amount, 1200000)
+})
+
+test('pickleball overview ticket totals follow selected month', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'long',
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', groupType: 'pickleball', name: 'Virgo Pickleball', members: ['long', 'minh'] },
+    members: [
+      { id: 'long', groupId: 'pickle-1', name: 'Long', memberType: 'fixed', isActive: true },
+      { id: 'minh', groupId: 'pickle-1', name: 'Minh', memberType: 'fixed', isActive: true },
+    ],
+    pickle: {
+      monthlyCourtFee: 0,
+      monthlyConfigs: [{ yearMonth: '2026-05', courtFee: 0, sessionsCount: 1 }],
+      sessions: [],
+      externalTickets: [
+        { id: 'may-ticket', groupId: 'pickle-1', date: '2026-05-15', status: 'team_fund', totalAmount: 100000, memberIds: ['long', 'minh'] },
+        { id: 'jun-ticket', groupId: 'pickle-1', date: '2026-06-15', status: 'team_fund', totalAmount: 300000, memberIds: ['long', 'minh'] },
+      ],
+    },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state.pickle, 'long', state.members, '2026-05')
+
+  assert.equal(data.ticketStats.totalAmount, 100000)
+  assert.equal(data.ticketFund.teamFundTotal, 100000)
+  assert.equal(data.yourBalance.ticketAdjustment, 50000)
 })
 
 test('edit expense data keeps saved receipt images for update forms', () => {
@@ -979,13 +1054,13 @@ test('Pickleball tickets data exposes individual-ticket table rows and team-fund
 })
 
 test('Pickleball overview and member detail include individual-ticket balances', () => {
-  assert.match(dataSource, /function memberTicketBalance\(state, memberId\) \{/)
-  assert.match(dataSource, /function memberTeamFundTicketShare\(state, memberId\) \{/)
+  assert.match(dataSource, /function memberTicketBalance\(state, memberId, date\) \{/)
+  assert.match(dataSource, /function memberTeamFundTicketShare\(state, memberId, date\) \{/)
   assert.match(dataSource, /const currentPickleballMemberId = memberIdForGroup\(state\?\.currentGroup, currentUserId, members, state\?\.currentUserName\)/)
-  assert.match(dataSource, /const p2pTicketBalance = memberTicketBalance\(state, currentPickleballMemberId\)/)
-  assert.match(dataSource, /const teamFundTicketShare = memberTeamFundTicketShare\(state, currentPickleballMemberId\)/)
+  assert.match(dataSource, /const p2pTicketBalance = memberTicketBalance\(state, currentPickleballMemberId, today\)/)
+  assert.match(dataSource, /const teamFundTicketShare = memberTeamFundTicketShare\(state, currentPickleballMemberId, today\)/)
   assert.match(dataSource, /const ticketAmount = p2pTicketBalance - teamFundTicketShare/)
-  assert.match(dataSource, /const ticketStats = buildTicketMonthStats\(state\)/)
+  assert.match(dataSource, /const ticketStats = buildTicketMonthStats\(state, today\)/)
   assert.match(dataSource, /ticketStats,\s*\n\s*ticketFund,/)
   assert.match(dataSource, /ticketSessions: ticketStats\.sessionCount/)
   assert.match(dataSource, /ticketTotal: ticketStats\.totalAmount/)
@@ -994,8 +1069,8 @@ test('Pickleball overview and member detail include individual-ticket balances',
   assert.match(dataSource, /memberBalance\.courtFee/)
   assert.match(dataSource, /memberBalance\.waterFee/)
   assert.match(dataSource, /ticketAdjustment/)
-  assert.match(dataSource, /const ticketShare = memberTeamFundTicketShare\(state, memberId\)/)
-  assert.match(dataSource, /const p2pBalance = memberTicketBalance\(state, memberId\)/)
+  assert.match(dataSource, /const ticketShare = memberTeamFundTicketShare\(state, memberId, date\)/)
+  assert.match(dataSource, /const p2pBalance = memberTicketBalance\(state, memberId, date\)/)
   assert.match(dataSource, /ticketShare/)
   assert.match(dataSource, /p2pBalance/)
 })
