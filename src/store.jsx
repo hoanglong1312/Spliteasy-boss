@@ -2516,13 +2516,19 @@ export function AppProvider({ children }) {
         if (error) throw error
 
         if (table === 'pickle_sessions') {
-          const allMembers = safeArray(stateRef.current?.pickle?.fixedMembers)
-            .filter(m => m?.is_active !== false && m?.isActive !== false)
+          const sessionGroupId = session?.groupId || session?.group_id
+          const allMembers = safeArray(stateRef.current?.members)
+            .filter(m =>
+              String(m?.groupId || m?.group_id) === String(sessionGroupId) &&
+              m?.is_active !== false &&
+              m?.isActive !== false &&
+              String(m?.memberType || m?.member_type || 'fixed').toLowerCase() !== 'casual'
+            )
           const existingRecords = safeArray(session?.attendanceRecords || session?.attendance_records)
           const recordedMemberIds = new Set(existingRecords.map(r => String(r.memberId || r.member_id)))
           const unrecordedMembers = allMembers.filter(m => !recordedMemberIds.has(String(m.id)))
           if (unrecordedMembers.length > 0) {
-            await sb.from('pickle_attendees').upsert(
+            const { error: attendError } = await sb.from('pickle_attendees').upsert(
               unrecordedMembers.map(m => ({
                 session_id: sessionId,
                 member_id: m.id,
@@ -2532,6 +2538,7 @@ export function AppProvider({ children }) {
               })),
               { onConflict: 'session_id,member_id' }
             )
+            if (attendError) throw attendError
           }
         }
 
