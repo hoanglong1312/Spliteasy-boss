@@ -2559,7 +2559,7 @@ function buildTicketFundSummary(state) {
 }
 
 function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
-  const sessionsAttended = attendanceByMemberId(sessions, member.id, members)
+  const sessionsAttended = attendanceByMemberId(sessions, member.id, members, true)
   const sessionsTotal = totalSessions ?? sessions.length
   const progressPct = sessionsTotal > 0 ? Math.min(100, Math.round((sessionsAttended / sessionsTotal) * 100)) : 0
   const rank = calculateMemberRank(progressPct)
@@ -2603,7 +2603,7 @@ function memberIdentityKey(member) {
 
 function buildMemberAttendance(sessions, memberId, members = []) {
   const total = sessions.length
-  const attended = attendanceByMemberId(sessions, memberId, members)
+  const attended = attendanceByMemberId(sessions, memberId, members, true)
   const missed = Math.max(total - attended, 0)
   const percentage = total > 0 ? Math.round((attended / total) * 100) : 0
 
@@ -2707,9 +2707,9 @@ function memberExtrasShare(sessions, memberId, state, members = []) {
   }, 0)
 }
 
-function attendanceByMemberId(sessions, memberId, members = []) {
+function attendanceByMemberId(sessions, memberId, members = [], fallback = false) {
   return safeArray(sessions).filter(session => (
-    effectiveSessionMemberIds(session, members, false).some(id => String(id) === String(memberId))
+    effectiveSessionMemberIds(session, members, fallback).some(id => String(id) === String(memberId))
   )).length
 }
 

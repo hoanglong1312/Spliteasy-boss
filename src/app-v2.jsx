@@ -164,6 +164,7 @@ export default function AppV2() {
   const [stack, setStack] = useState([])
   const inviteTokenNavigated = useRef(false)
   const joinCodeNavigated = useRef(false)
+  const accessLinkConsumed = useRef(false)
   const [awaitingPin, setAwaitingPin] = useState(() => {
     const { token, member } = getStoredAuth()
     const memberId = member?.id
@@ -211,7 +212,8 @@ export default function AppV2() {
   }, [publicBillToken])
 
   useEffect(() => {
-    if (!memberAccessToken) return
+    if (!memberAccessToken || accessLinkConsumed.current) return
+    accessLinkConsumed.current = true
     let alive = true
     async function consumeAccessLink() {
       setAccessLinkLoading(true)
