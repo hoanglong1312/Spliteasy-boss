@@ -223,7 +223,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                 Cần thanh toán
               </div>
               <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                Nước, phát sinh, vé lẻ và tiền sân tháng sau.
+                Nước, phát sinh, vé lẻ và tiền sân tháng này.
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
@@ -240,21 +240,34 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
               const canMarkItemPaid = !item.paid && hasAmount;
               const selectable = !item.paid && hasAmount;
               return (
-                <div key={key} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '9px 10px',
-                  borderRadius: 10,
-                  border: `1px solid ${item.paid ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
-                  background: item.paid ? 'rgba(52,211,153,0.08)' : 'rgba(255,255,255,0.035)',
-                  opacity: item.paid ? 0.72 : !hasAmount ? 0.6 : 1,
-                }}>
+                <div
+                  key={key}
+                  onClick={() => {
+                    if (itemSavingKey || savingAction) return;
+                    if (item.paid) {
+                      unmarkSinglePaymentItem(item);
+                    } else if (hasAmount) {
+                      markSinglePaymentItem(item);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: '10px 10px',
+                    borderRadius: 10,
+                    border: `1px solid ${item.paid ? 'rgba(52,211,153,0.28)' : colors.borderSubtle}`,
+                    background: 'rgba(255,255,255,0.035)',
+                    opacity: !hasAmount ? 0.6 : (itemSavingKey && itemSavingKey !== key ? 0.55 : 1),
+                    cursor: (canMarkItemPaid || item.paid) && !itemSavingKey ? 'pointer' : 'default',
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={checked}
                     disabled={!selectable}
-                    style={{ cursor: selectable ? 'pointer' : 'not-allowed' }}
+                    style={{ cursor: selectable ? 'pointer' : 'not-allowed', flexShrink: 0 }}
+                    onClick={e => e.stopPropagation()}
                     onChange={event => {
                       setSelectedPaymentKeys(keys => event.target.checked
                         ? [...keys, key]
@@ -264,85 +277,27 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900 }}>{item.label}</div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.label}
+                    </div>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1, whiteSpace: 'nowrap' }}>
                       {item.yearMonth} · {item.paid ? 'Đã trả chủ sân' : !hasAmount ? 'Chưa có khoản' : 'Chưa chuyển'}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : colors.warning, ...type.mono }}>
-                    {formatVND(item.amount || 0)}
-                  </div>
-                  {item.paid ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 5, flexShrink: 0 }}>
-                      <div style={{
-                        padding: '6px 8px',
-                        borderRadius: 999,
-                        background: 'rgba(52,211,153,0.12)',
-                        color: '#6ee7b7',
-                        fontSize: 10,
-                        fontWeight: 900,
-                        whiteSpace: 'nowrap',
-                      }}>
-                        Đã thanh toán
-                      </div>
-                      <button
-                        type="button"
-                        disabled={Boolean(itemSavingKey)}
-                        onClick={() => unmarkSinglePaymentItem(item)}
-                        style={{
-                          border: 'none',
-                          borderRadius: 999,
-                          padding: '6px 8px',
-                          background: 'rgba(248,113,113,0.12)',
-                          color: '#fecaca',
-                          fontSize: 10,
-                          fontWeight: 900,
-                          fontFamily: 'inherit',
-                          cursor: itemSavingKey ? 'default' : 'pointer',
-                          opacity: itemSavingKey && itemSavingKey !== key ? 0.55 : 1,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {itemSavingKey === key ? 'Đang lưu' : 'Hủy thanh toán'}
-                      </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: item.paid ? '#6ee7b7' : (hasAmount ? colors.warning : colors.textSecondary), ...type.mono }}>
+                      {formatVND(item.amount || 0)}
                     </div>
-                  ) : (
-                    !hasAmount ? (
-                      <div style={{
-                        padding: '6px 8px',
-                        borderRadius: 999,
-                        background: 'rgba(148,163,184,0.10)',
-                        color: colors.textSecondary,
-                        fontSize: 10,
-                        fontWeight: 900,
-                        whiteSpace: 'nowrap',
-                        flexShrink: 0,
-                      }}>
-                        Chưa có khoản
+                    {item.paid ? (
+                      <div style={{ fontSize: 9, color: '#6ee7b7', fontWeight: 900 }}>
+                        {itemSavingKey === key ? '…' : '✓ Đã xác nhận'}
                       </div>
-                    ) : (
-                    <button
-                      type="button"
-                      disabled={!canMarkItemPaid || Boolean(itemSavingKey)}
-                      onClick={() => markSinglePaymentItem(item)}
-                      style={{
-                        border: 'none',
-                        borderRadius: 999,
-                        padding: '7px 9px',
-                        background: canMarkItemPaid ? 'rgba(96,165,250,0.16)' : 'rgba(148,163,184,0.10)',
-                        color: canMarkItemPaid ? '#bfdbfe' : colors.textSecondary,
-                        fontSize: 10,
-                        fontWeight: 900,
-                        fontFamily: 'inherit',
-                        cursor: canMarkItemPaid && !itemSavingKey ? 'pointer' : 'default',
-                        opacity: itemSavingKey && itemSavingKey !== key ? 0.55 : 1,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {itemSavingKey === key ? 'Đang lưu' : 'Xác nhận đã thanh toán'}
-                    </button>
-                    )
-                  )}
+                    ) : hasAmount ? (
+                      <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700 }}>
+                        {itemSavingKey === key ? 'Đang lưu…' : 'Bấm để xác nhận'}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
