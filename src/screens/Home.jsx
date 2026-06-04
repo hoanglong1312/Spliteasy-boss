@@ -74,6 +74,14 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
           onAction={onAction}
         />
 
+
+        {d.prevMonthUnpaid && (
+          <PrevMonthNotice
+            label={d.prevMonthUnpaid.label}
+            balance={d.prevMonthUnpaid.balance}
+            onView={() => onAction?.('monthPrev')}
+          />
+        )}
         <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} savingAction={savingAction} setSavingAction={setSavingAction} onAction={onAction} />
 
         <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
@@ -1520,3 +1528,46 @@ const DEMO = {
     },
   ],
 };
+
+function PrevMonthNotice({ label, balance, onView }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '9px 12px',
+      marginTop: 6,
+      borderRadius: 10,
+      background: 'rgba(251,191,36,0.07)',
+      border: '1px solid rgba(251,191,36,0.22)',
+      borderLeft: '3px solid #fbbf24',
+    }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: colors.warning }}>
+          {label} chưa trả ·
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 900, color: '#fca5a5', marginLeft: 4, ...type.mono }}>
+          {formatVND(Math.abs(balance))}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onView}
+        style={{
+          flexShrink: 0,
+          padding: '5px 10px',
+          borderRadius: 8,
+          background: 'rgba(251,191,36,0.14)',
+          border: '1px solid rgba(251,191,36,0.32)',
+          color: colors.warning,
+          fontSize: 11,
+          fontWeight: 800,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        Xem →
+      </button>
+    </div>
+  )
+}
