@@ -1099,10 +1099,9 @@ function candidateProfilesFromDirectory(members, profiles = []) {
     const key = String(profile.id || '')
     const memberRows = membersByProfile.get(key) || []
     const activeMember = memberRows.find(isActiveMember)
-    const hasInactiveRows = memberRows.some(member => !isActiveMember(member))
-    if (!activeMember && hasInactiveRows) return null
+    if (!activeMember) return null
     return {
-      id: activeMember?.id || profile.id,
+      id: activeMember.id,
       profileId: profile.id,
       profile_id: profile.id,
       name: profile.name || activeMember?.displayName || activeMember?.name || '',
