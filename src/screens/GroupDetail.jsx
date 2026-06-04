@@ -1100,8 +1100,13 @@ function AddMemberEditor({ title, groupId, candidates = [], currentMembers = [],
           style={{ marginTop: 12 }}
         />
 
-        <div style={{ marginTop: 12, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 2 }}>
-          {visibleCandidates.map(candidate => {
+        {(() => {
+          const inactiveCandidates = visibleCandidates.filter(c => c.isInactive);
+          const pickleballCandidates = visibleCandidates.filter(c => !c.isInactive && c.isPickleball);
+          const regularCandidates = visibleCandidates.filter(c => !c.isInactive && !c.isPickleball);
+          const sectionCount = [inactiveCandidates, pickleballCandidates, regularCandidates].filter(g => g.length > 0).length;
+
+          function renderCandidateBtn(candidate) {
             const id = String(candidate.id);
             const selected = selectedCandidateIds.includes(id);
             return (
@@ -1134,16 +1139,38 @@ function AddMemberEditor({ title, groupId, candidates = [], currentMembers = [],
                 <span style={{ width: 22, height: 22, borderRadius: 999, display: 'grid', placeItems: 'center', flexShrink: 0, background: selected ? colors.brand : 'rgba(255,255,255,0.08)', color: selected ? '#fff' : colors.textMuted, fontSize: 13, fontWeight: 900 }}>{selected ? '✓' : ''}</span>
               </button>
             );
-          })}
-          {isDuplicateCurrent && (
-            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: colors.danger, fontSize: 13, fontWeight: 700 }}>
-              "{cleanQuery}" đã là thành viên trong nhóm.
+          }
+
+          function renderSection(label, items) {
+            if (items.length === 0) return null;
+            return (
+              <div key={label}>
+                {sectionCount > 1 && (
+                  <div style={{ fontSize: 10, fontWeight: 700, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1, padding: '6px 2px 4px' }}>{label}</div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {items.map(renderCandidateBtn)}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div style={{ marginTop: 12, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: sectionCount > 1 ? 12 : 8, paddingRight: 2 }}>
+              {renderSection('Thêm lại', inactiveCandidates)}
+              {renderSection('Pickleball 🏓', pickleballCandidates)}
+              {renderSection('Thành viên', regularCandidates)}
+              {isDuplicateCurrent && (
+                <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: colors.danger, fontSize: 13, fontWeight: 700 }}>
+                  "{cleanQuery}" đã là thành viên trong nhóm.
+                </div>
+              )}
+              {visibleCandidates.length === 0 && !canAddNewName && !isDuplicateCurrent && (
+                <div style={{ padding: '18px 12px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>Không có thành viên phù hợp.</div>
+              )}
             </div>
-          )}
-          {visibleCandidates.length === 0 && !canAddNewName && !isDuplicateCurrent && (
-            <div style={{ padding: '18px 12px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>Không có thành viên phù hợp.</div>
-          )}
-        </div>
+          );
+        })()}
 
         <Button block variant="brand" style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} type="submit" disabled={savingAction === 'addMember' || (totalToAdd === 0 && !canAddNewName)}>
           {savingAction === 'addMember' && <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'pickleballLoadingSpin 0.7s linear infinite', display: 'inline-block', flexShrink: 0 }} />}
