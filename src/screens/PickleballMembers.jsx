@@ -291,7 +291,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
             )}
             <TypeSwitch value={newMemberType} onChange={setNewMemberType} />
             <Button block variant="success" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember'}>
-              {savingAction === 'addMember' ? 'Đang lưu…' : selectedCandidates.length > 0 ? `Lưu ${selectedCandidates.length} thành viên` : 'Lưu thành viên'}
+              {savingAction === 'addMember' ? 'Đang lưu…' : selectedCandidates.length > 0 ? `Thêm ${selectedCandidates.length} thành viên` : typedMemberName && !exactCandidateMatch && !duplicateMember ? `Thêm "${typedMemberName}" làm thành viên mới` : 'Thêm thành viên'}
             </Button>
           </form>
         </BottomSheet>

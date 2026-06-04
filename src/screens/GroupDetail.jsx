@@ -1082,7 +1082,10 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
     }
   }
 
-  const actionLabel = totalToAdd > 0 ? `Thêm ${totalToAdd} thành viên` : 'Thêm thành viên';
+  const newMemberLabel = canAddNewName ? '+ Thêm "' + cleanQuery + '" vào nhóm' : ''
+  const actionLabel = canAddNewName && selectedCandidates.length === 0
+    ? newMemberLabel
+    : totalToAdd > 0 ? 'Thêm ' + totalToAdd + ' thành viên' : 'Thêm thành viên';
 
   return (
     <BottomSheet title={title} onClose={onClose}>
@@ -1134,17 +1137,7 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
           )}
         </div>
 
-        {canAddNewName && (
-          <button
-            type="button"
-            onClick={() => setSelectedCandidateIds([])}
-            style={{ width: '100%', marginTop: 12, padding: '12px 14px', borderRadius: 16, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', color: colors.textPrimary, fontSize: 14, fontWeight: 800, cursor: 'pointer', textAlign: 'left' }}
-          >
-            + Thêm “{cleanQuery}” làm thành viên mới
-          </button>
-        )}
-
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember' || totalToAdd === 0}>{savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}</Button>
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember' || (totalToAdd === 0 && !canAddNewName)}>{savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}</Button>
       </form>
     </BottomSheet>
   );
