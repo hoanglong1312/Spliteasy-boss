@@ -920,9 +920,9 @@ export default function AppV2() {
         const { data, error } = await sb.from('profiles').update(profileUpdate).eq('id', profileId).select('id')
         if (error) throw error
         updatedRows = data
-        // Sync members.name so resume_recent_member_session name check stays valid
+        // Sync members.name across ALL groups via SECURITY DEFINER RPC (bypasses RLS)
         if (profileUpdate.name && safeArray(updatedRows).length) {
-          await sb.from('members').update({ name: profileUpdate.name }).eq('profile_id', profileId)
+          await sb.rpc('sync_member_names_for_profile', { p_profile_id: profileId, p_name: profileUpdate.name })
         }
       }
       if (!safeArray(updatedRows).length) {
