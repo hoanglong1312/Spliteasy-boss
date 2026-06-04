@@ -297,6 +297,7 @@ function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel) 
     if (!current || nextRank > currentRank || amount > Math.abs(Number(current.amount) || 0)) {
       const memberIds = row.memberIds || row.member_ids || memberIdsForProfile(profileId, members)
       const groupSource = safeArray(row.sources).find(source => (source?.sourceType || source?.source_type || 'group') === 'group')
+        || safeArray(row.sources).find(source => !!(source?.sourceId || source?.source_id))
       rowsByProfile.set(profileId, {
         profileId,
         memberIds,
