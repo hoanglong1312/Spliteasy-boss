@@ -2646,10 +2646,14 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId) {
   })
   const rebatePerFixed = fixedMemberCount > 0 ? casualCharges.reduce((sum, row) => sum + row.amount, 0) / fixedMemberCount : 0
   const member = members.find(row => String(row.id) === String(memberId))
+  const ownerPayments = currentGroupOwnerPayments(state)
+  const courtConfirmed = ownerPaymentCoversItem(ownerPayments, 'court', currentYearMonth)
   const courtFeeShare = courtFeeTotal / fixedMemberCount
   const fixedNetCost = Math.max(courtFeeShare - rebatePerFixed, 0)
   const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
-  const courtFee = memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost)
+  const courtFee = courtConfirmed
+    ? (memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost))
+    : 0
   const waterFee = memberWaterShare(sessions, memberId, members)
   const extras = memberExtrasShare(sessions, memberId, state, members)
   const ticketShare = memberTeamFundTicketShare(state, memberId)
