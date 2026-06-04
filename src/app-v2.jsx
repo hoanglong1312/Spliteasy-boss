@@ -119,12 +119,20 @@ function joinCodeFromLocation() {
   return (params.get('join') || '').trim().toUpperCase()
 }
 
+function monthFromLocation() {
+  if (typeof window === 'undefined') return ''
+  const params = new URLSearchParams(window.location.search || '')
+  const m = params.get('month') || ''
+  return /^\d{4}-\d{2}$/.test(m) ? m : ''
+}
+
 export default function AppV2() {
   const { state, dispatch } = useApp()
   const [publicBillToken, setPublicBillToken] = useState(() => publicBillTokenFromLocation())
   const [memberAccessToken] = useState(() => accessTokenFromLocation())
   const [groupInviteToken] = useState(() => inviteTokenFromLocation())
   const [groupJoinCode] = useState(() => joinCodeFromLocation())
+  const [linkedMonth] = useState(() => monthFromLocation())
   const [publicBillData, setPublicBillData] = useState(null)
   const [publicBillLoading, setPublicBillLoading] = useState(Boolean(publicBillToken))
   const [accessLinkLoading, setAccessLinkLoading] = useState(Boolean(memberAccessToken))
@@ -234,6 +242,13 @@ export default function AppV2() {
         memberName: data.memberName,
         purpose: data.purpose,
       })
+      if (linkedMonth) {
+        await dispatch({ type: 'SET_SELECTED_MONTH', selectedYearMonth: linkedMonth })
+        if (linkedMonth !== monthKey(new Date())) {
+          const [lYear, lMonth] = linkedMonth.split('-')
+          dispatch({ type: 'SHOW_TOAST', message: `Link dẫn đến tháng ${Number(lMonth)}/${lYear} · Xem số tiền cần thanh toán` })
+        }
+      }
       if (typeof window !== 'undefined') {
         window.history.replaceState(null, '', window.location.pathname)
       }
@@ -299,6 +314,13 @@ export default function AppV2() {
       memberName: data.memberName,
       purpose: data.purpose,
     })
+    if (linkedMonth) {
+      await dispatch({ type: 'SET_SELECTED_MONTH', selectedYearMonth: linkedMonth })
+      if (linkedMonth !== monthKey(new Date())) {
+        const [lYear, lMonth] = linkedMonth.split('-')
+        dispatch({ type: 'SHOW_TOAST', message: `Link dẫn đến tháng ${Number(lMonth)}/${lYear} · Xem số tiền cần thanh toán` })
+      }
+    }
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', window.location.pathname)
     }
@@ -1339,7 +1361,8 @@ export default function AppV2() {
         return
       }
       const shareToken = data?.urlToken || data?.token || data
-      const url = `${window.location.origin}${window.location.pathname}?access=${encodeURIComponent(shareToken)}`
+      const linkMonth = payload?.yearMonth || state.selectedYearMonth || monthKey(new Date())
+      const url = `${window.location.origin}${window.location.pathname}?access=${encodeURIComponent(shareToken)}&month=${encodeURIComponent(linkMonth)}`
       if (payload?.copy !== false && navigator.clipboard) {
         navigator.clipboard.writeText(url).catch(() => {})
         dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link cá nhân.' })
