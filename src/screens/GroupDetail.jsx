@@ -223,6 +223,10 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           active={activeTab}
           onChange={setActiveTab}
         />
+        </div>
+
+        {/* SCROLLABLE MIDDLE: tab content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 8px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
 
         {activeTab === 'activity' && (
           <>
@@ -291,7 +295,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
 
-        </div>
+        </div>{/* end scrollable middle */}
 
         {/* FIXED BOTTOM: GroupManagementPanel */}
         <div style={{ flexShrink: 0, padding: '0 16px 8px' }}>
