@@ -1337,7 +1337,7 @@ export default function AppV2() {
         return
       }
       const shareToken = data?.urlToken || data?.token || data
-      const url = `${window.location.origin}${window.location.pathname}?bill=${encodeURIComponent(shareToken)}`
+      const url = `${window.location.origin}${window.location.pathname}?access=${encodeURIComponent(shareToken)}`
       if (payload?.copy !== false && navigator.clipboard) {
         navigator.clipboard.writeText(url).catch(() => {})
         dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link cá nhân.' })
