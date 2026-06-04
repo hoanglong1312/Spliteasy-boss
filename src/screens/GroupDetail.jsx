@@ -6,7 +6,6 @@ import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
   ModuleHero, ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
-  MemberPicker,
   LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
@@ -136,20 +135,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
   return (
     <PhoneFrame>
-      {selectedMember ? (
-          <MemberDetailPanel
-            groupName={d.name}
-            member={selectedMember}
-            isTreasurer={canManageMembers}
-            onAction={onAction}
-            onBack={() => setSelectedMember(null)}
-          onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
-          onDelete={() => {
-            setDeleteConfirmMember(selectedMember);
-            setSelectedMember(null);
-          }}
-        />
-      ) : (
       <Screen tabBar style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
         {/* FIXED TOP: compact nav + group info */}
         <div style={{ flexShrink: 0, padding: '0 16px' }}>
@@ -195,8 +180,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             onOpen={currentMemberRow ? () => setSelectedMember(currentMemberRow) : null}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button variant="primary" style={{ flex: 1, padding: '12px 8px', fontSize: 12, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost"   style={{ flex: 1, padding: '12px 8px', fontSize: 12 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán</Button>
+            <Button variant="primary" style={{ flex: 1, padding: '7px 6px', fontSize: 11, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
+            <Button variant="ghost"   style={{ flex: 1, padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán</Button>
           </div>
         </ModuleHero>
 
@@ -316,6 +301,22 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           )}
         </div>
       </Screen>
+
+      {selectedMember && (
+        <BottomSheet title="Chi tiết thành viên" onClose={() => setSelectedMember(null)}>
+          <MemberDetailContent
+            groupName={d.name}
+            member={selectedMember}
+            isTreasurer={canManageMembers}
+            onAction={onAction}
+            onClose={() => setSelectedMember(null)}
+            onEdit={() => { setEditingMember(selectedMember); setSelectedMember(null); }}
+            onDelete={() => {
+              setDeleteConfirmMember(selectedMember);
+              setSelectedMember(null);
+            }}
+          />
+        </BottomSheet>
       )}
 
       {editingGroup && canManageGroup && (
@@ -360,7 +361,6 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           title="Thêm thành viên"
           groupId={d.id}
           candidates={d.memberCandidates || []}
-          isPickleball={d.isPickleball}
           onClose={closeMemberSheets}
           onAction={onAction}
         />
@@ -428,24 +428,24 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
       )}
 
-      {!selectedMember && fabOpen && (
+      {fabOpen && (
         <div
           style={{ position: 'absolute', inset: 0, zIndex: 15, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-end', padding: '0 20px', paddingBottom: 'calc(var(--tab-bar-height, 68px) + 16px)', background: 'rgba(0,0,0,0.45)' }}
           onClick={() => setFabOpen(false)}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }} onClick={e => e.stopPropagation()}>
             {canAddMembers && (
-              <button type="button" onClick={() => { setFabOpen(false); setAddingMember(true); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 24, background: colors.shellBg, border: `1px solid ${colors.borderSubtle}`, color: colors.textPrimary, fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.4)', whiteSpace: 'nowrap' }}>
+              <button type="button" onClick={() => { setFabOpen(false); setAddingMember(true); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 18px', borderRadius: 24, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: colors.textPrimary, fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.35)', whiteSpace: 'nowrap' }}>
                 <span>👤</span> Thêm thành viên
               </button>
             )}
-            <button type="button" onClick={() => { setFabOpen(false); onAction?.('addExpense', { groupId: d.id }); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 24, background: colors.brand, border: 'none', color: 'white', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 16px rgba(99,102,241,0.5)', whiteSpace: 'nowrap' }}>
+            <button type="button" onClick={() => { setFabOpen(false); onAction?.('addExpense', { groupId: d.id }); }} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 18px', borderRadius: 24, background: colors.brand, border: 'none', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 16px rgba(0,0,0,0.35)', whiteSpace: 'nowrap' }}>
               <span>✏️</span> Thêm chi tiêu
             </button>
           </div>
         </div>
       )}
-      {!selectedMember && <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => setFabOpen(f => !f)} />}
+      <TabBar active="groups" onChange={(k) => onAction?.('tab', k)} onFab={() => setFabOpen(f => !f)} />
       {savingAction && (
         <div role="status" aria-live="polite" style={loadingOverlayStyle}>
           <LoadingSpinner />
@@ -720,7 +720,7 @@ function RolePill({ icon, label }) {
   );
 }
 
-function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, onEdit, onDelete }) {
+function MemberDetailContent({ member, isTreasurer, onAction, onClose, onEdit, onDelete }) {
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [memberActionsOpen, setMemberActionsOpen] = useState(false);
@@ -777,15 +777,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
   }
 
   return (
-    <Screen style={{ paddingBottom: '28px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0 18px' }}>
-        <IconButton onClick={onBack}>‹</IconButton>
-        <div style={{ flex: 1, textAlign: 'center', paddingRight: 56 }}>
-          <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '2px', color: '#34d399', textTransform: 'uppercase' }}>{groupName}</div>
-          <div style={{ fontSize: 17, fontWeight: 900, marginTop: 3 }}>Chi tiết thành viên</div>
-        </div>
-      </div>
-
+    <div style={{ paddingBottom: '28px' }}>
       <Hero variant="emerald" glow={false} style={{ padding: 18, borderRadius: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
           <Avatar initial={member.initials} size={56} color={member.color} photoUrl={member.photoUrl} ring style={{ border: '4px solid rgba(7,8,15,0.85)', flexShrink: 0 }} />
@@ -904,7 +896,7 @@ function MemberDetailPanel({ groupName, member, isTreasurer, onAction, onBack, o
         </BottomSheet>
       )}
 
-    </Screen>
+    </div>
   );
 }
 
@@ -1031,61 +1023,20 @@ function InfoLine({ label, value }) {
   );
 }
 
-function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false, onClose, onAction }) {
+function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction }) {
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
-  const [inactiveCandidateQuery, setInactiveCandidateQuery] = useState('');
-  const [activeCandidateQuery, setActiveCandidateQuery] = useState('');
-  const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
   const [savingAction, setSavingAction] = useState('');
+  const cleanQuery = query.trim();
+  const normalizedQuery = normalizeSearch(cleanQuery);
   const selectedCandidates = candidates.filter(candidate => selectedCandidateIds.includes(String(candidate.id)));
-  const inactiveCandidates = candidates.filter(candidate => candidate.isInactive);
-  const activeCandidates = candidates.filter(candidate => !candidate.isInactive);
-  const inactiveCandidateCards = inactiveCandidates.map(candidate => ({
-    ...candidate,
-    selected: selectedCandidateIds.includes(String(candidate.id)),
-  }));
-  const activeCandidateCards = activeCandidates.map(candidate => ({
-    ...candidate,
-    selected: selectedCandidateIds.includes(String(candidate.id)),
-  }));
-
-  async function save(e) {
-    e.preventDefault();
-    const cleanName = name.trim();
-    if ((selectedCandidates.length === 0 && !cleanName) || savingAction) return;
-    setSavingAction('addMember');
-    try {
-      for (const candidate of selectedCandidates) {
-      if (candidate.isInactive) {
-        await onAction?.('reactivateMember', {
-          memberId: candidate.memberId || candidate.id,
-          groupId,
-          name: candidate.name,
-          profileId: candidate.profileId || '',
-        });
-        continue;
-      }
-      await onAction?.('addExpenseGroupMember', {
-        groupId,
-        memberId: candidate.memberId || candidate.id,
-        name: candidate.name,
-        profileId: candidate?.profileId || candidate?.id || '',
-        type: 'fixed',
-      });
-    }
-    if (cleanName) {
-      await onAction?.('addExpenseGroupMember', {
-        groupId,
-        name: cleanName,
-        profileId: '',
-        type: 'fixed',
-      });
-    }
-      onClose?.();
-    } finally {
-      setSavingAction('');
-    }
-  }
+  const visibleCandidates = candidates.filter(candidate => {
+    if (!normalizedQuery) return true;
+    return normalizeSearch(candidate.name).includes(normalizedQuery);
+  });
+  const hasExactMatch = candidates.some(candidate => normalizeSearch(candidate.name) === normalizedQuery);
+  const canAddNewName = Boolean(cleanQuery && !hasExactMatch);
+  const totalToAdd = selectedCandidates.length + (canAddNewName ? 1 : 0);
 
   function toggleCandidate(candidateId) {
     const id = String(candidateId);
@@ -1094,52 +1045,106 @@ function AddMemberEditor({ title, groupId, candidates = [], isPickleball = false
     ));
   }
 
-  const actionLabel = selectedCandidates.length > 0
-    ? `Thêm ${selectedCandidates.length + (name.trim() ? 1 : 0)} thành viên`
-    : 'Thêm thành viên';
+  async function save(e) {
+    e.preventDefault();
+    if (totalToAdd === 0 || savingAction) return;
+    setSavingAction('addMember');
+    try {
+      for (const candidate of selectedCandidates) {
+        if (candidate.isInactive) {
+          await onAction?.('reactivateMember', {
+            memberId: candidate.memberId || candidate.id,
+            groupId,
+            name: candidate.name,
+            profileId: candidate.profileId || '',
+          });
+          continue;
+        }
+        await onAction?.('addExpenseGroupMember', {
+          groupId,
+          memberId: candidate.memberId || candidate.id,
+          name: candidate.name,
+          profileId: candidate?.profileId || candidate?.id || '',
+          type: 'fixed',
+        });
+      }
+      if (canAddNewName) {
+        await onAction?.('addExpenseGroupMember', {
+          groupId,
+          name: cleanQuery,
+          profileId: '',
+          type: 'fixed',
+        });
+      }
+      onClose?.();
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  const actionLabel = totalToAdd > 0 ? `Thêm ${totalToAdd} thành viên` : 'Thêm thành viên';
 
   return (
     <BottomSheet title={title} onClose={onClose}>
       <form onSubmit={save}>
-        {inactiveCandidateCards.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <MemberPicker
-              aria-label="Danh sách chờ thêm lại"
-              candidates={inactiveCandidateCards}
-              selectedIds={selectedCandidateIds}
-              query={inactiveCandidateQuery}
-              onQueryChange={setInactiveCandidateQuery}
-              onToggle={toggleCandidate}
-              sectionTitle="Danh sách chờ thêm lại"
-              placeholder="Tìm vài ký tự để lọc thành viên"
-              emptyText="Không có thành viên phù hợp."
-              tone="groups"
-            />
-          </div>
-        )}
-        <div style={{ marginTop: 12 }}>
-          <MemberPicker
-            aria-label="Thành viên có sẵn"
-            candidates={activeCandidateCards}
-            selectedIds={selectedCandidateIds}
-            query={activeCandidateQuery}
-            onQueryChange={setActiveCandidateQuery}
-            onToggle={toggleCandidate}
-            sectionTitle="Thành viên có sẵn"
-            placeholder="Tìm vài ký tự để lọc thành viên"
-            emptyText="Không có thành viên phù hợp."
-            tone="groups"
-            maxListHeight={220}
-          />
-        </div>
-        <Field
-          label={candidates.length > 0 ? 'Hoặc nhập tên mới' : 'Tên hiển thị'}
-          value={name}
-          onChange={setName}
-          autoFocus
-          placeholder="Tên thành viên"
+        <SearchInput
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="Tìm hoặc nhập tên thành viên"
+          style={{ marginTop: 12 }}
         />
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember'}>{savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}</Button>
+
+        <div style={{ marginTop: 12, maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 2 }}>
+          {visibleCandidates.map(candidate => {
+            const id = String(candidate.id);
+            const selected = selectedCandidateIds.includes(id);
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleCandidate(id)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  padding: '12px 14px',
+                  borderRadius: 16,
+                  background: selected ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.05)',
+                  border: selected ? '1px solid rgba(99,102,241,0.45)' : `1px solid ${colors.borderSubtle}`,
+                  color: colors.textPrimary,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <span style={{ fontSize: 18 }}>{candidate.isInactive ? '↩️' : '🏓'}</span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{candidate.name}</span>
+                    {candidate.isInactive && <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: colors.textSecondary }}>Thêm lại vào nhóm</span>}
+                  </span>
+                </span>
+                <span style={{ width: 22, height: 22, borderRadius: 999, display: 'grid', placeItems: 'center', flexShrink: 0, background: selected ? colors.brand : 'rgba(255,255,255,0.08)', color: selected ? '#fff' : colors.textMuted, fontSize: 13, fontWeight: 900 }}>{selected ? '✓' : ''}</span>
+              </button>
+            );
+          })}
+          {visibleCandidates.length === 0 && !canAddNewName && (
+            <div style={{ padding: '18px 12px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>Không có thành viên phù hợp.</div>
+          )}
+        </div>
+
+        {canAddNewName && (
+          <button
+            type="button"
+            onClick={() => setSelectedCandidateIds([])}
+            style={{ width: '100%', marginTop: 12, padding: '12px 14px', borderRadius: 16, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.28)', color: colors.textPrimary, fontSize: 14, fontWeight: 800, cursor: 'pointer', textAlign: 'left' }}
+          >
+            + Thêm “{cleanQuery}” làm thành viên mới
+          </button>
+        )}
+
+        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember' || totalToAdd === 0}>{savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}</Button>
       </form>
     </BottomSheet>
   );
