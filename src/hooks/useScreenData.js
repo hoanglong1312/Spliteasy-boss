@@ -971,7 +971,10 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     pendingExpenses,
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
-    memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense' }),
+    memberCandidates: buildGroupMemberCandidates(g, members.filter(m => {
+      const expenseGroupIds = new Set(safeArray(appState?.groups).filter(gr => groupKind(gr) !== 'pickleball').map(gr => gr.id))
+      return expenseGroupIds.size === 0 || expenseGroupIds.has(m.groupId || m.group_id)
+    }), profiles, { mode: 'expense' }),
     paymentTarget,
     members: groupMembers.map(member => {
       const memberTransactions = buildMemberTransactions(g, member.id, selectedYearMonth, groupMembers)
@@ -1723,7 +1726,10 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     fixedMembers: fixedRows,
     casualMembers: casualRows,
     allMembers: allMemberRows,
-    memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles, { mode: 'pickleball' }),
+    memberCandidates: buildGroupMemberCandidates(currentGroup(state), safeArray(state?.members).filter(m => {
+      const pickleGroupIds = new Set(safeArray(state?.groups).filter(gr => groupKind(gr) === 'pickleball').map(gr => gr.id))
+      return pickleGroupIds.size === 0 || pickleGroupIds.has(m.groupId || m.group_id)
+    }), state?.profiles, { mode: 'pickleball' }),
     legacyGuests: buildGuestRows(sessions),
   }
 }
