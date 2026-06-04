@@ -274,18 +274,30 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               onChange={event => setMemberSearch(event.target.value)}
               placeholder="Tìm thành viên..."
             />
-            {visibleMembers.map(member => (
-              <MemberRow
-                key={member.id}
-                member={member}
-                isTreasurer={canManageMembers}
-                onOpen={setSelectedMember}
-                onMore={setMemberMenu}
-              />
-            ))}
-            {visibleMembers.length === 0 && (
-              <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
-            )}
+            <div
+              style={{
+                overflowY: 'auto',
+                maxHeight: 'calc(100dvh - 280px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                paddingRight: 2,
+                WebkitOverflowScrolling: 'touch',
+              }}
+            >
+              {visibleMembers.map(member => (
+                <MemberRow
+                  key={member.id}
+                  member={member}
+                  isTreasurer={canManageMembers}
+                  onOpen={setSelectedMember}
+                  onMore={setMemberMenu}
+                />
+              ))}
+              {visibleMembers.length === 0 && (
+                <EmptyState title="Chưa có thành viên" sub="Thêm thành viên để bắt đầu chia chi phí nhóm." />
+              )}
+            </div>
           </div>
         )}
 
