@@ -32,6 +32,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
   const [itemSavingKey, setItemSavingKey] = useState('');
   const [savingAction, setSavingAction] = useState('');
   const [paymentQrOpen, setPaymentQrOpen] = useState(false);
+  const [paymentMethodOpen, setPaymentMethodOpen] = useState(false);
   const [ownerBankOpen, setOwnerBankOpen] = useState(false);
   const perSession = Math.round(courtFee / Math.max(Number(d.sessionsCount) || 1, 1));
   const perMember = Math.round(courtFee / Math.max(Number(d.memberCount) || 1, 1));
@@ -285,6 +286,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                     );
                     setPaymentState('');
                     setPaymentQrOpen(false);
+                    setPaymentMethodOpen(false);
                   }}
                   style={{
                     display: 'flex',
@@ -338,24 +340,49 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
               {paymentState === 'saved' ? 'Đã ghi nhận giao dịch chuyển chủ sân.' : 'Chưa lưu được giao dịch. Thử lại sau.'}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <Button
-              variant="ghost"
-              disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 || !!savingAction}
-              style={{ flex: 1, padding: '12px 8px', fontSize: 13, whiteSpace: 'nowrap', opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 || !!savingAction ? 0.55 : 1 }}
-              onClick={handleConfirmSelected}
-            >
-              {savingAction === 'markOwnerPayment' ? 'Đang xử lý…' : 'Xác nhận đã chuyển'}
-            </Button>
-            <Button
-              variant="success"
-              disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0}
-              style={{ flex: 1, padding: '12px 8px', fontSize: 13, whiteSpace: 'nowrap', opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 ? 0.55 : 1 }}
-              onClick={() => setPaymentQrOpen(true)}
-            >
-              Thanh toán
-            </Button>
-          </div>
+          <Button
+            block
+            variant="success"
+            disabled={selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 || !!savingAction}
+            style={{ marginTop: 12, padding: 12, opacity: selectedPaymentItems.length === 0 || selectedPaymentTotal <= 0 || !!savingAction ? 0.55 : 1 }}
+            onClick={() => { setPaymentMethodOpen(o => !o); setPaymentQrOpen(false); }}
+          >
+            {savingAction === 'markOwnerPayment' ? 'Đang xử lý…' : 'Thanh toán'}
+          </Button>
+
+          {paymentMethodOpen && selectedPaymentItems.length > 0 && !savingAction && (
+            <div style={{ marginTop: 8, borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+              <button
+                type="button"
+                onClick={() => { setPaymentMethodOpen(false); handleConfirmSelected(); }}
+                style={{
+                  width: '100%', padding: '13px 14px', background: 'rgba(255,255,255,0.05)',
+                  border: 'none', borderBottom: '1px solid rgba(255,255,255,0.07)',
+                  color: '#e2e8f0', fontSize: 13, fontWeight: 700, textAlign: 'left',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <div>Đã chuyển khoản rồi</div>
+                <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, fontWeight: 500 }}>
+                  Ghi nhận thủ công, không tạo QR
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPaymentMethodOpen(false); setPaymentQrOpen(true); }}
+                style={{
+                  width: '100%', padding: '13px 14px', background: 'rgba(255,255,255,0.05)',
+                  border: 'none', color: '#6ee7b7', fontSize: 13, fontWeight: 700, textAlign: 'left',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <div>Tạo QR để chuyển khoản</div>
+                <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, fontWeight: 500 }}>
+                  Quét VietQR · {formatVND(selectedPaymentTotal)}
+                </div>
+              </button>
+            </div>
+          )}
 
           {paymentQrOpen && (
             <div style={{
