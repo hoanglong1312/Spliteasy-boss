@@ -28,10 +28,10 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [adminError, setAdminError] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
   const adminPinRef = useRef(null);
-  // Long is the only admin — find from recentSessions or pinnedSession
-  const longSession = d.recentSessions?.find(s => s.memberName === 'Long')
-    || (d.pinnedSession?.memberName === 'Long' ? d.pinnedSession : null);
-  const recentSessions = (d.recentSessions || []).filter(s => s.memberName !== 'Long');
+  const isTreasurerSession = s => s?.role === 'treasurer' || s?.hasPin === true && s?.profileId === '6faee487-3a0e-42d7-b8b9-06ccf2248dbc'
+  const longSession = d.recentSessions?.find(isTreasurerSession)
+    || (isTreasurerSession(d.pinnedSession) ? d.pinnedSession : null);
+  const recentSessions = (d.recentSessions || []).filter(s => !isTreasurerSession(s));
   const inviteToken = d.inviteToken || '';
   const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
@@ -666,7 +666,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
               if (longSession) allSessions.push(longSession);
               const existingSession = allSessions.find(s => s.memberName === selected);
               if (existingSession) {
-                if (existingSession.memberName === 'Long') {
+                if (isTreasurerSession(existingSession)) {
                   setAdminExpanded(true);
                 } else {
                   setJoining(true);
