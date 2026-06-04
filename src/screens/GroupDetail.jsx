@@ -361,6 +361,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           title="Thêm thành viên"
           groupId={d.id}
           candidates={d.memberCandidates || []}
+          currentMembers={d.members || []}
           onClose={closeMemberSheets}
           onAction={onAction}
         />
@@ -1023,7 +1024,7 @@ function InfoLine({ label, value }) {
   );
 }
 
-function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction }) {
+function AddMemberEditor({ title, groupId, candidates = [], currentMembers = [], onClose, onAction }) {
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
   const [query, setQuery] = useState('');
   const [savingAction, setSavingAction] = useState('');
@@ -1035,7 +1036,8 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
     return normalizeSearch(candidate.name).includes(normalizedQuery);
   });
   const hasExactMatch = candidates.some(candidate => normalizeSearch(candidate.name) === normalizedQuery);
-  const canAddNewName = Boolean(cleanQuery && !hasExactMatch);
+  const isDuplicateCurrent = Boolean(cleanQuery && currentMembers.some(m => normalizeSearch(m.name) === normalizedQuery));
+  const canAddNewName = Boolean(cleanQuery && !hasExactMatch && !isDuplicateCurrent);
   const totalToAdd = selectedCandidates.length + (canAddNewName ? 1 : 0);
 
   function toggleCandidate(candidateId) {
@@ -1132,7 +1134,12 @@ function AddMemberEditor({ title, groupId, candidates = [], onClose, onAction })
               </button>
             );
           })}
-          {visibleCandidates.length === 0 && !canAddNewName && (
+          {isDuplicateCurrent && (
+            <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: colors.danger, fontSize: 13, fontWeight: 700 }}>
+              "{cleanQuery}" đã là thành viên trong nhóm.
+            </div>
+          )}
+          {visibleCandidates.length === 0 && !canAddNewName && !isDuplicateCurrent && (
             <div style={{ padding: '18px 12px', borderRadius: 16, background: 'rgba(255,255,255,0.04)', color: colors.textSecondary, fontSize: 13, textAlign: 'center' }}>Không có thành viên phù hợp.</div>
           )}
         </div>
