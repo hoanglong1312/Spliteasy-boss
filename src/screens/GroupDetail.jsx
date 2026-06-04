@@ -33,6 +33,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const canManageMembers = Boolean(isTreasurer || d.isGroupCreator);
   const canAddMembers = true;
   const [activeTab, setActiveTab] = useState('members');
+  const [inviteExpanded, setInviteExpanded] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
@@ -149,34 +150,21 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
       ) : (
       <Screen tabBar style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
-        {/* FIXED TOP: Nav header */}
+        {/* FIXED TOP: compact nav + group info */}
         <div style={{ flexShrink: 0, padding: '0 16px' }}>
-        {/* Nav header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
+        {/* Compact nav: back | emoji + name | edit */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 8px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
-          <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: colors.textMuted, textTransform: 'uppercase' }}>NHÓM</div>
-            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{d.name}</div>
+          <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{d.emoji || '👥'}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 1 }}>{d.monthLabel || ''}</div>
           </div>
           {canManageGroup ? <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton> : <div style={{ width: 44 }} />}
         </div>
 
         <ModuleHero
           tone="groups"
-          eyebrow="CHI TIÊU NHÓM"
-          title={d.name}
-          subtitle={d.monthLabel || 'Tháng này'}
-          action={<div style={{
-            width: 46,
-            height: 46,
-            borderRadius: 14,
-            background: 'rgba(251,191,36,0.14)',
-            border: '1px solid rgba(251,191,36,0.28)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 24,
-          }}>{d.emoji || '👥'}</div>}
           style={{ cursor: 'pointer' }}
         >
           {d.description && (
@@ -225,6 +213,22 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
         </div>
 
+        {/* FIXED: Search + Add button for members tab */}
+        {activeTab === 'members' && (
+          <div style={{ flexShrink: 0, padding: '4px 16px 6px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {canAddMembers && (
+              <Button variant="ghost" style={{ fontSize: 12 }} onClick={() => setAddingMember(true)}>
+                + Thêm thành viên
+              </Button>
+            )}
+            <SearchInput
+              value={memberSearch}
+              onChange={event => setMemberSearch(event.target.value)}
+              placeholder="Tìm thành viên..."
+            />
+          </div>
+        )}
+
         {/* SCROLLABLE MIDDLE: tab content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 8px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
 
@@ -269,17 +273,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         )}
 
         {activeTab === 'members' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {canAddMembers && (
-              <Button variant="ghost" style={{ marginTop: 8, fontSize: 12 }} onClick={() => setAddingMember(true)}>
-                + Thêm thành viên
-              </Button>
-            )}
-            <SearchInput
-              value={memberSearch}
-              onChange={event => setMemberSearch(event.target.value)}
-              placeholder="Tìm thành viên..."
-            />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 4 }}>
             {visibleMembers.map(member => (
               <MemberRow
                 key={member.id}
@@ -297,13 +291,33 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
         </div>{/* end scrollable middle */}
 
-        {/* FIXED BOTTOM: GroupManagementPanel */}
+        {/* FIXED BOTTOM: collapsible invite panel */}
         <div style={{ flexShrink: 0, padding: '0 16px 8px' }}>
-          <GroupManagementPanel
-            inviteCode={d.inviteCode}
-            onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
-            onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
-          />
+          {inviteExpanded ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setInviteExpanded(false)}
+                style={{ width: '100%', textAlign: 'left', padding: '6px 0', background: 'none', border: 'none', color: colors.textMuted, fontSize: 11, fontWeight: 700, letterSpacing: '0.8px', textTransform: 'uppercase', cursor: 'pointer', marginBottom: 4 }}
+              >
+                QUẢN LÝ NHÓM ∧
+              </button>
+              <GroupManagementPanel
+                inviteCode={d.inviteCode}
+                onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
+                onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
+              />
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setInviteExpanded(true)}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 10, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', color: colors.textSecondary, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            >
+              <span>🔗 Link mời nhóm</span>
+              <span style={{ fontSize: 10, color: colors.textMuted }}>∨ mở rộng</span>
+            </button>
+          )}
         </div>
       </Screen>
       )}
