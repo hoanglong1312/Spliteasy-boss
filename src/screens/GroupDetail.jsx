@@ -1144,7 +1144,10 @@ function AddMemberEditor({ title, groupId, candidates = [], currentMembers = [],
           )}
         </div>
 
-        <Button block variant="brand" style={{ marginTop: 14 }} type="submit" disabled={savingAction === 'addMember' || (totalToAdd === 0 && !canAddNewName)}>{savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}</Button>
+        <Button block variant="brand" style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} type="submit" disabled={savingAction === 'addMember' || (totalToAdd === 0 && !canAddNewName)}>
+          {savingAction === 'addMember' && <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'pickleballLoadingSpin 0.7s linear infinite', display: 'inline-block', flexShrink: 0 }} />}
+          {savingAction === 'addMember' ? 'Đang lưu…' : actionLabel}
+        </Button>
       </form>
     </BottomSheet>
   );
