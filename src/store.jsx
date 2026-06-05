@@ -2007,11 +2007,7 @@ export function AppProvider({ children }) {
 
       case 'MARK_NOTIFICATIONS_READ': {
         if (!sb || !state.currentUserId) return
-        const { error } = await sb
-          .from('notifications')
-          .update({ is_read: true, read_at: new Date().toISOString() })
-          .eq('member_id', state.currentUserId)
-          .eq('is_read', false)
+        const { error } = await sb.rpc('mark_all_notifications_read')
         if (error) {
           console.error('[store] MARK_NOTIFICATIONS_READ:', error)
           throw error

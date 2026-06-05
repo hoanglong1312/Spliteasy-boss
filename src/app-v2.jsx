@@ -2038,6 +2038,14 @@ export default function AppV2() {
 
     if (type === 'markAllRead') {
       await dispatch({ type: 'MARK_NOTIFICATIONS_READ' })
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã đánh dấu tất cả là đã đọc' })
+      return
+    }
+
+    if (type === 'viewNotifDetail') {
+      if (payload?.refType === 'expense' && payload?.refId) {
+        setStack((s) => [...s, { screen: 'expense-detail', params: { expenseId: payload?.refId } }])
+      }
       return
     }
 

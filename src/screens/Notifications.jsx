@@ -53,6 +53,7 @@ export default function Notifications({ data, onAction }) {
                   onRejectPayment={() => onAction?.('rejectPaymentNotice', n)}
                   onApproveExpense={() => onAction?.('approveExpense', { expenseId: n.id, groupId: n.groupId })}
                   onRejectExpense={() => onAction?.('rejectExpense', { expenseId: n.id, groupId: n.groupId })}
+                  onPress={n.refId ? () => onAction?.('viewNotifDetail', n) : undefined}
                 />
               ))}
             </div>
@@ -63,7 +64,7 @@ export default function Notifications({ data, onAction }) {
   );
 }
 
-function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayment, onApproveExpense, onRejectExpense }) {
+function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayment, onApproveExpense, onRejectExpense, onPress }) {
   const [saving, setSaving] = useState(false);
   const wrap = (fn) => async () => { setSaving(true); try { await fn?.() } finally { setSaving(false) } };
   const unread = notif.unread;
@@ -127,7 +128,7 @@ function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayme
   }
 
   return (
-    <div style={base}>
+    <div onClick={onPress} style={{ ...base, cursor: onPress ? 'pointer' : 'default' }}>
       {unread && <ReadDot />}
       <IconCircle bg={notif.iconBg}>{notif.icon}</IconCircle>
       <Meta notif={notif} />
