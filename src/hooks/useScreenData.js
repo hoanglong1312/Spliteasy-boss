@@ -2404,10 +2404,10 @@ function buildExpenseDetailData(state, params) {
 }
 
 function buildTransactions(groups, currentUserId, members, currentUserName) {
-  return recentActivity(groups, 24)
+  return recentActivity(groups, 24 * 30)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
-    .slice(0, 4)
+    .slice(0, 8)
     .map(expense => {
       const group = groups.find(g => g.id === expense.groupId)
       const meForGroup = memberIdForGroup(

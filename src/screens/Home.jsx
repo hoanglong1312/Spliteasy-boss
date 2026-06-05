@@ -84,7 +84,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         )}
         <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} savingAction={savingAction} setSavingAction={setSavingAction} onAction={onAction} />
 
-        <SectionHeader action="Xem tất cả →">Giao dịch gần đây</SectionHeader>
+        <SectionHeader action="Xem tất cả →" onAction={() => onAction?.('allExpenses')}>Giao dịch gần đây</SectionHeader>
         <SearchInput
           value={filterText}
           onChange={e => setFilterText(e.target.value)}
