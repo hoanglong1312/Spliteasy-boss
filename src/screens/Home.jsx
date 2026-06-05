@@ -11,42 +11,6 @@ import {
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
-const CATEGORY_LABEL = {
-  pickleball: 'Pickleball',
-  court: 'Tiền sân',
-  water: 'Tiền bóng',
-  groups: 'Nhóm',
-  food: 'Ăn uống',
-  cafe: 'Cafe',
-  payment: 'Thanh toán',
-  general: 'Chung',
-  other: 'Khác',
-};
-
-const CATEGORY_BADGE_BG = {
-  pickleball: 'rgba(52,211,153,0.12)',
-  court: 'rgba(52,211,153,0.12)',
-  water: 'rgba(99,102,241,0.12)',
-  groups: 'rgba(99,102,241,0.12)',
-  food: 'rgba(251,191,36,0.12)',
-  cafe: 'rgba(251,191,36,0.12)',
-  payment: 'rgba(167,139,250,0.12)',
-  general: 'rgba(255,255,255,0.06)',
-  other: 'rgba(255,255,255,0.06)',
-};
-
-const CATEGORY_BADGE_COLOR = {
-  pickleball: '#6ee7b7',
-  court: '#6ee7b7',
-  water: '#a5b4fc',
-  groups: '#a5b4fc',
-  food: '#fcd34d',
-  cafe: '#fcd34d',
-  payment: '#c4b5fd',
-  general: '#cbd5e1',
-  other: '#cbd5e1',
-};
-
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
   { key: 'pending', label: 'Chờ duyệt' },
@@ -54,18 +18,10 @@ const STATUS_FILTERS = [
   { key: 'declined', label: 'Từ chối' },
 ];
 
-const CATEGORY_FILTERS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'court', label: 'Tiền sân' },
-  { key: 'water', label: 'Tiền nước' },
-  { key: 'other', label: 'Khác' },
-];
-
 export default function Home({ data, isTreasurer, paymentOpen = false, onPaymentClose, onAction }) {
   const d = data || DEMO;
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(true);
   const [paymentSheetOpen, setPaymentSheetOpen] = useState(false);
   const [paymentRecordDetail, setPaymentRecordDetail] = useState(null);
@@ -77,11 +33,10 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
   const pendingExpenses = d.pendingExpenses || [];
   const pendingPayments = d.pendingPayments || [];
   const visibleTransactions = d.transactions.filter(tx => {
-    const titleMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
-    const statusMatches = statusFilter === 'all' || transactionStatus(tx) === statusFilter;
-    const categoryMatches = categoryFilter === 'all' || transactionCategoryGroup(tx) === categoryFilter;
+    const textMatches = !normalizedFilter || String(tx.title || '').toLowerCase().includes(normalizedFilter);
+    const statusMatches = statusFilter === 'all' || tx.status === statusFilter;
     const mineMatches = !mineOnly || transactionBelongsToCurrentUser(tx, d.currentUserId);
-    return titleMatches && statusMatches && categoryMatches && mineMatches;
+    return textMatches && mineMatches && statusMatches;
   });
 
   return (
@@ -129,74 +84,16 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
               placeholder="Tìm chi tiêu..."
               style={{ marginBottom: 8 }}
             />
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-          <button
-            type="button"
-            onClick={() => setMineOnly(value => !value)}
-            style={{
-              flex: '0 0 auto',
-              padding: '7px 13px',
-              borderRadius: 10,
-              border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
-              background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
-              color: mineOnly ? '#6ee7b7' : colors.textSecondary,
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >Của tôi</button>
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '7px 10px',
-              borderRadius: 10,
-              border: `1px solid ${statusFilter !== 'all' ? 'rgba(99,102,241,0.55)' : colors.borderSubtle}`,
-              background: statusFilter !== 'all' ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-              color: statusFilter !== 'all' ? colors.brandLight : colors.textSecondary,
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none',
-              outline: 'none',
-            }}
-          >
-            {STATUS_FILTERS.map(f => (
-              <option key={f.key} value={f.key} style={{ background: '#1e293b', color: '#e2e8f0' }}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '7px 10px',
-              borderRadius: 10,
-              border: `1px solid ${categoryFilter !== 'all' ? 'rgba(245,158,11,0.55)' : colors.borderSubtle}`,
-              background: categoryFilter !== 'all' ? 'rgba(245,158,11,0.12)' : 'rgba(255,255,255,0.04)',
-              color: categoryFilter !== 'all' ? '#fcd34d' : colors.textSecondary,
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              appearance: 'none',
-              WebkitAppearance: 'none',
-              outline: 'none',
-            }}
-          >
-            {CATEGORY_FILTERS.map(f => (
-              <option key={f.key} value={f.key} style={{ background: '#1e293b', color: '#e2e8f0' }}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, overflowX: 'auto', paddingBottom: 2 }}>
+              <button type="button" onClick={() => setMineOnly(value => !value)} style={filterChipStyle(mineOnly, 'mine')}>Của tôi</button>
+              {STATUS_FILTERS.map(filter => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setStatusFilter(filter.key)}
+                  style={filterChipStyle(statusFilter === filter.key)}
+                >{filter.label}</button>
+              ))}
             </div>
           </>
         )}
