@@ -6,11 +6,14 @@ import { colors, type } from '../tokens';
 import { Avatar, Button, Input, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
 const CATEGORY_OPTIONS = [
-  { key: 'general', icon: '🧾', label: 'Chung' },
-  { key: 'food', icon: '🍜', label: 'Ăn uống' },
-  { key: 'cafe', icon: '☕', label: 'Cafe' },
-  { key: 'travel', icon: '🚌', label: 'Di chuyển' },
-  { key: 'gift', icon: '🎁', label: 'Quà tặng' },
+  { key: 'court',      icon: '🏸', label: 'Tiền sân' },
+  { key: 'pickleball', icon: '🎾', label: 'Tiền bóng' },
+  { key: 'water',      icon: '💧', label: 'Tiền nước' },
+  { key: 'food',       icon: '🍜', label: 'Ăn uống' },
+  { key: 'cafe',       icon: '☕', label: 'Cafe' },
+  { key: 'travel',     icon: '🚌', label: 'Di chuyển' },
+  { key: 'gift',       icon: '🎁', label: 'Quà tặng' },
+  { key: 'general',    icon: '🧾', label: 'Chung' },
 ];
 
 export default function AddExpense({ data, onAction }) {

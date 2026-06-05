@@ -5,6 +5,7 @@ import { PhoneFrame, Screen, IconButton, SearchInput, ListCard } from '../primit
 export default function AllExpenses({ data, isTreasurer, onAction }) {
   const d = data || { transactions: [], currentUserId: '' };
   const [filterText, setFilterText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [mineOnly, setMineOnly] = useState(true);
 
   const groupedTransactions = useMemo(() => {
@@ -12,8 +13,9 @@ export default function AllExpenses({ data, isTreasurer, onAction }) {
     const visible = safeArray(d.transactions).filter(tx => {
       const searchText = `${tx.title || ''} ${tx.subtitle || ''} ${tx.payerName || ''} ${tx.participantNames || ''}`.toLowerCase();
       const textMatches = matcher(searchText);
+      const statusMatches = statusFilter === 'all' || tx.status === statusFilter;
       const mineMatches = !mineOnly || transactionBelongsToCurrentUser(tx, d.currentUserId);
-      return textMatches && mineMatches;
+      return textMatches && statusMatches && mineMatches;
     });
 
     return visible.reduce((groups, tx) => {
@@ -26,7 +28,7 @@ export default function AllExpenses({ data, isTreasurer, onAction }) {
       }
       return groups;
     }, []);
-  }, [d.transactions, d.currentUserId, filterText, mineOnly]);
+  }, [d.transactions, d.currentUserId, filterText, statusFilter, mineOnly]);
 
   const isEmpty = groupedTransactions.length === 0;
 
@@ -63,6 +65,26 @@ export default function AllExpenses({ data, isTreasurer, onAction }) {
                 whiteSpace: 'nowrap',
               }}
             >Của tôi</button>
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStatusFilter(f.key)}
+                style={{
+                  flex: '0 0 auto',
+                  padding: '7px 13px',
+                  borderRadius: 10,
+                  border: `1px solid ${statusFilter === f.key ? 'rgba(99,102,241,0.55)' : colors.borderSubtle}`,
+                  background: statusFilter === f.key ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
+                  color: statusFilter === f.key ? colors.brandLight : colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >{f.label}</button>
+            ))}
           </div>
         )}
 
@@ -139,41 +161,12 @@ function monthLabel(value) {
   return `Tháng ${month}/${year}`;
 }
 
-const CATEGORY_LABEL = {
-  pickleball: 'Pickleball',
-  court: 'Tiền sân',
-  water: 'Tiền bóng',
-  groups: 'Nhóm',
-  food: 'Ăn uống',
-  cafe: 'Cafe',
-  payment: 'Thanh toán',
-  general: 'Chung',
-  other: 'Khác',
-};
-
-const CATEGORY_BADGE_BG = {
-  pickleball: 'rgba(52,211,153,0.12)',
-  court: 'rgba(52,211,153,0.12)',
-  water: 'rgba(99,102,241,0.12)',
-  groups: 'rgba(99,102,241,0.12)',
-  food: 'rgba(251,191,36,0.12)',
-  cafe: 'rgba(251,191,36,0.12)',
-  payment: 'rgba(167,139,250,0.12)',
-  general: 'rgba(255,255,255,0.06)',
-  other: 'rgba(255,255,255,0.06)',
-};
-
-const CATEGORY_BADGE_COLOR = {
-  pickleball: '#6ee7b7',
-  court: '#6ee7b7',
-  water: '#a5b4fc',
-  groups: '#a5b4fc',
-  food: '#fcd34d',
-  cafe: '#fcd34d',
-  payment: '#c4b5fd',
-  general: '#cbd5e1',
-  other: '#cbd5e1',
-};
+const STATUS_FILTERS = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'pending', label: 'Chờ duyệt' },
+  { key: 'approved', label: 'Đã duyệt' },
+  { key: 'declined', label: 'Từ chối' },
+];
 
 function ActivityRow({ tx, isTreasurer, last, onView, onAction }) {
   return (
@@ -201,18 +194,8 @@ function ActivityRow({ tx, isTreasurer, last, onView, onAction }) {
         }}>{tx.icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span>{tx.subtitle} · {tx.dateLabel}</span>
-            {tx.category && (
-              <span style={{
-                padding: '2px 6px',
-                borderRadius: 999,
-                background: CATEGORY_BADGE_BG[tx.category] || CATEGORY_BADGE_BG.general,
-                color: CATEGORY_BADGE_COLOR[tx.category] || CATEGORY_BADGE_COLOR.general,
-                fontSize: 10,
-                fontWeight: 800,
-              }}>{CATEGORY_LABEL[tx.category] || CATEGORY_LABEL.general}</span>
-            )}
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {tx.subtitle} · {tx.dateLabel}
           </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
