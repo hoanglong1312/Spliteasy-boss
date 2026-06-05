@@ -293,7 +293,12 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                     }}>
                       <button
                         type="button"
-                        onClick={() => !isPinRow && onAction?.('resumeRecentSession', session)}
+                        disabled={joining}
+                        onClick={async () => {
+                          if (isPinRow || joining) return;
+                          setJoining(true);
+                          try { await onAction?.('resumeRecentSession', session); } finally { setJoining(false); }
+                        }}
                         style={{
                           flex: 1,
                           minWidth: 0,

@@ -64,6 +64,8 @@ export default function Notifications({ data, onAction }) {
 }
 
 function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayment, onApproveExpense, onRejectExpense }) {
+  const [saving, setSaving] = useState(false);
+  const wrap = (fn) => async () => { setSaving(true); try { await fn?.() } finally { setSaving(false) } };
   const unread = notif.unread;
   const paymentStatus = String(notif.status || '').toLowerCase();
   const base = {
@@ -85,8 +87,8 @@ function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayme
           <Meta notif={notif} />
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={onApprove} style={approveBtn}>✓ Duyệt</button>
-          <button onClick={onReject} style={rejectBtn}>✕ Từ chối</button>
+          <button onClick={wrap(onApprove)} disabled={saving} style={approveBtn}>✓ Duyệt</button>
+          <button onClick={wrap(onReject)} disabled={saving} style={rejectBtn}>✕ Từ chối</button>
         </div>
       </div>
     );
@@ -101,8 +103,8 @@ function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayme
           <Meta notif={notif} />
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={onConfirmPayment} style={approveBtn}>Đã nhận</button>
-          <button onClick={onRejectPayment} style={rejectBtn}>Chưa nhận</button>
+          <button onClick={wrap(onConfirmPayment)} disabled={saving} style={approveBtn}>Đã nhận</button>
+          <button onClick={wrap(onRejectPayment)} disabled={saving} style={rejectBtn}>Chưa nhận</button>
         </div>
       </div>
     );
@@ -117,8 +119,8 @@ function NotifItem({ notif, onApprove, onReject, onConfirmPayment, onRejectPayme
           <Meta notif={notif} />
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button onClick={onApproveExpense} style={approveBtn}>✓ Duyệt</button>
-          <button onClick={onRejectExpense} style={rejectBtn}>✕ Từ chối</button>
+          <button onClick={wrap(onApproveExpense)} disabled={saving} style={approveBtn}>✓ Duyệt</button>
+          <button onClick={wrap(onRejectExpense)} disabled={saving} style={rejectBtn}>✕ Từ chối</button>
         </div>
       </div>
     );

@@ -33,7 +33,7 @@ export default function AddExpense({ data, onAction }) {
   const [amount, setAmount] = useState(() => editExpense?.amount != null ? String(editExpense.amount) : '');
   const [paidBy, setPaidBy] = useState(() => editExpense?.paidBy ?? selectedGroup.currentMemberId ?? selectedMembers[0]?.id ?? '');
   const [category, setCategory] = useState(() => editExpense?.category ?? 'general');
-  const [dateLabel, setDateLabel] = useState(() => editExpense?.date ? dateLabelFromValue(editExpense.date) : todayLabel());
+  const [dateLabel, setDateLabel] = useState(() => editExpense?.date ? dateLabelFromValue(editExpense.date) : (d.defaultDate || todayLabel()));
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [notes, setNotes] = useState(() => editExpense?.notes ?? '');
   const [receiptImages, setReceiptImages] = useState(() => editExpense?.receiptImages || []);

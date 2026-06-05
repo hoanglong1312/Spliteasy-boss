@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { colors, type } from '../tokens';
-import { PhoneFrame, Screen, IconButton, Button, Badge, ModuleHero, MemberPicker, SectionHeader } from '../primitives';
+import { PhoneFrame, Screen, IconButton, Button, Badge, ModuleHero, MemberPicker, SectionHeader, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
 const GROUP_TYPES = [
   { key: 'food', label: 'Ăn uống', emoji: '🍜', hint: 'Nhà hàng, cà phê' },
@@ -28,6 +28,7 @@ export default function NewGroup({ data, onAction }) {
   const [requiresApproval, setRequiresApproval] = useState(d.requiresApproval);
   const [selectedProfileIds, setSelectedProfileIds] = useState([]);
   const [profileQuery, setProfileQuery] = useState('');
+  const [saving, setSaving] = useState(false);
   const profileOptions = d.profileOptions || [];
   const filteredProfileOptions = profileOptions.filter(profile => {
     const query = normalizeSearch(profileQuery);
@@ -59,7 +60,7 @@ export default function NewGroup({ data, onAction }) {
         }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
           <div style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 700 }}>Tạo nhóm mới</div>
-          <button onClick={() => onAction?.('create', createPayload())} style={{
+          <button disabled={saving} onClick={async () => { setSaving(true); try { await onAction?.('create', createPayload()) } finally { setSaving(false) } }} style={{
             background: 'rgba(99,102,241,0.18)',
             border: '1px solid rgba(99,102,241,0.4)',
             color: '#c7d2fe', fontSize: 12, fontWeight: 700,
@@ -233,10 +234,12 @@ export default function NewGroup({ data, onAction }) {
           </div>
         </div>
 
-        <Button block variant="brand" style={{ marginTop: 18 }} onClick={() => onAction?.('create', createPayload())}>
+        <Button block variant="brand" style={{ marginTop: 18 }} disabled={saving}
+          onClick={async () => { setSaving(true); try { await onAction?.('create', createPayload()) } finally { setSaving(false) } }}>
           Tạo nhóm
         </Button>
       </Screen>
+      {saving && <div role="status" aria-live="polite" style={loadingOverlayStyle}><LoadingSpinner /><div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div></div>}
     </PhoneFrame>
   );
 }

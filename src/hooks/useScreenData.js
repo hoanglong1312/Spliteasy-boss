@@ -577,7 +577,7 @@ function buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, 
       sourceType: 'pickleball',
       sourceLabel: pickleballState?.currentGroup?.name || 'Pickleball',
       memberId: member.id,
-      amount: buildMemberMonthBalance(pickleballState, pickle, monthSessions, member.id).netBalance || 0,
+      amount: buildMemberMonthBalance(pickleballState, pickle, monthSessions, member.id, monthDate).netBalance || 0,
       month: monthKey(monthDate),
     }))
   return [...expenseRows, ...pickleRows].filter(row => row.memberId && row.amount !== 0)
@@ -798,6 +798,11 @@ function buildAddExpenseData(state, params) {
   const expenseId = normalizeId(params, 'expenseId')
   const expense = expenseId ? findExpense(state, expenseId) : null
   const requestedGroupId = normalizeId(params, 'groupId')
+  const yearMonth = params?.yearMonth || state?.selectedYearMonth
+  const currentYearMonth = monthKey(new Date())
+  const defaultDate = (!expense && yearMonth && yearMonth !== currentYearMonth)
+    ? (() => { const d = dateFromYearMonth(yearMonth); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` })()
+    : null
   const requestedGroup = requestedGroupId ? safeArray(state?.groups).find(item => String(item.id) === String(requestedGroupId)) : null
   const expenseGroups = safeArray(state?.groups)
     .map(safeGroup)
@@ -816,6 +821,7 @@ function buildAddExpenseData(state, params) {
     currentMemberName: currentMember?.displayName || currentMember?.name || state?.currentUserName,
     members,
     groupOptions: expenseGroups.map(group => buildAddExpenseGroupOption(state, group)),
+    defaultDate,
     editExpense: expense ? {
       id: expense.id,
       groupId: expense.groupId || expense.group_id || group?.id,

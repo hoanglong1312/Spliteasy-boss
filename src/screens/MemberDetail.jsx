@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { colors, type, formatVND, radius } from '../tokens';
 import {
   PhoneFrame, Screen, IconButton, Card, Avatar, Badge, Button, Input,
-  BottomSheet,
+  BottomSheet, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -18,6 +18,7 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
   const [editBankName, setEditBankName] = useState(d.bankName || '');
   const [editBankAccount, setEditBankAccount] = useState(d.bankAccount || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   if (!d) {
     return (
@@ -34,24 +35,30 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
     e.preventDefault();
     const name = editName.trim();
     if (!name) return;
-    await onAction?.('editMember', {
-      memberId: d.id,
-      profileId: d?.profileId || d?.profile_id || '',
-      groupId: d?.groupId || d?.group_id || '',
-      name,
-      bankAccountName: editBankAccountName.trim(),
-      bankName: editBankName,
-      bankAccount: editBankAccount.trim(),
-    });
-    setEditing(false);
+    setSaving(true);
+    try {
+      await onAction?.('editMember', {
+        memberId: d.id,
+        profileId: d?.profileId || d?.profile_id || '',
+        groupId: d?.groupId || d?.group_id || '',
+        name,
+        bankAccountName: editBankAccountName.trim(),
+        bankName: editBankName,
+        bankAccount: editBankAccount.trim(),
+      });
+      setEditing(false);
+    } finally { setSaving(false) }
   }
 
   async function switchType() {
-    await onAction?.('setMemberType', {
-      memberId: d.id,
-      type: d.type === 'casual' ? 'fixed' : 'casual',
-      groupId: d.groupId,
-    });
+    setSaving(true);
+    try {
+      await onAction?.('setMemberType', {
+        memberId: d.id,
+        type: d.type === 'casual' ? 'fixed' : 'casual',
+        groupId: d.groupId,
+      });
+    } finally { setSaving(false) }
   }
 
   async function toggleRole() {
@@ -59,17 +66,23 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
     if (!window.confirm(role === 'treasurer'
       ? `Cấp quyền Thủ quỹ cho ${d.name}?`
       : `Thu quyền Thủ quỹ của ${d.name}?`)) return;
-    await onAction?.('setMemberRole', {
-      memberId: d.id,
-      groupId: d.groupId,
-      role,
-    });
+    setSaving(true);
+    try {
+      await onAction?.('setMemberRole', {
+        memberId: d.id,
+        groupId: d.groupId,
+        role,
+      });
+    } finally { setSaving(false) }
   }
 
   async function confirmDeleteMember() {
-    await onAction?.('removePickleballMember', { memberId: d.id, groupId: d.groupId });
-    setShowDeleteConfirm(false);
-    onAction?.('back');
+    setSaving(true);
+    try {
+      await onAction?.('removePickleballMember', { memberId: d.id, groupId: d.groupId });
+      setShowDeleteConfirm(false);
+      onAction?.('back');
+    } finally { setSaving(false) }
   }
 
   return (
@@ -194,13 +207,13 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
         {isTreasurer && (
           <Card style={{ marginTop: 12 }}>
             <CardTitle>Quản lý</CardTitle>
-            <Button block variant="ghost" style={{ marginTop: 10, fontSize: 13 }} onClick={switchType}>
+            <Button block variant="ghost" style={{ marginTop: 10, fontSize: 13 }} disabled={saving} onClick={switchType}>
               ↔️ {d.type === 'casual' ? 'Chuyển thành Cố định' : 'Chuyển sang Vãng lai'}
             </Button>
-            <Button block variant="ghost" style={{ marginTop: 8, fontSize: 13 }} onClick={toggleRole}>
+            <Button block variant="ghost" style={{ marginTop: 8, fontSize: 13 }} disabled={saving} onClick={toggleRole}>
               👑 {d.role === 'treasurer' ? 'Thu quyền Thủ quỹ' : 'Cấp quyền Thủ quỹ'}
             </Button>
-            <Button block variant="danger" style={{ marginTop: 8, fontSize: 13 }} onClick={() => setShowDeleteConfirm(true)}>
+            <Button block variant="danger" style={{ marginTop: 8, fontSize: 13 }} disabled={saving} onClick={() => setShowDeleteConfirm(true)}>
               🗑 Xoá khỏi nhóm
             </Button>
           </Card>
@@ -270,11 +283,12 @@ export default function MemberDetail({ data, isTreasurer = true, onAction }) {
             Thành viên sẽ được ẩn khỏi danh sách nhóm. Bạn có thể thêm lại sau.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
-            <Button type="button" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>Hủy</Button>
-            <Button type="button" variant="danger" onClick={confirmDeleteMember}>Xác nhận</Button>
+            <Button type="button" variant="ghost" disabled={saving} onClick={() => setShowDeleteConfirm(false)}>Hủy</Button>
+            <Button type="button" variant="danger" disabled={saving} onClick={confirmDeleteMember}>Xác nhận</Button>
           </div>
         </BottomSheet>
       )}
+      {saving && <div role="status" aria-live="polite" style={loadingOverlayStyle}><LoadingSpinner /><div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div></div>}
     </PhoneFrame>
   );
 }

@@ -1,15 +1,16 @@
 // Spliteasy Boss — Payment flow (step 2/3: review + QR)
 // Props: data { recipient, amount, breakdown[], bank }, step, onAction
 
-import React from 'react';
+import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, IconButton, Hero, Card, Button, Avatar,
-  SectionLabel, Row,
+  SectionLabel, Row, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 import { generateQRUrl } from '../lib/vietqr.js';
 
 export default function PaymentFlow({ data, step = 2, totalSteps = 3, onAction }) {
+  const [saving, setSaving] = useState(false);
   const d = data || DEMO;
   const qrUrl = generateQRUrl({
     bankId: d.bank.code,
@@ -101,10 +102,12 @@ export default function PaymentFlow({ data, step = 2, totalSteps = 3, onAction }
           <Button variant="muted" style={{ flex: 1, fontSize: 12 }} onClick={() => onAction?.('copyAccount', d.bank.account)}>📋 Copy STK</Button>
           <Button variant="muted" style={{ flex: 1, fontSize: 12 }} onClick={() => onAction?.('shareQR')}>🔗 Chia sẻ QR</Button>
         </div>
-        <Button block variant="success" style={{ marginTop: 8, fontSize: 13 }} onClick={() => onAction?.('confirm')}>
+        <Button block variant="success" style={{ marginTop: 8, fontSize: 13 }} disabled={saving}
+          onClick={async () => { setSaving(true); try { await onAction?.('confirm') } finally { setSaving(false) } }}>
           ✓ Tôi đã chuyển khoản
         </Button>
       </Screen>
+      {saving && <div role="status" aria-live="polite" style={loadingOverlayStyle}><LoadingSpinner /><div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div></div>}
     </PhoneFrame>
   );
 }

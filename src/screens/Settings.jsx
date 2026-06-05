@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { colors, type } from '../tokens';
 import {
-  PhoneFrame, Screen, IconButton, Card, Button, Badge,
+  PhoneFrame, Screen, IconButton, Card, Button, Badge, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 function memberPinStorageKey(memberId) {
@@ -23,6 +23,7 @@ export default function Settings({ data, onAction }) {
   const [bankName, setBankName] = useState(primaryBank?.name || '');
   const [bankAccount, setBankAccount] = useState(primaryBank?.accountRaw || primaryBank?.account || primaryBank?.accountMasked || '');
   const [bankOwner, setBankOwner] = useState(d.accountHolder || '');
+  const [saving, setSaving] = useState(false);
 
   function startPinSetup(mode) {
     setPinSetupMode(mode);
@@ -103,10 +104,11 @@ export default function Settings({ data, onAction }) {
               <BankInput label="Số tài khoản" value={bankAccount} onChange={setBankAccount} placeholder="1027 8438 1234" />
               <BankInput label="Chủ tài khoản" value={bankOwner} onChange={setBankOwner} placeholder="NGUYEN VAN A" />
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={() => setEditingBank(false)}>Huỷ</Button>
-                <Button variant="brand" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={() => {
-                  onAction?.('saveBank', { bankName, bankAccount, bankAccountName: bankOwner });
-                  setEditingBank(false);
+                <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} disabled={saving} onClick={() => setEditingBank(false)}>Huỷ</Button>
+                <Button variant="brand" style={{ flex: 1, padding: 10, fontSize: 12 }} disabled={saving} onClick={async () => {
+                  setSaving(true);
+                  try { await onAction?.('saveBank', { bankName, bankAccount, bankAccountName: bankOwner }); setEditingBank(false); }
+                  finally { setSaving(false) }
                 }}>Lưu</Button>
               </div>
             </div>
@@ -262,6 +264,7 @@ export default function Settings({ data, onAction }) {
           <span style={{ color: colors.textMuted, textDecoration: 'underline' }}>Quyền riêng tư</span>
         </div>
       </Screen>
+      {saving && <div role="status" aria-live="polite" style={loadingOverlayStyle}><LoadingSpinner /><div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div></div>}
     </PhoneFrame>
   );
 }

@@ -1966,7 +1966,7 @@ export default function AppV2() {
     }
 
     if (type === 'fab') {
-      setStack((s) => [...s, { screen: 'add-expense', params: payload }])
+      setStack((s) => [...s, { screen: 'add-expense', params: { ...payload, yearMonth: state.selectedYearMonth } }])
       return
     }
 

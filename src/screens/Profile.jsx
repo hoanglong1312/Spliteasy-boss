@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, Hero, Card, Button, Badge,
-  SectionLabel,
+  SectionLabel, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const BANK_SUGGESTIONS = [
@@ -35,6 +35,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
   const [pinSetupMode, setPinSetupMode] = useState(null);
   const [pinInputValue, setPinInputValue] = useState('');
   const [pinSetupError, setPinSetupError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setCurrentPhotoUrl(d.user.photoUrl || '');
@@ -77,9 +78,12 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
     setEditingBank(false);
   }
 
-  function saveBank() {
-    onAction?.('saveBank', { bankName: bankName.trim(), bankAccount: bankAccount.trim(), bankAccountName: bankOwner.trim() });
-    setEditingBank(false);
+  async function saveBank() {
+    setSaving(true);
+    try {
+      await onAction?.('saveBank', { bankName: bankName.trim(), bankAccount: bankAccount.trim(), bankAccountName: bankOwner.trim() });
+      setEditingBank(false);
+    } finally { setSaving(false) }
   }
 
   function startPinSetup(mode) {
@@ -95,30 +99,33 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
   }
 
   async function submitPinSetup() {
-    if (pinSetupMode === 'set') {
-      if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
-      const saved = await onAction?.('setPin', { pin: pinInputValue });
-      if (saved === false) { setPinSetupError('Không lưu được PIN. Thử lại.'); return; }
-      setPinSet(true);
-      cancelPinSetup();
-    } else if (pinSetupMode === 'remove') {
-      const removed = await onAction?.('removePin');
-      if (removed === false) { setPinSetupError('Chưa xoá được PIN. Thử lại.'); return; }
-      setPinSet(false);
-      cancelPinSetup();
-    } else if (pinSetupMode === 'change-old') {
-      const verified = await onAction?.('verifyPin', { pin: pinInputValue });
-      if (verified === false) { setPinSetupError('PIN hiện tại không đúng.'); return; }
-      setPinSetupMode('change-new');
-      setPinInputValue('');
-      setPinSetupError('');
-    } else if (pinSetupMode === 'change-new') {
-      if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
-      const saved = await onAction?.('setPin', { pin: pinInputValue });
-      if (saved === false) { setPinSetupError('Không lưu được PIN. Thử lại.'); return; }
-      setPinSet(true);
-      cancelPinSetup();
-    }
+    setSaving(true);
+    try {
+      if (pinSetupMode === 'set') {
+        if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
+        const saved = await onAction?.('setPin', { pin: pinInputValue });
+        if (saved === false) { setPinSetupError('Không lưu được PIN. Thử lại.'); return; }
+        setPinSet(true);
+        cancelPinSetup();
+      } else if (pinSetupMode === 'remove') {
+        const removed = await onAction?.('removePin');
+        if (removed === false) { setPinSetupError('Chưa xoá được PIN. Thử lại.'); return; }
+        setPinSet(false);
+        cancelPinSetup();
+      } else if (pinSetupMode === 'change-old') {
+        const verified = await onAction?.('verifyPin', { pin: pinInputValue });
+        if (verified === false) { setPinSetupError('PIN hiện tại không đúng.'); return; }
+        setPinSetupMode('change-new');
+        setPinInputValue('');
+        setPinSetupError('');
+      } else if (pinSetupMode === 'change-new') {
+        if (pinInputValue.length < 6) { setPinSetupError('Nhập đủ 6 số.'); return; }
+        const saved = await onAction?.('setPin', { pin: pinInputValue });
+        if (saved === false) { setPinSetupError('Không lưu được PIN. Thử lại.'); return; }
+        setPinSet(true);
+        cancelPinSetup();
+      }
+    } finally { setSaving(false) }
   }
 
   const pinRequiresInput = pinSetupMode !== 'remove';
@@ -246,8 +253,8 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
               <BankInput label="Số tài khoản" value={bankAccount} onChange={setBankAccount} placeholder="" inputMode="numeric" />
               <BankInput label="Chủ tài khoản" value={bankOwner} onChange={setBankOwner} placeholder="" />
               <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={cancelBankEdit}>Huỷ</Button>
-                <Button variant="brand" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={saveBank}>Lưu</Button>
+                <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} disabled={saving} onClick={cancelBankEdit}>Huỷ</Button>
+                <Button variant="brand" style={{ flex: 1, padding: 10, fontSize: 12 }} disabled={saving} onClick={saveBank}>Lưu</Button>
               </div>
             </div>
           ) : (
@@ -320,13 +327,13 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
               <div style={{ fontSize: 11, color: '#fca5a5', marginTop: 8 }}>{pinSetupError}</div>
             )}
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} onClick={cancelPinSetup}>Huỷ</Button>
+              <Button variant="ghost" style={{ flex: 1, padding: 10, fontSize: 12 }} disabled={saving} onClick={cancelPinSetup}>Huỷ</Button>
               <Button variant="brand" style={{
                 flex: 1,
                 padding: 10,
                 fontSize: 12,
                 opacity: !pinRequiresInput || pinInputValue.length === 6 ? 1 : 0.4,
-              }} onClick={submitPinSetup}>
+              }} disabled={saving} onClick={submitPinSetup}>
                 {pinSetupMode === 'set' || pinSetupMode === 'change-new' ? 'Lưu PIN'
                   : pinSetupMode === 'remove' ? 'Xoá PIN' : 'Tiếp theo →'}
               </Button>
@@ -366,6 +373,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
       </Screen>
 
       <TabBar active="profile" onChange={(k) => onAction?.('tab', k)} onFab={() => onAction?.('fab')} />
+      {saving && <div role="status" aria-live="polite" style={loadingOverlayStyle}><LoadingSpinner /><div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div></div>}
     </PhoneFrame>
   );
 }

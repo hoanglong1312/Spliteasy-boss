@@ -5,12 +5,13 @@ import React, { useState } from 'react';
 import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, IconButton, Card, Hero, Button, Badge, Avatar,
-  Pill, PillRow,
+  Pill, PillRow, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 export default function ApprovalQueue({ data, onAction }) {
   const d = data || DEMO;
   const [filter, setFilter] = useState(d.filters[0]?.key);
+  const [saving, setSaving] = useState(false);
 
   return (
     <PhoneFrame>
@@ -68,9 +69,9 @@ export default function ApprovalQueue({ data, onAction }) {
         {/* Requests */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {d.requests.map((r) => (
-            <RequestCard key={r.id} req={r}
-              onApprove={() => onAction?.('approve', r.id)}
-              onReject={() => onAction?.('reject', r.id)}
+            <RequestCard key={r.id} req={r} disabled={saving}
+              onApprove={async () => { setSaving(true); try { await onAction?.('approve', r.id) } finally { setSaving(false) } }}
+              onReject={async () => { setSaving(true); try { await onAction?.('reject', r.id) } finally { setSaving(false) } }}
               onAddName={() => onAction?.('addName', r.id)}
             />
           ))}
@@ -104,15 +105,17 @@ export default function ApprovalQueue({ data, onAction }) {
 
         {/* Bulk action */}
         <Button block variant="success" style={{ marginTop: 18, fontSize: 13 }}
-          onClick={() => onAction?.('approveAll')}>
+          disabled={saving}
+          onClick={async () => { setSaving(true); try { await onAction?.('approveAll') } finally { setSaving(false) } }}>
           ✓ Duyệt tất cả · {d.pendingCount} yêu cầu
         </Button>
       </Screen>
+      {saving && <div role="status" aria-live="polite" style={loadingOverlayStyle}><LoadingSpinner /><div style={{ fontWeight: 800, color: '#f1f5f9' }}>Đang xử lý…</div></div>}
     </PhoneFrame>
   );
 }
 
-function RequestCard({ req, onApprove, onReject, onAddName }) {
+function RequestCard({ req, onApprove, onReject, onAddName, disabled }) {
   return (
     <Card style={{ padding: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -163,8 +166,8 @@ function RequestCard({ req, onApprove, onReject, onAddName }) {
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-        <button onClick={onApprove} style={approveBtn}>✓ Duyệt</button>
-        <button onClick={onReject} style={rejectBtn}>✕ Từ chối</button>
+        <button onClick={onApprove} disabled={disabled} style={approveBtn}>✓ Duyệt</button>
+        <button onClick={onReject} disabled={disabled} style={rejectBtn}>✕ Từ chối</button>
       </div>
     </Card>
   );
