@@ -5,7 +5,6 @@ import {
   groupBalance,
   groupNet,
   pickleSummary,
-  recentActivity,
 } from '../data.jsx'
 
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
@@ -91,6 +90,7 @@ export function useScreenData() {
   const screenData = useMemo(() => {
     const pickleballState = scopedPickleballState(state)
     const homeData = buildHomeData(state, currentUserId, members, groups, pickle, pickleballState, selectedYearMonth)
+    const allExpensesData = buildAllExpensesData(state, currentUserId, members, currentUserName)
     const groupsListData = buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth)
     const groupDetailData = buildGroupDetailData(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state?.profiles, state)
     const pickleballOverviewData = buildPickleballOverviewData(pickleballState, pickle, _allPickle, currentUserId, members, selectedYearMonth)
@@ -104,6 +104,7 @@ export function useScreenData() {
       isTreasurer,
       isPickleballTreasurer,
       homeData,
+      allExpensesData,
       groupsListData,
       groupDetailData,
       pickleballOverviewData,
@@ -2403,13 +2404,35 @@ function buildExpenseDetailData(state, params) {
   }
 }
 
+function buildAllExpensesData(state, currentUserId, members, currentUserName) {
+  const groups = safeArray(state?.groups)
+  return {
+    transactions: buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName),
+    currentUserId,
+  }
+}
+
 function buildTransactions(groups, currentUserId, members, currentUserName) {
-  return recentActivity(groups, 24 * 30)
+  return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName)
+    .slice(0, 8)
+}
+
+function buildExpenseActivity(groups) {
+  return safeArray(groups).flatMap(group => safeArray(group?.expenses).map(expense => ({
+    ...expense,
+    groupName: group.name,
+    groupEmoji: group.emoji,
+    groupColor: group.color,
+    groupId: group.id,
+  })))
+}
+
+function buildTransactionRows(expenses, groups, currentUserId, members, currentUserName) {
+  return safeArray(expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
-    .slice(0, 8)
     .map(expense => {
-      const group = groups.find(g => g.id === expense.groupId)
+      const group = safeArray(groups).find(g => g.id === expense.groupId)
       const meForGroup = memberIdForGroup(
         group,
         currentUserId,
@@ -2428,6 +2451,7 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
         category: expenseCategory(expense),
         title: expense.title || 'Chi tiêu',
         subtitle: expense.groupName || memberName(expense.paidBy, members),
+        date: expense.date,
         dateLabel: relativeDateLabel(expense.date),
         amount,
         status: expense.status,

@@ -1,0 +1,186 @@
+import React, { useMemo, useState } from 'react';
+import { colors, type, formatVND } from '../tokens';
+import { PhoneFrame, Screen, IconButton, SearchInput, ListCard } from '../primitives';
+
+export default function AllExpenses({ data, onAction }) {
+  const d = data || { transactions: [], currentUserId: '' };
+  const [filterText, setFilterText] = useState('');
+  const [mineOnly, setMineOnly] = useState(false);
+
+  const groupedTransactions = useMemo(() => {
+    const matcher = makeMatcher(filterText);
+    const visible = safeArray(d.transactions).filter(tx => {
+      const textMatches = matcher(`${tx.title || ''} ${tx.subtitle || ''}`);
+      const mineMatches = !mineOnly || transactionBelongsToCurrentUser(tx, d.currentUserId);
+      return textMatches && mineMatches;
+    });
+
+    return visible.reduce((groups, tx) => {
+      const key = monthKey(tx.date || tx.dateLabel);
+      const group = groups.find(item => item.key === key);
+      if (group) {
+        group.transactions.push(tx);
+      } else {
+        groups.push({ key, label: monthLabel(tx.date || tx.dateLabel), transactions: [tx] });
+      }
+      return groups;
+    }, []);
+  }, [d.transactions, d.currentUserId, filterText, mineOnly]);
+
+  const isEmpty = groupedTransactions.length === 0;
+
+  return (
+    <PhoneFrame>
+      <Screen>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 16px' }}>
+          <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
+          <h1 style={{ ...type.title, margin: 0 }}>Tất cả chi tiêu</h1>
+        </div>
+
+        <SearchInput
+          value={filterText}
+          onChange={e => setFilterText(e.target.value)}
+          placeholder="Tìm chi tiêu..."
+          style={{ marginBottom: 8 }}
+        />
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setMineOnly(value => !value)}
+            style={{
+              flex: '0 0 auto',
+              padding: '7px 13px',
+              borderRadius: 10,
+              border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
+              background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
+              color: mineOnly ? '#6ee7b7' : colors.textSecondary,
+              fontSize: 12,
+              fontWeight: 700,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >Của tôi</button>
+        </div>
+
+        {isEmpty ? (
+          <ListCard>
+            <div style={{ padding: '14px 0', fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
+              Không có giao dịch nào
+            </div>
+          </ListCard>
+        ) : groupedTransactions.map(group => (
+          <div key={group.key} style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: colors.textSecondary, marginBottom: 8 }}>
+              {group.label}
+            </div>
+            <ListCard>
+              {group.transactions.map((tx, index) => (
+                <ActivityRow
+                  key={tx.id}
+                  tx={tx}
+                  last={index === group.transactions.length - 1}
+                  onView={() => onAction?.('viewExpense', { expenseId: tx.id })}
+                />
+              ))}
+            </ListCard>
+          </div>
+        ))}
+      </Screen>
+    </PhoneFrame>
+  );
+}
+
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .trim();
+}
+
+function makeMatcher(query) {
+  const needle = normalizeSearch(query);
+  if (!needle) return () => true;
+  return (value) => normalizeSearch(value).includes(needle);
+}
+
+function transactionBelongsToCurrentUser(tx, currentUserId) {
+  if (tx?.isMine === true) return true;
+
+  const memberId = tx.currentMemberId || currentUserId;
+  if (!memberId) return false;
+  if (String(tx?.paidBy || '') === String(memberId)) return true;
+
+  return safeArray(tx?.participants).some(id => String(id) === String(memberId))
+    || safeArray(tx?.splits).some(split => String(split.memberId || split.member_id) === String(memberId));
+}
+
+function monthKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthLabel(value) {
+  const key = monthKey(value);
+  if (key === 'unknown') return 'Tháng khác';
+  const [year, month] = key.split('-');
+  return `Tháng ${month}/${year}`;
+}
+
+function ActivityRow({ tx, last, onView }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onView}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') onView?.();
+      }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 0',
+        borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.04)',
+        cursor: 'pointer',
+      }}
+    >
+      <div style={{
+        width: 38, height: 38, borderRadius: 12,
+        background: TX_ICON_BG[tx.category] || 'rgba(255,255,255,0.06)',
+        color: '#fff',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 18, flexShrink: 0,
+      }}>{tx.icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+          {tx.subtitle} · {tx.dateLabel}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{
+          fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',
+          color: tx.amount < 0 ? colors.danger : colors.success, ...type.mono,
+        }}>{formatVND(tx.amount)}</div>
+      </div>
+      <div style={{ color: colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
+    </div>
+  );
+}
+
+const TX_ICON_BG = {
+  pickleball: 'rgba(52,211,153,0.12)',
+  court:      'rgba(52,211,153,0.12)',
+  water:      'rgba(99,102,241,0.12)',
+  groups:     'rgba(99,102,241,0.12)',
+  food:       'rgba(251,191,36,0.12)',
+  cafe:       'rgba(251,191,36,0.12)',
+  payment:    'rgba(167,139,250,0.12)',
+  general:    'rgba(255,255,255,0.06)',
+};

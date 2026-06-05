@@ -6,6 +6,7 @@ import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPi
 import { createSupabase } from './lib/supabase.js'
 import { useScreenData } from './hooks/useScreenData'
 import Home from './screens/Home'
+import AllExpenses from './screens/AllExpenses'
 import GroupsList from './screens/GroupsList'
 import GroupDetail from './screens/GroupDetail'
 import AddExpense from './screens/AddExpense'
@@ -143,6 +144,7 @@ export default function AppV2() {
     isTreasurer,
     isPickleballTreasurer,
     homeData,
+    allExpensesData,
     groupsListData,
     groupDetailData,
     pickleballOverviewData,
@@ -2051,6 +2053,7 @@ export default function AppV2() {
 
     const ACTION_TO_SCREEN = {
       addExpense:       'add-expense',
+      allExpenses:      'all-expenses',
       payment:          'payment-flow',
       pay:              'payment-flow',
       settings:         'settings',
@@ -2203,6 +2206,7 @@ export default function AppV2() {
         return <GroupDetail data={detailData} isTreasurer={detailData?.isTreasurer ?? isTreasurer} onAction={handle} />
       }
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
+      case 'all-expenses':        return <AllExpenses data={allExpensesData} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
