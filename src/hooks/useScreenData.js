@@ -1275,7 +1275,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment),
       breakdown,
     },
-    yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId),
+    yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId, today),
     ticketStats,
     ticketFund,
     teamFundOverview,
@@ -2480,8 +2480,8 @@ function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdj
   ]
 }
 
-function buildPersonalTicketOverview(state, memberId) {
-  const rows = currentMonthTicketsForState(state)
+function buildPersonalTicketOverview(state, memberId, date) {
+  const rows = monthTicketsForState(state, date || new Date())
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
     .filter(ticket => isTicketRelatedToMember(ticket, memberId))
     .sort((a, b) => parseDateValue(ticketDate(a)) - parseDateValue(ticketDate(b)))

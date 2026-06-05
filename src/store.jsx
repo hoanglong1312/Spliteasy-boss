@@ -2803,6 +2803,13 @@ export function AppProvider({ children }) {
         const message = expenseRealtimeToastMessage(payload, stateRef.current.members)
         if (message) dispatch({ type: 'SHOW_TOAST', message })
       })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'pickleball_owner_payments',
+      }, () => {
+        scheduleRefresh()
+      })
       .subscribe((status, err) => {
         if (err) {
           console.error('[expenses-realtime]', status, err)
