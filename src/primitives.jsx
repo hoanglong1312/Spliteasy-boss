@@ -77,7 +77,7 @@ export function Screen({ children, style, tabBar = false }) {
     <div style={{
       position: 'absolute',
       top: 'var(--screen-top, 44px)',
-      bottom: tabBar ? 'calc(var(--tab-bar-height, 68px) + var(--safe-bottom, 0px))' : 0,
+      bottom: tabBar ? 'calc(var(--tab-bar-height, 56px) + var(--safe-bottom, 0px))' : 0,
       left: 0,
       right: 0,
       minHeight: 0,
@@ -111,12 +111,12 @@ const TAB_ITEMS = [
 export function TabBar({ active = 'home', onChange, onFab }) {
   return (
     <div style={{
-      position: 'absolute', bottom: 0, left: 0, right: 0, height: 'calc(var(--tab-bar-height, 68px) + var(--safe-bottom, 0px))',
+      position: 'absolute', bottom: 0, left: 0, right: 0, height: 'calc(var(--tab-bar-height, 56px) + var(--safe-bottom, 0px))',
       background: 'rgba(7,8,15,0.9)',
       backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       borderTop: `1px solid ${colors.borderSubtle}`,
       display: 'flex', alignItems: 'flex-start',
-      padding: '10px 8px calc(8px + var(--safe-bottom, 0px))', zIndex: 20,
+      padding: '10px 8px calc(4px + var(--safe-bottom, 0px))', zIndex: 20,
       touchAction: 'manipulation',
     }}>
       {TAB_ITEMS.slice(0, 2).map(t => (
@@ -676,7 +676,7 @@ export function MonthNav({ label, onPrev, onNext }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      gap: 16, padding: '4px 0 14px',
+      gap: 16, padding: '2px 0 8px',
       fontSize: 13, fontWeight: 700, color: '#cbd5e1', letterSpacing: '-0.2px',
     }}>
       <button style={arrow} onClick={onPrev}>‹</button>

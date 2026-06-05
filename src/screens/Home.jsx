@@ -54,7 +54,7 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
           <div>
-            <h1 style={{ ...type.title }}>Xin chào, {d.user.firstName} 👋</h1>
+            <h1 style={{ ...type.title }}>Xin chào, {d.user.name} 👋</h1>
             <div style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 500, marginTop: 2 }}>
               {d.user.dateLabel}
             </div>

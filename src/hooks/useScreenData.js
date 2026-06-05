@@ -241,9 +241,10 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
 
   return {
     user: {
+      name: state?.currentUserName || "Bạn",
       firstName: firstName(state?.currentUserName),
       dateLabel: formatFullDate(today),
-      hasNotifications: safeArray(state?.notifications).length > 0,
+      hasNotifications: safeArray(state?.notifications).some(n => n.is_read === false),
     },
     monthLabel: formatMonthLabel(today),
     totalBalance,
