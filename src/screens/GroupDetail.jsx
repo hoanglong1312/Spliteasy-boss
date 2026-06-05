@@ -725,11 +725,7 @@ function RolePill({ icon, label }) {
 function MemberDetailContent({ member, isTreasurer, onAction, onClose, onEdit, onDelete }) {
   const [transactionSearch, setTransactionSearch] = useState('');
   const [transactionFilter, setTransactionFilter] = useState('all');
-  const [memberActionsOpen, setMemberActionsOpen] = useState(false);
-  const [personalLink, setPersonalLink] = useState('');
-  const [personalLinkStatus, setPersonalLinkStatus] = useState('idle');
-  const [personalLinkError, setPersonalLinkError] = useState('');
-  const balance = Number(member.balance || 0);
+  const [memberActionsOpen, setMemberActionsOpen] = useState(false);const balance = Number(member.balance || 0);
   const summary = member.memberTransactionSummary || { owes: 0, advanced: 0, net: 0 };
   const transactions = member.memberTransactions || [];
   const visibleTransactions = transactions.filter(transaction => {
@@ -747,38 +743,7 @@ function MemberDetailContent({ member, isTreasurer, onAction, onClose, onEdit, o
   const balanceTone = balance < 0 ? colors.danger : balance > 0 ? '#6ee7b7' : colors.textSecondary;
   const balanceLabel = balance < 0 ? 'Cần nộp vào quỹ' : balance > 0 ? 'Quỹ cần bù lại' : '0';
   const balanceAmountLabel = balance === 0 ? '0 đ' : `${balance > 0 ? '+' : '-'}${formatVND(Math.abs(balance))}`;
-  const memberShareKey = `${member.groupId || ''}:${member.id || ''}`;
-  const canCreatePersonalLink = Boolean(isTreasurer || member.isCurrentUser);
-
-  useEffect(() => {
-    let alive = true;
-    async function ensureMemberBillShare() {
-      if (!canCreatePersonalLink) return;
-      if (!member.groupId || !member.id || personalLinkStatus === 'loading') return;
-      setPersonalLink('');
-      setPersonalLinkError('');
-      setPersonalLinkStatus('loading');
-      const url = await onAction?.('createMemberBillShare', { groupId: member.groupId, memberId: member.id, copy: false });
-      if (!alive) return;
-      if (url) {
-        setPersonalLink(url);
-        setPersonalLinkStatus('ready');
-      } else {
-        setPersonalLinkStatus('error');
-        setPersonalLinkError('Không tạo được link cá nhân.');
-      }
-    }
-    ensureMemberBillShare();
-    return () => { alive = false; };
-  }, [memberShareKey, canCreatePersonalLink]);
-
-  function copyPersonalLink() {
-    if (!personalLink || !navigator.clipboard) return;
-    navigator.clipboard.writeText(personalLink).catch(() => {});
-    onAction?.('toast', 'Đã sao chép link cá nhân.');
-  }
-
-  return (
+  const memberShareKey = `${member.groupId || ''}:${member.id || ''}`;return (
     <div style={{ paddingBottom: '28px' }}>
       <Hero variant="emerald" glow={false} style={{ padding: 18, borderRadius: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
@@ -845,43 +810,7 @@ function MemberDetailContent({ member, isTreasurer, onAction, onClose, onEdit, o
         ) : (
           <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 10 }}>Không có giao dịch phù hợp trong tháng này.</div>
         )}
-      </Card>
-
-      {canCreatePersonalLink && (
-        <Card style={{ marginTop: 12 }}>
-          <SectionTitle>LINK CÁ NHÂN</SectionTitle>
-          <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center' }}>
-            <div style={{
-              minHeight: 42,
-              display: 'flex',
-              alignItems: 'center',
-              padding: '9px 10px',
-              borderRadius: 12,
-              background: colors.inputBg,
-              border: `1px solid ${colors.borderSubtle}`,
-              color: personalLink ? colors.textPrimary : colors.textSecondary,
-              fontSize: 12,
-              lineHeight: 1.35,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {personalLinkStatus === 'loading' ? 'Đang tạo link...' : personalLink || personalLinkError || 'Chưa có link'}
-            </div>
-            <Button
-              variant="muted"
-              style={{ fontSize: 12, padding: '11px 12px' }}
-              disabled={!personalLink}
-              onClick={copyPersonalLink}
-            >Sao chép</Button>
-          </div>
-          <div style={{ marginTop: 8, fontSize: 11, color: colors.textSecondary, lineHeight: 1.45 }}>
-            Link mở thẳng trang chủ của member để xem tổng hợp, giao dịch và thanh toán.
-          </div>
-        </Card>
-      )}
-
-      {isTreasurer && (
+      </Card>      {isTreasurer && (
         <Button
           variant="muted"
           style={{ marginTop: 12, width: '100%', fontSize: 13 }}
