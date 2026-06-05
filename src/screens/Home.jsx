@@ -11,6 +11,42 @@ import {
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
+const CATEGORY_LABEL = {
+  pickleball: 'Pickleball',
+  court: 'Tiền sân',
+  water: 'Tiền nước',
+  groups: 'Nhóm',
+  food: 'Ăn uống',
+  cafe: 'Cafe',
+  payment: 'Thanh toán',
+  general: 'Chung',
+  other: 'Khác',
+};
+
+const CATEGORY_BADGE_BG = {
+  pickleball: 'rgba(52,211,153,0.12)',
+  court: 'rgba(52,211,153,0.12)',
+  water: 'rgba(99,102,241,0.12)',
+  groups: 'rgba(99,102,241,0.12)',
+  food: 'rgba(251,191,36,0.12)',
+  cafe: 'rgba(251,191,36,0.12)',
+  payment: 'rgba(167,139,250,0.12)',
+  general: 'rgba(255,255,255,0.06)',
+  other: 'rgba(255,255,255,0.06)',
+};
+
+const CATEGORY_BADGE_COLOR = {
+  pickleball: '#6ee7b7',
+  court: '#6ee7b7',
+  water: '#a5b4fc',
+  groups: '#a5b4fc',
+  food: '#fcd34d',
+  cafe: '#fcd34d',
+  payment: '#c4b5fd',
+  general: '#cbd5e1',
+  other: '#cbd5e1',
+};
+
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
   { key: 'pending', label: 'Chờ duyệt' },
@@ -82,16 +118,18 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
             onView={() => onAction?.('monthPrev')}
           />
         )}
-        <PendingApprovalZone expenses={pendingExpenses} payments={pendingPayments} savingAction={savingAction} setSavingAction={setSavingAction} onAction={onAction} />
+        {null}
 
         <SectionHeader action="Xem tất cả →" onAction={() => onAction?.('allExpenses')}>Giao dịch gần đây</SectionHeader>
-        <SearchInput
-          value={filterText}
-          onChange={e => setFilterText(e.target.value)}
-          placeholder="Tìm chi tiêu..."
-          style={{ marginBottom: 8 }}
-        />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+        {isTreasurer && (
+          <>
+            <SearchInput
+              value={filterText}
+              onChange={e => setFilterText(e.target.value)}
+              placeholder="Tìm chi tiêu..."
+              style={{ marginBottom: 8 }}
+            />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
           <button
             type="button"
             onClick={() => setMineOnly(value => !value)}
@@ -159,13 +197,18 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
               </option>
             ))}
           </select>
-        </div>
+            </div>
+          </>
+        )}
         <ListCard>
           {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (
             <ActivityRow
               key={tx.id}
               tx={tx}
               last={i === visibleTransactions.length - 1}
+              isTreasurer={isTreasurer}
+              onApprove={() => onAction?.('approveExpense', { expenseId: tx.id, groupId: tx.groupId })}
+              onReject={() => onAction?.('rejectExpense', { expenseId: tx.id, groupId: tx.groupId })}
               onView={() => onAction?.('viewExpense', { expenseId: tx.id })}
             />
           )) : (
@@ -1354,7 +1397,8 @@ function transactionBelongsToCurrentUser(tx, currentUserId) {
     || safeArray(tx?.splits).some(split => String(split.memberId || split.member_id) === String(memberId));
 }
 
-function ActivityRow({ tx, last, onView }) {
+function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
+  const category = tx.category || 'general';
   return (
     <div
       role="button"
@@ -1378,10 +1422,24 @@ function ActivityRow({ tx, last, onView }) {
       }}>{tx.icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
-        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-          {tx.subtitle} · {tx.dateLabel}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+          <span>{tx.subtitle} · {tx.dateLabel}</span>
+          <span style={{
+            padding: '2px 6px',
+            borderRadius: 999,
+            background: CATEGORY_BADGE_BG[category] || CATEGORY_BADGE_BG.general,
+            color: CATEGORY_BADGE_COLOR[category] || CATEGORY_BADGE_COLOR.general,
+            fontSize: 10,
+            fontWeight: 800,
+          }}>{CATEGORY_LABEL[category] || CATEGORY_LABEL.general}</span>
         </div>
       </div>
+      {isTreasurer && tx.status === 'pending' && (
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+          <button type="button" onClick={e => { e.stopPropagation(); onApprove?.(); }} style={{ padding: '6px 8px', borderRadius: 9, border: '1px solid rgba(52,211,153,0.45)', background: 'rgba(52,211,153,0.12)', color: '#6ee7b7', fontSize: 11, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Duyệt</button>
+          <button type="button" onClick={e => { e.stopPropagation(); onReject?.(); }} style={{ padding: '6px 8px', borderRadius: 9, border: '1px solid rgba(248,113,113,0.45)', background: 'rgba(248,113,113,0.12)', color: '#fca5a5', fontSize: 11, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Từ chối</button>
+        </div>
+      )}
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         <div style={{
           fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',

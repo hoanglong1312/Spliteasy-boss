@@ -2447,6 +2447,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
 
       return {
         id: expense.id,
+        groupId: expense.groupId,
         icon: expenseIcon(expense),
         category: expenseCategory(expense),
         title: expense.title || 'Chi tiêu',
@@ -2456,8 +2457,10 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
         amount,
         status: expense.status,
         paidBy,
+        payerName: memberName(paidBy, members) || '',
         participants,
         splits,
+        participantNames: safeArray(splits).map(s => memberName(s.memberId || s.member_id, members)).filter(Boolean).join(' '),
         currentMemberId: meForGroup,
         isMine: isExpenseRelatedToMember(normalizedExpense, meForGroup),
       }

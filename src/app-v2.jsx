@@ -2206,7 +2206,7 @@ export default function AppV2() {
         return <GroupDetail data={detailData} isTreasurer={detailData?.isTreasurer ?? isTreasurer} onAction={handle} />
       }
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
-      case 'all-expenses':        return <AllExpenses data={allExpensesData} onAction={handle} />
+      case 'all-expenses':        return <AllExpenses data={allExpensesData} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
