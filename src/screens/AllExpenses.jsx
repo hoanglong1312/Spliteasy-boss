@@ -2,15 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, IconButton, SearchInput, ListCard } from '../primitives';
 
-export default function AllExpenses({ data, onAction }) {
+export default function AllExpenses({ data, isTreasurer, onAction }) {
   const d = data || { transactions: [], currentUserId: '' };
   const [filterText, setFilterText] = useState('');
-  const [mineOnly, setMineOnly] = useState(false);
+  const [mineOnly, setMineOnly] = useState(true);
 
   const groupedTransactions = useMemo(() => {
     const matcher = makeMatcher(filterText);
     const visible = safeArray(d.transactions).filter(tx => {
-      const textMatches = matcher(`${tx.title || ''} ${tx.subtitle || ''}`);
+      const searchText = `${tx.title || ''} ${tx.subtitle || ''} ${tx.payerName || ''} ${tx.participantNames || ''}`.toLowerCase();
+      const textMatches = matcher(searchText);
       const mineMatches = !mineOnly || transactionBelongsToCurrentUser(tx, d.currentUserId);
       return textMatches && mineMatches;
     });
@@ -43,25 +44,27 @@ export default function AllExpenses({ data, onAction }) {
           placeholder="Tìm chi tiêu..."
           style={{ marginBottom: 8 }}
         />
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-          <button
-            type="button"
-            onClick={() => setMineOnly(value => !value)}
-            style={{
-              flex: '0 0 auto',
-              padding: '7px 13px',
-              borderRadius: 10,
-              border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
-              background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
-              color: mineOnly ? '#6ee7b7' : colors.textSecondary,
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}
-          >Của tôi</button>
-        </div>
+        {isTreasurer && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => setMineOnly(value => !value)}
+              style={{
+                flex: '0 0 auto',
+                padding: '7px 13px',
+                borderRadius: 10,
+                border: `1px solid ${mineOnly ? 'rgba(52,211,153,0.55)' : colors.borderSubtle}`,
+                background: mineOnly ? 'rgba(52,211,153,0.16)' : 'rgba(255,255,255,0.03)',
+                color: mineOnly ? '#6ee7b7' : colors.textSecondary,
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >Của tôi</button>
+          </div>
+        )}
 
         {isEmpty ? (
           <ListCard>
@@ -79,8 +82,10 @@ export default function AllExpenses({ data, onAction }) {
                 <ActivityRow
                   key={tx.id}
                   tx={tx}
+                  isTreasurer={isTreasurer}
                   last={index === group.transactions.length - 1}
                   onView={() => onAction?.('viewExpense', { expenseId: tx.id })}
+                  onAction={onAction}
                 />
               ))}
             </ListCard>
@@ -98,7 +103,7 @@ function safeArray(value) {
 function normalizeSearch(value) {
   return String(value || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/đ/gi, 'd')
     .toLowerCase()
     .trim();
@@ -134,42 +139,104 @@ function monthLabel(value) {
   return `Tháng ${month}/${year}`;
 }
 
-function ActivityRow({ tx, last, onView }) {
+const CATEGORY_LABEL = {
+  pickleball: 'Pickleball',
+  court: 'Tiền sân',
+  water: 'Tiền bóng',
+  groups: 'Nhóm',
+  food: 'Ăn uống',
+  cafe: 'Cafe',
+  payment: 'Thanh toán',
+  general: 'Chung',
+  other: 'Khác',
+};
+
+const CATEGORY_BADGE_BG = {
+  pickleball: 'rgba(52,211,153,0.12)',
+  court: 'rgba(52,211,153,0.12)',
+  water: 'rgba(99,102,241,0.12)',
+  groups: 'rgba(99,102,241,0.12)',
+  food: 'rgba(251,191,36,0.12)',
+  cafe: 'rgba(251,191,36,0.12)',
+  payment: 'rgba(167,139,250,0.12)',
+  general: 'rgba(255,255,255,0.06)',
+  other: 'rgba(255,255,255,0.06)',
+};
+
+const CATEGORY_BADGE_COLOR = {
+  pickleball: '#6ee7b7',
+  court: '#6ee7b7',
+  water: '#a5b4fc',
+  groups: '#a5b4fc',
+  food: '#fcd34d',
+  cafe: '#fcd34d',
+  payment: '#c4b5fd',
+  general: '#cbd5e1',
+  other: '#cbd5e1',
+};
+
+function ActivityRow({ tx, isTreasurer, last, onView, onAction }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onView}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') onView?.();
-      }}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '12px 0',
-        borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.04)',
-        cursor: 'pointer',
-      }}
-    >
-      <div style={{
-        width: 38, height: 38, borderRadius: 12,
-        background: TX_ICON_BG[tx.category] || 'rgba(255,255,255,0.06)',
-        color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 18, flexShrink: 0,
-      }}>{tx.icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
-        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-          {tx.subtitle} · {tx.dateLabel}
-        </div>
-      </div>
-      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onView}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') onView?.();
+        }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '12px 0',
+          borderBottom: last && !(isTreasurer && tx.status === 'pending') ? 'none' : '1px solid rgba(255,255,255,0.04)',
+          cursor: 'pointer',
+        }}
+      >
         <div style={{
-          fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',
-          color: tx.amount < 0 ? colors.danger : colors.success, ...type.mono,
-        }}>{formatVND(tx.amount)}</div>
+          width: 38, height: 38, borderRadius: 12,
+          background: TX_ICON_BG[tx.category] || 'rgba(255,255,255,0.06)',
+          color: '#fff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, flexShrink: 0,
+        }}>{tx.icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span>{tx.subtitle} · {tx.dateLabel}</span>
+            {tx.category && (
+              <span style={{
+                padding: '2px 6px',
+                borderRadius: 999,
+                background: CATEGORY_BADGE_BG[tx.category] || CATEGORY_BADGE_BG.general,
+                color: CATEGORY_BADGE_COLOR[tx.category] || CATEGORY_BADGE_COLOR.general,
+                fontSize: 10,
+                fontWeight: 800,
+              }}>{CATEGORY_LABEL[tx.category] || CATEGORY_LABEL.general}</span>
+            )}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{
+            fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',
+            color: tx.amount < 0 ? colors.danger : colors.success, ...type.mono,
+          }}>{formatVND(tx.amount)}</div>
+        </div>
+        <div style={{ color: colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
       </div>
-      <div style={{ color: colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
+      {isTreasurer && tx.status === 'pending' && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingTop: 8, paddingBottom: last ? 0 : 8, borderBottom: last ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
+          <button type="button"
+            onClick={e => { e.stopPropagation(); onAction?.('approveExpense', { expenseId: tx.id, groupId: tx.groupId }); }}
+            style={{ flex: 1, padding: '7px 0', borderRadius: 9, border: '1px solid rgba(52,211,153,0.45)', background: 'rgba(52,211,153,0.12)', color: '#6ee7b7', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+            Duyệt
+          </button>
+          <button type="button"
+            onClick={e => { e.stopPropagation(); onAction?.('rejectExpense', { expenseId: tx.id, groupId: tx.groupId }); }}
+            style={{ flex: 1, padding: '7px 0', borderRadius: 9, border: '1px solid rgba(248,113,113,0.45)', background: 'rgba(248,113,113,0.12)', color: '#fca5a5', fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+            Từ chối
+          </button>
+        </div>
+      )}
     </div>
   );
 }

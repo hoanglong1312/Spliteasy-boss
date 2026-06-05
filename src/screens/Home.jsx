@@ -14,7 +14,7 @@ import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 const CATEGORY_LABEL = {
   pickleball: 'Pickleball',
   court: 'Tiền sân',
-  water: 'Tiền nước',
+  water: 'Tiền bóng',
   groups: 'Nhóm',
   food: 'Ăn uống',
   cafe: 'Cafe',
