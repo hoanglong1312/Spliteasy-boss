@@ -18,6 +18,23 @@ const STATUS_FILTERS = [
   { key: 'declined', label: 'Từ chối' },
 ];
 
+function filterChipStyle(isActive, variant) {
+  const green = variant === 'mine';
+  return {
+    flexShrink: 0,
+    padding: '7px 14px',
+    borderRadius: 999,
+    border: `1.5px solid ${isActive ? (green ? 'rgba(52,211,153,0.55)' : 'rgba(99,102,241,0.55)') : 'rgba(255,255,255,0.1)'}`,
+    background: isActive ? (green ? 'rgba(52,211,153,0.16)' : 'rgba(99,102,241,0.14)') : 'rgba(255,255,255,0.04)',
+    color: isActive ? (green ? '#6ee7b7' : '#a5b4fc') : colors.textSecondary,
+    fontSize: 12,
+    fontWeight: 700,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  };
+}
+
 export default function Home({ data, isTreasurer, paymentOpen = false, onPaymentClose, onAction }) {
   const d = data || DEMO;
   const [filterText, setFilterText] = useState('');
@@ -1295,7 +1312,6 @@ function transactionBelongsToCurrentUser(tx, currentUserId) {
 }
 
 function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
-  const category = tx.category || 'general';
   return (
     <div
       role="button"
@@ -1319,16 +1335,8 @@ function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
       }}>{tx.icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>{tx.title}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-          <span>{tx.subtitle} · {tx.dateLabel}</span>
-          <span style={{
-            padding: '2px 6px',
-            borderRadius: 999,
-            background: CATEGORY_BADGE_BG[category] || CATEGORY_BADGE_BG.general,
-            color: CATEGORY_BADGE_COLOR[category] || CATEGORY_BADGE_COLOR.general,
-            fontSize: 10,
-            fontWeight: 800,
-          }}>{CATEGORY_LABEL[category] || CATEGORY_LABEL.general}</span>
+        <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {tx.subtitle} · {tx.dateLabel}
         </div>
       </div>
       {isTreasurer && tx.status === 'pending' && (
