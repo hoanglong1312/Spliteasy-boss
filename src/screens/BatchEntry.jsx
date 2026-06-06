@@ -1,6 +1,7 @@
 // Spliteasy Boss - Pickleball / Nhap nhanh tien nuoc thang
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createWorker } from 'tesseract.js';
 import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button } from '../primitives';
 import { parseWaterOcrText } from '../lib/waterOcrImport.js';
@@ -12,6 +13,8 @@ export default function BatchEntry({ data, onAction }) {
   const [waterImportOpen, setWaterImportOpen] = useState(false);
   const [waterImportText, setWaterImportText] = useState('');
   const [waterImportResult, setWaterImportResult] = useState(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const ocrInputRef = useRef(null);
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
@@ -43,6 +46,34 @@ export default function BatchEntry({ data, onAction }) {
 
   function analyzeWaterImport() {
     setWaterImportResult(parseWaterOcrText(waterImportText));
+  }
+
+  async function handleOcrImageUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setOcrLoading(true);
+      const worker = await createWorker('vie+eng');
+      const { data: { text } } = await worker.recognize(file);
+      await worker.terminate();
+
+      setWaterImportText(text.trim());
+      // Auto-analyze after OCR completes
+      setTimeout(() => {
+        setWaterImportResult(parseWaterOcrText(text.trim()));
+      }, 100);
+    } catch (error) {
+      console.error('OCR error:', error);
+      setWaterImportResult({
+        error: 'Lỗi khi nhận dạng ảnh. Vui lòng thử lại.',
+      });
+    } finally {
+      setOcrLoading(false);
+      if (ocrInputRef.current) {
+        ocrInputRef.current.value = '';
+      }
+    }
   }
 
   function applyWaterImportRows() {
@@ -140,6 +171,21 @@ export default function BatchEntry({ data, onAction }) {
           </Button>
           {waterImportOpen && (
             <div style={{ marginTop: 12 }}>
+              <input
+                type="file"
+                accept="image/*"
+                ref={ocrInputRef}
+                onChange={handleOcrImageUpload}
+                style={{ display: 'none' }}
+              />
+              <Button
+                variant="brand"
+                onClick={() => ocrInputRef.current?.click()}
+                disabled={ocrLoading}
+                style={{ marginBottom: 10 }}
+              >
+                {ocrLoading ? 'Đang nhận dạng...' : 'Chụp/Upload ảnh'}
+              </Button>
               <textarea
                 value={waterImportText}
                 onChange={(event) => setWaterImportText(event.target.value)}
