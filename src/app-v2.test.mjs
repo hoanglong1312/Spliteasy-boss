@@ -143,7 +143,7 @@ test('parseWaterOcrText returns a top-level error for empty or dateless text', (
 
 test('BatchEntry previews OCR import and applies all non-zero rows including needs_review', () => {
   assert.match(batchEntrySource, /import \{ parseWaterOcrText \} from '\.\.\/lib\/waterOcrImport\.js'/)
-  assert.match(batchEntrySource, /const \[waterImportOpen, setWaterImportOpen\] = useState\(false\)/)
+  assert.doesNotMatch(batchEntrySource, /ocrInputRef/)
   assert.match(batchEntrySource, /const \[waterImportText, setWaterImportText\] = useState\(''\)/)
   assert.match(batchEntrySource, /const \[waterImportResult, setWaterImportResult\] = useState\(null\)/)
   assert.match(batchEntrySource, /const \[editedAmounts, setEditedAmounts\] = useState/)
@@ -152,11 +152,12 @@ test('BatchEntry previews OCR import and applies all non-zero rows including nee
   assert.match(batchEntrySource, /const rows = waterImportResult\?\.rows \|\| \[\]/)
   assert.match(batchEntrySource, /rows\.forEach\(\(row, index/)
   assert.match(batchEntrySource, /setParsedRows\(result\)/)
-  assert.match(batchEntrySource, /setWaterImportOpen\(false\)/)
   assert.match(batchEntrySource, /matchSessionByDate\(sessions, row\.date/)
   assert.match(batchEntrySource, /type="text"/)
   assert.match(batchEntrySource, /value=\{editedAmounts\[index\]/)
-  assert.match(batchEntrySource, /Dán dữ liệu Excel\/OCR/)
+  assert.match(batchEntrySource, /Nhập tiền nước từ Excel/)
+  assert.match(batchEntrySource, /Mở file trong Excel\/Chrome → Chọn tất cả → Copy → Paste vào đây → Phân tích/)
+  assert.match(batchEntrySource, /161 01\/05\/2026 2 2 4 96\.000 đ 96\.000 đ 162 04\/05\/2026 2 4 76\.000 đ 76\.000 đ/)
   assert.match(batchEntrySource, /Phân tích/)
   assert.match(batchEntrySource, /Điền vào bảng nhập nhanh/)
 })

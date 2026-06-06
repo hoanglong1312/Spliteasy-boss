@@ -1,78 +1,17 @@
 // Spliteasy Boss - Pickleball / Nhap nhanh tien nuoc thang
 
-import React, { useEffect, useState, useRef } from 'react';
-import { createWorker } from 'tesseract.js';
+import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button } from '../primitives';
 import { parseWaterOcrText } from '../lib/waterOcrImport.js';
-
-
-function preprocessImageForOcr(file) {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    const objectUrl = URL.createObjectURL(file);
-
-    image.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = image.naturalWidth || image.width;
-        canvas.height = image.naturalHeight || image.height;
-
-        const context = canvas.getContext('2d');
-        if (!context) {
-          reject(new Error('Cannot create canvas context'));
-          return;
-        }
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-
-        for (let i = 0; i < pixels.length; i += 4) {
-          const gray = pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114;
-          const contrasted = Math.max(0, Math.min(255, (gray - 128) * 1.5 + 128));
-          const binary = contrasted >= 140 ? 255 : 0;
-
-          pixels[i] = binary;
-          pixels[i + 1] = binary;
-          pixels[i + 2] = binary;
-        }
-
-        context.putImageData(imageData, 0, 0);
-        canvas.toBlob(blob => {
-          if (!blob) {
-            reject(new Error('Cannot export preprocessed OCR image'));
-            return;
-          }
-          resolve(blob);
-        }, file.type || 'image/png');
-      } catch (error) {
-        reject(error);
-      }
-    };
-
-    image.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      reject(new Error('Cannot load OCR image'));
-    };
-
-    image.src = objectUrl;
-  });
-}
 
 export default function BatchEntry({ data, onAction }) {
   const d = data || DEMO;
   const [sessions, setSessions] = useState(() => sessionDrafts(d));
   const [parsedRows, setParsedRows] = useState([]);
-  const [waterImportOpen, setWaterImportOpen] = useState(false);
   const [waterImportText, setWaterImportText] = useState('');
   const [waterImportResult, setWaterImportResult] = useState(null);
-  const [ocrLoading, setOcrLoading] = useState(false);
   const [editedAmounts, setEditedAmounts] = useState({});
-  const ocrInputRef = useRef(null);
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
@@ -106,41 +45,6 @@ export default function BatchEntry({ data, onAction }) {
     setEditedAmounts({});
   }
 
-  async function handleOcrImageUpload(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setOcrLoading(true);
-      const worker = await createWorker('vie+eng');
-      await worker.setParameters({
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1',
-      });
-      const preprocessedImage = await preprocessImageForOcr(file);
-      const { data: { text } } = await worker.recognize(preprocessedImage);
-      await worker.terminate();
-
-      setWaterImportText(text.trim());
-      // Auto-analyze after OCR completes
-      setTimeout(() => {
-        const result = parseWaterOcrText(text.trim());
-        setWaterImportResult(result);
-        setEditedAmounts({});
-      }, 100);
-    } catch (error) {
-      console.error('OCR error:', error);
-      setWaterImportResult({
-        error: 'Lỗi khi nhận dạng ảnh. Vui lòng thử lại.',
-      });
-    } finally {
-      setOcrLoading(false);
-      if (ocrInputRef.current) {
-        ocrInputRef.current.value = '';
-      }
-    }
-  }
-
   function applyWaterImportRows() {
     const rows = waterImportResult?.rows || [];
     const result = [];
@@ -165,7 +69,6 @@ export default function BatchEntry({ data, onAction }) {
     });
     
     setParsedRows(result);
-    setWaterImportOpen(false);
   }
 
   return (
@@ -218,34 +121,22 @@ export default function BatchEntry({ data, onAction }) {
         </div>
 
         <Card style={{ marginTop: 10, padding: 14 }}>
-          <Button variant="ghost" onClick={() => setWaterImportOpen(!waterImportOpen)}>
-            Dán dữ liệu Excel/OCR
-          </Button>
-          {waterImportOpen && (
-            <div style={{ marginTop: 12 }}>
-              <input
-                type="file"
-                accept="image/*"
-                ref={ocrInputRef}
-                onChange={handleOcrImageUpload}
-                style={{ display: 'none' }}
-              />
-              <Button
-                variant="brand"
-                onClick={() => ocrInputRef.current?.click()}
-                disabled={ocrLoading}
-                style={{ marginBottom: 10 }}
-              >
-                {ocrLoading ? 'Đang nhận dạng...' : 'Chụp/Upload ảnh'}
-              </Button>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: colors.pickleball, textTransform: 'uppercase' }}>
+            Nhập tiền nước từ Excel
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 6, lineHeight: 1.4 }}>
+              Mở file trong Excel/Chrome → Chọn tất cả → Copy → Paste vào đây → Phân tích
+            </div>
               <textarea
                 value={waterImportText}
                 onChange={(event) => setWaterImportText(event.target.value)}
-                placeholder={'01/05/2026\n2\n2\n4\n96.000 đ'}
+                placeholder={'161 01/05/2026 2 2 4 96.000 đ 96.000 đ 162 04/05/2026 2 4 76.000 đ 76.000 đ'}
                 style={{
                   width: '100%',
                   minHeight: 150,
                   padding: 12,
+                  marginTop: 10,
                   resize: 'vertical',
                   background: colors.inputBg,
                   border: `1px solid ${colors.borderSubtle}`,
@@ -337,7 +228,6 @@ export default function BatchEntry({ data, onAction }) {
                 </div>
               )}
             </div>
-          )}
         </Card>
 
         <Card style={{ marginTop: 10, padding: 0 }}>
