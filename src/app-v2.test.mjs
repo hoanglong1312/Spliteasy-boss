@@ -68,16 +68,16 @@ test('parseWaterOcrText parses dated OCR rows into water quantities and skips to
     date: '2026-05-01',
     displayDate: '01/05/2026',
     quantities: {
-      10000: 2,
-      12500: 2,
+      10000: 4,
+      12500: 0,
       14000: 4,
       30000: 0,
     },
     detectedWaterTotal: 96000,
-    calculatedWaterTotal: 101000,
+    calculatedWaterTotal: 96000,
     extraNotes: [],
-    status: 'needs_review',
-    warnings: ['Tổng tiền nước không khớp'],
+    status: 'ok',
+    warnings: [],
   })
 
   assert.deepEqual(result.rows[1], {
@@ -122,7 +122,7 @@ test('parseWaterOcrText marks mismatched rows as needs_review', () => {
   const result = parseWaterOcrText(`01/05/2026\n2\n2\n4\n95.000 đ`)
 
   assert.equal(result.rows[0].status, 'needs_review')
-  assert.equal(result.rows[0].calculatedWaterTotal, 101000)
+  assert.equal(result.rows[0].calculatedWaterTotal, 90000)
   assert.equal(result.rows[0].detectedWaterTotal, 95000)
   assert.equal(result.rows[0].warnings.includes('Tổng tiền nước không khớp'), true)
 })

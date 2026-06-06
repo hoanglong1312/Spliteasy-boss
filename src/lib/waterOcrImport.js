@@ -1,4 +1,6 @@
-const WATER_PRICES = [10000, 12500, 14000, 30000]
+// 5 physical columns: LỌC(10k), KHOÁNG(10k), REVICE(12.5k), NEWBOOST(14k), POTASI(30k)
+// Two tiers share price 10k — combination search uses all 5; output merges them into one 10k key
+const WATER_PRICES = [10000, 10000, 12500, 14000, 30000]
 
 const emptyQuantities = () => ({
   10000: 0,
@@ -71,12 +73,14 @@ const assignQuantities = (values, detectedWaterTotal) => {
   }, 0) === detectedWaterTotal)
   const slots = matched || WATER_PRICES.map((_, index) => index).slice(0, values.length)
   slots.forEach((priceIndex, valueIndex) => {
-    quantities[WATER_PRICES[priceIndex]] = Number(values[valueIndex] || 0)
+    // Two physical columns share price 10k — accumulate into the same key
+    quantities[WATER_PRICES[priceIndex]] = (quantities[WATER_PRICES[priceIndex]] || 0) + Number(values[valueIndex] || 0)
   })
   return quantities
 }
 
-const calculatedTotal = quantities => WATER_PRICES.reduce((sum, price) => {
+const UNIQUE_PRICES = [...new Set(WATER_PRICES)]
+const calculatedTotal = quantities => UNIQUE_PRICES.reduce((sum, price) => {
   return sum + Number(quantities[price] || 0) * price
 }, 0)
 
