@@ -3,18 +3,26 @@
 import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button } from '../primitives';
+import { parseWaterOcrText } from '../lib/waterOcrImport.js';
 
 export default function BatchEntry({ data, onAction }) {
   const d = data || DEMO;
   const [sessions, setSessions] = useState(() => sessionDrafts(d));
   const [bulkInput, setBulkInput] = useState('');
+  const [waterImportOpen, setWaterImportOpen] = useState(false);
+  const [waterImportText, setWaterImportText] = useState('');
+  const [waterImportResult, setWaterImportResult] = useState(null);
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
     setBulkInput('');
+    setWaterImportText('');
+    setWaterImportResult(null);
   }, [data]);
 
   const parsedRows = parseMonthlyWaterInput(bulkInput, sessions);
+  const waterImportRows = waterImportResult?.rows || [];
+  const okImportRows = waterImportRows.filter(row => row.status === 'ok');
   const currentWaterRows = sessions.filter(session => parseAmount(session.water || session.waterAmount || 0) > 0);
   const previewWaterTotal = sessions.reduce((sum, session) => {
     const parsed = parsedRows.find(row => String(row.sessionId) === String(session.id));
@@ -31,6 +39,18 @@ export default function BatchEntry({ data, onAction }) {
         waterAmount: row.waterAmount,
       })),
     });
+  }
+
+  function analyzeWaterImport() {
+    setWaterImportResult(parseWaterOcrText(waterImportText));
+  }
+
+  function applyWaterImportRows() {
+    const rows = waterImportResult?.rows || [];
+    const okRows = rows.filter(row => row.status === 'ok');
+    const updatedSessions = applyImportedWaterRows(sessions, okRows);
+    setSessions(updatedSessions);
+    setBulkInput(exampleInput(updatedSessions));
   }
 
   return (
@@ -112,6 +132,97 @@ export default function BatchEntry({ data, onAction }) {
               ...type.mono,
             }}
           />
+        </Card>
+
+        <Card style={{ marginTop: 10, padding: 14 }}>
+          <Button variant="ghost" onClick={() => setWaterImportOpen(!waterImportOpen)}>
+            Dán dữ liệu Excel/OCR
+          </Button>
+          {waterImportOpen && (
+            <div style={{ marginTop: 12 }}>
+              <textarea
+                value={waterImportText}
+                onChange={(event) => setWaterImportText(event.target.value)}
+                placeholder={'01/05/2026\n2\n2\n4\n96.000 đ'}
+                style={{
+                  width: '100%',
+                  minHeight: 150,
+                  padding: 12,
+                  resize: 'vertical',
+                  background: colors.inputBg,
+                  border: `1px solid ${colors.borderSubtle}`,
+                  borderRadius: 12,
+                  color: colors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: type.family,
+                  lineHeight: 1.5,
+                  outline: 'none',
+                  ...type.mono,
+                }}
+              />
+              <Button variant="brand" onClick={analyzeWaterImport} style={{ marginTop: 10 }}>
+                Phân tích
+              </Button>
+
+              {waterImportResult?.error && (
+                <div style={{ marginTop: 10, fontSize: 11, color: '#fca5a5', fontWeight: 800 }}>
+                  {waterImportResult.error}
+                </div>
+              )}
+
+              {waterImportRows.length > 0 && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '78px 1fr 70px',
+                    gap: 8,
+                    padding: '0 0 8px',
+                    fontSize: 9,
+                    fontWeight: 900,
+                    color: colors.textMuted,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.6px',
+                  }}>
+                    <div>Ngày</div>
+                    <div>Nước</div>
+                    <div>Trạng thái</div>
+                  </div>
+                  {waterImportRows.map((row, index) => (
+                    <div key={`${row.date}-${index}`} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '78px 1fr 70px',
+                      gap: 8,
+                      padding: '9px 0',
+                      borderTop: `1px solid ${colors.borderSubtle}`,
+                      alignItems: 'start',
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 900 }}>{row.displayDate}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 900, color: colors.textPrimary, ...type.mono }}>
+                          {formatVND(row.calculatedWaterTotal)}
+                        </div>
+                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, lineHeight: 1.35 }}>
+                          10k: {row.quantities?.[10000] || 0} · 12.5k: {row.quantities?.[12500] || 0} · 14k: {row.quantities?.[14000] || 0} · 30k: {row.quantities?.[30000] || 0}
+                        </div>
+                        {[...(row.warnings || []), ...(row.extraNotes || [])].map((note, noteIndex) => (
+                          <div key={noteIndex} style={{ fontSize: 10, color: row.status === 'ok' ? colors.textMuted : '#fca5a5', marginTop: 3, lineHeight: 1.35 }}>
+                            {note}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 900, color: importStatusColor(row.status) }}>
+                        {importStatusLabel(row.status)}
+                      </div>
+                    </div>
+                  ))}
+                  <Button variant="brand" disabled={okImportRows.length === 0} onClick={applyWaterImportRows} style={{ marginTop: 12 }}>
+                    Điền vào bảng nhập nhanh
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         <Card style={{ marginTop: 10, padding: 0 }}>
@@ -230,6 +341,41 @@ function findSessionByInputDate(sessions, dateMatch) {
     const label = String(session.dateLabel || '');
     return rawDate.slice(5, 10) === `${month}-${day}` || label.includes(`${day}/${month}`);
   });
+}
+
+function applyImportedWaterRows(sessions, rows) {
+  return sessions.map(session => {
+    const importedRow = rows.find(row => matchesSessionDate(session, row.date));
+    if (!importedRow) return session;
+    const importedAmount = parseAmount(importedRow.calculatedWaterTotal);
+    return {
+      ...session,
+      water: importedAmount,
+      waterAmount: importedAmount,
+      waterInput: formatAmountInput(importedAmount),
+    };
+  });
+}
+
+function matchesSessionDate(session, date) {
+  const isoDate = String(date || '').slice(0, 10);
+  if (!isoDate) return false;
+  const rawDate = String(session.date || session.sessionDate || session.session_date || '').slice(0, 10);
+  if (rawDate === isoDate) return true;
+  const [, month, day] = isoDate.match(/^\d{4}-(\d{2})-(\d{2})$/) || [];
+  return Boolean(day && month && String(session.dateLabel || '').includes(`${day}/${month}`));
+}
+
+function importStatusLabel(status) {
+  if (status === 'ok') return 'Sẵn sàng';
+  if (status === 'needs_review') return 'Xem lại';
+  return 'Bỏ qua';
+}
+
+function importStatusColor(status) {
+  if (status === 'ok') return colors.pickleball;
+  if (status === 'needs_review') return '#fca5a5';
+  return colors.textMuted;
 }
 
 function sessionDrafts(data) {

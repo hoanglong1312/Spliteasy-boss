@@ -7,6 +7,7 @@ const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const mainSource = readFileSync(new URL('./main.jsx', import.meta.url), 'utf8')
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
+const batchEntrySource = readFileSync(new URL('./screens/BatchEntry.jsx', import.meta.url), 'utf8')
 
 const MAY_WATER_OCR_SAMPLE = `
 NGÀY
@@ -135,6 +136,23 @@ test('parseWaterOcrText returns a top-level error for empty or dateless text', (
     rows: [],
     error: 'Không tìm thấy ngày dạng dd/mm/yyyy',
   })
+})
+
+test('BatchEntry previews OCR import and only applies ok rows locally', () => {
+  assert.match(batchEntrySource, /import \{ parseWaterOcrText \} from '\.\.\/lib\/waterOcrImport\.js'/)
+  assert.match(batchEntrySource, /const \[waterImportOpen, setWaterImportOpen\] = useState\(false\)/)
+  assert.match(batchEntrySource, /const \[waterImportText, setWaterImportText\] = useState\(''\)/)
+  assert.match(batchEntrySource, /const \[waterImportResult, setWaterImportResult\] = useState\(null\)/)
+  assert.match(batchEntrySource, /function analyzeWaterImport\(\)/)
+  assert.match(batchEntrySource, /function applyWaterImportRows\(\)/)
+  assert.match(batchEntrySource, /waterImportResult\?\.rows\s*\|\| \[\][\s\S]*?filter\(row => row\.status === 'ok'\)/)
+  assert.match(batchEntrySource, /setSessions\(updatedSessions\)/)
+  assert.match(batchEntrySource, /function applyImportedWaterRows\(sessions, rows\)/)
+  assert.match(batchEntrySource, /waterAmount: importedAmount/)
+  assert.match(batchEntrySource, /waterInput: formatAmountInput\(importedAmount\)/)
+  assert.match(batchEntrySource, /Dán dữ liệu Excel\/OCR/)
+  assert.match(batchEntrySource, /Phân tích/)
+  assert.match(batchEntrySource, /Điền vào bảng nhập nhanh/)
 })
 
 test('PinEntryScreen uses a controlled numeric password input instead of a numpad', () => {
