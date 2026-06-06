@@ -69,6 +69,7 @@ test('parseWaterOcrText parses dated OCR rows into water quantities and skips to
     displayDate: '01/05/2026',
     quantities: {
       10000: 4,
+      12000: 0,
       12500: 0,
       14000: 4,
       30000: 0,
@@ -85,6 +86,7 @@ test('parseWaterOcrText parses dated OCR rows into water quantities and skips to
     displayDate: '04/05/2026',
     quantities: {
       10000: 2,
+      12000: 0,
       12500: 0,
       14000: 4,
       30000: 0,
@@ -106,6 +108,7 @@ test('parseWaterOcrText detects xé vé but excludes it from water totals', () =
     displayDate: '09/05/2026',
     quantities: {
       10000: 1,
+      12000: 0,
       12500: 0,
       14000: 0,
       30000: 0,
@@ -122,7 +125,7 @@ test('parseWaterOcrText marks mismatched rows as needs_review', () => {
   const result = parseWaterOcrText(`01/05/2026\n2\n2\n4\n95.000 đ`)
 
   assert.equal(result.rows[0].status, 'needs_review')
-  assert.equal(result.rows[0].calculatedWaterTotal, 90000)
+  assert.equal(result.rows[0].calculatedWaterTotal, 88000) // fallback: [10k,10k,12k] → 2*10+2*10+4*12=88k
   assert.equal(result.rows[0].detectedWaterTotal, 95000)
   assert.equal(result.rows[0].warnings.includes('Tổng tiền nước không khớp'), true)
 })

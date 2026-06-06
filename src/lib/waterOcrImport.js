@@ -1,9 +1,11 @@
-// 5 physical columns: LỌC(10k), KHOÁNG(10k), REVICE(12.5k), NEWBOOST(14k), POTASI(30k)
-// Two tiers share price 10k — combination search uses all 5; output merges them into one 10k key
-const WATER_PRICES = [10000, 10000, 12500, 14000, 30000]
+// 5 physical columns: LỌC(10k), KHOÁNG(10k), REVICE(12k or 12.5k), NEWBOOST(14k), POTASI(30k)
+// REVICE listed as 12.5k in header but billed at 12k in practice — include both so parser matches.
+// Two tiers share price 10k — combination search uses all; output merges same-price slots into one key.
+const WATER_PRICES = [10000, 10000, 12000, 12500, 14000, 30000]
 
 const emptyQuantities = () => ({
   10000: 0,
+  12000: 0,
   12500: 0,
   14000: 0,
   30000: 0,
@@ -26,15 +28,17 @@ const toIsoDate = displayDate => {
 }
 
 const standaloneNumbersBeforeAmount = (block, amount) => {
-  const lines = block
-    .split(/\n+/)
-    .map(line => line.trim())
+  // Split on any whitespace so iPhone OCR (single-line, space-separated) and
+  // desktop paste (multi-line) both produce the same token list.
+  const tokens = block
+    .split(/\s+/)
+    .map(token => token.trim())
     .filter(Boolean)
 
   const values = []
-  for (const line of lines) {
-    if (amount && parseMoney(line) === amount && /\d+[.,-]\d{3}\s*đ?/i.test(line)) break
-    if (/^\d+$/.test(line)) values.push(Number(line))
+  for (const token of tokens) {
+    if (amount && parseMoney(token) === amount && /\d+[.,-]\d{3}\s*đ?/i.test(token)) break
+    if (/^\d+$/.test(token)) values.push(Number(token))
   }
   return values
 }
