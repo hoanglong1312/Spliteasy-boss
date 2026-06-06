@@ -272,12 +272,8 @@ test('calendar guest form disables duplicate submissions while addGuest is pendi
 
 test('batch entry sends batch water saves and can cancel back', () => {
   assert.match(batchSource, /onAction\?\.\('saveBatchCosts'/)
-  assert.match(batchSource, /parseMonthlyWaterInput\(bulkInput, sessions\)/)
+  assert.match(batchSource, /const \[parsedRows, setParsedRows\] = useState/)
   assert.match(batchSource, /sessions:\s*parsedRows\.map/)
-  assert.match(batchSource, /textarea/)
-  assert.match(batchSource, /Dán tiền nước/)
-  assert.match(batchSource, /Nhập 0 để xóa tiền nước đã lưu cho buổi đó/)
-  assert.doesNotMatch(batchSource, />Huỷ<\/Button>/)
   assert.match(batchSource, /Tổng nước tháng/)
   assert.match(batchSource, /const previewWaterTotal = sessions\.reduce/)
   assert.match(batchSource, /const currentWaterRows = sessions\.filter/)
@@ -286,6 +282,8 @@ test('batch entry sends batch water saves and can cancel back', () => {
   assert.doesNotMatch(batchSource, /bottom:\s*0/)
   assert.doesNotMatch(batchSource, /openExtraSheet/)
   assert.doesNotMatch(batchSource, /ExtraBottomSheet/)
+  assert.doesNotMatch(batchSource, /Nhập 0 để xóa tiền nước đã lưu cho buổi đó/)
+  assert.doesNotMatch(batchSource, /const \[bulkInput, setBulkInput\]/)
 })
 
 test('batch entry uses one full-width save action and no reset-zero button', () => {
@@ -300,23 +298,7 @@ test('batch entry uses one full-width save action and no reset-zero button', () 
   assert.match(batchSource, /Giữ 0/)
 })
 
-test('batch entry supports amount-per-line and date-prefixed monthly water formats', () => {
-  assert.match(batchSource, /function parseMonthlyWaterInput\(input, sessions\)/)
-  assert.match(batchSource, /const rawDateMatch = line\.match/)
-  assert.match(batchSource, /const dateMatch = rawDateMatch && isValidInputDate\(rawDateMatch\) \? rawDateMatch : null/)
-  assert.match(batchSource, /const hasAmountDigits = \/\\d\/\.test\(amountText\)/)
-  assert.match(batchSource, /findSessionByInputDate\(sessions, dateMatch/)
-  assert.match(batchSource, /: sessions\[sequentialIndex\]/)
-  assert.match(batchSource, /formatAmountInput\(amount\)/)
-  assert.match(batchSource, /function isValidInputDate\(dateMatch\)/)
-})
 
-test('batch entry treats explicit zero as a saveable monthly water value', () => {
-  assert.match(batchSource, /const hasExplicitZero = \/\\b0\\b\/\.test\(amountText\)/)
-  assert.match(batchSource, /if \(!hasAmountDigits && !hasExplicitZero\)/)
-  assert.match(batchSource, /waterAmount: amount/)
-  assert.match(appSource, /\.filter\(row => row\.waterAmount >= 0\)/)
-})
 
 test('app handlers persist session water and extras through pickleball_session_items', () => {
   assert.match(appSource, /type === 'saveSessionCost'/)

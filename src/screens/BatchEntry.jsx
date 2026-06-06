@@ -9,23 +9,23 @@ import { parseWaterOcrText } from '../lib/waterOcrImport.js';
 export default function BatchEntry({ data, onAction }) {
   const d = data || DEMO;
   const [sessions, setSessions] = useState(() => sessionDrafts(d));
-  const [bulkInput, setBulkInput] = useState('');
+  const [parsedRows, setParsedRows] = useState([]);
   const [waterImportOpen, setWaterImportOpen] = useState(false);
   const [waterImportText, setWaterImportText] = useState('');
   const [waterImportResult, setWaterImportResult] = useState(null);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [editedAmounts, setEditedAmounts] = useState({});
   const ocrInputRef = useRef(null);
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
-    setBulkInput('');
+    setParsedRows([]);
     setWaterImportText('');
     setWaterImportResult(null);
+    setEditedAmounts({});
   }, [data]);
 
-  const parsedRows = parseMonthlyWaterInput(bulkInput, sessions);
   const waterImportRows = waterImportResult?.rows || [];
-  const okImportRows = waterImportRows.filter(row => row.status === 'ok');
   const currentWaterRows = sessions.filter(session => parseAmount(session.water || session.waterAmount || 0) > 0);
   const previewWaterTotal = sessions.reduce((sum, session) => {
     const parsed = parsedRows.find(row => String(row.sessionId) === String(session.id));
@@ -46,6 +46,7 @@ export default function BatchEntry({ data, onAction }) {
 
   function analyzeWaterImport() {
     setWaterImportResult(parseWaterOcrText(waterImportText));
+    setEditedAmounts({});
   }
 
   async function handleOcrImageUpload(event) {
@@ -61,7 +62,9 @@ export default function BatchEntry({ data, onAction }) {
       setWaterImportText(text.trim());
       // Auto-analyze after OCR completes
       setTimeout(() => {
-        setWaterImportResult(parseWaterOcrText(text.trim()));
+        const result = parseWaterOcrText(text.trim());
+        setWaterImportResult(result);
+        setEditedAmounts({});
       }, 100);
     } catch (error) {
       console.error('OCR error:', error);
@@ -78,10 +81,29 @@ export default function BatchEntry({ data, onAction }) {
 
   function applyWaterImportRows() {
     const rows = waterImportResult?.rows || [];
-    const okRows = rows.filter(row => row.status === 'ok');
-    const updatedSessions = applyImportedWaterRows(sessions, okRows);
-    setSessions(updatedSessions);
-    setBulkInput(exampleInput(updatedSessions));
+    const result = [];
+    
+    rows.forEach((row, index) => {
+      let finalAmount = row.detectedWaterTotal || row.calculatedWaterTotal || 0;
+      if (editedAmounts[index] !== undefined) {
+        finalAmount = parseAmount(editedAmounts[index]);
+      }
+      
+      if (finalAmount === 0 || isNaN(finalAmount)) return;
+      
+      const matchedSession = matchSessionByDate(sessions, row.date);
+      if (!matchedSession) return;
+      
+      result.push({
+        sessionId: matchedSession.id,
+        dateLabel: matchedSession.dateLabel,
+        waterAmount: finalAmount,
+        waterInput: formatAmountInput(finalAmount),
+      });
+    });
+    
+    setParsedRows(result);
+    setWaterImportOpen(false);
   }
 
   return (
@@ -95,7 +117,6 @@ export default function BatchEntry({ data, onAction }) {
             </div>
             <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>Dán tiền nước cuối tháng</div>
           </div>
-          <IconButton onClick={() => setBulkInput(exampleInput(sessions))}>↺</IconButton>
         </div>
 
         <div style={{
@@ -133,37 +154,6 @@ export default function BatchEntry({ data, onAction }) {
             Lưu tất cả
           </Button>
         </div>
-
-        <Card accent="pickleball" style={{ padding: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: colors.pickleball, textTransform: 'uppercase' }}>
-            Dán tiền nước
-          </div>
-          <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 6, lineHeight: 1.4 }}>
-            Nhập 0 để xóa tiền nước đã lưu cho buổi đó.
-          </div>
-          <textarea
-            value={bulkInput}
-            onChange={(event) => setBulkInput(event.target.value)}
-            placeholder={'60.000\n45.000\n0\n22/05 60.000'}
-            style={{
-              width: '100%',
-              minHeight: 126,
-              marginTop: 10,
-              padding: 12,
-              resize: 'vertical',
-              background: colors.inputBg,
-              border: `1px solid ${colors.borderSubtle}`,
-              borderRadius: 12,
-              color: colors.textPrimary,
-              fontSize: 14,
-              fontWeight: 800,
-              fontFamily: type.family,
-              lineHeight: 1.5,
-              outline: 'none',
-              ...type.mono,
-            }}
-          />
-        </Card>
 
         <Card style={{ marginTop: 10, padding: 14 }}>
           <Button variant="ghost" onClick={() => setWaterImportOpen(!waterImportOpen)}>
@@ -245,9 +235,26 @@ export default function BatchEntry({ data, onAction }) {
                     }}>
                       <div style={{ fontSize: 11, fontWeight: 900 }}>{row.displayDate}</div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 900, color: colors.textPrimary, ...type.mono }}>
-                          {formatVND(row.calculatedWaterTotal)}
-                        </div>
+                        <input
+                          type="text"
+                          value={editedAmounts[index] !== undefined ? editedAmounts[index] : formatAmountInput(row.detectedWaterTotal || row.calculatedWaterTotal)}
+                          onChange={(e) => setEditedAmounts({ ...editedAmounts, [index]: e.target.value })}
+                          placeholder={formatAmountInput(row.detectedWaterTotal || row.calculatedWaterTotal)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 8px',
+                            marginBottom: 6,
+                            background: colors.inputBg,
+                            border: `1px solid ${colors.borderSubtle}`,
+                            borderRadius: 8,
+                            color: colors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: 900,
+                            fontFamily: type.family,
+                            outline: 'none',
+                            ...type.mono,
+                          }}
+                        />
                         <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, lineHeight: 1.35 }}>
                           10k: {row.quantities?.[10000] || 0} · 12.5k: {row.quantities?.[12500] || 0} · 14k: {row.quantities?.[14000] || 0} · 30k: {row.quantities?.[30000] || 0}
                         </div>
@@ -262,7 +269,7 @@ export default function BatchEntry({ data, onAction }) {
                       </div>
                     </div>
                   ))}
-                  <Button variant="brand" disabled={okImportRows.length === 0} onClick={applyWaterImportRows} style={{ marginTop: 12 }}>
+                  <Button variant="brand" disabled={waterImportRows.length === 0} onClick={applyWaterImportRows} style={{ marginTop: 12 }}>
                     Điền vào bảng nhập nhanh
                   </Button>
                 </div>
@@ -340,76 +347,16 @@ function batchPreviewStatus(session, parsed) {
   };
 }
 
-function parseMonthlyWaterInput(input, sessions) {
-  const lines = String(input || '')
-    .split(/\n|;/)
-    .map(line => line.trim())
-    .filter(Boolean);
-  let sequentialIndex = 0;
-  const rows = [];
-  lines.forEach(line => {
-    const rawDateMatch = line.match(/(\d{1,2})[\/.-](\d{1,2})(?:[\/.-](\d{2,4}))?/);
-    const dateMatch = rawDateMatch && isValidInputDate(rawDateMatch) ? rawDateMatch : null;
-    const amountText = dateMatch ? line.replace(dateMatch[0], '') : line;
-    const hasAmountDigits = /\d/.test(amountText);
-    const hasExplicitZero = /\b0\b/.test(amountText);
-    if (!hasAmountDigits && !hasExplicitZero) {
-      if (!dateMatch) sequentialIndex += 1;
-      return;
-    }
-    const amount = parseAmount(amountText);
-    const session = dateMatch
-      ? findSessionByInputDate(sessions, dateMatch)
-      : sessions[sequentialIndex];
-    if (!dateMatch) sequentialIndex += 1;
-    if (!session) return;
-    rows.push({
-      sessionId: session.id,
-      dateLabel: session.dateLabel,
-      waterAmount: amount,
-      waterInput: formatAmountInput(amount),
-    });
-  });
-  return rows;
-}
-
-function isValidInputDate(dateMatch) {
-  const day = Number(dateMatch?.[1]);
-  const month = Number(dateMatch?.[2]);
-  return day >= 1 && day <= 31 && month >= 1 && month <= 12;
-}
-
-function findSessionByInputDate(sessions, dateMatch) {
-  const day = String(Number(dateMatch[1])).padStart(2, '0');
-  const month = String(Number(dateMatch[2])).padStart(2, '0');
-  return sessions.find(session => {
-    const rawDate = String(session.date || '');
-    const label = String(session.dateLabel || '');
-    return rawDate.slice(5, 10) === `${month}-${day}` || label.includes(`${day}/${month}`);
-  });
-}
-
-function applyImportedWaterRows(sessions, rows) {
-  return sessions.map(session => {
-    const importedRow = rows.find(row => matchesSessionDate(session, row.date));
-    if (!importedRow) return session;
-    const importedAmount = parseAmount(importedRow.calculatedWaterTotal);
-    return {
-      ...session,
-      water: importedAmount,
-      waterAmount: importedAmount,
-      waterInput: formatAmountInput(importedAmount),
-    };
-  });
-}
-
-function matchesSessionDate(session, date) {
+function matchSessionByDate(sessions, date) {
   const isoDate = String(date || '').slice(0, 10);
-  if (!isoDate) return false;
-  const rawDate = String(session.date || session.sessionDate || session.session_date || '').slice(0, 10);
-  if (rawDate === isoDate) return true;
-  const [, month, day] = isoDate.match(/^\d{4}-(\d{2})-(\d{2})$/) || [];
-  return Boolean(day && month && String(session.dateLabel || '').includes(`${day}/${month}`));
+  if (!isoDate) return null;
+  const session = sessions.find(s => {
+    const rawDate = String(s.date || s.sessionDate || s.session_date || '').slice(0, 10);
+    if (rawDate === isoDate) return true;
+    const [, month, day] = isoDate.match(/^\d{4}-(\d{2})-(\d{2})$/) || [];
+    return Boolean(day && month && String(s.dateLabel || '').includes(`${day}/${month}`));
+  });
+  return session || null;
 }
 
 function importStatusLabel(status) {
@@ -430,10 +377,6 @@ function sessionDrafts(data) {
     id: session.sessionId || session.id,
     waterInput: formatAmountInput(session.water || session.waterAmount || 0),
   }));
-}
-
-function exampleInput(sessions) {
-  return sessions.map(session => formatAmountInput(session.water || session.waterAmount || 0) || '0').join('\n');
 }
 
 function parseAmount(value) {
