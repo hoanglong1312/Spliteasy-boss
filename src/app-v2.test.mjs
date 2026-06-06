@@ -1,11 +1,141 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { parseWaterOcrText } from './lib/waterOcrImport.js'
 
 const appSource = readFileSync(new URL('./app-v2.jsx', import.meta.url), 'utf8')
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const mainSource = readFileSync(new URL('./main.jsx', import.meta.url), 'utf8')
 const dataSource = readFileSync(new URL('./hooks/useScreenData.js', import.meta.url), 'utf8')
+
+const MAY_WATER_OCR_SAMPLE = `
+NGÀY
+19h30-22h
+T2-4-6
+GIÁ TIỀN
+10k/chai
+10k/ chai 12,5k/chai 14k/chai 30k/chai
+50k/quả 30k/quả
+GHI CHÚ
+Tất
+THÀNH TIỀN
+161
+01/05/2026
+2
+2
+4
+96.000 đ
+96.000 đ
+162
+04/05/2026
+2
+4
+76.000 đ
+76.000 đ
+165
+09/05/2026
+Xé vé
+200.000 đ
+1
+10.000 đ
+210.000 đ
+173
+27/05/2026
+2
+2
+4
+88.000 đ
+15.000 đ
+103.000 đ
+175
+TỔNG CỘNG
+1.445-000đ
+`
+
+test('parseWaterOcrText parses dated OCR rows into water quantities and skips totals', () => {
+  const result = parseWaterOcrText(MAY_WATER_OCR_SAMPLE)
+
+  assert.equal(result.rows.some(row => row.displayDate === 'TỔNG CỘNG'), false)
+  assert.deepEqual(result.rows.map(row => row.displayDate), [
+    '01/05/2026',
+    '04/05/2026',
+    '09/05/2026',
+    '27/05/2026',
+  ])
+
+  assert.deepEqual(result.rows[0], {
+    date: '2026-05-01',
+    displayDate: '01/05/2026',
+    quantities: {
+      10000: 2,
+      12500: 2,
+      14000: 4,
+      30000: 0,
+    },
+    detectedWaterTotal: 96000,
+    calculatedWaterTotal: 101000,
+    extraNotes: [],
+    status: 'needs_review',
+    warnings: ['Tổng tiền nước không khớp'],
+  })
+
+  assert.deepEqual(result.rows[1], {
+    date: '2026-05-04',
+    displayDate: '04/05/2026',
+    quantities: {
+      10000: 2,
+      12500: 0,
+      14000: 4,
+      30000: 0,
+    },
+    detectedWaterTotal: 76000,
+    calculatedWaterTotal: 76000,
+    extraNotes: [],
+    status: 'ok',
+    warnings: [],
+  })
+})
+
+test('parseWaterOcrText detects xé vé but excludes it from water totals', () => {
+  const result = parseWaterOcrText(MAY_WATER_OCR_SAMPLE)
+  const row = result.rows.find(item => item.displayDate === '09/05/2026')
+
+  assert.deepEqual(row, {
+    date: '2026-05-09',
+    displayDate: '09/05/2026',
+    quantities: {
+      10000: 1,
+      12500: 0,
+      14000: 0,
+      30000: 0,
+    },
+    detectedWaterTotal: 10000,
+    calculatedWaterTotal: 10000,
+    extraNotes: ['Có xé vé 200.000 đ — không nhập vào nước'],
+    status: 'ok',
+    warnings: [],
+  })
+})
+
+test('parseWaterOcrText marks mismatched rows as needs_review', () => {
+  const result = parseWaterOcrText(`01/05/2026\n2\n2\n4\n95.000 đ`)
+
+  assert.equal(result.rows[0].status, 'needs_review')
+  assert.equal(result.rows[0].calculatedWaterTotal, 101000)
+  assert.equal(result.rows[0].detectedWaterTotal, 95000)
+  assert.equal(result.rows[0].warnings.includes('Tổng tiền nước không khớp'), true)
+})
+
+test('parseWaterOcrText returns a top-level error for empty or dateless text', () => {
+  assert.deepEqual(parseWaterOcrText(''), {
+    rows: [],
+    error: 'Chưa có dữ liệu để phân tích',
+  })
+  assert.deepEqual(parseWaterOcrText('TỔNG CỘNG 1.445.000 đ'), {
+    rows: [],
+    error: 'Không tìm thấy ngày dạng dd/mm/yyyy',
+  })
+})
 
 test('PinEntryScreen uses a controlled numeric password input instead of a numpad', () => {
   assert.match(appSource, /<input[\s\S]*type="password"[\s\S]*inputMode="numeric"[\s\S]*maxLength=\{6\}/)
