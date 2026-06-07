@@ -4084,7 +4084,7 @@ function memberIdForGroup(group, currentUserId, members, currentUserName) {
 
   const currentMember = safeArray(members).find(m => String(m.id) === String(currentUserId))
   const currentName = currentUserName || currentMember?.name
-  const match = membersForGroup(group, members).find(member => sameName(member.name, currentName))
+  const match = allMembersForGroup(group, members).filter(isActiveMember).find(member => sameName(member.name, currentName))
   return match?.id || currentUserId
 }
 

@@ -19,16 +19,19 @@
 |------|---------|
 | **Superpowers** (Claude plugin) | Planning: brainstorming → spec → writing-plans |
 | **Claude Code** | Orchestration + Review: quyết định kiến trúc, review output, điều phối |
-| **Codex** (`codex:codex-rescue` subagent hoặc `/codex:rescue`) | Execution + QA: viết code, chạy test, commit |
+| **Codex** (`codex:codex-rescue` subagent qua Agent tool) | Execution + QA: viết code, chạy test, commit |
 | **Cursor** | Quick fix trong editor |
 | **Browser / Playwright** | UI flow: reproduce, click/type, DOM assertion, screenshot |
 | **Chrome DevTools MCP** | Browser internals: console, network request/response, storage, performance |
 
 **Cơ chế gọi Codex — plugin `codex-plugin-cc`:**
-- Claude dispatch qua subagent `codex:codex-rescue` hoặc dùng `/codex:rescue <task>`
-- Task dài: `--background` → kiểm tra bằng `/codex:status` → lấy kết quả bằng `/codex:result`
-- Review changes: `/codex:review --base main` hoặc `/codex:adversarial-review --base main`
-- Codex CLI auth: ChatGPT account / OpenAI API key (KHÔNG dùng NINEROUTER_API_KEY)
+- Claude main dispatch bằng `Agent` tool với `subagent_type: "codex:codex-rescue"`.
+- Không gọi `Skill("codex:rescue")` để execute task; skill đó chỉ forward instruction và dễ lệch job state.
+- Prompt foreground bắt đầu bằng `--wait`; prompt background bắt đầu bằng `--background`.
+- Trước khi dispatch, Claude chạy helper `codex-companion.mjs task-resume-candidate --json`; nếu có thread resumable thì hỏi user continue/new.
+- Nếu subagent trả job ID nhưng `/codex:status` không thấy, coi là dispatch lỗi; thử direct companion task một lần, rồi fallback theo rule nếu vẫn không có diff/commit.
+- Review changes: `/codex:review --base main` hoặc `/codex:adversarial-review --base main` trong Claude command layer.
+- Codex CLI auth: setup qua `/codex:setup`; project này có thể dùng 9Router, không mặc định dùng `mcp__codex__codex` OpenAI provider.
 
 ---
 
