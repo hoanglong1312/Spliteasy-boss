@@ -265,8 +265,8 @@ export default function BatchEntry({ data, onAction }) {
                 <div style={{ marginTop: 12 }}>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '66px 90px 80px 70px',
-                    gap: 8,
+                    gridTemplateColumns: '60px 1fr 1fr 1fr',
+                    gap: 6,
                     padding: '0 0 8px',
                     fontSize: 9,
                     fontWeight: 900,
@@ -282,8 +282,8 @@ export default function BatchEntry({ data, onAction }) {
                   {waterImportRows.map((row, index) => (
                     <div key={`${row.date}-${index}`} style={{
                       display: 'grid',
-                      gridTemplateColumns: '66px 90px 80px 70px',
-                      gap: 8,
+                      gridTemplateColumns: '60px 1fr 1fr 1fr',
+                      gap: 6,
                       padding: '9px 0',
                       borderTop: `1px solid ${colors.borderSubtle}`,
                       alignItems: 'start',
@@ -310,82 +310,6 @@ export default function BatchEntry({ data, onAction }) {
                             ...type.mono,
                           }}
                         />
-                        <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, lineHeight: 1.35 }}>
-                          10k: {row.quantities?.[10000] || 0} · 12.5k: {row.quantities?.[12500] || 0} · 14k: {row.quantities?.[14000] || 0} · 30k: {row.quantities?.[30000] || 0}
-                        </div>
-                        {[...(row.warnings || []), ...(row.extraNotes || [])].map((note, noteIndex) => (
-                          <div key={noteIndex} style={{ fontSize: 10, color: row.status === 'ok' ? colors.textMuted : '#fca5a5', marginTop: 3, lineHeight: 1.35 }}>
-                            {note}
-                          </div>
-                        ))}
-                        {row.extraNotes?.length > 0 && (row.detectedWaterTotal || row.calculatedWaterTotal) > 0 && (() => {
-                          const water = row.detectedWaterTotal || row.calculatedWaterTotal;
-                          const existingTicket = (d.tickets || []).find(t => t.date === row.date);
-                          const active = addToTicket[index];
-                          if (!existingTicket) return null;
-                          return (
-                            <button
-                              type="button"
-                              key="ticket-toggle"
-                              onClick={() => setAddToTicket(prev => ({ ...prev, [index]: !prev[index] }))}
-                              style={{
-                                marginTop: 6,
-                                padding: '4px 8px',
-                                borderRadius: 8,
-                                fontSize: 10,
-                                fontWeight: 900,
-                                border: active ? '1px solid rgba(52,211,153,0.5)' : `1px solid ${colors.borderSubtle}`,
-                                background: active ? 'rgba(52,211,153,0.12)' : 'transparent',
-                                color: active ? '#6ee7b7' : colors.textMuted,
-                                cursor: 'pointer',
-                                fontFamily: type.family,
-                                display: 'block',
-                              }}
-                            >
-                              {active ? '✓ ' : ''}Cập nhật nước vé · {formatAmountInput(water)} đ
-                            </button>
-                          );
-                        })()}
-                        {row.ticketAmount > 0 && (() => {
-                          const existingTicket = (d.tickets || []).find(t => t.date === row.date);
-                          if (!existingTicket) {
-                            return (
-                              <div style={{ marginTop: 6, fontSize: 10, color: '#fca5a5', fontWeight: 800 }}>
-                                ⚠ Chưa có vé ngày {row.displayDate} — tạo trước trong Calendar
-                              </div>
-                            );
-                          }
-                          const amountMatches = existingTicket.totalAmount === row.ticketAmount;
-                          if (amountMatches) {
-                            return (
-                              <div style={{ marginTop: 6, fontSize: 10, color: '#6ee7b7', fontWeight: 800 }}>
-                                ✓ Vé {(row.ticketAmount / 1000).toFixed(0)}k — khớp
-                              </div>
-                            );
-                          }
-                          const active = updateTicketAmount[index];
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => setUpdateTicketAmount(prev => ({ ...prev, [index]: !prev[index] }))}
-                              style={{
-                                marginTop: 6,
-                                padding: '4px 8px',
-                                borderRadius: 8,
-                                fontSize: 10,
-                                fontWeight: 900,
-                                border: active ? '1px solid rgba(251,191,36,0.5)' : `1px solid ${colors.borderSubtle}`,
-                                background: active ? 'rgba(251,191,36,0.12)' : 'transparent',
-                                color: active ? '#fde68a' : colors.textMuted,
-                                cursor: 'pointer',
-                                fontFamily: type.family,
-                                display: 'block',
-                              }}
-                            >
-                              {active ? '✓ ' : ''}⚠ App {((existingTicket.totalAmount || 0) / 1000).toFixed(0)}k · OCR {(row.ticketAmount / 1000).toFixed(0)}k — cập nhật?
-                            </button>
-                          );
-                        })()}
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <input
