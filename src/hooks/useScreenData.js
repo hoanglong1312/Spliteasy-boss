@@ -239,6 +239,13 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
   const prevMonthUnpaid = buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth)
+  const allTickets = safeArray(pickleballState?.pickleballTickets)
+  const pendingTickets = {
+    count: allTickets.filter(t => String(t?.status || '').toLowerCase() === 'pending_review').length,
+    totalAmount: allTickets
+      .filter(t => String(t?.status || '').toLowerCase() === 'pending_review')
+      .reduce((sum, t) => sum + (Number(t?.total_amount ?? t?.totalAmount) || 0), 0),
+  }
 
   return {
     user: {
@@ -273,6 +280,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     profileBreakdown,
     paymentSummary,
     prevMonthUnpaid,
+    pendingTickets,
   }
 }
 
@@ -1975,6 +1983,14 @@ function buildBatchEntryData(state, params = {}) {
   const today = new Date()
   const monthDate = calendarMonthDate(params, today)
   const members = currentGroupMembers(state)
+  const tickets = monthTicketsForState(state, monthDate).map(t => ({
+    id: t.id,
+    date: String(t.session_date || t.date || '').slice(0, 10),
+    totalAmount: t.total_amount || t.totalAmount || 0,
+    memberIds: t.member_ids || t.memberIds || [],
+    advancerId: t.advancer_id || t.advancerId || null,
+    status: t.status || 'team_fund',
+  }))
   const sessions = getStateMonthSessions(state, monthDate)
     .slice()
     .sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
@@ -1998,6 +2014,7 @@ function buildBatchEntryData(state, params = {}) {
         extras: costs.extras,
         members: members.map(personChip),
         accessories: batchAccessories(session, members, presentIds),
+        memberIds: presentIds,
       }
     })
   const completedCount = sessions.filter(session => session.status === 'done').length
@@ -2008,6 +2025,7 @@ function buildBatchEntryData(state, params = {}) {
     completedCount,
     pendingCount,
     sessions,
+    tickets,
     summary: {
       water: sessions.reduce((sum, session) => sum + (Number(session.water) || 0), 0),
       accessories: sessions.reduce((sum, session) => (
@@ -3234,6 +3252,7 @@ function toTicketRow(ticket, index, state) {
   const status = ticketStatus(ticket)
   const totalAmount = ticketTotalAmount(ticket)
   const amountPerPerson = ticketAmountPerPerson(ticket)
+  const waterAmount = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
   const advancerId = ticketAdvancerId(ticket)
   const advancerName = advancerId ? memberName(advancerId, safeArray(state?.members)) : null
   const date = ticketDate(ticket)
@@ -3248,6 +3267,7 @@ function toTicketRow(ticket, index, state) {
     status,
     amount: totalAmount,
     totalAmount,
+    waterAmount,
     amountPerPerson,
     memberIds,
     memberLabels: attendees.map(row => row.name),
@@ -3310,9 +3330,9 @@ function ticketTotalAmount(ticket) {
 
 function ticketAmountPerPerson(ticket) {
   const memberIds = ticketMemberIds(ticket)
-  const explicit = Number(ticket?.amountPerPerson ?? ticket?.amount_per_person ?? ticket?.perPerson ?? ticket?.per_person ?? ticket?.price) || 0
-  if (explicit > 0) return explicit
-  return memberIds.length > 0 ? Math.round(ticketTotalAmount(ticket) / memberIds.length) : 0
+  const waterAmount = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
+  const total = ticketTotalAmount(ticket) + waterAmount
+  return memberIds.length > 0 ? Math.round(total / memberIds.length) : 0
 }
 
 function ticketDate(ticket) {
