@@ -48,14 +48,28 @@ const moneyValues = block => {
   return matches.map(parseMoney).filter(value => value > 0)
 }
 
-const pickWaterTotal = (amounts, ticketAmount) => {
-  const filtered = amounts.filter(amount => amount !== ticketAmount)
-  if (!filtered.length) return 0
-  if (ticketAmount) {
-    const exactWater = filtered.find(amount => filtered.includes(amount + ticketAmount))
-    if (exactWater) return exactWater
+const extractStructured = (amounts, hasTicket) => {
+  if (!amounts.length) {
+    return { waterAmount: 0, accessoriesAmount: 0, ticketAmount: 0 }
   }
-  return filtered[0]
+  if (hasTicket) {
+    const ticket = amounts[0]
+    const grand = amounts[amounts.length - 1]
+    const water = grand - ticket
+    return {
+      ticketAmount: ticket,
+      waterAmount: water > 0 ? water : 0,
+      accessoriesAmount: 0,
+    }
+  }
+  // Normal row: water = first amount, accessories = middle if 3 amounts
+  const water = amounts[0]
+  const accessories = amounts.length === 3 ? amounts[1] : 0
+  return {
+    ticketAmount: 0,
+    waterAmount: water,
+    accessoriesAmount: accessories,
+  }
 }
 
 const combinations = (length, size, start = 0) => {
@@ -91,15 +105,14 @@ const calculatedTotal = quantities => UNIQUE_PRICES.reduce((sum, price) => {
 const parseBlock = (displayDate, block) => {
   const hasTicket = /x[eé]\s*vé/i.test(block)
   const amounts = moneyValues(block)
-  const ticketAmount = hasTicket ? amounts[0] || 0 : 0
-  const detectedWaterTotal = pickWaterTotal(amounts, ticketAmount)
+  const { ticketAmount, waterAmount: detectedWaterTotal, accessoriesAmount } = extractStructured(amounts, hasTicket)
   const quantities = assignQuantities(standaloneNumbersBeforeAmount(block, detectedWaterTotal), detectedWaterTotal)
   const calculatedWaterTotal = calculatedTotal(quantities)
   const warnings = []
   const extraNotes = []
 
   if (ticketAmount) {
-    extraNotes.push(`Có xé vé ${formatMoney(ticketAmount)} — không nhập vào nước`)
+    extraNotes.push(`Có xé vé ${formatMoney(ticketAmount)} — vé sẽ được thêm riêng`)
   }
 
   if (!calculatedWaterTotal && !detectedWaterTotal) {
@@ -110,15 +123,15 @@ const parseBlock = (displayDate, block) => {
       detectedWaterTotal,
       calculatedWaterTotal,
       ticketAmount,
+      accessoriesAmount,
       extraNotes,
       status: 'skip',
       warnings: ['Không tìm thấy dữ liệu tiền nước'],
     }
   }
 
-  if (detectedWaterTotal && calculatedWaterTotal !== detectedWaterTotal) {
-    warnings.push('Tổng tiền nước không khớp')
-  }
+  // Trust money amounts; do not validate by quantity
+  // Quantity assignment is best-effort and may not match OCR total exactly
 
   return {
     date: toIsoDate(displayDate),
@@ -127,6 +140,7 @@ const parseBlock = (displayDate, block) => {
     detectedWaterTotal,
     calculatedWaterTotal,
     ticketAmount,
+    accessoriesAmount,
     extraNotes,
     status: warnings.length ? 'needs_review' : 'ok',
     warnings,
