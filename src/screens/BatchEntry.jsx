@@ -15,6 +15,8 @@ export default function BatchEntry({ data, onAction }) {
   const [editedSessionAmounts, setEditedSessionAmounts] = useState({});
   const [addToTicket, setAddToTicket] = useState({});
   const [updateTicketAmount, setUpdateTicketAmount] = useState({});
+  const [editedAccessories, setEditedAccessories] = useState({}); // { [rowIndex]: string }
+  const [editedTicketAmounts, setEditedTicketAmounts] = useState({}); // { [rowIndex]: string }
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
@@ -25,6 +27,8 @@ export default function BatchEntry({ data, onAction }) {
     setEditedSessionAmounts({});
     setAddToTicket({});
     setUpdateTicketAmount({});
+    setEditedAccessories({});
+    setEditedTicketAmounts({});
   }, [data]);
 
   const waterImportRows = waterImportResult?.rows || [];
@@ -83,6 +87,8 @@ export default function BatchEntry({ data, onAction }) {
     setEditedSessionAmounts({});
     setAddToTicket({});
     setUpdateTicketAmount({});
+    setEditedAccessories({});
+    setEditedTicketAmounts({});
     const rows = result?.rows || [];
     const applied = [];
     rows.forEach((row) => {
@@ -99,6 +105,61 @@ export default function BatchEntry({ data, onAction }) {
       });
     });
     setParsedRows(applied);
+  }
+
+  function saveOcrImport() {
+    const sessionUpdates = [];
+    const accessoriesExpenses = [];
+    const ticketUpdates = [];
+
+    waterImportRows.forEach((row, index) => {
+      const selectedMonthKey = sessions[0]?.date?.slice(0, 7) || '';
+      const rowMonthKey = row.date?.slice(0, 7);
+      
+      // Skip rows outside the selected month
+      if (rowMonthKey !== selectedMonthKey) return;
+
+      // Session water update
+      const waterAmount = parseAmount(editedAmounts[index]) || row.detectedWaterTotal || row.calculatedWaterTotal || 0;
+      if (waterAmount > 0) {
+        const matchedSession = sessions.find(s => s.date === row.date);
+        if (matchedSession) {
+          sessionUpdates.push({
+            sessionId: matchedSession.id,
+            waterAmount,
+          });
+        }
+      }
+
+      // Accessories expense
+      const accessoriesAmount = parseAmount(editedAccessories[index]) || 0;
+      if (accessoriesAmount > 0) {
+        accessoriesExpenses.push({
+          date: row.date,
+          displayDate: row.displayDate,
+          amount: accessoriesAmount,
+        });
+      }
+
+      // Ticket amount
+      const ticketAmount = parseAmount(editedTicketAmounts[index]) || row.ticketAmount || 0;
+      if (ticketAmount > 0) {
+        const matchedTicket = (d.tickets || []).find(t => t.date === row.date);
+        if (matchedTicket) {
+          ticketUpdates.push({
+            ticketId: matchedTicket.id,
+            waterAmount: waterAmount || 0,
+            totalAmount: ticketAmount,
+          });
+        }
+      }
+    });
+
+    onAction?.('saveOcrImport', {
+      sessionUpdates,
+      accessoriesExpenses,
+      ticketUpdates,
+    });
   }
 
   return (
@@ -148,6 +209,9 @@ export default function BatchEntry({ data, onAction }) {
           </div>
           <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
             Lưu tất cả
+          </Button>
+          <Button variant="pickleball" disabled={waterImportRows.length === 0} onClick={saveOcrImport}>
+            Lưu OCR
           </Button>
         </div>
 
@@ -201,7 +265,7 @@ export default function BatchEntry({ data, onAction }) {
                 <div style={{ marginTop: 12 }}>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: '78px 1fr 70px',
+                    gridTemplateColumns: '66px 90px 80px 70px',
                     gap: 8,
                     padding: '0 0 8px',
                     fontSize: 9,
@@ -212,12 +276,13 @@ export default function BatchEntry({ data, onAction }) {
                   }}>
                     <div>Ngày</div>
                     <div>Nước</div>
-                    <div>Trạng thái</div>
+                    <div>Phụ kiện</div>
+                    <div>Vé</div>
                   </div>
                   {waterImportRows.map((row, index) => (
                     <div key={`${row.date}-${index}`} style={{
                       display: 'grid',
-                      gridTemplateColumns: '78px 1fr 70px',
+                      gridTemplateColumns: '66px 90px 80px 70px',
                       gap: 8,
                       padding: '9px 0',
                       borderTop: `1px solid ${colors.borderSubtle}`,
@@ -322,8 +387,69 @@ export default function BatchEntry({ data, onAction }) {
                           );
                         })()}
                       </div>
-                      <div style={{ fontSize: 10, fontWeight: 900, color: importStatusColor(row.status) }}>
-                        {importStatusLabel(row.status)}
+                      <div style={{ minWidth: 0 }}>
+                        <input
+                          type="text"
+                          value={editedAccessories[index] !== undefined ? editedAccessories[index] : formatAmountInput(row.accessoriesAmount || 0)}
+                          onChange={(e) => setEditedAccessories({ ...editedAccessories, [index]: e.target.value })}
+                          placeholder={formatAmountInput(row.accessoriesAmount || 0)}
+                          style={{
+                            width: '100%',
+                            padding: '6px 6px',
+                            background: colors.inputBg,
+                            border: `1px solid ${colors.borderSubtle}`,
+                            borderRadius: 6,
+                            color: colors.textPrimary,
+                            fontSize: 11,
+                            fontWeight: 900,
+                            fontFamily: type.family,
+                            outline: 'none',
+                            ...type.mono,
+                          }}
+                        />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        {(() => {
+                          const selectedMonthKey = sessions[0]?.date?.slice(0, 7) || d.monthLabel?.match(/20\d{2}/)?.[0];
+                          const rowMonthKey = row.date?.slice(0, 7);
+                          const isOutsideMonth = selectedMonthKey && rowMonthKey && rowMonthKey !== selectedMonthKey;
+                          if (isOutsideMonth) {
+                            return (
+                              <div style={{
+                                padding: '6px 6px',
+                                background: colors.borderSubtle,
+                                borderRadius: 6,
+                                fontSize: 9,
+                                fontWeight: 900,
+                                color: colors.textMuted,
+                                textAlign: 'center',
+                              }}>
+                                Ngoài tháng
+                              </div>
+                            );
+                          }
+                          return (
+                            <input
+                              type="text"
+                              value={editedTicketAmounts[index] !== undefined ? editedTicketAmounts[index] : formatAmountInput(row.ticketAmount || 0)}
+                              onChange={(e) => setEditedTicketAmounts({ ...editedTicketAmounts, [index]: e.target.value })}
+                              placeholder={formatAmountInput(row.ticketAmount || 0)}
+                              style={{
+                                width: '100%',
+                                padding: '6px 6px',
+                                background: colors.inputBg,
+                                border: `1px solid ${colors.borderSubtle}`,
+                                borderRadius: 6,
+                                color: colors.textPrimary,
+                                fontSize: 11,
+                                fontWeight: 900,
+                                fontFamily: type.family,
+                                outline: 'none',
+                                ...type.mono,
+                              }}
+                            />
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}
