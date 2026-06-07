@@ -62,6 +62,10 @@ const extractStructured = (amounts, hasTicket) => {
       accessoriesAmount: 0,
     }
   }
+  // 4+ amounts = multi-item (NEWBOOST etc): grand total is last
+  if (amounts.length >= 4) {
+    return { ticketAmount: 0, waterAmount: amounts[amounts.length - 1], accessoriesAmount: 0 }
+  }
   // Normal row: water = first amount, accessories = middle if 3 amounts
   const water = amounts[0]
   const accessories = amounts.length === 3 ? amounts[1] : 0

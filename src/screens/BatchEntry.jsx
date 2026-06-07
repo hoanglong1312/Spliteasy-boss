@@ -210,7 +210,7 @@ export default function BatchEntry({ data, onAction }) {
           <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
             Lưu tất cả
           </Button>
-          <Button variant="pickleball" disabled={waterImportRows.length === 0} onClick={saveOcrImport}>
+          <Button variant="success" disabled={waterImportRows.length === 0} onClick={saveOcrImport}>
             Lưu OCR
           </Button>
         </div>
