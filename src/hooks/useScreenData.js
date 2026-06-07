@@ -3079,7 +3079,8 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const moved = isMovedSession(session)
   const locked = completed || moved
   const currentUserPresent = sessionIncludesCurrentUser(state, presentIds, groupMembers)
-  const currentUserTotal = currentUserPresent ? courtPerPerson + waterPerPerson + extrasPerPerson : 0
+  const currentUserWaterPerPerson = currentUserPresent ? waterPerPerson : 0
+  const currentUserTotal = currentUserPresent ? courtPerPerson + waterPerPerson + extrasPerPerson : courtPerPerson
 
   return {
     id: session.id,
@@ -3099,8 +3100,8 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     members,
     costs,
     costRows: [
-      { label: '🏸 Tiền sân/người', amount: courtPerPerson },
-      { label: '💧 Tiền nước/người tham gia', amount: waterPerPerson },
+      { label: currentUserPresent ? '🏸 Tiền sân/người' : '🏸 Tiền sân của bạn', amount: courtPerPerson },
+      { label: currentUserPresent ? '💧 Tiền nước/người tham gia' : '💧 Tiền nước của bạn', amount: currentUserWaterPerPerson },
       ...costs.extras.map(item => {
         const count = safeArray(item.memberIds).length
         return {
@@ -3109,10 +3110,11 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
         }
       }),
     ],
-    totalPerPerson: courtPerPerson + waterPerPerson + extrasPerPerson,
+    totalPerPerson: currentUserTotal,
+    totalLabel: currentUserPresent ? 'TỔNG/NGƯỜI THAM GIA' : 'TỔNG CỦA BẠN',
     currentUserPresent,
     currentUserTotal,
-    personalCostNote: currentUserPresent ? 'Bạn có mặt trong buổi này' : 'Bạn vắng buổi này · không tính chi phí',
+    personalCostNote: currentUserPresent ? 'Bạn có mặt trong buổi này' : 'Bạn vắng buổi này · tiền nước = 0đ',
     canShowCosts: sessionKey <= todayKey || isDoneStatus(session?.status),
     canComplete: !moved && sessionKey <= todayKey,
     isCompleted: locked,
