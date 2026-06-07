@@ -13,6 +13,8 @@ export default function BatchEntry({ data, onAction }) {
   const [waterImportResult, setWaterImportResult] = useState(null);
   const [editedAmounts, setEditedAmounts] = useState({});
   const [editedSessionAmounts, setEditedSessionAmounts] = useState({});
+  const [addToTicket, setAddToTicket] = useState({});
+  const [updateTicketAmount, setUpdateTicketAmount] = useState({});
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
@@ -21,6 +23,8 @@ export default function BatchEntry({ data, onAction }) {
     setWaterImportResult(null);
     setEditedAmounts({});
     setEditedSessionAmounts({});
+    setAddToTicket({});
+    setUpdateTicketAmount({});
   }, [data]);
 
   const waterImportRows = waterImportResult?.rows || [];
@@ -34,14 +38,41 @@ export default function BatchEntry({ data, onAction }) {
     : `${currentWaterRows.length}/${sessions.length} buổi đã có dữ liệu`;
 
   function saveAll() {
+    const ticketRows = waterImportRows
+      .map((row, index) => {
+        if (!addToTicket[index]) return null;
+        const water = Number(editedAmounts[index] !== undefined
+          ? editedAmounts[index].replace(/\D/g, '')
+          : row.detectedWaterTotal || row.calculatedWaterTotal) || 0;
+        if (!water && !updateTicketAmount[index]) return null;
+        const existingTicket = (d.tickets || []).find(t => t.date === row.date);
+        if (!existingTicket) return null;
+        return {
+          sessionDate: row.date,
+          waterAmount: water,
+          newTotal: updateTicketAmount[index] ? row.ticketAmount : null,
+          existingTicketId: existingTicket?.id || null,
+          existingTotal: existingTicket?.totalAmount || 0,
+        };
+      })
+      .filter(Boolean);
+
+    const ticketDates = new Set(
+      waterImportRows
+        .filter((row, i) => addToTicket[i] && (d.tickets || []).some(t => t.date === row.date))
+        .map(row => row.date)
+    );
+
     onAction?.('saveBatchCosts', {
       sessions: parsedRows.map(row => {
         const edited = editedSessionAmounts[row.sessionId];
+        const baseWater = edited !== undefined ? parseAmount(edited) : row.waterAmount;
         return {
           sessionId: row.sessionId,
-          waterAmount: edited !== undefined ? parseAmount(edited) : row.waterAmount,
+          waterAmount: ticketDates.has(row.date) ? 0 : baseWater,
         };
       }),
+      ticketRows,
     });
   }
 
@@ -50,6 +81,8 @@ export default function BatchEntry({ data, onAction }) {
     setWaterImportResult(result);
     setEditedAmounts({});
     setEditedSessionAmounts({});
+    setAddToTicket({});
+    setUpdateTicketAmount({});
     const rows = result?.rows || [];
     const applied = [];
     rows.forEach((row) => {
@@ -59,6 +92,7 @@ export default function BatchEntry({ data, onAction }) {
       if (!matched) return;
       applied.push({
         sessionId: matched.id,
+        date: row.date,
         dateLabel: matched.dateLabel,
         waterAmount: amount,
         waterInput: formatAmountInput(amount),
@@ -219,6 +253,74 @@ export default function BatchEntry({ data, onAction }) {
                             {note}
                           </div>
                         ))}
+                        {row.extraNotes?.length > 0 && (row.detectedWaterTotal || row.calculatedWaterTotal) > 0 && (() => {
+                          const water = row.detectedWaterTotal || row.calculatedWaterTotal;
+                          const existingTicket = (d.tickets || []).find(t => t.date === row.date);
+                          const active = addToTicket[index];
+                          if (!existingTicket) return null;
+                          return (
+                            <button
+                              type="button"
+                              key="ticket-toggle"
+                              onClick={() => setAddToTicket(prev => ({ ...prev, [index]: !prev[index] }))}
+                              style={{
+                                marginTop: 6,
+                                padding: '4px 8px',
+                                borderRadius: 8,
+                                fontSize: 10,
+                                fontWeight: 900,
+                                border: active ? '1px solid rgba(52,211,153,0.5)' : `1px solid ${colors.borderSubtle}`,
+                                background: active ? 'rgba(52,211,153,0.12)' : 'transparent',
+                                color: active ? '#6ee7b7' : colors.textMuted,
+                                cursor: 'pointer',
+                                fontFamily: type.family,
+                                display: 'block',
+                              }}
+                            >
+                              {active ? '✓ ' : ''}Cập nhật nước vé · {formatAmountInput(water)} đ
+                            </button>
+                          );
+                        })()}
+                        {row.ticketAmount > 0 && (() => {
+                          const existingTicket = (d.tickets || []).find(t => t.date === row.date);
+                          if (!existingTicket) {
+                            return (
+                              <div style={{ marginTop: 6, fontSize: 10, color: '#fca5a5', fontWeight: 800 }}>
+                                ⚠ Chưa có vé ngày {row.displayDate} — tạo trước trong Calendar
+                              </div>
+                            );
+                          }
+                          const amountMatches = existingTicket.totalAmount === row.ticketAmount;
+                          if (amountMatches) {
+                            return (
+                              <div style={{ marginTop: 6, fontSize: 10, color: '#6ee7b7', fontWeight: 800 }}>
+                                ✓ Vé {(row.ticketAmount / 1000).toFixed(0)}k — khớp
+                              </div>
+                            );
+                          }
+                          const active = updateTicketAmount[index];
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setUpdateTicketAmount(prev => ({ ...prev, [index]: !prev[index] }))}
+                              style={{
+                                marginTop: 6,
+                                padding: '4px 8px',
+                                borderRadius: 8,
+                                fontSize: 10,
+                                fontWeight: 900,
+                                border: active ? '1px solid rgba(251,191,36,0.5)' : `1px solid ${colors.borderSubtle}`,
+                                background: active ? 'rgba(251,191,36,0.12)' : 'transparent',
+                                color: active ? '#fde68a' : colors.textMuted,
+                                cursor: 'pointer',
+                                fontFamily: type.family,
+                                display: 'block',
+                              }}
+                            >
+                              {active ? '✓ ' : ''}⚠ App {((existingTicket.totalAmount || 0) / 1000).toFixed(0)}k · OCR {(row.ticketAmount / 1000).toFixed(0)}k — cập nhật?
+                            </button>
+                          );
+                        })()}
                       </div>
                       <div style={{ fontSize: 10, fontWeight: 900, color: importStatusColor(row.status) }}>
                         {importStatusLabel(row.status)}
