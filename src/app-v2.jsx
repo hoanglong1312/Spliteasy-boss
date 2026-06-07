@@ -823,6 +823,10 @@ export default function AppV2() {
           })
         }
       }
+      if (route?.screen === 'batch-entry') {
+        const nextRoute = { screen: 'batch-entry', params: { ...route.params, yearMonth: nextYearMonth } }
+        setStack((s) => s.map((item, index) => index === s.length - 1 ? nextRoute : item))
+      }
       return
     }
 
@@ -2213,7 +2217,7 @@ export default function AppV2() {
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} onAction={handle} />
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
-      case 'batch-entry':         return <BatchEntry data={getBatchEntryData()} onAction={handle} />
+      case 'batch-entry':         return <BatchEntry data={getBatchEntryData(route.params)} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />
       case 'join-group':          return <JoinGroup data={{ ...getJoinGroupData(), recentSessions: getRecentSessions(), pinnedSession: getPinnedSession(), inviteToken: groupInviteToken, joinCode: groupJoinCode }} onAction={handle} {...pinProps} />
       case 'expense-detail':      return <ExpenseDetail data={getExpenseDetailData(route.params?.expenseId ?? route.params)} onAction={handle} />

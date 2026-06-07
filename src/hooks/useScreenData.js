@@ -125,7 +125,7 @@ export function useScreenData() {
       getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
       getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState),
       getPickleballTeamFundData: (params) => buildPickleballTeamFundData(pickleballState, params?.yearMonth || selectedYearMonth),
-      getBatchEntryData: () => buildBatchEntryData(pickleballState),
+      getBatchEntryData: (params) => buildBatchEntryData(pickleballState, params),
       getPaymentFlowData: (memberId) => buildPaymentFlowData(pickleballState, memberId),
       getJoinGroupData: () => buildJoinGroupData(state),
       getAddExpenseData: (params) => buildAddExpenseData(state, params),
@@ -1971,10 +1971,11 @@ function buildPickleballSettingsData(state) {
   }
 }
 
-function buildBatchEntryData(state) {
+function buildBatchEntryData(state, params = {}) {
   const today = new Date()
+  const monthDate = calendarMonthDate(params, today)
   const members = currentGroupMembers(state)
-  const sessions = getStateMonthSessions(state, today)
+  const sessions = getStateMonthSessions(state, monthDate)
     .slice()
     .sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
     .map((session, index, all) => {
@@ -2003,7 +2004,7 @@ function buildBatchEntryData(state) {
   const pendingCount = sessions.length - completedCount
 
   return {
-    monthLabel: formatMonthLabel(today),
+    monthLabel: formatMonthLabel(monthDate),
     completedCount,
     pendingCount,
     sessions,

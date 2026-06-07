@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
-import { PhoneFrame, Screen, IconButton, Card, Button } from '../primitives';
+import { PhoneFrame, Screen, IconButton, Card, Button, MonthNav } from '../primitives';
 import { parseWaterOcrText } from '../lib/waterOcrImport.js';
 
 export default function BatchEntry({ data, onAction }) {
@@ -70,15 +70,16 @@ export default function BatchEntry({ data, onAction }) {
   return (
     <PhoneFrame>
       <Screen>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0 8px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
           <div style={{ textAlign: 'center', flex: 1 }}>
             <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1.2px', color: colors.textMuted, textTransform: 'uppercase' }}>
-              Pickleball · {d.monthLabel}
+              Pickleball
             </div>
             <div style={{ fontSize: 14, fontWeight: 800, marginTop: 2 }}>Dán tiền nước cuối tháng</div>
           </div>
         </div>
+        <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
         <div style={{
           position: 'sticky',
