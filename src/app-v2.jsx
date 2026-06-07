@@ -1160,6 +1160,7 @@ export default function AppV2() {
           session_date: sessionDate,
           session_time: sessionTime,
           total_amount: totalAmount,
+          water_amount: Number(payload?.waterAmount ?? payload?.water_amount) || 0,
           member_ids: memberIds,
           advancer_id: advancerId,
           status: ticketStatus,
@@ -1176,6 +1177,17 @@ export default function AppV2() {
       const ticketId = payload?.ticketId ?? payload?.id
       const groupId = activePickleballGroupId(state)
       if (!ticketId || !groupId) return
+      if (payload?.waterAmount !== undefined && !payload?.session_date && !payload?.date) {
+        const { token } = getStoredAuth()
+        const sb = createSupabase(token)
+        const { error } = await sb
+          .from('pickleball_tickets')
+          .update({ water_amount: Number(payload.waterAmount) || 0 })
+          .eq('id', ticketId)
+        if (error) throw error
+        await dispatch({ type: 'REFRESH' })
+        return
+      }
       const sessionDate = normalizeTicketDate(payload?.session_date || payload?.date)
       const sessionTime = payload?.session_time || payload?.time || null
       const memberIds = normalizeTicketMemberIds(payload?.member_ids || payload?.memberIds, state)
@@ -1192,17 +1204,21 @@ export default function AppV2() {
       const ticketStatus = isPickleballTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
+      const updates = {
+        session_date: sessionDate,
+        session_time: sessionTime,
+        total_amount: totalAmount,
+        member_ids: memberIds,
+        advancer_id: advancerId,
+        status: ticketStatus,
+        year_month: monthKey(sessionDate || new Date()),
+      }
+      if (payload?.waterAmount !== undefined || payload?.water_amount !== undefined) {
+        updates.water_amount = Number(payload?.waterAmount ?? payload?.water_amount) || 0
+      }
       const { error } = await sb
         .from('pickleball_tickets')
-        .update({
-          session_date: sessionDate,
-          session_time: sessionTime,
-          total_amount: totalAmount,
-          member_ids: memberIds,
-          advancer_id: advancerId,
-          status: ticketStatus,
-          year_month: monthKey(sessionDate || new Date()),
-        })
+        .update(updates)
         .eq('id', ticketId)
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
@@ -1657,30 +1673,18 @@ export default function AppV2() {
           .insert(legacyRows)
         if (error) throw error
       }
-      const ticketRows = safeArray(payload?.ticketRows).filter(r => r?.sessionDate && r?.waterAmount > 0)
+      const ticketRows = safeArray(payload?.ticketRows).filter(r =>
+        r?.existingTicketId && (r?.waterAmount > 0 || r?.newTotal != null)
+      )
       if (ticketRows.length > 0) {
-        const groupId = activePickleballGroupId(state)
-        const actorMemberId = activePickleballActorMemberId(state, groupId)
         for (const ticketRow of ticketRows) {
-          if (ticketRow.existingTicketId) {
-            const { error } = await sb.from('pickleball_tickets')
-              .update({ total_amount: ticketRow.existingTotal + ticketRow.waterAmount })
-              .eq('id', ticketRow.existingTicketId)
-            if (error) throw error
-          } else {
-            const memberIds = safeArray(ticketRow.memberIds).length > 0 ? ticketRow.memberIds : [actorMemberId]
-            const { error } = await sb.from('pickleball_tickets').insert({
-              group_id: groupId,
-              session_date: ticketRow.sessionDate,
-              total_amount: ticketRow.waterAmount,
-              member_ids: memberIds,
-              advancer_id: null,
-              status: 'team_fund',
-              year_month: monthKey(ticketRow.sessionDate),
-              created_by: actorMemberId,
-            })
-            if (error) throw error
-          }
+          const updates = {}
+          if (ticketRow.waterAmount > 0) updates.water_amount = ticketRow.waterAmount
+          if (ticketRow.newTotal != null) updates.total_amount = ticketRow.newTotal
+          const { error } = await sb.from('pickleball_tickets')
+            .update(updates)
+            .eq('id', ticketRow.existingTicketId)
+          if (error) throw error
         }
       }
       await dispatch({ type: 'REFRESH' })
@@ -2227,7 +2231,7 @@ export default function AppV2() {
         return <Profile data={profileData} isTreasurer={isTreasurer} onAction={handle} />
       case 'home':
       default:
-        return <Home data={homeData} isTreasurer={isTreasurer} paymentOpen={homePaymentOpen} onPaymentClose={() => handle('closeHomePayment')} onAction={handle} />
+        return <Home data={homeData} isTreasurer={isTreasurer} isPickleballTreasurer={isPickleballTreasurer} paymentOpen={homePaymentOpen} onPaymentClose={() => handle('closeHomePayment')} onAction={handle} />
     }
   }
 
