@@ -156,6 +156,12 @@ export default function BatchEntry({ data, onAction }) {
                 </div>
               )}
 
+              {waterImportResult && !waterImportResult.error && parsedRows.length === 0 && (
+                <div style={{ marginTop: 10, fontSize: 11, color: '#fca5a5', fontWeight: 800 }}>
+                  Không khớp buổi nào — kiểm tra dữ liệu có đúng tháng không
+                </div>
+              )}
+
               {waterImportRows.length > 0 && (
                 <div style={{ marginTop: 12 }}>
                   <div style={{

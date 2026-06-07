@@ -426,7 +426,9 @@ export function Button({ variant = 'brand', block, children, style, ...rest }) {
       background: palette.bg, color: palette.color,
       border: palette.border || 'none',
       boxShadow: palette.shadow || 'none',
-      fontFamily: 'inherit', cursor: 'pointer', ...style,
+      fontFamily: 'inherit', cursor: rest.disabled ? 'not-allowed' : 'pointer',
+      opacity: rest.disabled ? 0.4 : 1,
+      ...style,
     }} {...rest}>{children}</button>
   );
 }
