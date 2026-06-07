@@ -1691,6 +1691,84 @@ export default function AppV2() {
       setStack((s) => s[s.length - 1]?.screen === 'batch-entry' ? s.slice(0, -1) : s)
       return
     }
+    if (type === 'saveOcrImport') {
+      if (!isPickleballTreasurer) return
+      const groupId = activePickleballGroupId(state)
+      const actorMemberId = activePickleballActorMemberId(state, groupId)
+      const activeMembers = safeArray(state?.members)
+        .filter(m => String(m?.groupId || m?.group_id) === String(groupId) && m?.is_active !== false)
+        .map(m => m.id)
+      
+      const { token } = getStoredAuth()
+      if (!token) return
+      const sb = createSupabase(token)
+      
+      // 1. Update sessions with water amounts
+      const sessionUpdates = safeArray(payload?.sessionUpdates)
+      for (const sessionUpdate of sessionUpdates) {
+        const session = findSessionInPickleState(state, sessionUpdate.sessionId)
+        const sourceTable = session?.sourceTable || session?.source_table
+        if (sourceTable === 'pickle_sessions') {
+          await savePickleSessionWaterExpense(sb, state, session, sessionUpdate.sessionId, sessionUpdate.waterAmount, actorMemberId)
+        } else {
+          await zeroWaterSessionItems(sb, waterSessionItemIds(session))
+          const { error: deleteLegacyWaterError } = await sb
+            .from('pickleball_session_items')
+            .delete()
+            .eq('session_id', sessionUpdate.sessionId)
+            .eq('name', 'Nước')
+          if (deleteLegacyWaterError) throw deleteLegacyWaterError
+          if (sessionUpdate.waterAmount > 0) {
+            const { error } = await sb
+              .from('pickleball_session_items')
+              .insert([{
+                session_id: sessionUpdate.sessionId,
+                name: 'Nước',
+                amount: sessionUpdate.waterAmount,
+                member_ids: [],
+                created_by: state.currentUserId || null,
+              }])
+            if (error) throw error
+          }
+        }
+      }
+      
+      // 2. Create accessories expenses
+      const accessoriesExpenses = safeArray(payload?.accessoriesExpenses)
+      for (const expense of accessoriesExpenses) {
+        const displayDate = expense.displayDate || expense.date.split('-').reverse().join('/')
+        const { data, error } = await sb.rpc('create_expense_group_expense', {
+          p_group_id: groupId,
+          p_title: `Phụ kiện ${displayDate}`,
+          p_amount: expense.amount,
+          p_paid_by_member_id: state.currentUserId,
+          p_category: 'general',
+          p_notes: 'Import từ OCR bảng nước',
+          p_expense_date: expense.date,
+          p_participant_ids: activeMembers,
+          p_receipt_images: [],
+        })
+        if (error || data?.error) throw error || new Error(data.error)
+      }
+      
+      // 3. Update tickets with water and total amounts
+      const ticketUpdates = safeArray(payload?.ticketUpdates)
+      for (const ticketUpdate of ticketUpdates) {
+        const updates = {}
+        if (ticketUpdate.waterAmount >= 0) updates.water_amount = ticketUpdate.waterAmount
+        if (ticketUpdate.totalAmount > 0) updates.total_amount = ticketUpdate.totalAmount
+        if (Object.keys(updates).length > 0) {
+          const { error } = await sb.from('pickleball_tickets')
+            .update(updates)
+            .eq('id', ticketUpdate.ticketId)
+          if (error) throw error
+        }
+      }
+      
+      await dispatch({ type: 'REFRESH' })
+      setStack((s) => s[s.length - 1]?.screen === 'batch-entry' ? s.slice(0, -1) : s)
+      return
+    }
 
     if (type === 'togglePresence') {
       const route = stack[stack.length - 1]
