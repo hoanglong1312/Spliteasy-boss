@@ -1245,7 +1245,9 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const completedSessions = monthSessions.filter(s => isDoneStatus(s?.status)).length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
-  const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0)
+  const monthTickets = monthTicketsForState(state, today)
+  const ticketWaterTotal = monthTickets.reduce((sum, t) => sum + Number(t?.waterAmount ?? t?.water_amount ?? 0), 0)
+  const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0) + ticketWaterTotal
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
@@ -1321,7 +1323,9 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
   const nextCourtFeeTotal = Number(nextMonthlyConfig?.courtFee ?? nextMonthlyConfig?.court_fee ?? courtFeeTotal) || 0
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
-  const waterTotal = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0)
+  const monthTickets = monthTicketsForState(state, today)
+  const ticketWaterForFund = monthTickets.reduce((sum, t) => sum + Number(t?.waterAmount ?? t?.water_amount ?? 0), 0)
+  const waterTotal = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0) + ticketWaterForFund
   const extrasTotal = monthSessions.reduce((sum, session) => {
     return sum + sessionCostsForSession(state, session, currentFixedMembers).extras
       .reduce((extraSum, item) => extraSum + (Number(item.amount) || 0), 0)
@@ -2730,7 +2734,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const courtFee = courtConfirmed
     ? (memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost))
     : 0
-  const waterFee = memberWaterShare(sessions, memberId, members)
+  const waterFee = memberWaterShare(sessions, memberId, members) + memberTicketWaterShare(state, memberId, date)
   const extras = memberExtrasShare(sessions, memberId, state, members)
   const ticketShare = memberTeamFundTicketShare(state, memberId, date)
   const p2pBalance = memberTicketBalance(state, memberId, date)
@@ -2757,6 +2761,16 @@ function memberWaterShare(sessions, memberId, members = []) {
     if (!presentIds.some(id => String(id) === String(memberId))) return sum
     const splitCount = presentIds.length + sessionGuests(session).length
     return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
+  }, 0)
+}
+
+function memberTicketWaterShare(state, memberId, date) {
+  return monthTicketsForState(state, date).reduce((sum, ticket) => {
+    const wAmount = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0)
+    if (!wAmount) return sum
+    const ids = ticketMemberIds(ticket)
+    if (!ids.some(id => String(id) === String(memberId))) return sum
+    return sum + Math.round(wAmount / Math.max(ids.length, 1))
   }, 0)
 }
 
