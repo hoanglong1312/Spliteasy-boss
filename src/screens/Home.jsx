@@ -35,7 +35,7 @@ function filterChipStyle(isActive, variant) {
   };
 }
 
-export default function Home({ data, isTreasurer, paymentOpen = false, onPaymentClose, onAction }) {
+export default function Home({ data, isTreasurer, isPickleballTreasurer = false, paymentOpen = false, onPaymentClose, onAction }) {
   const d = data || DEMO;
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -90,7 +90,13 @@ export default function Home({ data, isTreasurer, paymentOpen = false, onPayment
             onView={() => onAction?.('monthPrev')}
           />
         )}
-        {null}
+        {isPickleballTreasurer && (
+          <PendingTicketsBanner
+            count={d.pendingTickets?.count || 0}
+            totalAmount={d.pendingTickets?.totalAmount || 0}
+            onNavigate={() => onAction?.('push', 'pickleball-calendar')}
+          />
+        )}
 
         <SectionHeader action="Xem tất cả →" onAction={() => onAction?.('allExpenses')}>Giao dịch gần đây</SectionHeader>
         {isTreasurer && (
@@ -1531,6 +1537,36 @@ function PrevMonthNotice({ label, balance, onView }) {
       >
         Xem →
       </button>
+    </div>
+  )
+}
+
+function PendingTicketsBanner({ count, totalAmount, onNavigate }) {
+  if (!count) return null
+  return (
+    <div
+      onClick={onNavigate}
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '10px 14px',
+        background: 'rgba(251,191,36,0.08)',
+        border: '1px solid rgba(251,191,36,0.38)',
+        borderRadius: 12,
+        cursor: 'pointer',
+        marginBottom: 12,
+      }}
+    >
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+          Vé lẻ chờ duyệt
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 900, marginTop: 2 }}>
+          {count} lượt · {totalAmount > 0 ? totalAmount.toLocaleString('vi-VN') + 'đ' : ''}
+        </div>
+      </div>
+      <span style={{ fontSize: 18, color: '#fbbf24' }}>›</span>
     </div>
   )
 }
