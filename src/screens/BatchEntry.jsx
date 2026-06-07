@@ -42,42 +42,72 @@ export default function BatchEntry({ data, onAction }) {
     : `${currentWaterRows.length}/${sessions.length} buổi đã có dữ liệu`;
 
   function saveAll() {
-    const ticketRows = waterImportRows
-      .map((row, index) => {
-        if (!addToTicket[index]) return null;
-        const water = Number(editedAmounts[index] !== undefined
-          ? editedAmounts[index].replace(/\D/g, '')
-          : row.detectedWaterTotal || row.calculatedWaterTotal) || 0;
-        if (!water && !updateTicketAmount[index]) return null;
-        const existingTicket = (d.tickets || []).find(t => t.date === row.date);
-        if (!existingTicket) return null;
-        return {
-          sessionDate: row.date,
-          waterAmount: water,
-          newTotal: updateTicketAmount[index] ? row.ticketAmount : null,
-          existingTicketId: existingTicket?.id || null,
-          existingTotal: existingTicket?.totalAmount || 0,
-        };
-      })
-      .filter(Boolean);
+    const selectedMonthKey = sessions[0]?.date?.slice(0, 7) || '';
+    const sessionUpdates = [];
+    const accessoriesExpenses = [];
+    const ticketUpdates = [];
+    const ticketDates = new Set();
+    const ocrSessionIds = new Set();
 
-    const ticketDates = new Set(
-      waterImportRows
-        .filter((row, i) => addToTicket[i] && (d.tickets || []).some(t => t.date === row.date))
-        .map(row => row.date)
-    );
-
-    onAction?.('saveBatchCosts', {
-      sessions: parsedRows.map(row => {
-        const edited = editedSessionAmounts[row.sessionId];
-        const baseWater = edited !== undefined ? parseAmount(edited) : row.waterAmount;
-        return {
-          sessionId: row.sessionId,
-          waterAmount: ticketDates.has(row.date) ? 0 : baseWater,
-        };
-      }),
-      ticketRows,
+    // First pass: collect ticket dates so session water = 0 for those dates
+    waterImportRows.forEach((row, index) => {
+      const rowMonthKey = row.date?.slice(0, 7);
+      if (selectedMonthKey && rowMonthKey !== selectedMonthKey) return;
+      const ticketTotal = parseAmount(editedTicketAmounts[index] !== undefined
+        ? editedTicketAmounts[index]
+        : formatAmountInput(row.ticketAmount || 0));
+      if (ticketTotal > 0) ticketDates.add(row.date);
     });
+
+    // Process OCR rows
+    waterImportRows.forEach((row, index) => {
+      const rowMonthKey = row.date?.slice(0, 7);
+      if (selectedMonthKey && rowMonthKey !== selectedMonthKey) return;
+
+      const ocrWater = parseAmount(editedAmounts[index] !== undefined
+        ? editedAmounts[index]
+        : formatAmountInput(row.detectedWaterTotal || row.calculatedWaterTotal));
+      const ticketTotal = parseAmount(editedTicketAmounts[index] !== undefined
+        ? editedTicketAmounts[index]
+        : formatAmountInput(row.ticketAmount || 0));
+      const accAmount = parseAmount(editedAccessories[index] !== undefined
+        ? editedAccessories[index]
+        : formatAmountInput(row.accessoriesAmount || 0));
+
+      if (accAmount > 0) {
+        accessoriesExpenses.push({ date: row.date, displayDate: row.displayDate, amount: accAmount });
+      }
+
+      if (ticketTotal > 0) {
+        const matchedTicket = (d.tickets || []).find(t => t.date === row.date);
+        if (matchedTicket) {
+          ticketUpdates.push({ ticketId: matchedTicket.id, waterAmount: ocrWater, totalAmount: ticketTotal });
+        }
+      }
+
+      const matchedSession = matchSessionByDate(sessions, row.date);
+      if (matchedSession) {
+        ocrSessionIds.add(String(matchedSession.id));
+        const bottomEdit = editedSessionAmounts[matchedSession.id];
+        // Ticket sessions: water stays in ticket table, not session
+        const sessionWater = ticketDates.has(row.date)
+          ? 0
+          : (bottomEdit !== undefined ? parseAmount(bottomEdit) : ocrWater);
+        sessionUpdates.push({ sessionId: matchedSession.id, waterAmount: sessionWater });
+      }
+    });
+
+    // Sessions matched manually (not in OCR rows)
+    parsedRows.forEach(row => {
+      if (ocrSessionIds.has(String(row.sessionId))) return;
+      const edited = editedSessionAmounts[row.sessionId];
+      sessionUpdates.push({
+        sessionId: row.sessionId,
+        waterAmount: edited !== undefined ? parseAmount(edited) : row.waterAmount,
+      });
+    });
+
+    onAction?.('saveOcrImport', { sessionUpdates, accessoriesExpenses, ticketUpdates });
   }
 
   function analyzeWaterImport() {
@@ -107,60 +137,6 @@ export default function BatchEntry({ data, onAction }) {
     setParsedRows(applied);
   }
 
-  function saveOcrImport() {
-    const sessionUpdates = [];
-    const accessoriesExpenses = [];
-    const ticketUpdates = [];
-
-    waterImportRows.forEach((row, index) => {
-      const selectedMonthKey = sessions[0]?.date?.slice(0, 7) || '';
-      const rowMonthKey = row.date?.slice(0, 7);
-      
-      // Skip rows outside the selected month
-      if (rowMonthKey !== selectedMonthKey) return;
-
-      // Session water update
-      const waterAmount = parseAmount(editedAmounts[index]) || row.detectedWaterTotal || row.calculatedWaterTotal || 0;
-      if (waterAmount > 0) {
-        const matchedSession = sessions.find(s => s.date === row.date);
-        if (matchedSession) {
-          sessionUpdates.push({
-            sessionId: matchedSession.id,
-            waterAmount,
-          });
-        }
-      }
-
-      // Accessories expense
-      const accessoriesAmount = parseAmount(editedAccessories[index]) || 0;
-      if (accessoriesAmount > 0) {
-        accessoriesExpenses.push({
-          date: row.date,
-          displayDate: row.displayDate,
-          amount: accessoriesAmount,
-        });
-      }
-
-      // Ticket amount
-      const ticketAmount = parseAmount(editedTicketAmounts[index]) || row.ticketAmount || 0;
-      if (ticketAmount > 0) {
-        const matchedTicket = (d.tickets || []).find(t => t.date === row.date);
-        if (matchedTicket) {
-          ticketUpdates.push({
-            ticketId: matchedTicket.id,
-            waterAmount: waterAmount || 0,
-            totalAmount: ticketAmount,
-          });
-        }
-      }
-    });
-
-    onAction?.('saveOcrImport', {
-      sessionUpdates,
-      accessoriesExpenses,
-      ticketUpdates,
-    });
-  }
 
   return (
     <PhoneFrame>
@@ -207,11 +183,8 @@ export default function BatchEntry({ data, onAction }) {
               {formatVND(previewWaterTotal)}
             </span>
           </div>
-          <Button variant="brand" disabled={parsedRows.length === 0} onClick={saveAll}>
+          <Button variant="brand" disabled={waterImportRows.length === 0 && parsedRows.length === 0} onClick={saveAll}>
             Lưu tất cả
-          </Button>
-          <Button variant="success" disabled={waterImportRows.length === 0} onClick={saveOcrImport}>
-            Lưu OCR
           </Button>
         </div>
 
@@ -288,7 +261,7 @@ export default function BatchEntry({ data, onAction }) {
                       borderTop: `1px solid ${colors.borderSubtle}`,
                       alignItems: 'start',
                     }}>
-                      <div style={{ fontSize: 11, fontWeight: 900 }}>{row.displayDate}</div>
+                      <div style={{ fontSize: 11, fontWeight: 900 }}>{row.displayDate.split('/').slice(0, 2).join('/')}</div>
                       <div style={{ minWidth: 0 }}>
                         <input
                           type="text"
