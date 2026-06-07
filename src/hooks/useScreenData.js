@@ -3111,7 +3111,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
       }),
     ],
     totalPerPerson: currentUserTotal,
-    totalLabel: currentUserPresent ? 'TỔNG/NGƯỜI THAM GIA' : 'TỔNG CỦA BẠN',
+    totalLabel: 'TỔNG CỦA BẠN',
     currentUserPresent,
     currentUserTotal,
     personalCostNote: currentUserPresent ? 'Bạn có mặt trong buổi này' : 'Bạn vắng buổi này · tiền nước = 0đ',

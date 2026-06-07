@@ -999,7 +999,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
 
       <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0' }} />
       <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>
-        Chi phí buổi
+        Chi phí của bạn
       </div>
       {costRows.map((c, i) => (
         <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '6px 0' }}>
@@ -1009,32 +1009,23 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
       ))}
 
       <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8,
-        padding: '10px 12px', background: session.currentUserPresent ? 'rgba(52,211,153,0.08)' : 'rgba(148,163,184,0.08)', borderRadius: 10,
+        marginTop: 8,
+        padding: '10px 12px',
+        background: session.currentUserPresent ? 'rgba(52,211,153,0.08)' : 'rgba(148,163,184,0.08)',
+        borderRadius: 10,
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: session.currentUserPresent ? '#6ee7b7' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{session.totalLabel || 'TỔNG/NGƯỜI THAM GIA'}</span>
-        <span style={{ fontSize: 16, fontWeight: 900, color: session.currentUserPresent ? colors.pickleball : '#94a3b8', ...type.mono }}>
-          {session.totalPerPerson.toLocaleString('vi-VN')} đ
-        </span>
-      </div>
-      {session.personalCostNote && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: 10,
-          marginTop: 8,
-          padding: '9px 11px',
-          borderRadius: 10,
-          background: session.currentUserPresent ? 'rgba(52,211,153,0.08)' : 'rgba(148,163,184,0.08)',
-          color: session.currentUserPresent ? '#a7f3d0' : '#cbd5e1',
-          fontSize: 11,
-          fontWeight: 800,
-          lineHeight: 1.3,
-        }}>
-          <span>{session.personalCostNote}</span>
-          <span style={{ whiteSpace: 'nowrap', ...type.mono }}>{(session.currentUserTotal || 0).toLocaleString('vi-VN')} đ</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: session.currentUserPresent ? '#6ee7b7' : '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{session.totalLabel || 'TỔNG CỦA BẠN'}</span>
+          <span style={{ fontSize: 16, fontWeight: 900, color: session.currentUserPresent ? colors.pickleball : '#94a3b8', ...type.mono }}>
+            {session.totalPerPerson.toLocaleString('vi-VN')} đ
+          </span>
         </div>
-      )}
+        {session.personalCostNote && (
+          <div style={{ fontSize: 10, color: session.currentUserPresent ? '#6ee7b7' : '#94a3b8', marginTop: 4, fontWeight: 500, opacity: 0.8 }}>
+            {session.personalCostNote}
+          </div>
+        )}
+      </div>
 
       {session.canShowCosts !== false && (
         <SessionCostSection
