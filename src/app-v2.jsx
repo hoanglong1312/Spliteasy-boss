@@ -1624,12 +1624,14 @@ export default function AppV2() {
       const { token } = getStoredAuth()
       if (!token) return
       const sb = createSupabase(token)
+      const pickleGroupId = activePickleballGroupId(state)
+      const actorMemberId = activePickleballActorMemberId(state, pickleGroupId)
       const legacyRows = []
       for (const row of rows) {
         const session = findSessionInPickleState(state, row.sessionId)
         const sourceTable = session?.sourceTable || session?.source_table
         if (sourceTable === 'pickle_sessions') {
-          await savePickleSessionWaterExpense(sb, state, session, row.sessionId, row.waterAmount)
+          await savePickleSessionWaterExpense(sb, state, session, row.sessionId, row.waterAmount, actorMemberId)
         } else {
           await zeroWaterSessionItems(sb, waterSessionItemIds(session))
           const { error: deleteLegacyWaterError } = await sb
@@ -1654,6 +1656,32 @@ export default function AppV2() {
           .from('pickleball_session_items')
           .insert(legacyRows)
         if (error) throw error
+      }
+      const ticketRows = safeArray(payload?.ticketRows).filter(r => r?.sessionDate && r?.waterAmount > 0)
+      if (ticketRows.length > 0) {
+        const groupId = activePickleballGroupId(state)
+        const actorMemberId = activePickleballActorMemberId(state, groupId)
+        for (const ticketRow of ticketRows) {
+          if (ticketRow.existingTicketId) {
+            const { error } = await sb.from('pickleball_tickets')
+              .update({ total_amount: ticketRow.existingTotal + ticketRow.waterAmount })
+              .eq('id', ticketRow.existingTicketId)
+            if (error) throw error
+          } else {
+            const memberIds = safeArray(ticketRow.memberIds).length > 0 ? ticketRow.memberIds : [actorMemberId]
+            const { error } = await sb.from('pickleball_tickets').insert({
+              group_id: groupId,
+              session_date: ticketRow.sessionDate,
+              total_amount: ticketRow.waterAmount,
+              member_ids: memberIds,
+              advancer_id: null,
+              status: 'team_fund',
+              year_month: monthKey(ticketRow.sessionDate),
+              created_by: actorMemberId,
+            })
+            if (error) throw error
+          }
+        }
       }
       await dispatch({ type: 'REFRESH' })
       setStack((s) => s[s.length - 1]?.screen === 'batch-entry' ? s.slice(0, -1) : s)
@@ -2424,7 +2452,7 @@ function currentGroupMemberIds(state, groupId) {
     .filter(Boolean)
 }
 
-async function savePickleSessionWaterExpense(sb, state, session, sessionId, waterAmount) {
+async function savePickleSessionWaterExpense(sb, state, session, sessionId, waterAmount, actorMemberId) {
   const expenseDate = String(session?.sessionDate || session?.session_date || session?.date || new Date().toISOString().slice(0, 10)).slice(0, 10)
   await zeroWaterSessionItems(sb, waterSessionItemIds(session))
   await deletePickleSessionWaterExpenses(sb, sessionId)
@@ -2449,10 +2477,10 @@ async function savePickleSessionWaterExpense(sb, state, session, sessionId, wate
       amount: waterAmount,
       expense_date: expenseDate,
       category: 'water',
-      paid_by_member_id: state.currentUserId,
-      submitted_by_member_id: state.currentUserId,
+      paid_by_member_id: actorMemberId || state.currentUserId,
+      submitted_by_member_id: actorMemberId || state.currentUserId,
       status: 'approved',
-      reviewed_by_member_id: state.currentUserId,
+      reviewed_by_member_id: actorMemberId || state.currentUserId,
       reviewed_at: new Date().toISOString(),
     })
   if (insertWaterError) throw insertWaterError
