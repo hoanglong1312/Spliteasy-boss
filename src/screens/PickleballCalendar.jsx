@@ -234,6 +234,22 @@ function CalendarCell({ day, selected, onClick }) {
 function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingAction, setSavingAction, onAction }) {
   const dateLabel = formatDayLabel(date);
   const total = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0);
+  const [ticketWaterEdits, setTicketWaterEdits] = useState({});
+  const [waterEditOpen, setWaterEditOpen] = useState({});
+
+  async function saveTicketWater(ticketId) {
+    const raw = ticketWaterEdits[ticketId];
+    if (raw === undefined) return;
+    if (savingAction) return;
+    setSavingAction('saveWater');
+    try {
+      await onAction?.('updateTicket', { ticketId, waterAmount: parseAmount(raw) || 0 });
+      setWaterEditOpen(prev => ({ ...prev, [ticketId]: false }));
+    } finally {
+      setSavingAction('');
+    }
+  }
+
   async function approveTicket(ticket) {
     if (savingAction) return;
     setSavingAction('approveTicket');
@@ -311,6 +327,67 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
                 </div>
               )}
             </div>
+            {(ticket.waterAmount > 0 || waterEditOpen[ticket.id]) && (
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.borderSubtle}` }}>
+                {!waterEditOpen[ticket.id] ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 800 }}>
+                      💧 Nước: {formatVNDShort(ticket.waterAmount)} (+{formatVNDShort(Math.round(ticket.waterAmount / Math.max(ticket.memberIds.length, 1)))}/người)
+                    </span>
+                    {isTreasurer && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTicketWaterEdits(prev => ({ ...prev, [ticket.id]: formatAmountInput(ticket.waterAmount) }));
+                          setWaterEditOpen(prev => ({ ...prev, [ticket.id]: true }));
+                        }}
+                        style={{ fontSize: 10, background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px 4px' }}
+                      >Sửa</button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={ticketWaterEdits[ticket.id] ?? ''}
+                      onChange={e => setTicketWaterEdits(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                      placeholder="0"
+                      style={{
+                        flex: 1,
+                        padding: '5px 8px',
+                        background: colors.inputBg,
+                        border: `1px solid ${colors.borderSubtle}`,
+                        borderRadius: 8,
+                        color: colors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                    />
+                    <button type="button" onClick={() => saveTicketWater(ticket.id)} disabled={savingAction === 'saveWater'}
+                      style={{ fontSize: 11, fontWeight: 900, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(52,211,153,0.4)', background: 'rgba(52,211,153,0.1)', color: '#6ee7b7', cursor: 'pointer' }}>
+                      {savingAction === 'saveWater' ? '…' : 'Lưu'}
+                    </button>
+                    <button type="button" onClick={() => setWaterEditOpen(prev => ({ ...prev, [ticket.id]: false }))}
+                      style={{ fontSize: 11, padding: '5px 8px', borderRadius: 8, border: `1px solid ${colors.borderSubtle}`, background: 'transparent', color: colors.textSecondary, cursor: 'pointer' }}>
+                      Hủy
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            {isTreasurer && ticket.waterAmount === 0 && !waterEditOpen[ticket.id] && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTicketWaterEdits(prev => ({ ...prev, [ticket.id]: '' }));
+                  setWaterEditOpen(prev => ({ ...prev, [ticket.id]: true }));
+                }}
+                style={{ marginTop: 6, fontSize: 10, background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: 0, display: 'block' }}
+              >+ Thêm nước</button>
+            )}
           </div>
         ))}
       </div>
@@ -325,6 +402,9 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
   const [memberIds, setMemberIds] = useState(editingTicket?.memberIds || []);
   const [paymentMode, setPaymentMode] = useState(initialPaymentMode);
   const [advancerId, setAdvancerId] = useState(editingTicket?.advancerId || '');
+  const [waterInput, setWaterInput] = useState(
+    editingTicket?.waterAmount > 0 ? formatAmountInput(editingTicket.waterAmount) : ''
+  );
   const [error, setError] = useState('');
   const selectedMembers = members.filter(member => memberIds.some(id => String(id) === String(member.id)));
   const ticketPrice = Number(editingTicket?.amountPerPerson || data.ticketPricePerPerson || data.ticketPrice || 50000) || 50000;
@@ -356,6 +436,8 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
         session_time: time,
         member_ids: memberIds,
         total_amount: totalAmount,
+        water_amount: parseAmount(waterInput) || 0,
+        waterAmount: parseAmount(waterInput) || 0,
         advancer_id: paymentMode === 'advancer' ? advancerId : null,
         paymentMode,
       });
@@ -445,6 +527,32 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
             <span>{formatVNDShort(ticketPrice)}/người</span>
             <span style={{ ...type.mono }}>Tổng {formatVNDShort(totalAmount)}</span>
           </div>
+        </div>
+
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>
+            Tiền nước (tuỳ chọn)
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={waterInput}
+            onChange={e => setWaterInput(e.target.value)}
+            placeholder="0"
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              background: colors.inputBg,
+              border: `1px solid ${colors.borderSubtle}`,
+              borderRadius: 10,
+              color: colors.textPrimary,
+              fontSize: 13,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
