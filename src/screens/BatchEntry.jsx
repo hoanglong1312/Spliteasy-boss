@@ -12,6 +12,7 @@ export default function BatchEntry({ data, onAction }) {
   const [waterImportText, setWaterImportText] = useState('');
   const [waterImportResult, setWaterImportResult] = useState(null);
   const [editedAmounts, setEditedAmounts] = useState({});
+  const [editedSessionAmounts, setEditedSessionAmounts] = useState({});
 
   useEffect(() => {
     setSessions(sessionDrafts(d));
@@ -19,6 +20,7 @@ export default function BatchEntry({ data, onAction }) {
     setWaterImportText('');
     setWaterImportResult(null);
     setEditedAmounts({});
+    setEditedSessionAmounts({});
   }, [data]);
 
   const waterImportRows = waterImportResult?.rows || [];
@@ -33,42 +35,36 @@ export default function BatchEntry({ data, onAction }) {
 
   function saveAll() {
     onAction?.('saveBatchCosts', {
-      sessions: parsedRows.map(row => ({
-        sessionId: row.sessionId,
-        waterAmount: row.waterAmount,
-      })),
+      sessions: parsedRows.map(row => {
+        const edited = editedSessionAmounts[row.sessionId];
+        return {
+          sessionId: row.sessionId,
+          waterAmount: edited !== undefined ? parseAmount(edited) : row.waterAmount,
+        };
+      }),
     });
   }
 
   function analyzeWaterImport() {
-    setWaterImportResult(parseWaterOcrText(waterImportText));
+    const result = parseWaterOcrText(waterImportText);
+    setWaterImportResult(result);
     setEditedAmounts({});
-  }
-
-  function applyWaterImportRows() {
-    const rows = waterImportResult?.rows || [];
-    const result = [];
-    
-    rows.forEach((row, index) => {
-      let finalAmount = row.detectedWaterTotal || row.calculatedWaterTotal || 0;
-      if (editedAmounts[index] !== undefined) {
-        finalAmount = parseAmount(editedAmounts[index]);
-      }
-      
-      if (finalAmount === 0 || isNaN(finalAmount)) return;
-      
-      const matchedSession = matchSessionByDate(sessions, row.date);
-      if (!matchedSession) return;
-      
-      result.push({
-        sessionId: matchedSession.id,
-        dateLabel: matchedSession.dateLabel,
-        waterAmount: finalAmount,
-        waterInput: formatAmountInput(finalAmount),
+    setEditedSessionAmounts({});
+    const rows = result?.rows || [];
+    const applied = [];
+    rows.forEach((row) => {
+      const amount = row.detectedWaterTotal || row.calculatedWaterTotal || 0;
+      if (!amount) return;
+      const matched = matchSessionByDate(sessions, row.date);
+      if (!matched) return;
+      applied.push({
+        sessionId: matched.id,
+        dateLabel: matched.dateLabel,
+        waterAmount: amount,
+        waterInput: formatAmountInput(amount),
       });
     });
-    
-    setParsedRows(result);
+    setParsedRows(applied);
   }
 
   return (
@@ -222,9 +218,6 @@ export default function BatchEntry({ data, onAction }) {
                       </div>
                     </div>
                   ))}
-                  <Button variant="brand" disabled={waterImportRows.length === 0} onClick={applyWaterImportRows} style={{ marginTop: 12 }}>
-                    Điền vào bảng nhập nhanh
-                  </Button>
                 </div>
               )}
             </div>
@@ -252,14 +245,32 @@ export default function BatchEntry({ data, onAction }) {
                     {status.label}
                   </div>
                 </div>
-                <div style={{
-                  fontSize: 13,
-                  fontWeight: 900,
-                  color: status.amountColor,
-                  ...type.mono,
-                }}>
-                  {parsed ? formatVND(parsed.waterAmount) : formatVND(session.water || session.waterAmount || 0)}
-                </div>
+                <input
+                  type="text"
+                  value={
+                    parsed
+                      ? (editedSessionAmounts[session.id] !== undefined
+                          ? editedSessionAmounts[session.id]
+                          : formatAmountInput(parsed.waterAmount))
+                      : formatAmountInput(session.water || session.waterAmount || 0)
+                  }
+                  disabled={!parsed}
+                  onChange={e => setEditedSessionAmounts({ ...editedSessionAmounts, [session.id]: e.target.value })}
+                  style={{
+                    background: parsed ? colors.inputBg : 'transparent',
+                    border: parsed ? `1px solid ${colors.borderSubtle}` : 'none',
+                    borderRadius: 8,
+                    padding: parsed ? '4px 6px' : '0',
+                    color: parsed ? colors.pickleball : colors.textMuted,
+                    fontSize: 13,
+                    fontWeight: 900,
+                    fontFamily: type.family,
+                    outline: 'none',
+                    width: '80px',
+                    textAlign: 'right',
+                    ...type.mono,
+                  }}
+                />
               </div>
             );
           })}
