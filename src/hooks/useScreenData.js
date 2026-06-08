@@ -3123,11 +3123,16 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const costs = sessionCostsForSession(state, session, members)
   const monthSessions = getStateMonthSessions(state, parseDate(sessionDate(session)) || today)
   const courtPerPerson = perPersonCourtFee(pickle, monthSessions)
-  const casualPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
+  const calExplicitPresentIds = new Set([
+    ...sessionMemberIds(session).map(String),
+    ...sessionAttendanceRecords(session).filter(r => r.status !== 'absent').map(r => String(r.memberId)),
+  ].filter(Boolean))
+  const casualPresentIds = Array.from(calExplicitPresentIds).filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
   const fixedCount = Math.max(groupMembers.filter(member => memberType(member) === 'fixed').length, 1)
   const rebatePerFixed = casualPresentIds.length > 0 ? Math.round(casualPresentIds.length * courtPerPerson / fixedCount) : 0
   const netCourtPerPerson = Math.max(courtPerPerson - rebatePerFixed, 0)
-  const splitCount = presentIds.length + guests.length
+  const fixedPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) !== 'casual')
+  const splitCount = fixedPresentIds.length + casualPresentIds.length + guests.length
   const waterPerPerson = splitCount > 0 ? Math.round(costs.waterAmount / splitCount) : 0
   const extrasPerPerson = costs.extras.reduce((sum, item) => {
     const count = safeArray(item.memberIds).length
