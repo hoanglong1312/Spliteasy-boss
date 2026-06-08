@@ -2975,6 +2975,10 @@ function isOffScheduleStaleSession(state, session) {
   if (!['scheduled', 'upcoming'].includes(normalizedStatus)) return false
   const date = parseDate(sessionDate(session))
   if (!date) return false
+  // Past sessions are never hidden — may be legitimately reopened off-schedule sessions
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (date < today) return false
   const originDate = replacementOriginDate(session)
   if (originDate && originDate !== dateKey(date)) return false
   const monthlyConfig = currentMonthlyPickleConfig(state, monthKey(date))
