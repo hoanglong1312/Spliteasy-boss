@@ -95,7 +95,15 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
             items={d.pendingTickets?.items || []}
             count={d.pendingTickets?.count || 0}
             totalAmount={d.pendingTickets?.totalAmount || 0}
-            onNavigate={() => onAction?.('push', 'pickleball-calendar')}
+            onNavigate={() => {
+              const firstItem = (d.pendingTickets?.items || [])[0]
+              const date = firstItem?.date
+              const yearMonth = date ? date.slice(0, 7) : undefined
+              onAction?.('push', {
+                screen: 'pickleball-calendar',
+                params: yearMonth ? { yearMonth, selectedDate: date } : {}
+              })
+            }}
             onAction={onAction}
           />
         )}
