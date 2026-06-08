@@ -2757,7 +2757,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const courtFee = courtConfirmed
     ? (memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost))
     : 0
-  const waterFee = memberWaterShare(sessions, memberId, members) + memberTicketWaterShare(state, memberId, date)
+  const waterFee = memberWaterShare(sessions, memberId, members)
   const extras = memberExtrasShare(sessions, memberId, state, members)
   const ticketShare = memberTeamFundTicketShare(state, memberId, date)
   const p2pBalance = memberTicketBalance(state, memberId, date)
