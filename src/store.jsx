@@ -248,6 +248,7 @@ function replacementSessionsForOrigin(state, originalSession) {
     return String(session?.id || '') !== originalId &&
       (!groupId || !sessionGroupId || String(sessionGroupId) === String(groupId)) &&
       rescheduleOriginDate(session) === originDate &&
+      sessionDateValue(session) !== originDate &&
       !isHiddenReplacementSession(session)
   })
 }
