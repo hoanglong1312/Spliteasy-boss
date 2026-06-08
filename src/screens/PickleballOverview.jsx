@@ -134,9 +134,9 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             )}
           </Card>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'space-between' }}>
             {personalSummaryCards.map(card => (
-              <CompactCostCard key={card.label} icon={card.icon} label={card.label} value={card.amount} sub={card.sub} />
+              <CompactCostCard key={card.label} icon={card.icon} label={card.label} value={card.amount} sub={card.sub} style={{ flex: 1 }} />
             ))}
           </div>
         </div>
@@ -328,9 +328,9 @@ function balanceHeroStyle(total) {
   };
 }
 
-function CompactCostCard({ icon, label, value, sub }) {
+function CompactCostCard({ icon, label, value, sub, style }) {
   return (
-    <Card style={{ padding: '11px 9px' }}>
+    <Card style={{ padding: '11px 9px', display: 'flex', flexDirection: 'column', justifyContent: 'center', ...style }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ fontSize: 14 }}>{icon}</span>
         <div style={{ fontSize: 8, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 800 }}>
