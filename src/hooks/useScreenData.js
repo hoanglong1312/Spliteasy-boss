@@ -239,7 +239,10 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
   const prevMonthUnpaid = buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth)
-  const allTickets = safeArray(pickleballState?.pickleballTickets)
+  const allTickets = [
+    ...safeArray(pickleballState?.pickle?.externalTickets),
+    ...safeArray(pickleballState?._allPickle?.externalTickets),
+  ]
   const pendingTickets = {
     count: allTickets.filter(t => String(t?.status || '').toLowerCase() === 'pending_review').length,
     totalAmount: allTickets
