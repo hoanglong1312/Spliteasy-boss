@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { colors, type, formatVNDShort } from '../tokens'
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Badge, SubTabs, Pill, PillRow, Avatar, Button, Input,
-  LoadingSpinner, loadingOverlayStyle,
+  LoadingSpinner, loadingOverlayStyle, MonthNav,
 } from '../primitives'
 
 const EMPTY_DATA = {
@@ -82,6 +82,8 @@ export default function PickleballTickets({ data, isTreasurer = true, onAction }
           ]}
           active="tickets" onChange={(k) => onAction?.('subTab', k)}
         />
+
+        <MonthNav label={d.monthLabel || d.summary?.monthLabel} onPrev={() => onAction?.("monthPrev")} onNext={() => onAction?.("monthNext")} />
 
         <Card accent="pickleball" style={{ padding: 14 }}>
           <div style={{ ...type.label, color: colors.pickleball }}>{d.summary.monthLabel || d.monthLabel}</div>

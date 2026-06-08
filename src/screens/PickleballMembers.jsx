@@ -5,7 +5,7 @@ import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, Card, Badge, SubTabs, Avatar, Stat, Button, Input,
   ModuleHero, ActionButton, SearchInput, StatGrid, BottomSheet, MemberPicker,
-  LoadingSpinner, loadingOverlayStyle,
+  LoadingSpinner, loadingOverlayStyle, MonthNav,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -195,6 +195,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
             <Button type="button" variant="primary" onClick={() => setShowAddMember(true)} style={{ padding: '10px 12px', fontSize: 12, color: '#064e3b' }}>+ Thêm</Button>
           ) : null}
         />
+
+        <MonthNav label={d.monthLabel} onPrev={() => onAction?.("monthPrev")} onNext={() => onAction?.("monthNext")} />
 
         <SubTabs
           items={[

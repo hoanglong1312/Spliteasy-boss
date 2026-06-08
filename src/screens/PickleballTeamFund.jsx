@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Card, Button, Input, Avatar,
-  LoadingSpinner, loadingOverlayStyle,
+  LoadingSpinner, loadingOverlayStyle, MonthNav,
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
 
@@ -181,6 +181,8 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           </div>
           <IconButton onClick={() => onAction?.('back')}>×</IconButton>
         </div>
+
+        <MonthNav label={d.monthLabel} onPrev={() => onAction?.("monthPrev")} onNext={() => onAction?.("monthNext")} />
 
         <Card accent="finance" style={{ padding: '14px 12px' }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>
