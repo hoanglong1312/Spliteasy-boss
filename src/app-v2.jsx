@@ -2065,7 +2065,7 @@ export default function AppV2() {
           .select('id')
           .single()
         if (profileError) throw profileError
-        const { error: memberError } = await sb
+        const { data: newMember, error: memberError } = await sb
           .from('members')
           .insert({
             group_id: groupId,
@@ -2074,7 +2074,40 @@ export default function AppV2() {
             member_type: 'casual',
             is_active: true,
           })
+          .select('id')
+          .single()
         if (memberError) throw memberError
+        const { error: attendanceError } = await sb
+          .from('pickle_attendees')
+          .insert({
+            session_id: sessionId,
+            member_id: newMember.id,
+            attendee_type: 'member',
+            rsvp_status: 'going',
+            attended: true,
+          })
+        if (attendanceError) throw attendanceError
+      } else {
+        const { data: existingAttendance, error: attendanceLookupError } = await sb
+          .from('pickle_attendees')
+          .select('id')
+          .eq('session_id', sessionId)
+          .eq('member_id', existingMember.id)
+          .eq('attendee_type', 'member')
+          .maybeSingle()
+        if (attendanceLookupError) throw attendanceLookupError
+        if (!existingAttendance) {
+          const { error: attendanceError } = await sb
+            .from('pickle_attendees')
+            .insert({
+              session_id: sessionId,
+              member_id: existingMember.id,
+              attendee_type: 'member',
+              rsvp_status: 'going',
+              attended: true,
+            })
+          if (attendanceError) throw attendanceError
+        }
       }
       await dispatch({ type: 'REFRESH' })
       return
