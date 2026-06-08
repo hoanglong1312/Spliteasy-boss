@@ -964,9 +964,8 @@ function AddMemberEditor({ title, groupId, candidates = [], currentMembers = [],
     if (!normalizedQuery) return true;
     return normalizeSearch(candidate.name).includes(normalizedQuery);
   });
-  const hasExactMatch = candidates.some(candidate => normalizeSearch(candidate.name) === normalizedQuery);
   const isDuplicateCurrent = Boolean(cleanQuery && currentMembers.some(m => normalizeSearch(m.name) === normalizedQuery));
-  const canAddNewName = Boolean(cleanQuery && !hasExactMatch && !isDuplicateCurrent);
+  const canAddNewName = Boolean(cleanQuery && visibleCandidates.length === 0 && !isDuplicateCurrent);
   const totalToAdd = selectedCandidates.length + (canAddNewName ? 1 : 0);
 
   function toggleCandidate(candidateId) {
