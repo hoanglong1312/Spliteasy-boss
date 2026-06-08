@@ -2752,7 +2752,9 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? pickle?.monthlyCourtFee ?? pickle?.monthly_court_fee ?? 0)
   const configuredSessionCount = Number(monthlyConfig?.sessionsCount ?? monthlyConfig?.sessions_count ?? 0)
   const sessionsCount = Math.max(sessions.length || configuredSessionCount, 1)
-  const ratePerSession = courtFeeTotal / sessionsCount / fixedMemberCount
+  const activeCount = safeArray(monthlyConfig?.active_member_ids ?? monthlyConfig?.activeMemberIds).length
+  const memberCount = Math.max(activeCount || fixedMemberCount, 1)
+  const ratePerSession = courtFeeTotal / sessionsCount / memberCount
   const casualCharges = casualMembers.map(member => {
     const vanglaiCharge = ratePerSession * attendanceByMemberId(sessions, member.id)
     return {
@@ -2760,11 +2762,11 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
       amount: Math.round(vanglaiCharge),
     }
   })
-  const rebatePerFixed = fixedMemberCount > 0 ? casualCharges.reduce((sum, row) => sum + row.amount, 0) / fixedMemberCount : 0
+  const rebatePerFixed = memberCount > 0 ? casualCharges.reduce((sum, row) => sum + row.amount, 0) / memberCount : 0
   const member = members.find(row => String(row.id) === String(memberId))
   const ownerPayments = currentGroupOwnerPayments(state)
   const courtConfirmed = ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth)
-  const courtFeeShare = courtFeeTotal / fixedMemberCount
+  const courtFeeShare = courtFeeTotal / memberCount
   const fixedNetCost = Math.max(courtFeeShare - rebatePerFixed, 0)
   const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
   const courtFee = courtConfirmed
