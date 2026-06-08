@@ -1313,7 +1313,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       color: currentMember?.color,
       statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
       ticketAdjustment,
-      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment),
+      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, members),
       breakdown,
     },
     yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId, today),
@@ -2551,8 +2551,11 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
   ]
 }
 
-function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment) {
-  const waterSessions = monthSessions.filter(s => sessionWaterAmount(s) > 0).length
+function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = []) {
+  const waterSessions = monthSessions.filter(s => (
+    sessionWaterAmount(s) > 0 &&
+    effectiveSessionMemberIds(s, members).some(id => String(id) === String(memberId))
+  )).length
   return [
     { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' },
     { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước` },
