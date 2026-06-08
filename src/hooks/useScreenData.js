@@ -1619,6 +1619,10 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
   }))
   const monthSessions = getMonthSessions(pickle, parseDate(sessionDate(session)) || new Date())
   const courtPerPerson = perPersonCourtFee(pickle, monthSessions)
+  const casualPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
+  const fixedCount = Math.max(fixedMembers.length, groupMembers.filter(member => memberType(member) === 'fixed').length, 1)
+  const rebatePerFixed = casualPresentIds.length > 0 ? Math.round(casualPresentIds.length * courtPerPerson / fixedCount) : 0
+  const netCourtPerPerson = Math.max(courtPerPerson - rebatePerFixed, 0)
   const waterTotal = sessionWaterAmount(session)
   const splitCount = presentMembers.length + guests.length
   const waterPerPerson = splitCount > 0 ? Math.round(waterTotal / splitCount) : 0
@@ -1640,8 +1644,8 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
     absentMembers,
     guests,
     courtFee: {
-      perPerson: courtPerPerson,
-      sub: `${Math.round((Number(pickle?.monthlyCourtFee) || 0) / Math.max(monthSessions.length, 1)).toLocaleString('vi-VN')} đ/buổi ÷ ${Math.max(fixedMembers.length, groupMembers.length, 1)} TV`,
+      perPerson: netCourtPerPerson,
+      sub: `${Math.round((Number(pickle?.monthlyCourtFee) || 0) / Math.max(monthSessions.length, 1)).toLocaleString('vi-VN')} đ/buổi ÷ ${Math.max(fixedMembers.length, groupMembers.length, 1)} TV${casualPresentIds.length > 0 ? ` · ${casualPresentIds.length} vãng lai` : ''}`,
     },
     waterFee: {
       perPerson: waterPerPerson,
@@ -1649,7 +1653,7 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
       sub: `${waterTotal.toLocaleString('vi-VN')} đ ÷ ${Math.max(splitCount, 1)} người`,
     },
     accessories,
-    totalPerPerson: courtPerPerson + waterPerPerson + accessoriesPerPerson,
+    totalPerPerson: netCourtPerPerson + waterPerPerson + accessoriesPerPerson,
     currentUserId,
   }
 }
@@ -3115,6 +3119,10 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const costs = sessionCostsForSession(state, session, members)
   const monthSessions = getStateMonthSessions(state, parseDate(sessionDate(session)) || today)
   const courtPerPerson = perPersonCourtFee(pickle, monthSessions)
+  const casualPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
+  const fixedCount = Math.max(groupMembers.filter(member => memberType(member) === 'fixed').length, 1)
+  const rebatePerFixed = casualPresentIds.length > 0 ? Math.round(casualPresentIds.length * courtPerPerson / fixedCount) : 0
+  const netCourtPerPerson = Math.max(courtPerPerson - rebatePerFixed, 0)
   const splitCount = presentIds.length + guests.length
   const waterPerPerson = splitCount > 0 ? Math.round(costs.waterAmount / splitCount) : 0
   const extrasPerPerson = costs.extras.reduce((sum, item) => {
@@ -3128,7 +3136,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const locked = completed || moved
   const currentUserPresent = sessionIncludesCurrentUser(state, presentIds, groupMembers)
   const currentUserWaterPerPerson = currentUserPresent ? waterPerPerson : 0
-  const currentUserTotal = currentUserPresent ? courtPerPerson + waterPerPerson + extrasPerPerson : courtPerPerson
+  const currentUserTotal = currentUserPresent ? netCourtPerPerson + waterPerPerson + extrasPerPerson : netCourtPerPerson
 
   return {
     id: session.id,
@@ -3148,7 +3156,7 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     members,
     costs,
     costRows: [
-      { label: currentUserPresent ? '🏸 Tiền sân/người' : '🏸 Tiền sân của bạn', amount: courtPerPerson },
+      { label: currentUserPresent ? '🏸 Tiền sân/người' : '🏸 Tiền sân của bạn', amount: netCourtPerPerson },
       { label: currentUserPresent ? '💧 Tiền nước/người tham gia' : '💧 Tiền nước của bạn', amount: currentUserWaterPerPerson },
       ...costs.extras.map(item => {
         const count = safeArray(item.memberIds).length
