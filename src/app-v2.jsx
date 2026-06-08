@@ -2013,14 +2013,22 @@ export default function AppV2() {
       const existingMember = await findCasualMemberByName(sb, groupId, guestName)
       if (!existingMember) {
         const parts = memberNameParts(guestName)
-        const { error: memberError } = await sb
-          .from('members')
+        const { data: profile, error: profileError } = await sb
+          .from('profiles')
           .insert({
-            group_id: groupId,
             name: guestName,
             short: parts.short,
             initials: parts.initials,
             color: '#574EFA',
+          })
+          .select('id')
+          .single()
+        if (profileError) throw profileError
+        const { error: memberError } = await sb
+          .from('members')
+          .insert({
+            group_id: groupId,
+            profile_id: profile.id,
             role: 'member',
             member_type: 'casual',
             is_active: true,
@@ -2612,12 +2620,19 @@ function memberNameParts(name) {
 }
 
 async function findCasualMemberByName(sb, groupId, name) {
+  const { data: profile, error: profileError } = await sb
+    .from('profiles')
+    .select('id')
+    .ilike('name', name)
+    .maybeSingle()
+  if (profileError) throw profileError
+  if (!profile) return null
   const { data, error } = await sb
     .from('members')
     .select('id')
     .eq('group_id', groupId)
     .eq('member_type', 'casual')
-    .ilike('name', name)
+    .eq('profile_id', profile.id)
     .maybeSingle()
   if (error) throw error
   return data
