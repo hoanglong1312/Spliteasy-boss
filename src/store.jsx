@@ -2513,33 +2513,6 @@ export function AppProvider({ children }) {
           .eq('id', sessionId)
         if (error) throw error
 
-        if (table === 'pickle_sessions') {
-          const sessionGroupId = session?.groupId || session?.group_id
-          const allMembers = safeArray(stateRef.current?.members)
-            .filter(m =>
-              String(m?.groupId || m?.group_id) === String(sessionGroupId) &&
-              m?.is_active !== false &&
-              m?.isActive !== false &&
-              String(m?.memberType || m?.member_type || 'fixed').toLowerCase() !== 'casual'
-            )
-          const existingRecords = safeArray(session?.attendanceRecords || session?.attendance_records)
-          const recordedMemberIds = new Set(existingRecords.map(r => String(r.memberId || r.member_id)))
-          const unrecordedMembers = allMembers.filter(m => !recordedMemberIds.has(String(m.id)))
-          if (unrecordedMembers.length > 0) {
-            const { error: attendError } = await sb.from('pickle_attendees').upsert(
-              unrecordedMembers.map(m => ({
-                session_id: sessionId,
-                member_id: m.id,
-                attendee_type: 'member',
-                rsvp_status: 'going',
-                attended: true,
-              })),
-              { onConflict: 'session_id,member_id' }
-            )
-            if (attendError) throw attendError
-          }
-        }
-
         await refresh()
         break
       }
