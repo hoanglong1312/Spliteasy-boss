@@ -190,13 +190,10 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           tone="pickleball"
           eyebrow={`CLB PICKLEBALL · ${d.clubName}`}
           title="Thành viên"
-          subtitle={d.monthLabel}
           action={isTreasurer ? (
             <Button type="button" variant="primary" onClick={() => setShowAddMember(true)} style={{ padding: '10px 12px', fontSize: 12, color: '#064e3b' }}>+ Thêm</Button>
           ) : null}
         />
-
-        <MonthNav label={d.monthLabel} onPrev={() => onAction?.("monthPrev")} onNext={() => onAction?.("monthNext")} />
 
         <SubTabs
           items={[
@@ -207,6 +204,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           active="members"
           onChange={(key) => onAction?.('subTab', key)}
         />
+
+        <MonthNav label={d.monthLabel} onPrev={() => onAction?.("monthPrev")} onNext={() => onAction?.("monthNext")} />
 
         <StatGrid>
           <Stat value={d.stats?.permanent || fixedMembers.length} label="Cố định" accent="pickleball" />

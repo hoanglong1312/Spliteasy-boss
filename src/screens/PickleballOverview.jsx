@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, Card, Button, Badge, SubTabs, Avatar,
+  PhoneFrame, Screen, TabBar, IconButton, Card, Button, Badge, SubTabs, Avatar, MonthNav,
 } from '../primitives';
 
 export default function PickleballOverview({ data, isTreasurer = true, onAction }) {
@@ -47,6 +47,8 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             if (k === 'members') onAction?.('push', 'pickleball-members');
           }}
         />
+
+        <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
         {/* Your balance */}
         <Card accent="finance" style={balanceHeroStyle(d.yourBalance.total)}>
