@@ -97,6 +97,15 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
             onNavigate={() => onAction?.('push', 'pickleball-calendar')}
           />
         )}
+        {isTreasurer && (
+          <PendingApprovalZone
+            expenses={pendingExpenses}
+            payments={pendingPayments}
+            savingAction={savingAction}
+            setSavingAction={setSavingAction}
+            onAction={onAction}
+          />
+        )}
 
         <SectionHeader action="Xem tất cả →" onAction={() => onAction?.('allExpenses')}>Giao dịch gần đây</SectionHeader>
         {isTreasurer && (
