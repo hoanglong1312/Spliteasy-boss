@@ -1619,7 +1619,11 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
   }))
   const monthSessions = getMonthSessions(pickle, parseDate(sessionDate(session)) || new Date())
   const courtPerPerson = perPersonCourtFee(pickle, monthSessions)
-  const casualPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
+  const explicitPresentIds = new Set([
+    ...sessionMemberIds(session).map(String),
+    ...sessionAttendanceRecords(session).filter(r => r.status !== 'absent').map(r => String(r.memberId)),
+  ].filter(Boolean))
+  const casualPresentIds = Array.from(explicitPresentIds).filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
   const fixedCount = Math.max(fixedMembers.length, groupMembers.filter(member => memberType(member) === 'fixed').length, 1)
   const rebatePerFixed = casualPresentIds.length > 0 ? Math.round(casualPresentIds.length * courtPerPerson / fixedCount) : 0
   const netCourtPerPerson = Math.max(courtPerPerson - rebatePerFixed, 0)
