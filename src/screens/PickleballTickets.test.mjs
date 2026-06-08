@@ -25,6 +25,34 @@ test('PickleballTickets renders emerald tickets layout and treasurer actions', (
   assert.match(screenSource, /onAction\?\.\('deleteTicket', \{ ticketId: t\.id \}\)/)
 })
 
+test('Home pending tickets banner expands with inline approve and delete actions', () => {
+  const callsite = homeSource.slice(
+    homeSource.indexOf('<PendingTicketsBanner'),
+    homeSource.indexOf('{isTreasurer &&')
+  )
+  const banner = homeSource.slice(
+    homeSource.indexOf('function PendingTicketsBanner'),
+    homeSource.indexOf('function MonthSummary')
+  )
+
+  assert.match(callsite, /items=\{d\.pendingTickets\?\.items \|\| \[\]\}/)
+  assert.match(callsite, /count=\{d\.pendingTickets\?\.count \|\| 0\}/)
+  assert.match(callsite, /totalAmount=\{d\.pendingTickets\?\.totalAmount \|\| 0\}/)
+  assert.match(callsite, /onNavigate=\{\(\) => onAction\?\.\('push', 'pickleball-calendar'\)\}/)
+  assert.match(callsite, /onAction=\{onAction\}/)
+  assert.match(banner, /function PendingTicketsBanner\(\{ items = \[\], count, totalAmount, onNavigate, onAction \}\)/)
+  assert.match(banner, /const \[expanded, setExpanded\] = useState\(false\)/)
+  assert.match(banner, /items\.map\(ticket =>/)
+  assert.match(banner, /ticket\.dateLabel \|\| ticket\.date \|\| 'Chưa có ngày'/)
+  assert.match(banner, /ticket\.memberLabel \|\| '—'/)
+  assert.match(banner, /ticket\.advancerName \? `\$\{ticket\.advancerName\} ứng` : 'Quỹ team trả'/)
+  assert.match(banner, /await onAction\?\.\('approveTicket', \{ ticketId: ticket\.id, status: ticket\.approveStatus \}\)/)
+  assert.match(banner, /await onAction\?\.\('deleteTicket', \{ ticketId: ticket\.id \}\)/)
+  assert.match(banner, /'Đang lưu…'/)
+  assert.match(banner, /saving \? 'Đang lưu…' : 'Duyệt'/)
+  assert.match(banner, /saving \? 'Đang lưu…' : 'Xóa'/)
+})
+
 test('PickleballTickets add form calculates total from selected participants and saves expected payload', () => {
   assert.match(screenSource, /import React, \{ useEffect, useMemo, useState \} from 'react'/)
   assert.match(screenSource, /function AddTicketSheet\(\{ data, onClose, onSave \}\) \{/)

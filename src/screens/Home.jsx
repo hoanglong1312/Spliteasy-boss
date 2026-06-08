@@ -92,9 +92,11 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         )}
         {isPickleballTreasurer && (
           <PendingTicketsBanner
+            items={d.pendingTickets?.items || []}
             count={d.pendingTickets?.count || 0}
             totalAmount={d.pendingTickets?.totalAmount || 0}
             onNavigate={() => onAction?.('push', 'pickleball-calendar')}
+            onAction={onAction}
           />
         )}
         {isTreasurer && (
@@ -1550,32 +1552,173 @@ function PrevMonthNotice({ label, balance, onView }) {
   )
 }
 
-function PendingTicketsBanner({ count, totalAmount, onNavigate }) {
+function PendingTicketsBanner({ items = [], count, totalAmount, onNavigate, onAction }) {
+  const [expanded, setExpanded] = useState(false)
+  const [savingTicketId, setSavingTicketId] = useState('')
   if (!count) return null
+
+  async function approveTicket(ticket) {
+    if (savingTicketId) return
+    setSavingTicketId(ticket.id)
+    try {
+      await onAction?.('approveTicket', { ticketId: ticket.id, status: ticket.approveStatus })
+    } finally {
+      setSavingTicketId('')
+    }
+  }
+
+  async function deleteTicket(ticket) {
+    if (savingTicketId) return
+    setSavingTicketId(ticket.id)
+    try {
+      await onAction?.('deleteTicket', { ticketId: ticket.id })
+    } finally {
+      setSavingTicketId('')
+    }
+  }
+
   return (
     <div
-      onClick={onNavigate}
       style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
         padding: '10px 14px',
         background: 'rgba(251,191,36,0.08)',
         border: '1px solid rgba(251,191,36,0.38)',
         borderRadius: 12,
-        cursor: 'pointer',
         marginBottom: 12,
       }}
     >
-      <div>
-        <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-          Vé lẻ chờ duyệt
+      <button
+        type="button"
+        onClick={() => setExpanded(value => !value)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          padding: 0,
+          background: 'transparent',
+          border: 0,
+          color: 'inherit',
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            Vé lẻ chờ duyệt
+          </div>
+          <div style={{ fontSize: 12, fontWeight: 900, marginTop: 2 }}>
+            {count} lượt · {totalAmount > 0 ? totalAmount.toLocaleString('vi-VN') + 'đ' : ''}
+          </div>
         </div>
-        <div style={{ fontSize: 12, fontWeight: 900, marginTop: 2 }}>
-          {count} lượt · {totalAmount > 0 ? totalAmount.toLocaleString('vi-VN') + 'đ' : ''}
+        <span style={{ fontSize: 18, color: '#fbbf24', transform: expanded ? 'rotate(90deg)' : 'none' }}>›</span>
+      </button>
+
+      {expanded && (
+        <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+          {items.map(ticket => {
+            const saving = savingTicketId === ticket.id
+            const total = Number(ticket.totalAmount) || 0
+            const perPerson = Number(ticket.amountPerPerson) || 0
+            return (
+              <div
+                key={ticket.id}
+                style={{
+                  padding: 10,
+                  borderRadius: 10,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: colors.textPrimary }}>
+                      {ticket.dateLabel || ticket.date || 'Chưa có ngày'}{ticket.time ? ` · ${ticket.time}` : ''}
+                    </div>
+                    <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, lineHeight: 1.45 }}>
+                      {ticket.memberLabel || '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4, lineHeight: 1.45 }}>
+                      {ticket.advancerName ? `${ticket.advancerName} ứng` : 'Quỹ team trả'}
+                    </div>
+                  </div>
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 950, color: colors.textPrimary }}>
+                      {total.toLocaleString('vi-VN')}đ
+                    </div>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3 }}>
+                      {perPerson.toLocaleString('vi-VN')}đ/người
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => approveTicket(ticket)}
+                    disabled={Boolean(savingTicketId)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(52,211,153,0.45)',
+                      background: 'rgba(52,211,153,0.16)',
+                      color: '#6ee7b7',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      fontFamily: 'inherit',
+                      cursor: savingTicketId ? 'not-allowed' : 'pointer',
+                      opacity: savingTicketId && !saving ? 0.55 : 1,
+                    }}
+                  >
+                    {saving ? 'Đang lưu…' : 'Duyệt'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteTicket(ticket)}
+                    disabled={Boolean(savingTicketId)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(248,113,113,0.45)',
+                      background: 'rgba(248,113,113,0.14)',
+                      color: '#fca5a5',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      fontFamily: 'inherit',
+                      cursor: savingTicketId ? 'not-allowed' : 'pointer',
+                      opacity: savingTicketId && !saving ? 0.55 : 1,
+                    }}
+                  >
+                    {saving ? 'Đang lưu…' : 'Xóa'}
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+          <button
+            type="button"
+            onClick={onNavigate}
+            style={{
+              width: '100%',
+              padding: '8px 10px',
+              borderRadius: 8,
+              border: '1px solid rgba(251,191,36,0.32)',
+              background: 'rgba(251,191,36,0.1)',
+              color: '#fbbf24',
+              fontSize: 12,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: 'pointer',
+            }}
+          >
+            Xem lịch pickleball
+          </button>
         </div>
-      </div>
-      <span style={{ fontSize: 18, color: '#fbbf24' }}>›</span>
+      )}
     </div>
   )
 }

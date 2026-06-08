@@ -515,6 +515,71 @@ test('home source balances normalize Supabase expense payer aliases', () => {
   assert.equal(data.sourceBreakdown[0].amount, 180000)
 })
 
+test('home pending tickets include expandable ticket item details', () => {
+  const { buildHomeData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'long',
+    currentUserName: 'Long',
+    members: [
+      { id: 'long', name: 'Long' },
+      { id: 'duy', name: 'Duy' },
+      { id: 'myt', name: 'Mýt' },
+    ],
+    groups: [],
+    pickle: {
+      sessions: [],
+      externalTickets: [
+        {
+          id: 'ticket-1',
+          status: 'pending_review',
+          session_date: '2026-05-24',
+          session_time: '19:30',
+          member_ids: ['long', 'duy'],
+          total_amount: 100000,
+          advancer_id: 'duy',
+        },
+      ],
+    },
+    _allPickle: {
+      sessions: [],
+      externalTickets: [
+        {
+          id: 'ticket-2',
+          status: 'PENDING_REVIEW',
+          sessionDate: '2026-05-25',
+          time: '20:00',
+          memberIds: ['myt'],
+          totalAmount: 50000,
+        },
+        { id: 'approved-ticket', status: 'team_fund', totalAmount: 90000 },
+      ],
+    },
+    notifications: [],
+  }
+
+  const data = buildHomeData(state, 'long', state.members, state.groups, state.pickle, state, '2026-05')
+
+  assert.equal(data.pendingTickets.count, 2)
+  assert.equal(data.pendingTickets.totalAmount, 150000)
+  assert.deepEqual(Array.from(data.pendingTickets.items.map(ticket => ticket.id)), ['ticket-1', 'ticket-2'])
+  assert.deepEqual({ ...data.pendingTickets.items[0], memberIds: Array.from(data.pendingTickets.items[0].memberIds) }, {
+    id: 'ticket-1',
+    date: '2026-05-24',
+    dateLabel: 'CN 24/05',
+    time: '19:30',
+    memberIds: ['long', 'duy'],
+    memberLabel: 'Long, Duy',
+    totalAmount: 100000,
+    amountPerPerson: 50000,
+    advancerId: 'duy',
+    advancerName: 'Duy',
+    approveStatus: 'unpaid',
+  })
+  assert.equal(data.pendingTickets.items[1].dateLabel, 'T2 25/05')
+  assert.equal(data.pendingTickets.items[1].advancerName, null)
+  assert.equal(data.pendingTickets.items[1].approveStatus, 'team_fund')
+})
+
 test('group detail exposes monthly total spent and expense count for the summary card', () => {
   const { buildGroupDetailData } = loadScreenDataBuilders()
   const group = {

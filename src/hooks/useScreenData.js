@@ -243,11 +243,32 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     ...safeArray(pickleballState?.pickle?.externalTickets),
     ...safeArray(pickleballState?._allPickle?.externalTickets),
   ]
+  const pendingTicketItems = allTickets
+    .filter(t => String(t?.status || '').toLowerCase() === 'pending_review')
+    .map(t => {
+      const memberIds = safeArray(t.memberIds || t.member_ids)
+      const attendeeNames = memberIds.map(id => memberName(id, members)).filter(Boolean)
+      const advancerId = t.advancerId || t.advancer_id
+      return {
+        id: t.id,
+        date: t.sessionDate || t.session_date,
+        dateLabel: formatSessionDetailDate(t.sessionDate || t.session_date),
+        time: t.sessionTime || t.session_time || t.time || '',
+        memberIds,
+        memberLabel: attendeeNames.join(', ') || '—',
+        totalAmount: Number(t.totalAmount || t.total_amount) || 0,
+        amountPerPerson: memberIds.length > 0
+          ? Math.round((Number(t.totalAmount || t.total_amount) || 0) / memberIds.length)
+          : 0,
+        advancerId,
+        advancerName: advancerId ? memberName(advancerId, members) : null,
+        approveStatus: advancerId ? 'unpaid' : 'team_fund',
+      }
+    })
   const pendingTickets = {
-    count: allTickets.filter(t => String(t?.status || '').toLowerCase() === 'pending_review').length,
-    totalAmount: allTickets
-      .filter(t => String(t?.status || '').toLowerCase() === 'pending_review')
-      .reduce((sum, t) => sum + (Number(t?.total_amount ?? t?.totalAmount) || 0), 0),
+    count: pendingTicketItems.length,
+    totalAmount: pendingTicketItems.reduce((sum, t) => sum + t.totalAmount, 0),
+    items: pendingTicketItems,
   }
 
   return {
