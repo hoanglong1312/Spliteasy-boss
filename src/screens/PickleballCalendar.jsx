@@ -1,7 +1,7 @@
 // Spliteasy Boss — Pickleball · Buổi đánh (calendar + detail panel)
 // Props: data { clubName, monthLabel, days[], selectedSession }, isTreasurer
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Input,
@@ -33,6 +33,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
   const initialSession = d.selectedSession || (d.sessions || [])[0] || null;
   const [selectedDate, setSelectedDate] = useState(d.selectedSessionDate || initialSession?.date || '');
   const [selectedSessionId, setSelectedSessionId] = useState(initialSession?.id || null);
+  const selectedSessionIdRef = useRef(initialSession?.id || null);
   const [savingAction, setSavingAction] = useState('');
   const selectedSession = selectedSessionId
     ? ((d.sessions || []).find(session => String(session.id) === String(selectedSessionId)) ||
@@ -43,10 +44,12 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
   const [editingTicket, setEditingTicket] = useState(null);
 
   useEffect(() => {
-    const nextSession = d.selectedSession || (d.sessions || [])[0] || null;
-    setSelectedDate(d.selectedSessionDate || nextSession?.date || '');
+    const preservedSession = (d.sessions || []).find(session => String(session.id) === String(selectedSessionIdRef.current));
+    const nextSession = preservedSession || d.selectedSession || (d.sessions || [])[0] || null;
+    setSelectedDate(preservedSession?.date || d.selectedSessionDate || nextSession?.date || '');
     setSelectedSessionId(nextSession?.id || null);
-  }, [d.selectedSession?.id, d.selectedSessionDate]);
+    selectedSessionIdRef.current = nextSession?.id || null;
+  }, [d.selectedSession?.id, d.selectedSessionDate, d.sessions]);
 
   useEffect(() => {
     if (editingTicket) setTicketFormOpen(true);
@@ -104,6 +107,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
               onClick={() => {
                 if (day.state === 'faded') return;
                 setSelectedDate(day.date);
+                selectedSessionIdRef.current = day.sessionId || null;
                 setSelectedSessionId(day.sessionId || null);
               }}
             />

@@ -815,6 +815,18 @@ test('store auto-generation inserts only missing generated session dates', () =>
   assert.match(autoGenerateBlock, /if \(validSessions\.length === 0\) \{[\s\S]*await refresh\(\)[\s\S]*return \[\]/)
 })
 
+test('store auto-generation skips past dates only in the current month', () => {
+  const autoGenerateBlock = storeSource.match(/case 'AUTO_GENERATE_SESSIONS':\s*\{[\s\S]*?return validSessions\s*\n\s*\}/)?.[0] || ''
+
+  assert.match(storeSource, /function localDateKey\(date = new Date\(\)\)/)
+  assert.match(autoGenerateBlock, /const todayKey = localDateKey\(\)/)
+  assert.match(autoGenerateBlock, /if \(yearMonth === todayKey\.slice\(0, 7\)\) \{[\s\S]*validSessions = validSessions\.filter\(session => session\.date >= todayKey\)[\s\S]*\}/)
+  assert.ok(
+    autoGenerateBlock.indexOf('session.date >= todayKey') < autoGenerateBlock.indexOf('const rows = validSessions.map'),
+    'past-date filter runs before insert rows are built',
+  )
+})
+
 test('scheduled session clear removes normalized primary and missing-status legacy rows', () => {
   const start = storeSource.indexOf('function safeArray')
   const end = storeSource.indexOf('\nfunction removeSessionGuestFromState', start)

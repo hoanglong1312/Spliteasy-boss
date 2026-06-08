@@ -94,6 +94,21 @@ test('PickleballCalendar ticket sheet keeps member save errors visible', () => {
   assert.match(sheetSource, /ticket_rls_denied/)
 })
 
+test('PickleballCalendar preserves selected session id across data refreshes', () => {
+  const topLevel = calendarSource.slice(
+    calendarSource.indexOf('export default function PickleballCalendar'),
+    calendarSource.indexOf('function LegendChip')
+  )
+
+  assert.match(calendarSource, /import React, \{ useEffect, useRef, useState \} from 'react'/)
+  assert.match(topLevel, /const selectedSessionIdRef = useRef\(initialSession\?\.id \|\| null\)/)
+  assert.match(topLevel, /selectedSessionIdRef\.current = day\.sessionId \|\| null/)
+  assert.match(topLevel, /const preservedSession = \(d\.sessions \|\| \[\]\)\.find\(session => String\(session\.id\) === String\(selectedSessionIdRef\.current\)\)/)
+  assert.match(topLevel, /setSelectedDate\(preservedSession\?\.date \|\| d\.selectedSessionDate \|\| nextSession\?\.date \|\| ''\)/)
+  assert.match(topLevel, /setSelectedSessionId\(nextSession\?\.id \|\| null\)/)
+  assert.doesNotMatch(topLevel, /setSelectedSessionId\(nextSession\?\.id \|\| null\);\n\s*}\, \[d\.selectedSession\?\.id, d\.selectedSessionDate\]\)/)
+})
+
 test('loading overlays render at PhoneFrame level for full-screen coverage', () => {
   const ticketTopLevel = screenSource.slice(
     screenSource.indexOf('export default function PickleballTickets'),

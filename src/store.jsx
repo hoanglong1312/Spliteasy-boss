@@ -19,6 +19,11 @@ function monthKey(value) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
+function localDateKey(date = new Date()) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 function ownerPaymentItemMatches(item, targetItem, payment = {}) {
   return String(item?.key || item?.type || '') === String(targetItem?.key || targetItem?.type || '') &&
     String(item?.yearMonth || item?.year_month || payment?.yearMonth || payment?.year_month || '') === String(targetItem?.yearMonth || targetItem?.year_month || '')
@@ -2385,6 +2390,10 @@ export function AppProvider({ children }) {
             .filter(date => date.startsWith(`${yearMonth}-`)),
         ].filter(Boolean))
         validSessions = validSessions.filter(session => !existingDateSet.has(session.date))
+        const todayKey = localDateKey()
+        if (yearMonth === todayKey.slice(0, 7)) {
+          validSessions = validSessions.filter(session => session.date >= todayKey)
+        }
         if (validSessions.length === 0) {
           await refresh()
           return []
