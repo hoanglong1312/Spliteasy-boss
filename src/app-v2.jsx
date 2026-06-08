@@ -1028,6 +1028,7 @@ export default function AppV2() {
       if (!memberId) return
       const targetType = payload?.type
       const targetGroupId = payload?.groupId || state.currentGroupId
+      const yearMonth = payload?.yearMonth || monthKey(new Date())
       const currentMember = safeArray(state?.members).find(item => String(item.id) === String(memberId))
       const currentGroup = safeArray(state?.groups).find(group => String(group.id) === String(targetGroupId))
       const isPickleballGroup = isPickleballActionGroup(currentGroup)
@@ -1051,6 +1052,46 @@ export default function AppV2() {
       if (payload?.groupId) request = request.eq('group_id', payload.groupId)
       const { error } = await request
       if (error) throw error
+      if (isPickleballGroup) {
+        const currentMonthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
+          .concat(safeArray(state?._allPickle?.monthlyConfigs), safeArray(state?.pickleballMonthlyConfigs))
+          .find(config => (
+            String(config?.groupId || config?.group_id || '') === String(targetGroupId || '') &&
+            String(config?.yearMonth || config?.year_month || '') === String(yearMonth || '')
+          )) || {}
+        const currentFixedMemberIds = safeArray(currentMonthlyConfig?.fixedMemberIds ?? currentMonthlyConfig?.fixed_member_ids)
+        const baseFixedMemberIds = currentFixedMemberIds.length > 0
+          ? currentFixedMemberIds
+          : safeArray(state?.members)
+            .filter(member => (
+              String(member?.groupId || member?.group_id || '') === String(targetGroupId || '') &&
+              member?.isActive !== false &&
+              member?.is_active !== false &&
+              normalizeMemberType(member?.memberType || member?.member_type) === 'fixed'
+            ))
+            .map(member => member.id)
+            .filter(Boolean)
+        const fixedSet = new Set(baseFixedMemberIds.map(String))
+        if (targetType === 'fixed') fixedSet.add(String(memberId))
+        else fixedSet.delete(String(memberId))
+        const nextFixedMemberIds = safeArray(state?.members)
+          .filter(member => (
+            String(member?.groupId || member?.group_id || '') === String(targetGroupId || '') &&
+            member?.isActive !== false &&
+            member?.is_active !== false &&
+            fixedSet.has(String(member.id))
+          ))
+          .map(member => member.id)
+          .filter(Boolean)
+        const { error: monthlyError } = await sb
+          .from('pickleball_monthly_config')
+          .upsert({
+            group_id: targetGroupId,
+            year_month: yearMonth,
+            fixed_member_ids: nextFixedMemberIds,
+          }, { onConflict: 'group_id,year_month' })
+        if (monthlyError) throw monthlyError
+      }
       await dispatch({ type: 'REFRESH' })
       return
     }

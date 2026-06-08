@@ -43,8 +43,13 @@ function normalizeTime(value, fallback) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 export default function PickleballSettings({ data, onAction }) {
   const d = data || DEMO;
+  const fixedMemberIds = safeArray(d.monthlyConfig?.fixedMemberIds ?? d.monthlyConfig?.fixed_member_ids);
   const [weekdays, setWeekdays]   = useState(new Set(d.weekdays));
   const [autoGen, setAutoGen]     = useState(d.autoGenerate);
   const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(d.timeRange));
@@ -238,6 +243,58 @@ export default function PickleballSettings({ data, onAction }) {
           <Button block variant="brand" style={{ marginTop: 8 }} onClick={saveSettings} disabled={savingAction === 'save'}>
             {savingAction === 'save' ? 'Đang lưu…' : '💾 Lưu cài đặt'}
           </Button>
+
+          {safeArray(d.members).length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <FieldLabel>Loại thành viên tháng này</FieldLabel>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {safeArray(d.members).map(member => {
+                  const displayType = fixedMemberIds.length > 0
+                    ? (fixedMemberIds.some(id => String(id) === String(member.id)) ? 'fixed' : 'casual')
+                    : (member.memberType || member.type || 'fixed');
+                  const isFixed = displayType !== 'casual';
+                  const nextType = isFixed ? 'casual' : 'fixed';
+                  return (
+                    <div key={member.id} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      padding: '10px 12px', background: colors.cardSurface,
+                      border: `1px solid ${colors.borderSubtle}`, borderRadius: 12,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 9, minWidth: 0 }}>
+                        <div style={{
+                          width: 30, height: 30, borderRadius: '50%',
+                          background: isFixed ? 'rgba(52,211,153,0.16)' : 'rgba(251,191,36,0.14)',
+                          border: `1px solid ${isFixed ? 'rgba(52,211,153,0.32)' : 'rgba(251,191,36,0.32)'}`,
+                          color: isFixed ? '#6ee7b7' : '#fde68a',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 11, fontWeight: 900, flex: '0 0 auto',
+                        }}>{member.initial || String(member.name || '?').slice(0, 1)}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {member.name}
+                          </div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: isFixed ? '#6ee7b7' : '#fde68a', marginTop: 2 }}>
+                            {isFixed ? 'Cố định' : 'Vãng lai'}
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onAction?.('setMemberType', { memberId: member.id, groupId: d.groupId, yearMonth: d.currentYearMonth, type: nextType })}
+                        style={{
+                          border: `1px solid ${isFixed ? 'rgba(251,191,36,0.28)' : 'rgba(52,211,153,0.30)'}`,
+                          background: isFixed ? 'rgba(251,191,36,0.10)' : 'rgba(52,211,153,0.10)',
+                          color: isFixed ? '#fde68a' : '#6ee7b7',
+                          borderRadius: 10, padding: '7px 9px', fontSize: 11, fontWeight: 900,
+                          fontFamily: 'inherit', cursor: 'pointer', flex: '0 0 auto',
+                        }}
+                      >{isFixed ? 'Vãng lai' : 'Cố định'}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           </div>
         </div>
       </div>

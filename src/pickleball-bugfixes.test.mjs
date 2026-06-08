@@ -89,6 +89,43 @@ test('home data exposes active monthly member balances including session items a
   ])
 })
 
+test('home month balance uses monthly fixed member snapshot before global member type', () => {
+  const { buildHomeData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'm1',
+    currentUserName: 'An',
+    currentGroupId: 'g1',
+    currentGroup: { id: 'g1', name: 'CLB' },
+    members: [
+      { id: 'm1', groupId: 'g1', name: 'An', memberType: 'casual' },
+      { id: 'm2', groupId: 'g1', name: 'Binh', memberType: 'fixed' },
+      { id: 'm3', groupId: 'g1', name: 'Chi', memberType: 'fixed' },
+    ],
+    pickle: {
+      fixedMembers: ['m2', 'm3'],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 300000, fixedMemberIds: ['m1', 'm2'] }],
+      ownerPayments: [{ id: 'p1', groupId: 'g1', yearMonth: '2026-05', items: [{ type: 'next_court' }] }],
+      sessions: [
+        { id: 's1', groupId: 'g1', date: '2026-05-12', status: 'completed', attendees: ['m1', 'm2', 'm3'] },
+      ],
+    },
+    _allPickle: {
+      sessions: [],
+      sessionItems: [],
+      monthlyConfigs: [{ groupId: 'g1', yearMonth: '2026-05', courtFee: 300000, fixedMemberIds: ['m1', 'm2'] }],
+      ownerPayments: [{ id: 'p1', groupId: 'g1', yearMonth: '2026-05', items: [{ type: 'next_court' }] }],
+    },
+  }
+
+  const data = buildHomeData(state, 'm1', state.members, [], state.pickle)
+
+  assert.deepEqual(JSON.parse(JSON.stringify(data.memberBalances.map(row => [row.memberId, row.type, row.owed]).sort((a, b) => a[0].localeCompare(b[0])))), [
+    ['m1', 'fixed', 75000],
+    ['m2', 'fixed', 75000],
+    ['m3', 'casual', 150000],
+  ])
+})
+
 test('store loads legacy pickleball_sessions and pickleball_attendance for calendar display', () => {
   assert.match(storeSource, /pbsR/)
   assert.match(storeSource, /pbaR/)

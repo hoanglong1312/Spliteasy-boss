@@ -1286,6 +1286,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     ticket_price: Number(config.ticket_price ?? config.ticketPrice ?? 50000) || 50000,
     activeMemberIds: safeArray(config.active_member_ids ?? config.activeMemberIds),
     active_member_ids: safeArray(config.active_member_ids ?? config.activeMemberIds),
+    fixedMemberIds: safeArray(config.fixed_member_ids ?? config.fixedMemberIds),
+    fixed_member_ids: safeArray(config.fixed_member_ids ?? config.fixedMemberIds),
     scheduleWeekdays: safeArray(config.schedule_weekdays ?? config.scheduleWeekdays),
     schedule_weekdays: safeArray(config.schedule_weekdays ?? config.scheduleWeekdays),
     scheduleStartDay: config.schedule_start_day ?? config.scheduleStartDay ?? null,
@@ -2260,6 +2262,9 @@ export function AppProvider({ children }) {
         }
         if ('activeMonthlyMemberIds' in action || 'activeMemberIds' in action || 'active_member_ids' in action) {
           row.active_member_ids = safeArray(action.activeMonthlyMemberIds ?? action.activeMemberIds ?? action.active_member_ids)
+        }
+        if ('fixedMemberIds' in action || 'fixed_member_ids' in action) {
+          row.fixed_member_ids = safeArray(action.fixedMemberIds ?? action.fixed_member_ids)
         }
         if ('ticketPrice' in action || 'ticket_price' in action) {
           row.ticket_price = Number(action.ticketPrice ?? action.ticket_price) || 50000

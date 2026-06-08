@@ -618,17 +618,19 @@ function buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, 
 
 function buildHomeMemberBalances(state, pickle, monthDate) {
   const monthSessions = getStateMonthSessions(state, monthDate)
+  const yearMonth = monthKey(monthDate || new Date())
   return currentGroupMembers(state)
     .filter(isActiveMember)
     .map(member => {
-      const balance = buildMemberMonthBalance(state, pickle, monthSessions, member.id)
+      const balance = buildMemberMonthBalance(state, pickle, monthSessions, member.id, monthDate)
+      const type = isFixedForMonth(state, member, yearMonth) ? 'fixed' : 'casual'
       return {
         memberId: member.id,
         id: member.id,
         name: member.displayName || member.name || 'Thành viên',
         initial: initials(member),
         initials: initials(member),
-        type: memberType(member),
+        type,
         netBalance: balance.netBalance,
         owed: balance.totalOwed,
         courtFee: balance.courtFee,
@@ -1948,7 +1950,7 @@ function buildPickleballSettingsData(state) {
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const sessions = getStateMonthSessions(state, today)
   const members = currentGroupMembers(state).filter(isActiveMember)
-  const fixedMembers = members.filter(member => memberType(member) === 'fixed')
+  const fixedMembers = members.filter(member => isFixedForMonth(state, member, currentYearMonth))
   const billingMembers = fixedMembers.length > 0 ? fixedMembers : members
   const weekdays = normalizeWeekdays(
     monthlyConfig?.scheduleWeekdays ||
@@ -1980,8 +1982,10 @@ function buildPickleballSettingsData(state) {
 
   return {
     clubName: group.name || 'CLB Pickleball',
+    groupId: group.id || group.group_id,
     currentYearMonth,
     currentRole: currentMember?.role,
+    monthlyConfig,
     activeMonthlyMemberIds,
     courtFeePerSession: Math.round(courtFeeTotal / Math.max(sessionsCount, 1)),
     scheduleDay: weekdays.join(', '),
@@ -1997,6 +2001,8 @@ function buildPickleballSettingsData(state) {
       name: m.name || m.member_name,
       initial: initials(m),
       activeThisMonth: activeMonthlyMemberIds.some(id => String(id) === String(m.id || m.member_id)),
+      memberType: isFixedForMonth(state, m, currentYearMonth) ? 'fixed' : 'casual',
+      type: isFixedForMonth(state, m, currentYearMonth) ? 'fixed' : 'casual',
     })),
     weekdays,
     timeRange: scheduleTime,
@@ -2734,11 +2740,11 @@ function calculateMemberRank(progressPct) {
 
 function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const members = currentGroupMembers(state).filter(isActiveMember)
-  const fixedMembers = members.filter(member => memberType(member) === 'fixed')
-  const casualMembers = members.filter(member => memberType(member) === 'casual')
-  const fixedMemberCount = Math.max(fixedMembers.length, 1)
   const currentYearMonth = monthKey(date || new Date())
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
+  const fixedMembers = members.filter(member => isFixedForMonth(state, member, currentYearMonth))
+  const casualMembers = members.filter(member => !isFixedForMonth(state, member, currentYearMonth))
+  const fixedMemberCount = Math.max(fixedMembers.length, 1)
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? pickle?.monthlyCourtFee ?? pickle?.monthly_court_fee ?? 0)
   const configuredSessionCount = Number(monthlyConfig?.sessionsCount ?? monthlyConfig?.sessions_count ?? 0)
   const sessionsCount = Math.max(sessions.length || configuredSessionCount, 1)
@@ -2758,7 +2764,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const fixedNetCost = Math.max(courtFeeShare - rebatePerFixed, 0)
   const casualCharge = casualCharges.find(row => String(row.memberId) === String(memberId))?.amount || 0
   const courtFee = courtConfirmed
-    ? (memberType(member) === 'casual' ? casualCharge : Math.round(fixedNetCost))
+    ? (!isFixedForMonth(state, member, currentYearMonth) ? casualCharge : Math.round(fixedNetCost))
     : 0
   const waterFee = memberWaterShare(sessions, memberId, members)
   const extras = memberExtrasShare(sessions, memberId, state, members)
@@ -2844,6 +2850,18 @@ function isCourtExpense(expense) {
 function memberType(member) {
   const raw = String(member?.memberType || member?.member_type || '').toLowerCase()
   return ['casual', 'guest', 'vanglai', 'vãng lai'].includes(raw) ? 'casual' : 'fixed'
+}
+
+function monthlyFixedMemberIds(state, yearMonth) {
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  return safeArray(monthlyConfig?.fixedMemberIds ?? monthlyConfig?.fixed_member_ids)
+}
+
+function isFixedForMonth(state, member, yearMonth) {
+  const ids = monthlyFixedMemberIds(state, yearMonth)
+  return ids.length > 0
+    ? ids.some(id => String(id) === String(member?.id || member?.member_id))
+    : memberType(member) === 'fixed'
 }
 
 function isActiveMember(member) {

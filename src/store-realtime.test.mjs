@@ -99,6 +99,18 @@ test('monthly pickleball config save persists schedule time aliases', () => {
   assert.match(source, /row\.schedule_time = action\.scheduleTime \?\? action\.schedule_time \?\? action\.timeRange \?\? null/)
 })
 
+test('monthly pickleball config normalizes and saves fixed member snapshots', () => {
+  assert.match(storeSource, /fixedMemberIds: safeArray\(config\.fixed_member_ids \?\? config\.fixedMemberIds\)/)
+  assert.match(storeSource, /fixed_member_ids: safeArray\(config\.fixed_member_ids \?\? config\.fixedMemberIds\)/)
+
+  const match = storeSource.match(/case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': \{[\s\S]*?\n      \}/)
+  assert.ok(match, 'SAVE_PICKLEBALL_MONTHLY_CONFIG case is available')
+  const source = match[0]
+
+  assert.match(source, /if \('fixedMemberIds' in action \|\| 'fixed_member_ids' in action\) \{/)
+  assert.match(source, /row\.fixed_member_ids = safeArray\(action\.fixedMemberIds \?\? action\.fixed_member_ids\)/)
+})
+
 test('monthly pickleball config save can skip existing rows', () => {
   const match = storeSource.match(/case 'SAVE_PICKLEBALL_MONTHLY_CONFIG': \{[\s\S]*?\n      \}/)
   assert.ok(match, 'SAVE_PICKLEBALL_MONTHLY_CONFIG case is available')

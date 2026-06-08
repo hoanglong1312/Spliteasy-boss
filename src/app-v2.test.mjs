@@ -304,6 +304,30 @@ test('AppV2 uses the profile-aware role RPC for expense groups', () => {
   assert.match(roleBlock, /\.from\('members'\)[\s\S]*\.update\(\{ role: payload\?\.role \}\)[\s\S]*\.eq\('id', memberId\)/)
 })
 
+test('AppV2 snapshots pickleball member type changes into monthly config', () => {
+  const memberTypeBlock = appSource.slice(
+    appSource.indexOf("if (type === 'setMemberType')"),
+    appSource.indexOf("if (type === 'removeMemberFromGroup')")
+  )
+
+  assert.match(memberTypeBlock, /const yearMonth = payload\?\.yearMonth \|\| monthKey\(new Date\(\)\)/)
+  assert.match(memberTypeBlock, /const currentMonthlyConfig = safeArray\(state\?\.pickle\?\.monthlyConfigs\)/)
+  assert.match(memberTypeBlock, /const currentFixedMemberIds = safeArray\(currentMonthlyConfig\?\.fixedMemberIds \?\? currentMonthlyConfig\?\.fixed_member_ids\)/)
+  assert.match(memberTypeBlock, /const fixedSet = new Set\(baseFixedMemberIds\.map\(String\)\)/)
+  assert.match(memberTypeBlock, /if \(targetType === 'fixed'\) fixedSet\.add\(String\(memberId\)\)/)
+  assert.match(memberTypeBlock, /const nextFixedMemberIds = safeArray\(state\?\.members\)/)
+  assert.match(memberTypeBlock, /\.from\('pickleball_monthly_config'\)[\s\S]*?\.upsert\(\{[\s\S]*?group_id: targetGroupId,[\s\S]*?year_month: yearMonth,[\s\S]*?fixed_member_ids: nextFixedMemberIds,/)
+  assert.match(memberTypeBlock, /onConflict: 'group_id,year_month'/)
+})
+
+test('PickleballSettings member type actions include the current month', () => {
+  const settingsSource = readFileSync(new URL('./screens/PickleballSettings.jsx', import.meta.url), 'utf8')
+
+  assert.match(settingsSource, /fixedMemberIds = safeArray\(d\.monthlyConfig\?\.fixedMemberIds \?\? d\.monthlyConfig\?\.fixed_member_ids\)/)
+  assert.match(settingsSource, /const displayType = fixedMemberIds\.length > 0/)
+  assert.match(settingsSource, /onAction\?\.\('setMemberType', \{ memberId: member\.id, groupId: d\.groupId, yearMonth: d\.currentYearMonth, type: nextType \}\)/)
+})
+
 test('AppV2 edit group preserves descriptions for expense group settings', () => {
   assert.match(appSource, /if \(type === 'editGroup'\)/)
   assert.match(appSource, /description: group\.description \|\| '',/)
