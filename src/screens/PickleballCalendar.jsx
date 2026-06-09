@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card, Button, Badge, SubTabs, Input,
+  PhoneFrame, Screen, TabBar, MonthNav, Card, Button, Badge, SubTabs, Input,
   LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
@@ -65,7 +65,6 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             </div>
             <h1 style={{ ...type.title, marginTop: 2 }}>Buổi đánh</h1>
           </div>
-          {isTreasurer && <IconButton onClick={() => onAction?.('settings')}>⚙️</IconButton>}
         </div>
 
         <SubTabs

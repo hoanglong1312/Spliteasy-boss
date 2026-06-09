@@ -15,7 +15,6 @@ import PickleballCalendar from './screens/PickleballCalendar'
 import PickleballMembers from './screens/PickleballMembers'
 import MemberDetail from './screens/MemberDetail'
 import PickleballTickets from './screens/PickleballTickets'
-import PickleballSettings from './screens/PickleballSettings'
 import PickleballTeamFund from './screens/PickleballTeamFund'
 import BatchEntry from './screens/BatchEntry'
 import Profile from './screens/Profile'
@@ -155,7 +154,6 @@ export default function AppV2() {
     getPickleballMembersData,
     getMemberDetailData,
     getPickleballTicketsData,
-    getPickleballSettingsData,
     getPickleballTeamFundData,
     getBatchEntryData,
     getPaymentFlowData,
@@ -593,14 +591,11 @@ export default function AppV2() {
     }
 
     if (type === 'settings') {
-      const route = stack[stack.length - 1]
-      const routeScreen = String(route?.screen || '')
-      const fromPickleball = activeTab === 'pickleball' || routeScreen.startsWith('pickleball')
-      setStack((s) => [...s, { screen: fromPickleball ? 'pickleball-settings' : 'settings', params: payload }])
+      setStack((s) => [...s, { screen: 'settings', params: payload }])
       return
     }
 
-    if (type === 'saveSettings' || (type === 'save' && stack[stack.length - 1]?.screen === 'pickleball-settings')) {
+    if (type === 'saveSettings' || (type === 'save' && ('weekdays' in (payload || {}) || 'scheduleTime' in (payload || {})))) {
       const groupId = activePickleballGroupId(state)
       const pickleballGroup = activePickleballGroup(state)
       const yearMonth = payload?.currentYearMonth || monthKey(new Date())
@@ -742,7 +737,6 @@ export default function AppV2() {
         }
       }
       alert('Đã lưu cài đặt lịch')
-      setStack((s) => s.slice(0, -1))
       return
     }
 
@@ -2268,7 +2262,6 @@ export default function AppV2() {
       payment:          'payment-flow',
       pay:              'payment-flow',
       settings:         'settings',
-      pickleballSettings: 'pickleball-settings',
       batchEntry:       'batch-entry',
       newGroup:         'new-group',
       notifications:    'notifications',
@@ -2422,7 +2415,6 @@ export default function AppV2() {
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
-      case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} onAction={handle} />
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'batch-entry':         return <BatchEntry data={getBatchEntryData(route.params)} onAction={handle} />
       case 'payment-flow':        return <PaymentFlow data={getPaymentFlowData(route.params)} onAction={handle} />

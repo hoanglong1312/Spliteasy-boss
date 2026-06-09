@@ -123,7 +123,6 @@ export function useScreenData() {
       getPickleballMembersData: () => buildPickleballMembersData(pickleballState, selectedYearMonth),
       getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId, selectedYearMonth),
       getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
-      getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState),
       getPickleballTeamFundData: (params) => buildPickleballTeamFundData(pickleballState, params?.yearMonth || selectedYearMonth),
       getBatchEntryData: (params) => buildBatchEntryData(pickleballState, params),
       getPaymentFlowData: (memberId) => buildPaymentFlowData(pickleballState, memberId),
@@ -1971,76 +1970,6 @@ function buildPickleballTicketsData(state) {
     ticketPricePerPerson: ticketPrice,
     defaultTicketAmountPerPerson: ticketPrice,
     tickets,
-  }
-}
-
-function buildPickleballSettingsData(state) {
-  const today = new Date()
-  const currentYearMonth = monthKey(today)
-  const group = currentGroup(state)
-  const config = currentPickleConfig(state)
-  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
-  const sessions = getStateMonthSessions(state, today)
-  const members = currentGroupMembers(state).filter(isActiveMember)
-  const fixedMembers = members.filter(member => isFixedForMonth(state, member, currentYearMonth))
-  const billingMembers = fixedMembers.length > 0 ? fixedMembers : members
-  const weekdays = normalizeWeekdays(
-    monthlyConfig?.scheduleWeekdays ||
-    monthlyConfig?.schedule_weekdays ||
-    config?.scheduleWeekdays ||
-    config?.schedule_weekdays ||
-    config?.weekdays ||
-    config?.scheduleDays ||
-    config?.schedule_days ||
-    group?.scheduleWeekdays ||
-    group?.schedule_weekdays ||
-    group?.scheduleDays
-  )
-  const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? config?.monthlyCourtFee ?? config?.monthly_court_fee ?? group?.monthlyCourtFee ?? 0)
-  const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
-  const WEEK_LABELS_LOCAL = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
-  const wantedDays = new Set(weekdays)
-  const daysInCurMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-  let calcSessions = 0
-  for (let dayNum = 1; dayNum <= daysInCurMonth; dayNum++) {
-    const dt = new Date(today.getFullYear(), today.getMonth(), dayNum)
-    if (wantedDays.has(WEEK_LABELS_LOCAL[dt.getDay()])) calcSessions++
-  }
-  const sessionsCount = calcSessions > 0 ? calcSessions : Math.max(sessions.length, 1)
-  const scheduleTime = configuredPickleScheduleTime(state, currentYearMonth, '19:00 – 21:00')
-  const currentMember = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
-  const memberIds = billingMembers.map(m => m.id || m.member_id).filter(Boolean)
-  const activeMonthlyMemberIds = memberIds
-
-  return {
-    clubName: group.name || 'CLB Pickleball',
-    groupId: group.id || group.group_id,
-    currentYearMonth,
-    currentRole: currentMember?.role,
-    monthlyConfig,
-    activeMonthlyMemberIds,
-    courtFeePerSession: Math.round(courtFeeTotal / Math.max(sessionsCount, 1)),
-    scheduleDay: weekdays.join(', '),
-    scheduleTime,
-    maxMembers: Number(config?.maxMembers ?? config?.max_members ?? members.length) || members.length || 12,
-    requireApproval: config?.requireApproval ?? config?.require_approval ?? group?.requiresApproval ?? true,
-    courtFeeTotal,
-    ticketPrice,
-    sessionsCount,
-    memberCount: billingMembers.length || 1,
-    members: members.map(m => ({
-      id: m.id || m.member_id,
-      name: m.name || m.member_name,
-      initial: initials(m),
-      activeThisMonth: activeMonthlyMemberIds.some(id => String(id) === String(m.id || m.member_id)),
-      memberType: isFixedForMonth(state, m, currentYearMonth) ? 'fixed' : 'casual',
-      type: isFixedForMonth(state, m, currentYearMonth) ? 'fixed' : 'casual',
-    })),
-    weekdays,
-    timeRange: scheduleTime,
-    startDate: monthlyConfig?.scheduleStartDay || monthlyConfig?.schedule_start_day || config?.startDate || config?.start_date || '01/' + String(today.getMonth() + 1).padStart(2, '0') + '/' + today.getFullYear(),
-    autoGenerate: config?.autoGenerate ?? config?.auto_generate ?? true,
-    nextMonthPreview: buildNextMonthPreview(today, weekdays),
   }
 }
 
