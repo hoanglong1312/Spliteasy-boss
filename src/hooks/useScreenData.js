@@ -1723,7 +1723,7 @@ function buildPickleballCalendarData(state, params = {}) {
   const casualMembers = safeArray(state?.members)
     .filter(member => String(member?.groupId || member?.group_id || '') === String(currentGroupId || ''))
     .filter(isActiveMember)
-    .filter(member => memberType(member) === 'casual')
+    .filter(member => !isFixedForMonth(state, member, currentYearMonth))
     .map(member => ({
       id: member.id,
       name: member.displayName || member.name || '',
@@ -3098,7 +3098,10 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const fixedCount = Math.max(groupMembers.filter(member => isFixedForMonth(state, member, sessionYearMonth)).length, 1)
   const rebatePerFixed = casualPresentIds.length > 0 ? Math.round(casualPresentIds.length * courtPerPerson / fixedCount) : 0
   const netCourtPerPerson = Math.max(courtPerPerson - rebatePerFixed, 0)
-  const fixedPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) !== 'casual')
+  const fixedPresentIds = presentIds.filter(id => {
+    const member = groupMembers.find(m => String(m.id) === String(id))
+    return member && isFixedForMonth(state, member, sessionYearMonth)
+  })
   const splitCount = fixedPresentIds.length + casualPresentIds.length + guests.length
   const waterPerPerson = splitCount > 0 ? Math.round(costs.waterAmount / splitCount) : 0
   const extrasPerPerson = costs.extras.reduce((sum, item) => {
