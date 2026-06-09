@@ -58,6 +58,11 @@ test('Pickleball member row does not nest quick action button inside another but
   assert.doesNotMatch(memberSource, /return \(\s*<button type="button" onClick=\{\(\) => onAction\?\.\('memberDetail'/);
 });
 
+test('Pickleball member type changes pass the selected month to avoid cross-month contamination', () => {
+  assert.match(memberSource, /onAction\?\.\('setMemberType', \{ memberId: member\.id, type, groupId: d\.groupId, yearMonth: d\.currentYearMonth \}\)/);
+  assert.match(dataSource, /currentYearMonth: monthKey\(today\)/);
+});
+
 test('Pickleball member edit includes profile and group identity so profile-level name updates refresh rows', () => {
   assert.match(memberSource, /await onAction\?\.\('editMember', \{[\s\S]*?memberId: editingMember\.id,[\s\S]*?profileId: editingMember\?\.profileId \|\| editingMember\?\.profile_id \|\| '',[\s\S]*?groupId: d\.groupId,[\s\S]*?name,/);
 });

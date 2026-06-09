@@ -1788,6 +1788,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
+    currentYearMonth: monthKey(today),
     stats: {
       active: activeMembers.length,
       permanent: fixedRows.length,

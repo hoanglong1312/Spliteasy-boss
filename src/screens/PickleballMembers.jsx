@@ -146,7 +146,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     setQuickActionMember(null);
     setSavingAction('changeType');
     try {
-      await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId });
+      await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId, yearMonth: d.currentYearMonth });
     } finally {
       setSavingAction('');
     }
