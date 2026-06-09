@@ -63,6 +63,17 @@ test('Pickleball member type changes pass the selected month to avoid cross-mont
   assert.match(dataSource, /currentYearMonth: monthKey\(today\)/);
 });
 
+test('Pickleball member actions expand inline instead of using a quick action sheet', () => {
+  assert.match(memberSource, /const \[expandedMemberId, setExpandedMemberId\] = useState\(null\)/);
+  assert.match(memberSource, /isExpanded=\{expandedMemberId === member\.id\}/);
+  assert.match(memberSource, /onToggleExpand=\{onToggleExpand\}/);
+  assert.match(memberSource, /setExpandedMemberId\(prev => prev === id \? null : id\)/);
+  assert.match(memberSource, />Sửa<\/button>/);
+  assert.match(memberSource, />Xóa<\/button>/);
+  assert.doesNotMatch(memberSource, /QuickActionSheet/);
+  assert.doesNotMatch(memberSource, /quickActionMember/);
+});
+
 test('Pickleball member edit includes profile and group identity so profile-level name updates refresh rows', () => {
   assert.match(memberSource, /await onAction\?\.\('editMember', \{[\s\S]*?memberId: editingMember\.id,[\s\S]*?profileId: editingMember\?\.profileId \|\| editingMember\?\.profile_id \|\| '',[\s\S]*?groupId: d\.groupId,[\s\S]*?name,/);
 });

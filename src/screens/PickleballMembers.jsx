@@ -4,7 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { colors, type } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, Card, Badge, SubTabs, Avatar, Stat, Button, Input,
-  ModuleHero, ActionButton, SearchInput, StatGrid, BottomSheet, MemberPicker,
+  ModuleHero, SearchInput, StatGrid, BottomSheet, MemberPicker,
   LoadingSpinner, loadingOverlayStyle, MonthNav,
 } from '../primitives';
 
@@ -15,7 +15,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const [search, setSearch] = useState('');
   const [expandedFixed, setExpandedFixed] = useState(false);
   const [expandedCasual, setExpandedCasual] = useState(false);
-  const [quickActionMember, setQuickActionMember] = useState(null);
+  const [expandedMemberId, setExpandedMemberId] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [editName, setEditName] = useState('');
   const [editBankAccountName, setEditBankAccountName] = useState('');
@@ -49,7 +49,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const filteredCasual = useMemo(() => filterMembers(casualMembers, query), [casualMembers, query]);
 
   function openEdit(member) {
-    setQuickActionMember(null);
+    setExpandedMemberId(null);
     setEditingMember(member);
     setEditName(member.name || '');
     setEditBankAccountName(member.bankAccountName || '');
@@ -143,7 +143,6 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   async function changeType(member) {
     if (savingAction) return;
     const type = member.type === 'casual' ? 'fixed' : 'casual';
-    setQuickActionMember(null);
     setSavingAction('changeType');
     try {
       await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId, yearMonth: d.currentYearMonth });
@@ -155,7 +154,6 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   async function changeRole(member) {
     if (savingAction) return;
     const role = member.role === 'treasurer' ? 'member' : 'treasurer';
-    setQuickActionMember(null);
     if (!window.confirm(role === 'treasurer'
       ? `Cấp quyền Thủ quỹ cho ${member.name}?`
       : `Thu quyền Thủ quỹ của ${member.name}?`)) return;
@@ -168,7 +166,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   }
 
   function deleteMember(member) {
-    setQuickActionMember(null);
+    setExpandedMemberId(null);
     setDeleteConfirmMember(member);
   }
 
@@ -226,8 +224,11 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           expanded={expandedFixed}
           onExpand={() => setExpandedFixed(true)}
           isTreasurer={isTreasurer}
-          onMore={setQuickActionMember}
-          onAction={onAction}
+          expandedMemberId={expandedMemberId}
+          onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
+          onChangeType={changeType}
+          onEdit={openEdit}
+          onDelete={deleteMember}
         />
 
         <MemberSection
@@ -236,21 +237,13 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           expanded={expandedCasual}
           onExpand={() => setExpandedCasual(true)}
           isTreasurer={isTreasurer}
-          onMore={setQuickActionMember}
-          onAction={onAction}
+          expandedMemberId={expandedMemberId}
+          onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
+          onChangeType={changeType}
+          onEdit={openEdit}
+          onDelete={deleteMember}
         />
       </Screen>
-
-      {quickActionMember && isTreasurer && (
-        <QuickActionSheet
-          member={quickActionMember}
-          onClose={() => setQuickActionMember(null)}
-          onEdit={() => openEdit(quickActionMember)}
-          onChangeType={() => changeType(quickActionMember)}
-          onChangeRole={() => changeRole(quickActionMember)}
-          onDelete={() => deleteMember(quickActionMember)}
-        />
-      )}
 
       {showAddMember && isTreasurer && (
         <BottomSheet title="Thêm thành viên" onClose={() => setShowAddMember(false)}>
@@ -395,7 +388,7 @@ function maskAccount(value) {
   return `${text.slice(0, 4)} •••• ${text.slice(-3)}`;
 }
 
-function MemberSection({ title, members, expanded, onExpand, isTreasurer, onMore, onAction }) {
+function MemberSection({ title, members, expanded, onExpand, isTreasurer, expandedMemberId, onToggleExpand, onChangeType, onEdit, onDelete }) {
   const visibleMembers = expanded ? members : members.slice(0, 5);
   const hiddenCount = Math.max(members.length - visibleMembers.length, 0);
 
@@ -418,8 +411,11 @@ function MemberSection({ title, members, expanded, onExpand, isTreasurer, onMore
             member={member}
             last={index === visibleMembers.length - 1 && hiddenCount === 0}
             isTreasurer={isTreasurer}
-            onMore={onMore}
-            onAction={onAction}
+            isExpanded={expandedMemberId === member.id}
+            onToggleExpand={onToggleExpand}
+            onChangeType={onChangeType}
+            onEdit={onEdit}
+            onDelete={onDelete}
           />
         ))}
         {hiddenCount > 0 && (
@@ -441,102 +437,136 @@ function MemberSection({ title, members, expanded, onExpand, isTreasurer, onMore
   );
 }
 
-function MemberRow({ member, last, isTreasurer, onMore, onAction }) {
-  const isCasual = member.type === 'casual';
+function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onChangeType, onEdit, onDelete }) {
+  const isFixed = member.memberType === 'fixed' || member.type === 'fixed';
+  const isCasual = !isFixed;
   const pct = Number(member.progressPct) || 0;
   const rank = member.rank || {};
   const barColor = progressColor(pct);
 
   return (
-    <div role="button" tabIndex={0} onClick={() => onAction?.('memberDetail', { memberId: member.id })} onKeyDown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') onAction?.('memberDetail', { memberId: member.id });
-    }} style={{
-      width: '100%',
-      display: 'grid',
-      gridTemplateColumns: '34px minmax(0, 1fr) 30px',
-      gap: 10,
-      alignItems: 'center',
-      padding: '10px 0',
-      border: 'none',
-      borderBottom: last ? 'none' : `1px solid ${colors.borderSubtle}`,
-      background: 'transparent',
-      color: colors.textPrimary,
-      fontFamily: 'inherit',
-      textAlign: 'left',
-      cursor: 'pointer',
-    }}>
-      <Avatar initial={member.initial} size={34} color={member.color} photoUrl={member.photoUrl} />
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-          <span style={{
-            fontSize: 13,
-            fontWeight: 800,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
+    <div style={{ borderBottom: last ? 'none' : `1px solid ${colors.borderSubtle}` }}>
+      <div role="button" tabIndex={0} onClick={() => onToggleExpand(member.id)} onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onToggleExpand(member.id);
+      }} style={{
+        width: '100%',
+        display: 'grid',
+        gridTemplateColumns: isTreasurer ? '34px minmax(0, 1fr) auto' : '34px minmax(0, 1fr)',
+        gap: 10,
+        alignItems: 'center',
+        padding: '10px 0',
+        border: 'none',
+        background: isExpanded ? 'rgba(255,255,255,0.04)' : 'transparent',
+        color: colors.textPrimary,
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        cursor: 'pointer',
+        borderRadius: isExpanded ? '12px 12px 0 0' : 12,
+      }}>
+        <Avatar initial={member.initial} size={34} color={member.color} photoUrl={member.photoUrl} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+            <span style={{
+              fontSize: 13,
+              fontWeight: 800,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>{member.name}</span>
+            {!isCasual && <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>}
+            {member.isTreasurer && <Badge tone="warn" style={{ padding: '2px 6px', fontSize: 9 }}>THỦ QUỸ</Badge>}
+          </div>
+          {isCasual ? (
+            <div style={{ marginTop: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, ...type.mono }}>
+                {member.sessionsAttended || 0} buổi
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{
+                height: 6,
+                flex: 1,
+                borderRadius: 100,
+                overflow: 'hidden',
+                background: colors.inputBg,
+              }}>
+                <div style={{
+                  width: `${Math.max(Math.min(pct, 100), 0)}%`,
+                  height: '100%',
+                  borderRadius: 100,
+                  background: barColor,
+                }} />
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 800, color: barColor, whiteSpace: 'nowrap', ...type.mono }}>
+                {pct}% · {rank.label || member.rankLabel}
+              </span>
+            </div>
+          )}
+          <div style={{ fontSize: 10, fontWeight: 800, color: isFixed ? colors.success : colors.warning, marginTop: 5 }}>
+            {isFixed ? 'Cố định' : 'Vãng lai'}
+          </div>
+        </div>
+        {isTreasurer && (
+          <button type="button" onClick={(e) => {
+            e.stopPropagation();
+            onChangeType(member);
+          }} style={{
+            border: `1px solid ${isFixed ? 'rgba(251,191,36,0.28)' : 'rgba(52,211,153,0.30)'}`,
+            background: isFixed ? 'rgba(251,191,36,0.10)' : 'rgba(52,211,153,0.10)',
+            color: isFixed ? '#fde68a' : '#6ee7b7',
+            borderRadius: 10,
+            padding: '7px 9px',
+            fontSize: 11,
+            fontWeight: 900,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
             whiteSpace: 'nowrap',
-          }}>{member.name}</span>
-          {!isCasual && <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>}
-          {member.isTreasurer && <Badge tone="warn" style={{ padding: '2px 6px', fontSize: 9 }}>THỦ QUỸ</Badge>}
-        </div>
-        {isCasual ? (
-          <div style={{ marginTop: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, ...type.mono }}>
-              {member.sessionsAttended || 0} buổi
-            </span>
-          </div>
-        ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-          <div style={{
-            height: 6,
-            flex: 1,
-            borderRadius: 100,
-            overflow: 'hidden',
-            background: colors.inputBg,
-          }}>
-            <div style={{
-              width: `${Math.max(Math.min(pct, 100), 0)}%`,
-              height: '100%',
-              borderRadius: 100,
-              background: barColor,
-            }} />
-          </div>
-          <span style={{ fontSize: 10, fontWeight: 800, color: barColor, whiteSpace: 'nowrap', ...type.mono }}>
-            {pct}% · {rank.label || member.rankLabel}
-          </span>
-        </div>
+          }}>{isFixed ? '→ Vãng lai' : '→ Cố định'}</button>
         )}
       </div>
-      {isTreasurer ? (
-        <button type="button" aria-label={`Mở thao tác ${member.name}`} onClick={(e) => {
-          e.stopPropagation();
-          onMore(member);
-        }} style={{
-          width: 30,
-          height: 30,
-          borderRadius: 10,
-          border: `1px solid ${colors.borderSubtle}`,
-          background: colors.inputBg,
-          color: colors.textSecondary,
-          fontSize: 18,
-          lineHeight: 1,
-          fontFamily: 'inherit',
-          cursor: 'pointer',
-        }}>⋯</button>
-      ) : (
-        <span />
+      {isExpanded && isTreasurer && (
+        <div style={{
+          display: 'flex',
+          gap: 8,
+          padding: '8px 0 10px 44px',
+          background: 'rgba(255,255,255,0.04)',
+          borderRadius: '0 0 12px 12px',
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+        }}>
+          <button type="button" onClick={(e) => {
+            e.stopPropagation();
+            onEdit(member);
+          }} style={{
+            flex: 1,
+            padding: '8px 0',
+            borderRadius: 10,
+            background: 'rgba(99,102,241,0.12)',
+            border: '1px solid rgba(99,102,241,0.24)',
+            color: '#c7d2fe',
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}>Sửa</button>
+          <button type="button" onClick={(e) => {
+            e.stopPropagation();
+            onDelete(member);
+          }} style={{
+            flex: 1,
+            padding: '8px 0',
+            borderRadius: 10,
+            background: 'rgba(248,113,113,0.10)',
+            border: '1px solid rgba(248,113,113,0.22)',
+            color: '#fca5a5',
+            fontSize: 12,
+            fontWeight: 700,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+          }}>Xóa</button>
+        </div>
       )}
     </div>
-  );
-}
-
-function QuickActionSheet({ member, onClose, onEdit, onChangeType, onChangeRole, onDelete }) {
-  return (
-    <BottomSheet title={member.name} onClose={onClose}>
-      <ActionButton onClick={onEdit}>✏️ Sửa</ActionButton>
-      <ActionButton onClick={onChangeType}>↔️ {member.type === 'casual' ? 'Chuyển thành Cố định' : 'Chuyển sang Vãng lai'}</ActionButton>
-      <ActionButton onClick={onChangeRole}>👑 {member.role === 'treasurer' ? 'Thu quyền Thủ quỹ' : 'Cấp quyền Thủ quỹ'}</ActionButton>
-      <ActionButton danger onClick={onDelete}>🗑 Xoá</ActionButton>
-    </BottomSheet>
   );
 }
 
