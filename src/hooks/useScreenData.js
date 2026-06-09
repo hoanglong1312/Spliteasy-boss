@@ -1789,8 +1789,8 @@ function buildPickleballMembersData(state, selectedYearMonth) {
   const sessions = getStateMonthSessions(state, today).filter(session => !isMovedSession(session))
   const confirmedSessions = sessions.filter(s => isDoneStatus(s?.status))
   const joinRequests = currentJoinRequests(state)
-  const fixedMembers = activeMembers.filter(member => memberType(member) === 'fixed')
-  const casualMembers = dedupeMemberRowsByProfileOrName(activeMembers.filter(member => memberType(member) === 'casual'))
+  const fixedMembers = activeMembers.filter(member => isFixedForMonth(state, member, selectedYearMonth))
+  const casualMembers = dedupeMemberRowsByProfileOrName(activeMembers.filter(member => !isFixedForMonth(state, member, selectedYearMonth)))
   const joinRequestRows = joinRequests.map(request => {
     const created = parseDate(request.createdAt || request.created_at)
     return {
@@ -1801,9 +1801,9 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, fixedMembers))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'fixed' }, confirmedSessions, sessions.length, fixedMembers))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow(member, confirmedSessions, sessions.length, []))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'casual' }, confirmedSessions, sessions.length, []))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
 
   return {
