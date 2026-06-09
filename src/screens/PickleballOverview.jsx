@@ -1,14 +1,50 @@
 // Spliteasy Boss — Pickleball · Tổng quan
 // Props: data { clubName, monthLabel, memberCount, todaySession, progress, monthCosts, yourBalance }, isTreasurer
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
-  PhoneFrame, Screen, TabBar, IconButton, Card, Button, Badge, SubTabs, Avatar, MonthNav,
+  PhoneFrame, Screen, TabBar, Card, Button, Badge, SubTabs, Avatar, MonthNav,
 } from '../primitives';
+
+const DAYS = ['T2','T3','T4','T5','T6','T7','CN'];
+const ISO_WEEKDAY_LABELS = ['', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+function hasSelectedWeekday(weekdaySet, isoWeekday) {
+  return weekdaySet.has(isoWeekday) ||
+    weekdaySet.has(String(isoWeekday)) ||
+    weekdaySet.has(ISO_WEEKDAY_LABELS[isoWeekday]);
+}
+
+function computeSessionsCount(weekdaySet, yearMonth) {
+  if (!weekdaySet.size || !yearMonth) return 0;
+  const [y, m] = yearMonth.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  let count = 0;
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = new Date(y, m - 1, day);
+    const isoWeekday = date.getDay() === 0 ? 7 : date.getDay();
+    if (hasSelectedWeekday(weekdaySet, isoWeekday)) count += 1;
+  }
+  return count;
+}
+
+function splitTimeRange(value) {
+  const matches = String(value || '').match(/\d{1,2}:\d{2}/g) || [];
+  return [normalizeTime(matches[0], '19:00'), normalizeTime(matches[1], '21:00')];
+}
+
+function normalizeTime(value, fallback) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return fallback;
+  const hour = Math.max(0, Math.min(Number(match[1]) || 0, 23));
+  const minute = Math.max(0, Math.min(Number(match[2]) || 0, 59));
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
 
 export default function PickleballOverview({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
+  const sc = d.scheduleConfig || {};
   const yourTickets = d.yourTickets || { summary: { sessionCount: 0, totalAdjustment: 0, displayAdjustment: 0, advancedCount: 0 }, rows: [] };
   const teamFundOverview = d.teamFundOverview || { ticketFund: { rows: [], totalDue: 0, totalCredit: 0 }, ticketStats: { sessionCount: 0, totalAmount: 0 }, costRows: [] };
   const personalSummaryCards = d.yourBalance.summaryCards || [
@@ -17,6 +53,47 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
     { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: 0, sub: 'Qua quỹ team' },
   ];
   const [tab, setTab] = useState('overview');
+  const [configExpanded, setConfigExpanded] = useState(false);
+  const [weekdays, setWeekdays] = useState(new Set(sc.weekdays || []));
+  const [autoGen, setAutoGen] = useState(sc.autoGenerate ?? true);
+  const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(sc.timeRange));
+  const [startDate, setStartDate] = useState(sc.startDate || '');
+  const [clubNameEdit, setClubNameEdit] = useState(sc.clubName || d.clubName || '');
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    const nextConfig = data?.scheduleConfig || {};
+    setWeekdays(new Set(nextConfig.weekdays || []));
+    setAutoGen(nextConfig.autoGenerate ?? true);
+    setTimeParts(splitTimeRange(nextConfig.timeRange));
+    setStartDate(nextConfig.startDate || '');
+    setClubNameEdit(nextConfig.clubName || data?.clubName || '');
+  }, [data]);
+
+  const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
+  const timeInputStyle = {
+    width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+    borderRadius: 10, padding: '10px 8px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+    fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
+  };
+
+  async function saveConfig() {
+    if (savingConfig) return;
+    setSavingConfig(true);
+    try {
+      await onAction?.('save', {
+        weekdays: Array.from(weekdays),
+        autoGen,
+        currentYearMonth: d.currentYearMonth,
+        startDate,
+        scheduleTime: `${timeStart} – ${timeEnd}`,
+        clubName: clubNameEdit,
+      });
+      setConfigExpanded(false);
+    } finally {
+      setSavingConfig(false);
+    }
+  }
 
   return (
     <PhoneFrame>
@@ -31,7 +108,6 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               {d.monthLabel} · {d.memberCount} thành viên
             </div>
           </div>
-          {isTreasurer && <IconButton onClick={() => onAction?.('settings')}>⚙️</IconButton>}
         </div>
 
         <SubTabs
@@ -252,6 +328,130 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           >
             📋 Nhập nhanh tiền nước
           </Button>
+        )}
+
+        {isTreasurer && (
+          <div style={{ marginTop: 16, borderRadius: 14, border: '1px solid rgba(99,102,241,0.22)', overflow: 'hidden' }}>
+            <button
+              type="button"
+              onClick={() => setConfigExpanded(prev => !prev)}
+              style={{
+                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '12px 14px', background: 'rgba(99,102,241,0.08)',
+                border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <div style={{ textAlign: 'left', minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#c7d2fe', letterSpacing: '0.5px' }}>⚙ Cài đặt lịch</div>
+                {!configExpanded && (
+                  <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {Array.from(weekdays).join(' ') || 'Chưa chọn ngày'} · {timeStart}–{timeEnd} · {liveSessionsCount} buổi
+                  </div>
+                )}
+              </div>
+              <span style={{ fontSize: 12, color: colors.textMuted, flex: '0 0 auto' }}>{configExpanded ? '▲' : '▼'}</span>
+            </button>
+
+            {configExpanded && (
+              <div style={{ padding: '12px 14px 14px', background: 'rgba(99,102,241,0.04)', display: 'flex', flexDirection: 'column' }}>
+                <div style={{
+                  fontSize: 11, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                  borderRadius: 10, padding: '8px 12px', marginBottom: 10, color: '#c7d2fe', fontWeight: 600,
+                }}>
+                  {liveSessionsCount} buổi theo lịch tháng này
+                </div>
+
+                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>
+                  Tên CLB
+                </div>
+                <input
+                  type="text"
+                  value={clubNameEdit}
+                  onChange={(e) => setClubNameEdit(e.target.value)}
+                  style={{
+                    width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+                    fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 10,
+                  }}
+                />
+
+                <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>
+                  Thứ trong tuần
+                </div>
+                <div style={{ display: 'flex', gap: 5, marginBottom: 10 }}>
+                  {DAYS.map(day => {
+                    const active = weekdays.has(day);
+                    return (
+                      <button key={day} type="button" onClick={() => {
+                        const next = new Set(weekdays);
+                        next.has(day) ? next.delete(day) : next.add(day);
+                        setWeekdays(next);
+                      }} style={{
+                        flex: 1, textAlign: 'center', padding: '10px 0', borderRadius: 10,
+                        background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${active ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                        color: active ? '#c7d2fe' : colors.textMuted,
+                        fontSize: 11, fontWeight: active ? 700 : 600, fontFamily: 'inherit', cursor: 'pointer',
+                      }}>{day}</button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>Giờ chơi</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 5 }}>
+                      <input type="time" value={timeStart} onChange={(e) => setTimeParts([e.target.value, timeEnd])} style={timeInputStyle} />
+                      <span style={{ color: colors.textMuted, fontSize: 12, fontWeight: 700 }}>–</span>
+                      <input type="time" value={timeEnd} onChange={(e) => setTimeParts([timeStart, e.target.value])} style={timeInputStyle} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>Ngày bắt đầu</div>
+                    <input
+                      type="date"
+                      value={startDate ? (startDate.includes('-') ? startDate : startDate.split('/').reverse().join('-')) : ''}
+                      onChange={(e) => {
+                        const parts = e.target.value.split('-');
+                        setStartDate(parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : e.target.value);
+                      }}
+                      style={{
+                        width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+                        fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '12px 14px', background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, marginBottom: 10,
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>Tự tạo buổi cuối tháng</div>
+                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2 }}>Tạo lịch tháng tiếp theo tự động</div>
+                  </div>
+                  <button type="button" onClick={() => setAutoGen(v => !v)} style={{
+                    width: 42, height: 24, borderRadius: 100,
+                    background: autoGen ? 'rgba(99,102,241,0.7)' : 'rgba(255,255,255,0.1)',
+                    position: 'relative', border: 'none', cursor: 'pointer', padding: 0, flex: '0 0 auto',
+                  }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', background: 'white',
+                      position: 'absolute', top: 3, right: autoGen ? 3 : 'auto', left: autoGen ? 'auto' : 3,
+                      transition: 'all 0.2s',
+                    }} />
+                  </button>
+                </div>
+
+                <Button block variant="brand" onClick={saveConfig} disabled={savingConfig}>
+                  {savingConfig ? 'Đang lưu…' : '💾 Lưu cài đặt'}
+                </Button>
+              </div>
+            )}
+          </div>
         )}
 
       </Screen>
