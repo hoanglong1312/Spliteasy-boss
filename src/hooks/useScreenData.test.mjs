@@ -181,6 +181,29 @@ test('pickleball members do not render one active profile in both fixed and casu
   assert.equal(data.stats.total, 1)
 })
 
+test('pickleball overview data includes schedule config for inline treasurer settings', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'club',
+    currentGroup: { id: 'club', name: 'CLB', type: 'pickleball' },
+    members: [{ id: 'a', groupId: 'club', name: 'An', memberType: 'fixed', isActive: true }],
+    _allPickle: {
+      configs: [{ groupId: 'club', clubName: 'Default Club', scheduleWeekdays: ['T2'], scheduleTime: '18:00 – 20:00', startDate: '01/05/2026', autoGenerate: false }],
+      monthlyConfigs: [{ groupId: 'club', yearMonth: '2026-06', scheduleWeekdays: ['T3', 'T5'], scheduleTime: '19:00 – 21:00', scheduleStartDay: '03/06/2026' }],
+    },
+    pickle: { sessions: [], monthlyConfigs: [{ groupId: 'club', yearMonth: '2026-06' }] },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'a', state.members, '2026-06')
+
+  assert.equal(data.currentYearMonth, '2026-06')
+  assert.equal(data.scheduleConfig.clubName, 'Default Club')
+  assert.deepEqual([...data.scheduleConfig.weekdays], ['T3', 'T5'])
+  assert.equal(data.scheduleConfig.timeRange, '19:00 – 21:00')
+  assert.equal(data.scheduleConfig.startDate, '03/06/2026')
+  assert.equal(data.scheduleConfig.autoGenerate, false)
+})
+
 test('pickleball member candidates exclude inactive duplicates when the profile is already casual', () => {
   const { buildPickleballMembersData } = loadScreenDataBuilders()
   const state = {

@@ -1260,6 +1260,9 @@ function buildGroupPaymentTarget(group, members) {
 function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members, selectedYearMonth) {
   const today = dateFromYearMonth(selectedYearMonth)
   const currentYearMonth = monthKey(today)
+  const group = currentGroup(state)
+  const pickleConfig = currentPickleConfig(state)
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const currentMonthConfig = safeArray(pickle?.monthlyConfigs).find(
     c => c.yearMonth === currentYearMonth
   )
@@ -1287,10 +1290,30 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const breakdown = buildPickleBreakdown(pickle, monthSessions, currentPickleballMemberId, summary, ticketAmount, memberBalance)
   const currentMember = members.find(member => String(member.id || member.member_id) === String(currentPickleballMemberId))
   const ticketAdjustment = -ticketAmount
+  const scheduleWeekdays = normalizeWeekdays(
+    monthlyConfig?.scheduleWeekdays ||
+    monthlyConfig?.schedule_weekdays ||
+    pickleConfig?.scheduleWeekdays ||
+    pickleConfig?.schedule_weekdays ||
+    pickleConfig?.weekdays ||
+    pickleConfig?.scheduleDays ||
+    pickleConfig?.schedule_days ||
+    group?.scheduleWeekdays ||
+    group?.schedule_weekdays ||
+    group?.scheduleDays
+  )
 
   return {
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
     monthLabel: formatMonthLabel(today),
+    currentYearMonth,
+    scheduleConfig: {
+      clubName: pickleConfig?.clubName || pickleConfig?.club_name || group?.name || '',
+      weekdays: scheduleWeekdays,
+      timeRange: monthlyConfig?.scheduleTime || monthlyConfig?.schedule_time || pickleConfig?.scheduleTime || pickleConfig?.schedule_time || pickleConfig?.timeRange || group?.scheduleTime || group?.schedule_time || '',
+      startDate: monthlyConfig?.scheduleStartDay || monthlyConfig?.schedule_start_day || pickleConfig?.startDate || pickleConfig?.start_date || '',
+      autoGenerate: pickleConfig?.autoGenerate ?? pickleConfig?.auto_generate ?? true,
+    },
     memberCount: activeMemberIds.length,
     todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime) : null,
     progress: {
