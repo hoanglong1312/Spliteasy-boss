@@ -2042,6 +2042,19 @@ export default function AppV2() {
       const { token } = getStoredAuth()
       if (!token) return
       const sb = createSupabase(token)
+      // Skip guest row if this person is already attending as a member in this session
+      const { data: existingProfile } = await sb.from('profiles').select('id').ilike('name', guestName).maybeSingle()
+      if (existingProfile) {
+        const { data: groupMemberIds } = await sb.from('members').select('id').eq('group_id', groupId).eq('profile_id', existingProfile.id)
+        if (groupMemberIds?.length) {
+          const ids = groupMemberIds.map(r => r.id)
+          const { data: memberAttendance } = await sb.from('pickle_attendees').select('id').eq('session_id', sessionId).eq('attendee_type', 'member').in('member_id', ids).maybeSingle()
+          if (memberAttendance) {
+            await dispatch({ type: 'REFRESH' })
+            return
+          }
+        }
+      }
       const { error } = await sb
         .from('pickle_attendees')
         .insert({
