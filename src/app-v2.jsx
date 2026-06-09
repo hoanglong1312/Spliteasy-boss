@@ -1037,21 +1037,23 @@ export default function AppV2() {
         : null
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
-      if (duplicateTargetMember) {
-        const { error: duplicateError } = await sb
+      if (!isPickleballGroup) {
+        if (duplicateTargetMember) {
+          const { error: duplicateError } = await sb
+            .from('members')
+            .update({ is_active: false })
+            .eq('id', duplicateTargetMember.id)
+            .eq('group_id', targetGroupId)
+          if (duplicateError) throw duplicateError
+        }
+        let request = sb
           .from('members')
-          .update({ is_active: false })
-          .eq('id', duplicateTargetMember.id)
-          .eq('group_id', targetGroupId)
-        if (duplicateError) throw duplicateError
+          .update({ member_type: targetType, is_active: true })
+          .eq('id', memberId)
+        if (payload?.groupId) request = request.eq('group_id', payload.groupId)
+        const { error } = await request
+        if (error) throw error
       }
-      let request = sb
-        .from('members')
-        .update({ member_type: targetType, is_active: true })
-        .eq('id', memberId)
-      if (payload?.groupId) request = request.eq('group_id', payload.groupId)
-      const { error } = await request
-      if (error) throw error
       if (isPickleballGroup) {
         const currentMonthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
           .concat(safeArray(state?._allPickle?.monthlyConfigs), safeArray(state?.pickleballMonthlyConfigs))
