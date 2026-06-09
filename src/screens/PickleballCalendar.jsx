@@ -601,6 +601,12 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
     : Array.isArray(session.costs) ? session.costs : [];
   const [guestName, setGuestName] = useState('');
   const [guestFormOpen, setGuestFormOpen] = useState(false);
+  const guestFormRef = useRef(null);
+  useEffect(() => {
+    if (guestFormOpen && guestFormRef.current) {
+      guestFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [guestFormOpen]);
   const costMembers = (session.members || [])
     .filter(member => member.id)
     .map(member => ({
@@ -954,7 +960,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
       </div>
 
       {guestFormOpen && canManageSession && (
-        <form onSubmit={addGuest} style={{
+        <form ref={guestFormRef} onSubmit={addGuest} style={{
           display: 'grid',
           gridTemplateColumns: '1fr auto',
           gap: 8,
