@@ -3055,9 +3055,13 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const guests = sessionGuests(session)
   const attendanceMembers = groupMembers.filter(member => isFixedForMonth(state, member, sessionYearMonth))
   const attendanceNames = attendanceDisplayNames(groupMembers)
+  const calExplicitPresentIds = new Set([
+    ...sessionMemberIds(session).map(String),
+    ...sessionAttendanceRecords(session).filter(r => r.status !== 'absent').map(r => String(r.memberId)),
+  ].filter(Boolean))
   const casualAttendingMembers = groupMembers
     .filter(member => !isFixedForMonth(state, member, sessionYearMonth))
-    .filter(member => presentSet.has(String(member.id)))
+    .filter(member => calExplicitPresentIds.has(String(member.id)))
   const fixedPresentCount = attendanceMembers
     .filter(member => presentSet.has(String(member.id)))
     .length
@@ -3087,10 +3091,6 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const costs = sessionCostsForSession(state, session, members)
   const monthSessions = getStateMonthSessions(state, parseDate(sessionDate(session)) || today)
   const courtPerPerson = perPersonCourtFee(pickle, monthSessions)
-  const calExplicitPresentIds = new Set([
-    ...sessionMemberIds(session).map(String),
-    ...sessionAttendanceRecords(session).filter(r => r.status !== 'absent').map(r => String(r.memberId)),
-  ].filter(Boolean))
   const casualPresentIds = Array.from(calExplicitPresentIds).filter(id => {
     const member = groupMembers.find(m => String(m.id) === String(id))
     return member && !isFixedForMonth(state, member, sessionYearMonth)

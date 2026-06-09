@@ -24,7 +24,7 @@ function loadScreenDataBuilders() {
     pickleSummary: () => ({ memberOwes: {} }),
     recentActivity: () => [],
   }
-  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildHomeData, buildNewGroupData, buildPickleballMembersData, buildPickleballOverviewData, buildPickleballTeamFundData }`, context)
+  vm.runInNewContext(`${source}\nglobalThis.__builders = { buildAddExpenseData, buildGroupDetailData, buildGroupMemberCandidates, buildGroupsListData, buildHomeData, buildNewGroupData, buildPickleballCalendarData, buildPickleballMembersData, buildPickleballOverviewData, buildPickleballTeamFundData }`, context)
   return context.__builders
 }
 
@@ -1061,6 +1061,32 @@ test('Pickleball overview reads current-month court fee and current fixed member
   assert.match(overviewSource, /const activeMemberIds = currentFixedMembers\.map/)
   assert.match(overviewSource, /memberCount: activeMemberIds\.length/)
   assert.match(overviewSource, /courtSub: `\$\{activeMemberIds\.length\} thành viên cố định`/)
+})
+
+test('calendar session detail excludes casual members without explicit attendance records', () => {
+  const { buildPickleballCalendarData } = loadScreenDataBuilders()
+  const state = {
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', name: 'Virgo Pickleball 246', members: ['fixed-minh', 'casual-hoang'] },
+    members: [
+      { id: 'fixed-minh', groupId: 'pickle-1', name: 'Minh', memberType: 'fixed', isActive: true },
+      { id: 'casual-hoang', groupId: 'pickle-1', name: 'Hoàng Em', memberType: 'casual', isActive: true },
+    ],
+    pickle: {
+      monthlyConfigs: [{ groupId: 'pickle-1', yearMonth: '2026-06', fixedMemberIds: ['fixed-minh'] }],
+      sessions: [{
+        id: 'session-1',
+        groupId: 'pickle-1',
+        date: '2026-06-01',
+        status: 'completed',
+        attendanceRecords: [{ memberId: 'fixed-minh', status: 'present' }],
+      }],
+    },
+  }
+
+  const data = buildPickleballCalendarData(state, { yearMonth: '2026-06', selectedDate: '2026-06-01' })
+
+  assert.equal(data.selectedSession.attendees.map(member => member.name).join(','), 'Minh')
 })
 
 test('Screen data scopes pickleball builders to pickleballGroupId instead of the opened expense group', () => {
