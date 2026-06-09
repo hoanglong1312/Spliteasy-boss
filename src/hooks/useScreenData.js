@@ -3095,12 +3095,16 @@ function ticketIncludesCurrentUser(state, ticket) {
 function toCalendarSessionDetail(state, session, allSessions, today) {
   const pickle = state?.pickle || {}
   const groupMembers = currentGroupMembers(state).filter(isActiveMember)
+  const sessionYearMonth = monthKey(sessionDate(session))
   const isFutureSession = dateKey(sessionDate(session) || '') > dateKey(today)
   const presentIds = effectiveSessionMemberIds(session, groupMembers, !isFutureSession)
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
-  const attendanceMembers = groupMembers.filter(member => memberType(member) === 'fixed')
-  const attendanceNames = attendanceDisplayNames(attendanceMembers)
+  const attendanceMembers = groupMembers.filter(member => isFixedForMonth(state, member, sessionYearMonth))
+  const attendanceNames = attendanceDisplayNames(groupMembers)
+  const casualAttendingMembers = groupMembers
+    .filter(member => !isFixedForMonth(state, member, sessionYearMonth))
+    .filter(member => presentSet.has(String(member.id)))
   const fixedPresentCount = attendanceMembers
     .filter(member => presentSet.has(String(member.id)))
     .length
@@ -3111,6 +3115,13 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
       name: attendanceNames.get(String(member.id)) || firstName(member.displayName || member.name),
       memberType: memberType(member),
       kind: presentSet.has(String(member.id)) ? 'present' : 'absent',
+    })),
+    ...casualAttendingMembers.map(member => ({
+      id: member.id,
+      initial: initials(member),
+      name: attendanceNames.get(String(member.id)) || firstName(member.displayName || member.name),
+      memberType: 'casual',
+      kind: 'casual',
     })),
     ...guests.map((guest, index) => ({
       id: guest.id || guest.guest_id || `guest-${index}`,
@@ -3127,8 +3138,11 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
     ...sessionMemberIds(session).map(String),
     ...sessionAttendanceRecords(session).filter(r => r.status !== 'absent').map(r => String(r.memberId)),
   ].filter(Boolean))
-  const casualPresentIds = Array.from(calExplicitPresentIds).filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) === 'casual')
-  const fixedCount = Math.max(groupMembers.filter(member => memberType(member) === 'fixed').length, 1)
+  const casualPresentIds = Array.from(calExplicitPresentIds).filter(id => {
+    const member = groupMembers.find(m => String(m.id) === String(id))
+    return member && !isFixedForMonth(state, member, sessionYearMonth)
+  })
+  const fixedCount = Math.max(groupMembers.filter(member => isFixedForMonth(state, member, sessionYearMonth)).length, 1)
   const rebatePerFixed = casualPresentIds.length > 0 ? Math.round(casualPresentIds.length * courtPerPerson / fixedCount) : 0
   const netCourtPerPerson = Math.max(courtPerPerson - rebatePerFixed, 0)
   const fixedPresentIds = presentIds.filter(id => memberType(groupMembers.find(member => String(member.id) === String(id))) !== 'casual')
