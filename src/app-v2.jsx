@@ -2044,8 +2044,12 @@ export default function AppV2() {
         const { data: groupMemberIds } = await sb.from('members').select('id').eq('group_id', groupId).eq('profile_id', existingProfile.id)
         if (groupMemberIds?.length) {
           const ids = groupMemberIds.map(r => r.id)
-          const { data: memberAttendance } = await sb.from('pickle_attendees').select('id').eq('session_id', sessionId).eq('attendee_type', 'member').in('member_id', ids).maybeSingle()
+          const { data: memberAttendance } = await sb.from('pickle_attendees').select('id, attended').eq('session_id', sessionId).eq('attendee_type', 'member').in('member_id', ids).maybeSingle()
           if (memberAttendance) {
+            if (!memberAttendance.attended) {
+              const { error: upErr } = await sb.from('pickle_attendees').update({ attended: true, rsvp_status: 'going' }).eq('id', memberAttendance.id)
+              if (upErr) throw upErr
+            }
             await dispatch({ type: 'REFRESH' })
             return
           }

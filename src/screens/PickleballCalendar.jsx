@@ -1386,7 +1386,7 @@ function formatDayLabel(value) {
 }
 
 function AttendChip({ a, onToggle, isTreasurer, sessionId, savingAction, setSavingAction, onAction }) {
-  const active = a.kind === 'present' || a.kind === 'guest';
+  const active = a.kind === 'present' || a.kind === 'guest' || a.kind === 'casual';
 
   async function removeGuest() {
     if (savingAction) return;
@@ -1471,7 +1471,7 @@ function AttendChip({ a, onToggle, isTreasurer, sessionId, savingAction, setSavi
           width: ATTENDANCE_CHIP_SIZE,
           height: ATTENDANCE_CHIP_SIZE,
           borderRadius: '50%',
-          background: a.kind === 'present' ? colors.pickleball : 'rgba(255,255,255,0.06)',
+          background: active ? colors.pickleball : 'rgba(255,255,255,0.06)',
           border: `1px solid ${active ? 'rgba(52,211,153,0.48)' : colors.borderSubtle}`,
           color: active ? '#052e26' : colors.textSecondary,
           display: 'flex',
