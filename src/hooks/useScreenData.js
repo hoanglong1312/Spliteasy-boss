@@ -2076,7 +2076,7 @@ function buildPaymentFlowData(state, memberId) {
 
 function buildJoinGroupData(state) {
   const group = currentGroup(state)
-  const members = currentGroupMembers(state)
+  const members = currentGroupMembers(state).filter(isActiveMember)
   const treasurer = members.find(member => member.role === 'treasurer') || members[0]
   const existingNames = members.map(member => member.displayName || member.name).filter(Boolean)
   const hasGroup = Boolean(group.id)
