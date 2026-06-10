@@ -91,8 +91,10 @@ export function rememberRecentSession(member, token = '') {
     role: member.role || '',
     inviteCode: member.inviteCode || member.invite_code || '',
   }
-  const sessions = getRecentSessions()
-    .filter(session => !hasMatchingSessionIdentity(session, nextSession))
+  const existing = getRecentSessions()
+  const matched = existing.find(session => hasMatchingSessionIdentity(session, nextSession))
+  if (!nextSession.inviteCode && matched?.inviteCode) nextSession.inviteCode = matched.inviteCode
+  const sessions = existing.filter(session => !hasMatchingSessionIdentity(session, nextSession))
   localStorage.setItem(RECENT_SESSIONS_KEY, JSON.stringify([nextSession, ...sessions].slice(0, 5)))
   if (isTreasurerRole(nextSession.role)) {
     setPinnedSession(nextSession)

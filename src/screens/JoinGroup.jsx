@@ -344,17 +344,17 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
         {!inviteToken && !code && codeFocused && (() => {
           const seen = new Set();
           const suggestions = recentSessions
-            .map(s => s.inviteCode)
-            .filter(c => c && !seen.has(c) && seen.add(c))
+            .map(s => ({ code: s.inviteCode, label: s.inviteCode || s.groupName }))
+            .filter(s => s.label && !seen.has(s.label) && seen.add(s.label))
             .slice(0, 3);
           if (!suggestions.length) return null;
           return (
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-              {suggestions.map(ic => (
+              {suggestions.map(({ code: ic, label }) => (
                 <button
-                  key={ic}
+                  key={label}
                   type="button"
-                  onClick={() => { setCode(ic); setCodeFocused(false); }}
+                  onClick={() => { if (ic) { setCode(ic); setCodeFocused(false); } }}
                   style={{
                     padding: '4px 10px',
                     borderRadius: 8,
@@ -367,7 +367,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                     letterSpacing: '0.4px',
                     cursor: 'pointer',
                   }}
-                >{ic}</button>
+                >{label}</button>
               ))}
             </div>
           );
