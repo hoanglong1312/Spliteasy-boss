@@ -111,10 +111,32 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.match(joinGroupSource, /onAction\?\.\('removeRecentSession', session\)/)
   assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
   assert.match(joinGroupSource, /Tên đã có cần link cá nhân hoặc PIN/)
-  assert.match(joinGroupSource, /session\.groupName \|\| 'Bấm để vào lại'/)
+  assert.match(joinGroupSource, /session\.hasPin \? 'Có PIN · Bấm để vào lại' : 'Bấm để vào lại'/)
   assert.match(joinGroupSource, /!\(recentSessions\.length > 0\) && !hasGroupPreview && !looking/)
   assert.match(joinGroupSource, /await requestJoinByInviteLink\(inviteToken, memberName\)/)
   assert.match(joinGroupSource, /setJoinSent\(true\)/)
+})
+
+test('invite-link login switches members cleanly and preserves group names', () => {
+  assert.match(appSource, /if \(type === 'joinGroup_direct'\)[\s\S]*state\.currentUserId[\s\S]*String\(state\.currentUserId\) !== String\(payload\?\.memberId\)[\s\S]*type: 'LOGOUT'[\s\S]*keepRecent: true/)
+  assert.match(appSource, /type: 'LOGIN'[\s\S]*token: payload\.token[\s\S]*groupName: payload\.groupName/)
+  assert.match(joinGroupSource, /token: tokenData\.token[\s\S]*memberName: tokenData\.member_name[\s\S]*groupName: foundGroup\?\.name \|\| ''/)
+  assert.match(joinGroupSource, /token: result\.token[\s\S]*memberName: result\.memberName[\s\S]*groupName: foundGroup\?\.name \|\| ''/)
+  assert.match(authSource, /groupName: member\.groupName \|\| ''/)
+  assert.match(screenDataSource, /getRecentInvites\(\)/)
+})
+
+test('JoinGroup stores invite previews and can reopen recent invites', () => {
+  assert.match(authSource, /const RECENT_INVITES_KEY\s*=\s*'spliteasy_recent_invites'/)
+  assert.match(authSource, /export function saveRecentInvite\(token, group\)/)
+  assert.match(authSource, /export function getRecentInvites\(\)/)
+  assert.match(authSource, /\[nextInvite, \.\.\.invites\]\.slice\(0, 3\)/)
+  assert.match(joinGroupSource, /saveRecentInvite\(inviteToken, result\)/)
+  assert.match(joinGroupSource, /Nhóm đã được mời gần đây/)
+  assert.match(joinGroupSource, /onAction\?\.\('loadStoredInvite', \{ token: invite\.token \}\)/)
+  assert.match(joinGroupSource, /Treasurer: /)
+  assert.match(appSource, /const \[groupInviteToken, setGroupInviteToken\] = useState/)
+  assert.match(appSource, /if \(type === 'loadStoredInvite'\)[\s\S]*setGroupInviteToken\(payload\?\.token \|\| ''\)/)
 })
 
 test('JoinGroup empty state does not show a fake Spliteasy group before link or code lookup', () => {

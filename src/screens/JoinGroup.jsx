@@ -37,7 +37,12 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
   const recentInvites = d.recentInvites || [];
-  const visibleRecentSessions = recentSessions.filter(s => !isTreasurerSession(s));
+  const visibleRecentSessions = recentSessions
+    .filter(s => !isTreasurerSession(s))
+    .filter((s, i, arr) => {
+      const key = s.profileId || s.memberId;
+      return arr.findIndex(x => (x.profileId || x.memberId) === key) === i;
+    });
   const joinButtonText = joining
     ? 'Đang tham gia...'
     : isInviteLinkFlow
@@ -131,6 +136,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
     }
     setInvitePinLoading(true);
     setInvitePinError('');
+    await new Promise(r => requestAnimationFrame(r));
     try {
       const tokenData = await getTokenAfterPinVerify(pinRequiredMemberId, invitePinValue);
       if (tokenData?.error === 'wrong_pin') {
@@ -334,7 +340,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
                           <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {session.groupName || 'Bấm để vào lại'}{session.hasPin ? ' · Có PIN' : ''}
+                            {session.hasPin ? 'Có PIN · Bấm để vào lại' : 'Bấm để vào lại'}
                           </span>
                         </span>
                         {!isPinRow && <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>}
