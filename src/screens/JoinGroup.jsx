@@ -35,6 +35,10 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [sessionPinError, setSessionPinError] = useState('');
   const [sessionPinLoading, setSessionPinLoading] = useState(false);
   const [localSessions, setLocalSessions] = useState(() => getRecentSessions());
+  const [chipPinName, setChipPinName] = useState(null);
+  const [chipPinValue, setChipPinValue] = useState('');
+  const [chipPinError, setChipPinError] = useState('');
+  const [chipPinLoading, setChipPinLoading] = useState(false);
   const SESSION_AVATAR_COLORS = [
   'linear-gradient(135deg, #4a6cf7, #7c3aed)',
   'linear-gradient(135deg, #10b981, #059669)',
@@ -176,7 +180,34 @@ const getSessionAvatarColor = (name) => {
       setInvitePinLoading(false);
     }
   };
-  const handleSessionPinSubmit = async (session) => {
+  const handleChipPinSubmit = async () => {
+  if (!chipPinValue.trim()) { setChipPinError('Nhập mã PIN'); return; }
+  const allSessions = [...(d.recentSessions || []), ...(localSessions || [])];
+  if (longSession) allSessions.push(longSession);
+  const session = allSessions.find(s => s.memberName === chipPinName);
+  if (!session) { setChipPinError('Không tìm thấy session. Thử lại.'); return; }
+  setChipPinLoading(true);
+  setChipPinError('');
+  await new Promise(r => requestAnimationFrame(r));
+  try {
+    const ok = await verifyProfilePin(session.profileId, chipPinValue);
+    if (!ok) {
+      setChipPinError('Sai PIN. Thử lại.');
+      setChipPinValue('');
+      setChipPinLoading(false);
+      return;
+    }
+    setChipPinName(null);
+    setChipPinValue('');
+    setSelected(chipPinName);
+  } catch {
+    setChipPinError('Lỗi xác minh. Thử lại.');
+  } finally {
+    setChipPinLoading(false);
+  }
+};
+
+const handleSessionPinSubmit = async (session) => {
     if (!sessionPinValue.trim()) { setSessionPinError('Nhập mã PIN'); return; }
     setSessionPinLoading(true);
     setSessionPinError('');
@@ -622,7 +653,22 @@ const getSessionAvatarColor = (name) => {
                 {existingNames.map((name) => {
                   const active = name === selected;
                   return (
-                    <button key={name} onClick={() => { setSelected(name); setNewName(''); }} style={{
+                    <button key={name} onClick={() => {
+                      const allSessions = [...(d.recentSessions || []), ...(localSessions || [])];
+                      if (longSession) allSessions.push(longSession);
+                      const session = allSessions.find(s => s.memberName === name);
+                      if (session?.hasPin && !isTreasurerSession(session)) {
+                        setChipPinName(name);
+                        setChipPinValue('');
+                        setChipPinError('');
+                        setSelected(null);
+                        setNewName('');
+                      } else {
+                        setSelected(name);
+                        setNewName('');
+                        setChipPinName(null);
+                      }
+                    }} style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '7px 12px 7px 6px', borderRadius: 100,
                       background: active ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
@@ -640,6 +686,45 @@ const getSessionAvatarColor = (name) => {
                   );
                 })}
               </div>
+
+              {chipPinName && (
+                <div style={{ marginTop: 10, borderRadius: 12, border: '1px solid rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.07)', padding: 12 }}>
+                  <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 8 }}>
+                    🔒 Nhập PIN để xác nhận danh tính của <strong style={{ color: colors.textPrimary }}>{chipPinName}</strong>
+                  </div>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    placeholder="Nhập mã PIN"
+                    value={chipPinValue}
+                    autoFocus
+                    onChange={e => { setChipPinValue(e.target.value.replace(/\D/g, '').slice(0, 6)); setChipPinError(''); }}
+                    onKeyDown={e => e.key === 'Enter' && !chipPinLoading && handleChipPinSubmit()}
+                    disabled={chipPinLoading}
+                    style={{
+                      width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
+                      border: `1px solid ${chipPinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
+                      background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
+                      fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
+                      WebkitTextSecurity: 'disc', boxSizing: 'border-box', marginBottom: 6,
+                    }}
+                  />
+                  {chipPinError && <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 6 }}>{chipPinError}</div>}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="button" onClick={() => { setChipPinName(null); setChipPinValue(''); setChipPinError(''); }}
+                      style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: `1px solid ${colors.borderNormal}`, background: 'transparent', color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      Hủy
+                    </button>
+                    <button type="button" onClick={handleChipPinSubmit} disabled={chipPinLoading}
+                      style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: chipPinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)', color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700, cursor: chipPinLoading ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      {chipPinLoading && <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff', display: 'inline-block', animation: 'pickleballLoadingSpin 0.8s linear infinite' }} />}
+                      {chipPinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div style={{ height: 1, background: colors.borderSubtle, margin: '14px 0' }} />
 
