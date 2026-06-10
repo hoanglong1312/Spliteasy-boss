@@ -274,53 +274,6 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           )}
         </div>
 
-        {/* Invite code */}
-        {!d.group?.id && !isInviteLinkFlow && recentInvites.length > 0 && (
-          <Card style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(52,211,153,0.24)', background: 'rgba(52,211,153,0.07)' }}>
-            <div style={{
-              fontSize: 9, fontWeight: 800, letterSpacing: '1px',
-              color: '#6ee7b7', textTransform: 'uppercase', marginBottom: 10,
-            }}>Nhóm đã được mời gần đây</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {recentInvites.map(invite => (
-                <button
-                  key={`${invite.groupId}:${invite.token}`}
-                  type="button"
-                  onClick={() => onAction?.('loadStoredInvite', { token: invite.token })}
-                  style={{
-                    width: '100%',
-                    padding: '12px 13px',
-                    borderRadius: 12,
-                    border: `1px solid ${colors.borderSubtle}`,
-                    background: 'rgba(15,23,42,0.72)',
-                    color: colors.textPrimary,
-                    fontFamily: 'inherit',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
-                >
-                  <span style={{
-                    width: 34, height: 34, borderRadius: 12,
-                    background: 'rgba(52,211,153,0.15)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 17, flex: '0 0 auto',
-                  }}>{invite.emoji || '👥'}</span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{invite.groupName || 'Nhóm'}</span>
-                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Treasurer: {invite.treasurer || 'Thủ quỹ'}
-                    </span>
-                  </span>
-                  <span style={{ fontSize: 18, color: '#6ee7b7' }}>›</span>
-                </button>
-              ))}
-            </div>
-          </Card>
-        )}
-
         {!hasGroupPreview && !looking && !isInviteLinkFlow && (
           <Card style={{ padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
