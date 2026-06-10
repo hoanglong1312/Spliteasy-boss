@@ -314,7 +314,7 @@ const getSessionAvatarColor = (name) => {
           )}
         </div>
 
-        {!hasGroupPreview && !looking && !isInviteLinkFlow && (
+        {!hasGroupPreview && !looking && !isInviteLinkFlow && localSessions.length === 0 && (
           <Card style={{ padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{
@@ -332,6 +332,141 @@ const getSessionAvatarColor = (name) => {
               </div>
             </div>
           </Card>
+        )}
+
+        {!hasGroupPreview && localSessions.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: '1.2px',
+              color: colors.textMuted, textTransform: 'uppercase',
+              marginBottom: 6,
+            }}>Vào lại tài khoản gần đây</div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 10 }}>
+              Chạm vào tên đã dùng trên máy này.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {localSessions.map((session) => {
+                const sessionKey = session.profileId || session.memberId;
+                const isExpanded = expandedPinSessionId === sessionKey;
+                return (
+                  <div
+                    key={sessionKey}
+                    style={{
+                      borderRadius: 14,
+                      border: `1px solid ${isExpanded ? colors.brand : 'rgba(255,255,255,0.08)'}`,
+                      background: isExpanded ? 'rgba(99,102,241,0.10)' : 'rgba(255,255,255,0.04)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* Card header row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px' }}>
+                      <div style={{
+                        width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                        background: getSessionAvatarColor(session.memberName),
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 16, fontWeight: 800, color: '#fff',
+                      }}>
+                        {(session.memberName || '?')[0].toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>
+                        {session.memberName}
+                      </div>
+                      {!isExpanded && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (session.hasPin) {
+                              setExpandedPinSessionId(sessionKey);
+                              setSessionPinValue('');
+                              setSessionPinError('');
+                            } else {
+                              onAction?.('resumeSession', session);
+                            }
+                          }}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            fontSize: 18, color: colors.brand, padding: '4px 8px',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {session.hasPin ? '🔒' : '›'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isExpanded) { setExpandedPinSessionId(null); setSessionPinValue(''); setSessionPinError(''); }
+                          const updated = removeRecentSession(session);
+                          setLocalSessions(updated);
+                        }}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          fontSize: 13, color: colors.textMuted,
+                          minWidth: 28, minHeight: 28,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          borderRadius: 14, padding: 4,
+                        }}
+                      >×</button>
+                    </div>
+                    {/* Inline PIN expand */}
+                    {isExpanded && (
+                      <div style={{
+                        borderTop: '1px solid rgba(99,102,241,0.25)',
+                        padding: '10px 12px',
+                      }}>
+                        <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 8 }}>
+                          🔒 Nhập PIN để vào tài khoản này
+                        </div>
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          placeholder="Nhập mã PIN"
+                          value={sessionPinValue}
+                          autoFocus
+                          onChange={e => { setSessionPinValue(e.target.value.replace(/\D/g, '').slice(0, 6)); setSessionPinError(''); }}
+                          onKeyDown={e => e.key === 'Enter' && !sessionPinLoading && handleSessionPinSubmit(session)}
+                          disabled={sessionPinLoading}
+                          style={{
+                            width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
+                            border: `1px solid ${sessionPinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
+                            background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
+                            fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
+                            WebkitTextSecurity: 'disc', boxSizing: 'border-box', marginBottom: 6,
+                          }}
+                        />
+                        {sessionPinError && (
+                          <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 6 }}>{sessionPinError}</div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSessionPinSubmit(session)}
+                          disabled={sessionPinLoading}
+                          style={{
+                            width: '100%', padding: '9px 0', borderRadius: 8, border: 'none',
+                            background: sessionPinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)',
+                            color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+                            cursor: sessionPinLoading ? 'default' : 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}
+                        >
+                          {sessionPinLoading && (
+                            <span style={{
+                              width: 14, height: 14, borderRadius: '50%',
+                              border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
+                              display: 'inline-block', animation: 'pickleballLoadingSpin 0.8s linear infinite',
+                            }} />
+                          )}
+                          {sessionPinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         <div style={{
