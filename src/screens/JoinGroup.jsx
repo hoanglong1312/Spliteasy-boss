@@ -614,7 +614,86 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           </div>
         )}
 
-        {hasGroupPreview && !pinRequired && <Button block variant="brand" style={{ marginTop: 10, opacity: joining ? 0.6 : 1 }}
+        {pinSession && !pinRequired && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{
+              borderRadius: '12px 12px 0 0',
+              border: '1px solid rgba(99,102,241,0.5)',
+              borderBottom: 'none',
+              background: 'rgba(99,102,241,0.1)',
+              padding: '12px 13px',
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <Avatar initial={(pinSession.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, fontWeight: 900, color: colors.textPrimary }}>
+                  {pinSession.memberName || 'Thành viên'}
+                </span>
+                <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                  {pinSession.groupName || foundGroup?.name || ''} · Nhập PIN để vào
+                </span>
+              </span>
+            </div>
+            <div style={{
+              borderRadius: '0 0 12px 12px',
+              border: '1px solid rgba(99,102,241,0.5)',
+              borderTop: '1px solid rgba(99,102,241,0.2)',
+              background: 'rgba(99,102,241,0.06)',
+              padding: '12px 13px',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                placeholder="Nhập mã PIN"
+                value={pinValue}
+                onChange={e => onPinChange?.(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !pinLoading && onPinSubmit?.(pinValue)}
+                disabled={pinLoading}
+                autoFocus
+                style={{
+                  width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
+                  border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
+                  background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
+                  fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
+                  WebkitTextSecurity: 'disc', boxSizing: 'border-box',
+                }}
+              />
+              {pinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{pinError}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" onClick={onPinCancel} style={{
+                  flex: 1, padding: '9px 0', borderRadius: 8,
+                  border: `1px solid ${colors.borderNormal}`,
+                  background: 'transparent', color: colors.textSecondary,
+                  fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}>Hủy</button>
+                <button type="button" onClick={() => onPinSubmit?.(pinValue)} disabled={pinLoading} style={{
+                  flex: 2, padding: '9px 0', borderRadius: 8, border: 'none',
+                  background: pinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)',
+                  color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+                  cursor: pinLoading ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}>
+                  {pinLoading && (
+                    <>
+                      <style>{`@keyframes pickleballLoadingSpin{to{transform:rotate(360deg)}}`}</style>
+                      <span style={{
+                        width: 14, height: 14, borderRadius: '50%',
+                        border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
+                        display: 'inline-block', animation: 'pickleballLoadingSpin 0.8s linear infinite', flexShrink: 0,
+                      }} />
+                    </>
+                  )}
+                  {pinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {hasGroupPreview && !pinRequired && !pinSession && <Button block variant="brand" style={{ marginTop: 10, opacity: joining ? 0.6 : 1 }}
           onClick={async () => {
             if (joining) return;
             setJoinError('');
