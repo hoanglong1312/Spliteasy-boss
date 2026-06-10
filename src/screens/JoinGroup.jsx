@@ -518,9 +518,10 @@ const getSessionAvatarColor = (name) => {
         {/* Recent code suggestions */}
         {!inviteToken && !code && codeFocused && (() => {
           const seen = new Set();
-          const suggestions = recentSessions
-            .map(s => ({ code: s.inviteCode, label: s.inviteCode || s.groupName }))
-            .filter(s => s.label && !seen.has(s.label) && seen.add(s.label))
+          const suggestions = localSessions
+            .filter(s => s.inviteCode && s.inviteCode.trim())
+            .map(s => ({ code: s.inviteCode, label: s.inviteCode }))
+            .filter(s => !seen.has(s.label) && seen.add(s.label))
             .slice(0, 3);
           if (!suggestions.length) return null;
           return (
