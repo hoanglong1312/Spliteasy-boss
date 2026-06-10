@@ -2,7 +2,7 @@
 // Props: data { code, group, existingNames[], selectedName }
 
 import React, { useState, useEffect, useRef } from 'react';
-import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, verifyPinForInviteLink, getTokenAfterPinVerify } from '../lib/auth.js';
+import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, getTokenAfterPinVerify, saveRecentInvite } from '../lib/auth.js';
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
@@ -27,14 +27,23 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [adminExpanded, setAdminExpanded] = useState(false);
   const [adminError, setAdminError] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
-  const adminPinRef = useRef(null);
+  const [adminPinValue, setAdminPinValue] = useState('');
   const isTreasurerSession = s => s?.role === 'treasurer' || s?.hasPin === true && s?.profileId === '6faee487-3a0e-42d7-b8b9-06ccf2248dbc'
   const longSession = d.recentSessions?.find(isTreasurerSession)
     || (isTreasurerSession(d.pinnedSession) ? d.pinnedSession : null);
-  const recentSessions = (d.recentSessions || []).filter(s => !isTreasurerSession(s));
+  const recentSessions = d.recentSessions || [];
   const inviteToken = d.inviteToken || '';
   const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
+  const recentInvites = d.recentInvites || [];
+  const visibleRecentSessions = recentSessions.filter(s => !isTreasurerSession(s));
+  const joinButtonText = joining
+    ? 'Đang tham gia...'
+    : isInviteLinkFlow
+      ? 'Gửi yêu cầu tham gia'
+      : selected && !newName
+        ? 'Vào nhóm'
+        : 'Tham gia';
 
   const existingNames = hasGroupPreview
     ? (inviteToken
@@ -56,6 +65,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
     lookupGroupInviteLink(inviteToken)
       .then(result => {
         if (!alive) return;
+        saveRecentInvite(inviteToken, result);
         setFoundGroup({
           ...result,
           member_names: result.member_names || [],
@@ -96,7 +106,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   }, [code, inviteToken]);
 
   const handleAdminLogin = async () => {
-    const pin = adminPinRef.current?.value || '';
+    const pin = adminPinValue;
     if (!pin) { setAdminError('Nhập mã PIN'); return; }
     setAdminLoading(true);
     setAdminError('');
@@ -104,7 +114,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
       const result = await onAction?.('adminPinLogin', { pin, session: longSession });
       if (result?.error === 'wrong_pin') {
         setAdminError('Sai mã PIN. Thử lại.');
-        if (adminPinRef.current) { adminPinRef.current.value = ''; adminPinRef.current.focus(); }
+        setAdminPinValue('');
       } else if (result?.error) {
         setAdminError('Không đăng nhập được. Thử lại.');
       }
@@ -133,6 +143,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
         memberId: tokenData.member_id,
         groupId: tokenData.group_id,
         memberName: tokenData.member_name,
+        groupName: foundGroup?.name || '',
       });
       setInvitePinLoading(false);
     } catch (err) {
@@ -171,7 +182,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           {!adminExpanded ? (
             <button
               type="button"
-              onClick={() => { setAdminExpanded(true); setAdminError(''); }}
+                  onClick={() => { setAdminExpanded(true); setAdminError(''); setAdminPinValue(''); }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                 padding: '9px 12px', borderRadius: 12,
@@ -219,12 +230,12 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                 display: 'flex', flexDirection: 'column', gap: 8,
               }}>
                 <input
-                  ref={adminPinRef}
                   type="password"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={6}
-                  defaultValue=""
+                  value={adminPinValue}
+                  onChange={e => { setAdminPinValue(e.target.value.replace(/\D/g, '').slice(0, 6)); setAdminError(''); }}
                   placeholder="Nhập mã PIN"
                   autoFocus
                   onKeyDown={e => e.key === 'Enter' && !adminLoading && handleAdminLogin()}
@@ -233,12 +244,13 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                     border: `1px solid ${adminError ? 'rgba(248,113,113,0.5)' : 'rgba(251,191,36,0.3)'}`,
                     background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
                     fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
+                    WebkitTextSecurity: 'disc',
                     boxSizing: 'border-box',
                   }}
                 />
                 {adminError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{adminError}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button" onClick={() => { setAdminExpanded(false); setAdminError(''); }} style={{
+                  <button type="button" onClick={() => { setAdminExpanded(false); setAdminError(''); setAdminPinValue(''); }} style={{
                     flex: 1, padding: '9px 0', borderRadius: 8,
                     border: `1px solid ${colors.borderNormal}`, background: 'transparent',
                     color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -255,7 +267,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
         </div>
 
         {/* Invite code */}
-        {recentSessions.length > 0 && (
+        {visibleRecentSessions.length > 0 && (
           <Card style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(99,102,241,0.28)', background: 'rgba(99,102,241,0.08)' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
@@ -277,7 +289,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {recentSessions.map(session => {
+              {visibleRecentSessions.map(session => {
                 const isPinRow = pinSession?.memberId === session.memberId
                 return (
                   <div key={session.memberId} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -358,7 +370,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                         gap: 8,
                       }}>
                         <input
-                          type="tel"
+                          type="password"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           maxLength={6}
@@ -420,6 +432,52 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                   </div>
                 )
               })}
+            </div>
+          </Card>
+        )}
+
+        {!d.group?.id && !isInviteLinkFlow && recentInvites.length > 0 && (
+          <Card style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(52,211,153,0.24)', background: 'rgba(52,211,153,0.07)' }}>
+            <div style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: '1px',
+              color: '#6ee7b7', textTransform: 'uppercase', marginBottom: 10,
+            }}>Nhóm đã được mời gần đây</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {recentInvites.map(invite => (
+                <button
+                  key={`${invite.groupId}:${invite.token}`}
+                  type="button"
+                  onClick={() => onAction?.('loadStoredInvite', { token: invite.token })}
+                  style={{
+                    width: '100%',
+                    padding: '12px 13px',
+                    borderRadius: 12,
+                    border: `1px solid ${colors.borderSubtle}`,
+                    background: 'rgba(15,23,42,0.72)',
+                    color: colors.textPrimary,
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                >
+                  <span style={{
+                    width: 34, height: 34, borderRadius: 12,
+                    background: 'rgba(52,211,153,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 17, flex: '0 0 auto',
+                  }}>{invite.emoji || '👥'}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{invite.groupName || 'Nhóm'}</span>
+                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      Treasurer: {invite.treasurer || 'Thủ quỹ'}
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 18, color: '#6ee7b7' }}>›</span>
+                </button>
+              ))}
             </div>
           </Card>
         )}
@@ -543,7 +601,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           <>
             <SectionLabel>Bạn là ai?</SectionLabel>
             <div style={{ fontSize: 11, color: colors.textSecondary, margin: '-4px 0 12px', lineHeight: 1.5 }}>
-              Có mã mời thì chọn tên có sẵn để vào nhóm. Link mời công khai chỉ nhận tên mới để chờ thủ quỹ duyệt.
+              Có mã mời thì chọn tên có sẵn để vào nhóm. Link mời công khai chỉ nhận tên mới để chờ thủ quỹ duyệt. Tên đã có cần link cá nhân hoặc PIN.
             </div>
 
             <Card style={{ padding: 14 }}>
@@ -626,7 +684,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           <div style={{ marginTop: 10 }}>
             <SectionLabel style={{ marginBottom: 8 }}>Xác nhận bằng mã PIN</SectionLabel>
             <input
-              type="tel"
+              type="password"
               inputMode="numeric"
               placeholder="Nhập mã PIN của bạn"
               value={invitePinValue}
@@ -645,6 +703,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                 border: `1px solid ${invitePinError ? '#fc5c65' : colors.border}`,
                 marginBottom: invitePinError ? 6 : 10,
                 letterSpacing: '0.3em',
+                WebkitTextSecurity: 'disc',
               }}
               disabled={invitePinLoading}
             />
@@ -668,7 +727,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
             setJoinError('');
             if (!inviteToken && !code.trim()) { setJoinError('Vui lòng nhập mã mời.'); return; }
             if (!memberName) { setJoinError('Vui lòng chọn hoặc nhập tên của bạn.'); return; }
-            if (selected && !newName) {
+            if (isInviteLinkFlow && selected && !newName) {
               // Existing member selected — try to resume their session
               const allSessions = [...(d.recentSessions || [])];
               if (longSession) allSessions.push(longSession);
@@ -681,10 +740,6 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                   await onAction?.('resumeRecentSession', existingSession);
                   setJoining(false);
                 }
-                return;
-              }
-              if (!isInviteLinkFlow && !code.trim()) {
-                setJoinError('Tên đã có. Dùng link cá nhân của bạn để vào lại.');
                 return;
               }
               // invite link flow: fall through to requestJoinByInviteLink
@@ -700,6 +755,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                     memberId: result.memberId,
                     groupId: result.groupId,
                     memberName: result.memberName,
+                    groupName: foundGroup?.name || '',
                   });
                   setJoining(false);
                   return;
@@ -725,7 +781,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
               setJoining(false);
             }
           }}>
-          {joining ? '⏳ Đang tham gia...' : 'Tham gia →'}
+          {joinButtonText}
         </Button>}
 
         {/* Pending hint */}

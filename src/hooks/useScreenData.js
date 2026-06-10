@@ -6,6 +6,7 @@ import {
   groupNet,
   pickleSummary,
 } from '../data.jsx'
+import { getRecentInvites } from '../lib/auth.js'
 
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 const WEEKDAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
@@ -2097,6 +2098,7 @@ function buildJoinGroupData(state) {
     existingNames: hasGroup ? existingNames : [],
     suggestedName: '',
     selectedName: '',
+    recentInvites: getRecentInvites(),
   }
 }
 

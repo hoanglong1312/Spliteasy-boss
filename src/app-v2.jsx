@@ -130,7 +130,7 @@ export default function AppV2() {
   const { state, dispatch } = useApp()
   const [publicBillToken, setPublicBillToken] = useState(() => publicBillTokenFromLocation())
   const [memberAccessToken] = useState(() => accessTokenFromLocation())
-  const [groupInviteToken] = useState(() => inviteTokenFromLocation())
+  const [groupInviteToken, setGroupInviteToken] = useState(() => inviteTokenFromLocation())
   const [groupJoinCode] = useState(() => joinCodeFromLocation())
   const [linkedMonth] = useState(() => monthFromLocation())
   const [publicBillData, setPublicBillData] = useState(null)
@@ -240,6 +240,7 @@ export default function AppV2() {
         memberId: data.memberId,
         groupId: data.groupId,
         memberName: data.memberName,
+        groupName: data.groupName,
         purpose: data.purpose,
       })
       if (linkedMonth) {
@@ -312,6 +313,7 @@ export default function AppV2() {
       memberId: data.memberId,
       groupId: data.groupId,
       memberName: data.memberName,
+      groupName: data.groupName,
       purpose: data.purpose,
     })
     if (linkedMonth) {
@@ -353,7 +355,7 @@ export default function AppV2() {
         console.error('[app] resumeSessionByProfile:', error || data)
         return null
       }
-      return { authToken: data.authToken, memberId: data.memberId, groupId: data.groupId, memberName: data.memberName || session.memberName }
+      return { authToken: data.authToken, memberId: data.memberId, groupId: data.groupId, memberName: data.memberName || session.memberName, groupName: data.groupName || session.groupName }
     }
 
     if (!session?.memberId) return null
@@ -366,7 +368,7 @@ export default function AppV2() {
       console.error('[app] resumeRecentSession:', error || data)
       return null
     }
-    return { authToken: data.authToken, memberId: data.memberId || session.memberId, groupId: data.groupId || session.groupId, memberName: data.memberName || session.memberName }
+    return { authToken: data.authToken, memberId: data.memberId || session.memberId, groupId: data.groupId || session.groupId, memberName: data.memberName || session.memberName, groupName: data.groupName || session.groupName }
   }
 
   async function verifyMemberPin(memberId, pin) {
@@ -461,7 +463,7 @@ export default function AppV2() {
       if (!resolved?.authToken) return { error: 'no_token' }
       setStack([])
       setActiveTab('home')
-      await dispatch({ type: 'LOGIN', token: resolved.authToken, memberId: resolved.memberId, groupId: resolved.groupId, memberName: resolved.memberName })
+      await dispatch({ type: 'LOGIN', token: resolved.authToken, memberId: resolved.memberId, groupId: resolved.groupId, memberName: resolved.memberName, groupName: resolved.groupName || session?.groupName })
       return { ok: true }
     }
 
@@ -480,14 +482,16 @@ export default function AppV2() {
         dispatch({ type: 'SHOW_TOAST', message: 'Không vào lại được tài khoản này. Nhờ thủ quỹ gửi link mới nếu tên đã bị xóa hoặc đổi.' })
         return
       }
+      const { authToken } = resolved
       setStack([])
       setActiveTab('home')
       await dispatch({
         type: 'LOGIN',
-        token: resolved.authToken,
-        memberId: resolved.memberId,
-        groupId: resolved.groupId,
-        memberName: resolved.memberName,
+        token: authToken,
+        memberId: payload.memberId || resolved.memberId,
+        groupId: payload.groupId || resolved.groupId,
+        memberName: payload.memberName || resolved.memberName,
+        groupName: payload.groupName || resolved.groupName,
       })
       return
     }
@@ -499,6 +503,9 @@ export default function AppV2() {
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
         sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
       }
+      if (state.currentUserId && String(state.currentUserId) !== String(payload?.memberId)) {
+        dispatch({ type: 'LOGOUT', keepRecent: true })
+      }
       setStack([])
       setActiveTab('home')
       await dispatch({
@@ -507,7 +514,13 @@ export default function AppV2() {
         memberId: payload.memberId,
         groupId: payload.groupId,
         memberName: payload.memberName,
+        groupName: payload.groupName,
       })
+      return
+    }
+
+    if (type === 'loadStoredInvite') {
+      setGroupInviteToken(payload?.token || '')
       return
     }
 
@@ -1917,6 +1930,7 @@ export default function AppV2() {
         memberId: result.member_id,
         groupId: result.group_id,
         memberName: result.member_name,
+        groupName: result.group_name || result.groupName || payload.groupName || '',
         hasPin: true,
       }
       const requiresPin = await checkMemberPinRequired(manualSession.memberId)
@@ -1937,6 +1951,7 @@ export default function AppV2() {
         memberId: manualSession.memberId,
         groupId: manualSession.groupId,
         memberName: manualSession.memberName,
+        groupName: manualSession.groupName,
       })
       return
     }

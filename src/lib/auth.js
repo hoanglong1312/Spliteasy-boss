@@ -3,6 +3,7 @@ import { createSupabase } from './supabase.js'
 const TOKEN_KEY  = 'spliteasy_token'
 const MEMBER_KEY = 'spliteasy_member'
 const RECENT_SESSIONS_KEY = 'spliteasy_recent_sessions'
+const RECENT_INVITES_KEY = 'spliteasy_recent_invites'
 const PINNED_SESSION_KEY = 'spliteasy_pinned_session'
 
 export function getStoredAuth() {
@@ -30,6 +31,40 @@ export function storeAuth(token, member) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(MEMBER_KEY, JSON.stringify(member))
   rememberRecentSession(member, token)
+}
+
+export function saveRecentInvite(token, group) {
+  if (!token || !group?.id) return
+  const nextInvite = {
+    token,
+    groupId: group.id,
+    groupName: group.name || '',
+    emoji: group.emoji || '👥',
+    treasurer: group.treasurer || group.treasurer_name || '',
+  }
+  const invites = getRecentInvites()
+    .filter(invite => invite.token !== token && invite.groupId !== nextInvite.groupId)
+  localStorage.setItem(RECENT_INVITES_KEY, JSON.stringify([nextInvite, ...invites].slice(0, 3)))
+}
+
+export function getRecentInvites() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_INVITES_KEY) || '[]')
+    const seen = new Set()
+    const invites = (Array.isArray(parsed) ? parsed : [])
+      .filter(invite => invite?.token && invite?.groupId)
+      .filter(invite => {
+        const key = `${invite.token}:${invite.groupId}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .slice(0, 3)
+    localStorage.setItem(RECENT_INVITES_KEY, JSON.stringify(invites))
+    return invites
+  } catch {
+    return []
+  }
 }
 
 export function getRecentSessions() {
@@ -235,16 +270,21 @@ export async function profilePinRequired(profileId) {
 // Get token after PIN verified for invite link (returns token + member/group info)
 export async function getTokenAfterPinVerify(memberId, pin) {
   const sb = createSupabase()
-  
+
   // Verify PIN first
   const { data: pinOk, error: pinErr } = await sb.rpc('verify_member_pin', { p_member_id: memberId, p_pin: pin })
   if (pinErr) throw pinErr
   if (!pinOk) return { error: 'wrong_pin' }
-  
+
   // PIN correct — issue new token using resume_recent_member_session RPC
   const { data, error } = await sb.rpc('resume_recent_member_session', { p_member_id: memberId })
   if (error) throw error
   if (data?.error) throw new Error(data.error)
-  
-  return data // { token, member_id, group_id, member_name }
+
+  return {
+    token: data?.token || data?.authToken,
+    member_id: data?.member_id || data?.memberId || memberId,
+    group_id: data?.group_id || data?.groupId,
+    member_name: data?.member_name || data?.memberName,
+  }
 }

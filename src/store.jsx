@@ -1548,8 +1548,8 @@ export function AppProvider({ children }) {
       }
 
       case 'LOGIN': {
-        const { token: newToken, memberId, groupId, memberName } = action
-        storeAuth(newToken, { id: memberId, groupId, name: memberName })
+        const { token: newToken, memberId, groupId, memberName, groupName } = action
+        storeAuth(newToken, { id: memberId, groupId, name: memberName, groupName })
         tokenRef.current = newToken
         await refresh(newToken)
         break
@@ -1625,7 +1625,7 @@ export function AppProvider({ children }) {
           clearTimeout(toastTimerRef.current)
           toastTimerRef.current = null
         }
-        clearAuth()
+        clearAuth({ keepRecent: action.keepRecent !== false })
         tokenRef.current = null
         setState(buildEmptyState())
         break
