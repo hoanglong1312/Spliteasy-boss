@@ -36,7 +36,11 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const isInviteLinkFlow = Boolean(inviteToken);
   const hasGroupPreview = Boolean(foundGroup || d.group?.id);
 
-  const existingNames = hasGroupPreview ? (foundGroup?.member_names || d.existingNames || []) : [];
+  const existingNames = hasGroupPreview
+    ? (inviteToken
+        ? (foundGroup?.member_names || [])
+        : (foundGroup?.member_names || d.existingNames || []))
+    : [];
   const displayGroup = foundGroup
     ? { emoji: foundGroup.emoji, name: foundGroup.name, treasurer: foundGroup.treasurer,
         foundedLabel: '', activeCount: existingNames.length, memberCount: existingNames.length,
@@ -46,7 +50,6 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
 
   useEffect(() => {
     if (!inviteToken) return;
-    if (d.group?.id) return;  // already have group data from logged-in state, skip lookup
     let alive = true;
     setLooking(true);
     setLookupError('');
@@ -55,7 +58,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
         if (!alive) return;
         setFoundGroup({
           ...result,
-          member_names: [],
+          member_names: result.member_names || [],
           treasurer: result.treasurer || result.treasurer_name,
         });
       })
