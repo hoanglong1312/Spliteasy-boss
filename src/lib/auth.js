@@ -89,6 +89,7 @@ export function rememberRecentSession(member, token = '') {
     hasPin: member.hasPin === true || member.has_pin === true,
     authToken: token || member.authToken || '',
     role: member.role || '',
+    inviteCode: member.inviteCode || member.invite_code || '',
   }
   const sessions = getRecentSessions()
     .filter(session => !hasMatchingSessionIdentity(session, nextSession))

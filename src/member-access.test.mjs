@@ -105,16 +105,14 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.match(joinGroupSource, /const recentSessions = d\.recentSessions \|\| \[\]/)
   assert.match(joinGroupSource, /const inviteToken = d\.inviteToken \|\| ''/)
   assert.match(joinGroupSource, /useState\(d\.joinCode \|\| d\.code \|\| ''\)/)
-  assert.match(joinGroupSource, /Vào lại tài khoản gần đây/)
-  assert.match(joinGroupSource, /onAction\?\.\('resumeRecentSession'/)
-  assert.match(joinGroupSource, /aria-label=\{`Xóa tài khoản gần đây \$\{session\.memberName \|\| 'Thành viên'\}`\}/)
-  assert.match(joinGroupSource, /onAction\?\.\('removeRecentSession', session\)/)
   assert.match(joinGroupSource, /Có mã mời\? Nhập tại đây/)
   assert.match(joinGroupSource, /Tên đã có cần link cá nhân hoặc PIN/)
-  assert.match(joinGroupSource, /session\.hasPin \? 'Có PIN · Bấm để vào lại' : 'Bấm để vào lại'/)
-  assert.match(joinGroupSource, /!\(recentSessions\.length > 0\) && !hasGroupPreview && !looking/)
+  assert.match(joinGroupSource, /!hasGroupPreview && !looking && !isInviteLinkFlow/)
   assert.match(joinGroupSource, /await requestJoinByInviteLink\(inviteToken, memberName\)/)
   assert.match(joinGroupSource, /setJoinSent\(true\)/)
+  // Recent code suggestions — shows chips from recentSessions[].inviteCode when input focused
+  assert.match(joinGroupSource, /s\.inviteCode/)
+  assert.doesNotMatch(joinGroupSource, /Vào lại tài khoản gần đây/)
 })
 
 test('invite-link login switches members cleanly and preserves group names', () => {

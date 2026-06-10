@@ -29,6 +29,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [adminError, setAdminError] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminPinValue, setAdminPinValue] = useState('');
+  const [codeFocused, setCodeFocused] = useState(false);
   const isTreasurerSession = s => s?.role === 'treasurer' || s?.hasPin === true && s?.profileId === '6faee487-3a0e-42d7-b8b9-06ccf2248dbc'
   const longSession = d.recentSessions?.find(isTreasurerSession)
     || (isTreasurerSession(d.pinnedSession) ? d.pinnedSession : null);
@@ -274,197 +275,6 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
         </div>
 
         {/* Invite code */}
-        {visibleRecentSessions.length > 0 && (
-          <Card style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(99,102,241,0.28)', background: 'rgba(99,102,241,0.08)' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10,
-            }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 12,
-                background: 'rgba(99,102,241,0.18)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16,
-              }}>↩</div>
-              <div>
-                <div style={{
-                  fontSize: 9, fontWeight: 800, letterSpacing: '1px',
-                  color: '#c7d2fe', textTransform: 'uppercase',
-                }}>Vào lại tài khoản gần đây</div>
-                <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                  Chạm vào tên đã dùng trên máy này.
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {visibleRecentSessions.map(session => {
-                const isPinRow = pinSession?.memberId === session.memberId
-                return (
-                  <div key={session.memberId} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-                    <div style={{
-                      width: '100%',
-                      padding: 0,
-                      borderRadius: isPinRow ? '12px 12px 0 0' : 12,
-                      border: `1px solid ${isPinRow ? 'rgba(99,102,241,0.5)' : colors.borderSubtle}`,
-                      borderBottom: isPinRow ? 'none' : undefined,
-                      background: isPinRow ? 'rgba(99,102,241,0.1)' : 'rgba(15,23,42,0.72)',
-                      color: colors.textPrimary,
-                      fontFamily: 'inherit',
-                      display: 'flex',
-                      alignItems: 'center',
-                      overflow: 'hidden',
-                    }}>
-                      <button
-                        type="button"
-                        disabled={joining}
-                        onClick={async () => {
-                          if (isPinRow || joining) return;
-                          setJoining(true);
-                          try { await onAction?.('resumeRecentSession', session); } finally { setJoining(false); }
-                        }}
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          padding: '12px 10px 12px 13px',
-                          border: 'none',
-                          background: 'transparent',
-                          color: colors.textPrimary,
-                          fontFamily: 'inherit',
-                          textAlign: 'left',
-                          cursor: isPinRow ? 'default' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <Avatar initial={(session.memberName || 'T')[0]} size={34} color="rgba(99,102,241,0.32)" ring={false} />
-                        <span style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ display: 'block', fontSize: 13, fontWeight: 900 }}>{session.memberName || 'Thành viên'}</span>
-                          <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {session.hasPin ? 'Có PIN · Bấm để vào lại' : 'Bấm để vào lại'}
-                          </span>
-                        </span>
-                        {!isPinRow && <span style={{ fontSize: 18, color: colors.brandLight }}>›</span>}
-                      </button>
-                      {!isPinRow && (
-                        <button
-                          type="button"
-                          aria-label={`Xóa tài khoản gần đây ${session.memberName || 'Thành viên'}`}
-                          onClick={() => onAction?.('removeRecentSession', session)}
-                          style={{
-                            width: 42,
-                            alignSelf: 'stretch',
-                            border: 'none',
-                            borderLeft: `1px solid ${colors.borderSubtle}`,
-                            background: 'rgba(248,113,113,0.08)',
-                            color: '#fca5a5',
-                            fontSize: 18,
-                            fontWeight: 900,
-                            fontFamily: 'inherit',
-                            cursor: 'pointer',
-                          }}
-                        >×</button>
-                      )}
-                    </div>
-                    {isPinRow && (
-                      <div style={{
-                        borderRadius: '0 0 12px 12px',
-                        border: '1px solid rgba(99,102,241,0.5)',
-                        borderTop: '1px solid rgba(99,102,241,0.2)',
-                        background: 'rgba(99,102,241,0.06)',
-                        padding: '12px 13px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 8,
-                      }}>
-                        <input
-                          type="password"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          maxLength={6}
-                          value={pinValue}
-                          onChange={e => onPinChange?.(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          onKeyDown={e => e.key === 'Enter' && onPinSubmit?.()}
-                          placeholder="Nhập mã PIN"
-                          style={{
-                            width: '100%',
-                            fontSize: 16,
-                            padding: '9px 12px',
-                            borderRadius: 8,
-                            border: `1px solid ${pinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
-                            background: 'rgba(0,0,0,0.3)',
-                            color: colors.textPrimary,
-                            fontFamily: 'inherit',
-                            outline: 'none',
-                            letterSpacing: '0.2em',
-                            WebkitTextSecurity: 'disc',
-                          }}
-                        />
-                        {pinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{pinError}</div>}
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button
-                            type="button"
-                            onClick={onPinCancel}
-                            style={{
-                              flex: 1,
-                              padding: '9px 0',
-                              borderRadius: 8,
-                              border: `1px solid ${colors.borderNormal}`,
-                              background: 'transparent',
-                              color: colors.textSecondary,
-                              fontFamily: 'inherit',
-                              fontSize: 13,
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                            }}
-                          >Hủy</button>
-                          <button
-                            type="button"
-                            onClick={() => onPinSubmit?.()}
-                            disabled={pinLoading}
-                            style={{
-                              flex: 2,
-                              padding: '9px 0',
-                              borderRadius: 8,
-                              border: 'none',
-                              background: pinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)',
-                              color: '#fff',
-                              fontFamily: 'inherit',
-                              fontSize: 13,
-                              fontWeight: 700,
-                              cursor: pinLoading ? 'default' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                            }}
-                          >
-                            {pinLoading && (
-                              <>
-                                <style>{`@keyframes pickleballLoadingSpin{to{transform:rotate(360deg)}}`}</style>
-                                <span style={{
-                                  width: 14,
-                                  height: 14,
-                                  borderRadius: '50%',
-                                  border: '2px solid rgba(255,255,255,0.35)',
-                                  borderTopColor: '#fff',
-                                  display: 'inline-block',
-                                  animation: 'pickleballLoadingSpin 0.8s linear infinite',
-                                  flexShrink: 0,
-                                }} />
-                              </>
-                            )}
-                            {pinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </Card>
-        )}
-
         {!d.group?.id && !isInviteLinkFlow && recentInvites.length > 0 && (
           <Card style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(52,211,153,0.24)', background: 'rgba(52,211,153,0.07)' }}>
             <div style={{
@@ -511,7 +321,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
           </Card>
         )}
 
-        {!(recentSessions.length > 0) && !hasGroupPreview && !looking && (
+        {!hasGroupPreview && !looking && !isInviteLinkFlow && (
           <Card style={{ padding: 16, marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{
@@ -551,6 +361,8 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
             <input
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
+              onFocus={() => setCodeFocused(true)}
+              onBlur={() => setTimeout(() => setCodeFocused(false), 150)}
               placeholder="NHẬP-MÃ-MỜI"
               disabled={Boolean(inviteToken)}
               style={{
@@ -574,6 +386,39 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
             letterSpacing: '0.3px', cursor: 'pointer', fontFamily: 'inherit',
           }}>XÓA</button>}
         </div>
+
+        {/* Recent code suggestions */}
+        {!inviteToken && !code && codeFocused && (() => {
+          const seen = new Set();
+          const suggestions = recentSessions
+            .map(s => s.inviteCode)
+            .filter(c => c && !seen.has(c) && seen.add(c))
+            .slice(0, 3);
+          if (!suggestions.length) return null;
+          return (
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+              {suggestions.map(ic => (
+                <button
+                  key={ic}
+                  type="button"
+                  onClick={() => { setCode(ic); setCodeFocused(false); }}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(52,211,153,0.35)',
+                    background: 'rgba(52,211,153,0.08)',
+                    color: '#6ee7b7',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: '0.4px',
+                    cursor: 'pointer',
+                  }}
+                >{ic}</button>
+              ))}
+            </div>
+          );
+        })()}
 
         {/* Lookup status */}
         {looking && (

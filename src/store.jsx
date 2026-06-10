@@ -1548,8 +1548,8 @@ export function AppProvider({ children }) {
       }
 
       case 'LOGIN': {
-        const { token: newToken, memberId, groupId, memberName, groupName } = action
-        storeAuth(newToken, { id: memberId, groupId, name: memberName, groupName })
+        const { token: newToken, memberId, groupId, memberName, groupName, inviteCode } = action
+        storeAuth(newToken, { id: memberId, groupId, name: memberName, groupName, inviteCode: inviteCode || '' })
         tokenRef.current = newToken
         await refresh(newToken)
         break
@@ -1614,6 +1614,7 @@ export function AppProvider({ children }) {
           id: result.member_id,
           groupId: result.group_id,
           name: result.member_name || memberName,
+          inviteCode,
         })
         tokenRef.current = nextToken
         await refresh(nextToken)

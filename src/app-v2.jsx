@@ -1958,6 +1958,7 @@ export default function AppV2() {
         groupId: manualSession.groupId,
         memberName: manualSession.memberName,
         groupName: manualSession.groupName,
+        inviteCode: payload.code || '',
       })
       return
     }
