@@ -491,6 +491,8 @@ export default function AppV2() {
       const { authToken } = resolved
       setStack([])
       setActiveTab('home')
+      window.history.replaceState(null, '', window.location.pathname)
+      setGroupInviteToken('')
       await dispatch({
         type: 'LOGIN',
         token: authToken,
@@ -514,6 +516,8 @@ export default function AppV2() {
       }
       setStack([])
       setActiveTab('home')
+      window.history.replaceState(null, '', window.location.pathname)
+      setGroupInviteToken('')
       await dispatch({
         type: 'LOGIN',
         token: payload.token,
