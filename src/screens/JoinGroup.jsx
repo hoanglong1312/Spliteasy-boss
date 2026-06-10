@@ -6,7 +6,7 @@ import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, getT
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
-export default function JoinGroup({ data, onAction, pinSession, pinValue = '', pinError = '', onPinChange, onPinSubmit, onPinCancel }) {
+export default function JoinGroup({ data, onAction, pinSession, pinValue = '', pinError = '', pinLoading, onPinChange, onPinSubmit, onPinCancel }) {
   const d = data || DEMO;
   const [code, setCode] = useState(d.joinCode || d.code || '');
   const [selected, setSelected] = useState(d.selectedName);
@@ -420,19 +420,41 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
                           <button
                             type="button"
                             onClick={() => onPinSubmit?.()}
+                            disabled={pinLoading}
                             style={{
                               flex: 2,
                               padding: '9px 0',
                               borderRadius: 8,
                               border: 'none',
-                              background: 'rgba(99,102,241,0.9)',
+                              background: pinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)',
                               color: '#fff',
                               fontFamily: 'inherit',
                               fontSize: 13,
                               fontWeight: 700,
-                              cursor: 'pointer',
+                              cursor: pinLoading ? 'default' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
                             }}
-                          >Xác nhận</button>
+                          >
+                            {pinLoading && (
+                              <>
+                                <style>{`@keyframes pickleballLoadingSpin{to{transform:rotate(360deg)}}`}</style>
+                                <span style={{
+                                  width: 14,
+                                  height: 14,
+                                  borderRadius: '50%',
+                                  border: '2px solid rgba(255,255,255,0.35)',
+                                  borderTopColor: '#fff',
+                                  display: 'inline-block',
+                                  animation: 'pickleballLoadingSpin 0.8s linear infinite',
+                                  flexShrink: 0,
+                                }} />
+                              </>
+                            )}
+                            {pinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
+                          </button>
                         </div>
                       </div>
                     )}

@@ -186,6 +186,7 @@ export default function AppV2() {
   const [pinError, setPinError] = useState('')
   const [pinInput, setPinInput] = useState('')
   const [pendingPinSession, setPendingPinSession] = useState(null)
+  const [pinLoading, setPinLoading] = useState(false)
   const [, setRecentSessionVersion] = useState(0)
   const [homePaymentOpen, setHomePaymentOpen] = useState(false)
 
@@ -400,29 +401,35 @@ export default function AppV2() {
   }
 
   async function submitPin(value = pinInput) {
-    const pending = pendingPinSession
-    const profileId = pending?.profileId
-    const memberId = pending?.memberId || state.currentUserId
-    const pinKey = profileId || memberId
+    setPinLoading(true)
+    await new Promise(r => requestAnimationFrame(r))
+    try {
+      const pending = pendingPinSession
+      const profileId = pending?.profileId
+      const memberId = pending?.memberId || state.currentUserId
+      const pinKey = profileId || memberId
 
-    let pinOk = false
-    if (profileId) {
-      pinOk = await verifyProfilePin(profileId, value)
-    } else {
-      pinOk = await verifyMemberPin(memberId, value)
-    }
+      let pinOk = false
+      if (profileId) {
+        pinOk = await verifyProfilePin(profileId, value)
+      } else {
+        pinOk = await verifyMemberPin(memberId, value)
+      }
 
-    if (pinOk) {
-      if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
-      if (document.activeElement) document.activeElement.blur()
-      setPendingPinSession(null)
-      setAwaitingPin(false)
-      setPinError('')
-      setPinInput('')
-      if (pending) handle('resumeRecentSession', { ...pending, hasPin: false })
-    } else {
-      setPinError('Mã PIN không đúng. Thử lại.')
-      setPinInput('')
+      if (pinOk) {
+        if (pinKey) sessionStorage.setItem(PIN_UNLOCK_KEY, pinKey)
+        if (document.activeElement) document.activeElement.blur()
+        setPendingPinSession(null)
+        setAwaitingPin(false)
+        setPinError('')
+        setPinInput('')
+        if (pending) handle('resumeRecentSession', { ...pending, hasPin: false })
+      } else {
+        setPinError('Mã PIN không đúng. Thử lại.')
+        setPinInput('')
+      }
+    } finally {
+      setPinLoading(false)
     }
   }
 
@@ -436,7 +443,6 @@ export default function AppV2() {
       dispatch({ type: 'LOGOUT' })
       sessionStorage.removeItem(PIN_UNLOCK_KEY)
       setStack([])
-      setActiveTab('home')
       setAwaitingPin(false)
       setPendingPinSession(null)
       setPinError('')
@@ -2323,6 +2329,7 @@ export default function AppV2() {
     pinSession: pendingPinSession,
     pinValue: pinInput,
     pinError,
+    pinLoading,
     onPinChange: updatePinInput,
     onPinSubmit: submitPin,
     onPinCancel: () => { setAwaitingPin(false); setPendingPinSession(null); setPinError(''); setPinInput('') },

@@ -198,8 +198,10 @@ export function clearAuth({ keepRecent = true } = {}) {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(MEMBER_KEY)
   localStorage.removeItem('spliteasy_tokens')
+  localStorage.removeItem(PINNED_SESSION_KEY)
   if (!keepRecent) localStorage.removeItem(RECENT_SESSIONS_KEY)
 }
+
 
 // Tra cứu nhóm theo mã mời — không cần token (SECURITY DEFINER)
 export async function lookupGroupByCode(inviteCode) {

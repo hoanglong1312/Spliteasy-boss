@@ -1627,6 +1627,10 @@ export function AppProvider({ children }) {
         }
         clearAuth({ keepRecent: action.keepRecent !== false })
         tokenRef.current = null
+        if (channelRef.current) {
+          channelRef.current.unsubscribe?.()
+          channelRef.current = null
+        }
         setState(buildEmptyState())
         break
       }
@@ -2765,6 +2769,8 @@ export function AppProvider({ children }) {
 
       case 'SET_CURRENT_USER':
         break
+
+
 
       default:
         console.warn('[store] Unknown action:', action.type)
