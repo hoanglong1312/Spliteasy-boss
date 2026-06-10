@@ -2,7 +2,7 @@
 // Props: data { code, group, existingNames[], selectedName }
 
 import React, { useState, useEffect, useRef } from 'react';
-import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, getTokenAfterPinVerify, saveRecentInvite } from '../lib/auth.js';
+import { lookupGroupByCode, lookupGroupInviteLink, requestJoinByInviteLink, getTokenAfterPinVerify, saveRecentInvite, getRecentSessions, removeRecentSession, verifyProfilePin } from '../lib/auth.js';
 import { colors, type } from '../tokens';
 import { PhoneFrame, Screen, IconButton, Card, Button, Avatar, AvatarStack, SectionLabel, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
@@ -30,6 +30,23 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminPinValue, setAdminPinValue] = useState('');
   const [codeFocused, setCodeFocused] = useState(false);
+  const [expandedPinSessionId, setExpandedPinSessionId] = useState(null);
+  const [sessionPinValue, setSessionPinValue] = useState('');
+  const [sessionPinError, setSessionPinError] = useState('');
+  const [sessionPinLoading, setSessionPinLoading] = useState(false);
+  const [localSessions, setLocalSessions] = useState(() => getRecentSessions());
+  const SESSION_AVATAR_COLORS = [
+  'linear-gradient(135deg, #4a6cf7, #7c3aed)',
+  'linear-gradient(135deg, #10b981, #059669)',
+  'linear-gradient(135deg, #f59e0b, #ef4444)',
+  'linear-gradient(135deg, #e11d48, #be123c)',
+  'linear-gradient(135deg, #0ea5e9, #0284c7)',
+];
+const getSessionAvatarColor = (name) => {
+  let hash = 0;
+  for (let i = 0; i < (name || '').length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  return SESSION_AVATAR_COLORS[Math.abs(hash) % SESSION_AVATAR_COLORS.length];
+};
   const isTreasurerSession = s => s?.role === 'treasurer' || s?.hasPin === true && s?.profileId === '6faee487-3a0e-42d7-b8b9-06ccf2248dbc'
   const longSession = d.recentSessions?.find(isTreasurerSession)
     || (isTreasurerSession(d.pinnedSession) ? d.pinnedSession : null);
@@ -159,6 +176,29 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
       setInvitePinLoading(false);
     }
   };
+  const handleSessionPinSubmit = async (session) => {
+    if (!sessionPinValue.trim()) { setSessionPinError('Nhập mã PIN'); return; }
+    setSessionPinLoading(true);
+    setSessionPinError('');
+    await new Promise(r => requestAnimationFrame(r));
+    try {
+      const ok = await verifyProfilePin(session.profileId, sessionPinValue);
+      if (!ok) {
+        setSessionPinError('Sai PIN. Thử lại.');
+        setSessionPinValue('');
+        setSessionPinLoading(false);
+        return;
+      }
+      setExpandedPinSessionId(null);
+      setSessionPinValue('');
+      await onAction?.('resumeSession', session);
+    } catch {
+      setSessionPinError('Lỗi xác minh. Thử lại.');
+    } finally {
+      setSessionPinLoading(false);
+    }
+  };
+
 
   return (
     <PhoneFrame>
