@@ -1233,6 +1233,16 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                       onClick={(e) => {
                         e.stopPropagation();
                         const key = row.linkMemberId || row.memberId;
+                        if (!isPaidLocal) {
+                          withLoading(() => onAction?.('markMemberPaid', {
+                            memberId: row.linkMemberId || row.memberId || '',
+                            amount: Math.abs(rowAmount),
+                            monthLabel: data?.monthLabel || '',
+                            memberName: row.name || row.memberName || 'Thành viên',
+                            coveredSources: safeArray(row.coveredSources),
+                            groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
+                          }));
+                        }
                         setLocalPaidSet(prev => {
                           const next = new Set(prev);
                           next.has(key) ? next.delete(key) : next.add(key);
