@@ -974,6 +974,11 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [shareMember, setShareMember] = useState(null);
+  // New QR states
+  const [qrMode, setQrMode] = useState(false);
+  const [qrSelected, setQrSelected] = useState(new Set());
+  const [qrSheetMembers, setQrSheetMembers] = useState(null);
+  const [qrSheetIndex, setQrSheetIndex] = useState(0);
   const rows = safeArray(progressRows);
   const pending = safeArray(pendingRecords);
   const refunds = safeArray(refundRows);
@@ -1000,6 +1005,16 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const totalNeedCollect = [...pendingRowsRaw, ...unpaidRowsRaw].reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
   const totalRefund = refunds.reduce((sum, row) => sum + Math.max(0, Number(row.amount) || 0), 0);
   const isSearching = Boolean(searchQuery.trim());
+
+  const handleOpenQrSheet = () => {
+    const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId));
+    setQrSheetMembers(rows.map(r => ({ 
+      name: r.name || r.memberName, 
+      amount: Math.abs(Number(r.amount) || 0), 
+      memberId: r.linkMemberId || r.memberId 
+    })));
+    setQrSheetIndex(0);
+  };
 
   return (
     <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
@@ -1055,31 +1070,106 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         </DashboardSection>
       )}
 
-      <DashboardSection
-        title={`Còn chưa thanh toán · ${unpaidRows.length}${isSearching ? `/${unpaidRowsRaw.length}` : ''}`}
-        subtitle="Các member còn âm tiền sau khi trừ khoản đã nhận"
-        amount={unpaidRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0)}
-        icon="⌁"
-        color="#fca5a5"
-        expanded={unpaidExpanded}
-        onToggle={() => setUnpaidExpanded(value => !value)}
-        listScroll
-      >
-        {unpaidRows.length > 0 ? unpaidRows.map(row => (
-          <PaymentDashboardRow
-            key={row.profileId || row.name}
-            row={row}
-            tone="unpaid"
-            onSelect={() => setShareMember({
-              name: row.name || row.memberName,
-              memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
-              groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-            })}
-          />
-        )) : (
+      <div style={{ position: 'relative' }}>
+        <DashboardSection
+          title={`Còn chưa thanh toán · ${unpaidRows.length}${isSearching ? `/${unpaidRowsRaw.length}` : ''}`}
+          subtitle="Các member còn âm tiền sau khi trừ khoản đã nhận"
+          amount={unpaidRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0)}
+          icon="⌁"
+          color="#fca5a5"
+          expanded={unpaidExpanded}
+          onToggle={() => setUnpaidExpanded(value => !value)}
+          listScroll
+          headerRight={
+            <button
+              type="button"
+              onClick={() => { setQrMode(!qrMode); setQrSelected(new Set()); }}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: '#6366f1',
+                border: 'none',
+                color: '#f8fafc',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+              title={qrMode ? 'Tắt chế độ QR' : 'Bật chế độ QR'}
+            >
+              {qrMode ? '✕' : 'QR'}
+            </button>
+          }
+        >
+        {unpaidRows.length > 0 ? unpaidRows.map(row => {
+          const rowKey = row.linkMemberId || row.memberId;
+          const isSelected = qrMode && qrSelected.has(rowKey);
+          return (
+            <div
+              key={row.profileId || row.name}
+              onClick={() => {
+                if (qrMode) {
+                  const newSet = new Set(qrSelected);
+                  if (newSet.has(rowKey)) {
+                    newSet.delete(rowKey);
+                  } else {
+                    newSet.add(rowKey);
+                  }
+                  setQrSelected(newSet);
+                } else {
+                  setShareMember({
+                    name: row.name || row.memberName,
+                    memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
+                    groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
+                  });
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: qrMode ? 10 : 0,
+                background: isSelected ? 'rgba(99,102,241,0.10)' : 'transparent',
+                padding: isSelected ? 8 : 0,
+                borderRadius: isSelected ? 12 : 0,
+              }}
+            >
+              {qrMode && (
+                <div style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  border: `2px solid ${isSelected ? '#6366f1' : 'rgba(255,255,255,0.3)'}`,
+                  background: isSelected ? '#6366f1' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  {isSelected && <div style={{ fontSize: 12, color: '#fff' }}>✓</div>}
+                </div>
+              )}
+              <div style={{ flex: 1 }}>
+                <PaymentDashboardRow
+                  row={row}
+                  tone="unpaid"
+                  onSelect={qrMode ? undefined : () => setShareMember({
+                    name: row.name || row.memberName,
+                    memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
+                    groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
+                  })}
+                />
+              </div>
+            </div>
+          );
+        }) : (
           <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{isSearching ? 'Không có member khớp tìm kiếm.' : 'Không còn ai cần nộp.'}</div>
         )}
       </DashboardSection>
+      </div>
 
       {refunds.length > 0 && (
         <DashboardSection
@@ -1125,12 +1215,43 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         </DashboardSection>
       )}
 
+      {qrMode && qrSelected.size > 0 && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '12px 16px', background: 'rgba(15,15,20,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)', zIndex: 100 }}>
+          <button
+            onClick={handleOpenQrSheet}
+            style={{
+              width: '100%',
+              background: '#6366f1',
+              color: '#f8fafc',
+              border: 'none',
+              borderRadius: 10,
+              padding: '12px 0',
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Tạo QR · {qrSelected.size} member
+          </button>
+        </div>
+      )}
+
       {shareMember && (
         <MemberShareLinkSheet
           member={shareMember}
           monthLabel={data?.monthLabel}
           onAction={onAction}
           onClose={() => setShareMember(null)}
+        />
+      )}
+
+      {qrSheetMembers && (
+        <MultiMemberQRSheet
+          members={qrSheetMembers}
+          paymentTarget={data?.paymentSummary?.paymentTarget}
+          currentIndex={qrSheetIndex}
+          onIndexChange={setQrSheetIndex}
+          onClose={() => { setQrSheetMembers(null); setQrSheetIndex(0); setQrMode(false); setQrSelected(new Set()); }}
         />
       )}
     </div>
@@ -1212,6 +1333,176 @@ function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {
   );
 }
 
+function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChange, onClose }) {
+  const member = members[currentIndex];
+  const canShowQr = paymentTarget?.code && paymentTarget?.account && paymentTarget?.holder && member?.amount > 0;
+  
+  let qrUrl = '';
+  if (canShowQr) {
+    try {
+      qrUrl = generateQRUrl({
+        bankId: paymentTarget.code,
+        account: paymentTarget.account,
+        accountName: paymentTarget.holder,
+        amount: member.amount,
+        description: `Spliteasy ${member.name}`,
+      });
+    } catch (err) {
+      // Silently fail if QR generation doesn't work
+    }
+  }
+
+  const handleDownload = async () => {
+    if (!qrUrl) return;
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `vietqr-thanh-toan-${member.name || 'spliteasy'}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed:', err);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+      {/* Backdrop */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
+      
+      {/* Sheet */}
+      <div style={{ position: 'relative', background: '#12121a', borderRadius: '16px 16px 0 0', padding: '20px 20px 32px', maxHeight: '85vh', overflowY: 'auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+            QR thanh toán{members.length > 1 ? ` · ${members.length} member` : ''}
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: 'none',
+              borderRadius: 8,
+              width: 28,
+              height: 28,
+              cursor: 'pointer',
+              color: '#94a3b8',
+              fontSize: 14,
+              fontFamily: 'inherit',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Member name + amount */}
+        <div style={{ textAlign: 'center', marginBottom: 12 }}>
+          <div style={{ fontSize: 17, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+            {member.name}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171' }}>
+            {member.amount?.toLocaleString('vi-VN')} đ
+          </div>
+        </div>
+
+        {/* QR */}
+        {canShowQr ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+            <img
+              src={qrUrl}
+              alt="QR thanh toán"
+              width={210}
+              height={210}
+              style={{ borderRadius: 12 }}
+            />
+            <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
+              Đưa QR này cho {member.name} quét để thanh toán
+            </div>
+            <button
+              onClick={handleDownload}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 16px',
+                color: '#f8fafc',
+                fontSize: 13,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontWeight: 600,
+              }}
+            >
+              Tải QR
+            </button>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, padding: '24px 0' }}>
+            Chưa có thông tin ngân hàng để tạo QR
+          </div>
+        )}
+
+        {/* Navigation dots — only if multiple members */}
+        {members.length > 1 && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 20 }}>
+            <button
+              onClick={() => onIndexChange(Math.max(0, currentIndex - 1))}
+              disabled={currentIndex === 0}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 14px',
+                color: currentIndex === 0 ? '#4b5563' : '#f8fafc',
+                cursor: currentIndex === 0 ? 'default' : 'pointer',
+                fontSize: 16,
+                fontFamily: 'inherit',
+              }}
+            >
+              ‹
+            </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {members.map((_, i) => (
+                <div
+                  key={i}
+                  onClick={() => onIndexChange(i)}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: i === currentIndex ? '#6366f1' : 'rgba(255,255,255,0.2)',
+                    cursor: 'pointer',
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => onIndexChange(Math.min(members.length - 1, currentIndex + 1))}
+              disabled={currentIndex === members.length - 1}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: 'none',
+                borderRadius: 6,
+                padding: '6px 14px',
+                color: currentIndex === members.length - 1 ? '#4b5563' : '#f8fafc',
+                cursor: currentIndex === members.length - 1 ? 'default' : 'pointer',
+                fontSize: 16,
+                fontFamily: 'inherit',
+              }}
+            >
+              ›
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProgressStat({ label, count, color }) {
   return (
     <div style={{ minWidth: 0, padding: '8px 6px', borderRadius: 12, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', textAlign: 'center' }}>
@@ -1221,7 +1512,7 @@ function ProgressStat({ label, count, color }) {
   );
 }
 
-function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, listScroll = false, children }) {
+function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, listScroll = false, headerRight, children }) {
   return (
     <section style={{ minWidth: 0 }}>
       <button type="button" aria-expanded={expanded} onClick={onToggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33`, color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
@@ -1230,7 +1521,10 @@ function DashboardSection({ title, subtitle, amount, icon, color, expanded, onTo
           <div style={{ fontSize: 12, fontWeight: 900, color, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
           <div style={{ fontSize: 12, fontWeight: 900, color, marginTop: 2, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatVND(amount)}</div>
         </div>
-        <div style={{ fontSize: 18, color, lineHeight: 1, flexShrink: 0 }}>{expanded ? '⌃' : '⌄'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {headerRight}
+          <div style={{ fontSize: 18, color, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
+        </div>
       </button>
       {expanded && (
         <div
