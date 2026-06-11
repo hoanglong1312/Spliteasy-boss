@@ -977,8 +977,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [shareMember, setShareMember] = useState(null);
   const [loading, setLoading] = useState(false);
   // New QR states
-  const [qrMode, setQrMode] = useState(false);
-  const [qrSelected, setQrSelected] = useState(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectModeSelected, setSelectModeSelected] = useState(new Set());
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
   const [qrSheetIndex, setQrSheetIndex] = useState(0);
   const rows = safeArray(progressRows);
@@ -1021,7 +1021,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   }
 
   const handleOpenQrSheet = () => {
-    const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId));
+    const rows = unpaidRows.filter(r => selectModeSelected.has(r.linkMemberId || r.memberId));
     setQrSheetMembers(rows.map(r => ({
       name: r.name || r.memberName,
       amount: Math.abs(Number(r.amount) || 0),
@@ -1125,88 +1125,108 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           headerRight={
             <button
               type="button"
-              onClick={() => { const next = !qrMode; setQrMode(next); setQrSelected(new Set()); if (next) setUnpaidExpanded(true); }}
+              onClick={() => {
+                const next = !selectMode;
+                setSelectMode(next);
+                setSelectModeSelected(new Set());
+                if (next) setUnpaidExpanded(true);
+              }}
               style={{
-                width: 28,
-                height: 28,
+                padding: '4px 10px',
                 borderRadius: 8,
-                background: '#6366f1',
+                background: selectMode ? '#1e40af' : '#334155',
                 border: 'none',
-                color: '#f8fafc',
-                fontSize: 12,
+                color: selectMode ? '#93c5fd' : '#94a3b8',
+                fontSize: 10,
                 fontWeight: 700,
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
               }}
-              title={qrMode ? 'Tắt chế độ QR' : 'Bật chế độ QR'}
             >
-              {qrMode ? '✕' : 'QR'}
+              {selectMode ? '✕ Hủy' : '☑ Chọn'}
             </button>
           }
         >
         {unpaidRows.length > 0 ? unpaidRows.map(row => {
           const rowKey = row.linkMemberId || row.memberId;
           const rowAmount = Number(row.amount) || 0;
-          const isSelected = qrMode && qrSelected.has(rowKey) && rowAmount > 0;
+          const isSelected = selectMode && selectModeSelected.has(rowKey) && rowAmount > 0;
+
           return (
             <div
               key={row.profileId || row.name}
               onClick={() => {
-                if (qrMode && (Number(row.amount) || 0) > 0) {
-                  const newSet = new Set(qrSelected);
-                  if (newSet.has(rowKey)) {
-                    newSet.delete(rowKey);
-                  } else {
-                    newSet.add(rowKey);
-                  }
-                  setQrSelected(newSet);
-                } else {
-                  setShareMember({
-                    name: row.name || row.memberName,
-                    memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
-                    groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-                  });
+                if (selectMode && rowAmount > 0) {
+                  const newSet = new Set(selectModeSelected);
+                  if (newSet.has(rowKey)) newSet.delete(rowKey);
+                  else newSet.add(rowKey);
+                  setSelectModeSelected(newSet);
                 }
               }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: qrMode ? 10 : 0,
-                background: isSelected ? 'rgba(99,102,241,0.10)' : 'transparent',
-                padding: isSelected ? 8 : 0,
-                borderRadius: isSelected ? 12 : 0,
-                opacity: (qrMode && rowAmount <= 0) ? 0.5 : 1,
+                gap: selectMode ? 10 : 0,
+                background: isSelected ? 'rgba(59,130,246,0.10)' : 'transparent',
+                padding: '8px 0',
+                borderRadius: isSelected ? 10 : 0,
+                opacity: (selectMode && rowAmount <= 0) ? 0.5 : 1,
+                cursor: selectMode ? 'pointer' : 'default',
               }}
             >
-              {qrMode && (
+              {selectMode && (
                 <div style={{
                   width: 20,
                   height: 20,
                   borderRadius: '50%',
-                  border: `2px solid ${isSelected ? '#6366f1' : 'rgba(255,255,255,0.3)'}`,
-                  background: isSelected ? '#6366f1' : 'transparent',
+                  flexShrink: 0,
+                  border: `2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.3)'}`,
+                  background: isSelected ? '#3b82f6' : 'transparent',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
                 }}>
                   {isSelected && <div style={{ fontSize: 12, color: '#fff' }}>✓</div>}
                 </div>
               )}
-              <div style={{ flex: 1 }}>
-                <PaymentDashboardRow
-                  row={row}
-                  tone="unpaid"
-                  onSelect={qrMode ? undefined : () => setShareMember({
-                    name: row.name || row.memberName,
-                    memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
-                    groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-                  })}
-                >
-                  {!qrMode && (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {row.name || row.memberName}
+                  </div>
+                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
+                    {row.sourceSummary || (row.sourceCount ? `${row.sourceCount} nguồn` : 'nguồn tiền')}
+                    {rowAmount > 0 && <span style={{ color: '#f87171', marginLeft: 4 }}>· {(rowAmount).toLocaleString('vi-VN')} đ</span>}
+                  </div>
+                </div>
+                {!selectMode && (
+                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAction?.('copyProfileShareLink', {
+                          profileId: row.profileId,
+                          memberId: row.linkMemberId || row.memberId || '',
+                          groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
+                          name: row.name || row.memberName || '',
+                        });
+                      }}
+                      style={{ ...miniDashButton('#334155', '#94a3b8'), padding: '6px 8px', fontSize: 11 }}
+                      title="Copy link chia sẻ"
+                    >🔗</button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setQrSheetMembers([{
+                          name: row.name || row.memberName,
+                          memberId: row.linkMemberId || row.memberId || '',
+                          amount: rowAmount,
+                        }]);
+                        setQrSheetIndex(0);
+                      }}
+                      style={{ ...miniDashButton('#4f46e5', '#f8fafc'), padding: '6px 9px', fontSize: 11 }}
+                    >QR</button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1220,10 +1240,10 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                           groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
                         }));
                       }}
-                      style={miniDashButton('#22c55e', '#052e16')}
-                    >Đã TT</button>
-                  )}
-                </PaymentDashboardRow>
+                      style={{ ...miniDashButton('#22c55e', '#052e16'), padding: '6px 10px', fontSize: 11, fontWeight: 900 }}
+                    >✓TT</button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -1277,24 +1297,47 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         </DashboardSection>
       )}
 
-      {qrMode && qrSelected.size > 0 && (
-        <div style={{ padding: '12px 16px', background: 'rgba(15,15,20,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+      {selectMode && selectModeSelected.size > 0 && (
+        <div style={{
+          padding: '10px 12px',
+          background: '#1e40af',
+          borderRadius: 12,
+          marginTop: 6,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+          <span style={{ color: '#93c5fd', fontSize: 11, fontWeight: 700, flex: 1 }}>
+            {selectModeSelected.size} member đã chọn
+          </span>
           <button
             onClick={handleOpenQrSheet}
-            style={{
-              width: '100%',
-              background: '#6366f1',
-              color: '#f8fafc',
-              border: 'none',
-              borderRadius: 10,
-              padding: '12px 0',
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: 'pointer',
+            style={{ ...miniDashButton('#2563eb', '#f8fafc'), padding: '7px 11px', fontSize: 11, fontWeight: 800 }}
+          >QR</button>
+          <button
+            onClick={() => {
+              const selectedRows = unpaidRows.filter(r =>
+                selectModeSelected.has(r.linkMemberId || r.memberId)
+              );
+              selectedRows.forEach(row => {
+                withLoading(() => onAction?.('markMemberPaid', {
+                  memberId: row.linkMemberId || row.memberId || '',
+                  amount: Math.abs(Number(row.amount) || 0),
+                  monthLabel: data?.monthLabel || '',
+                  memberName: row.name || row.memberName || 'Thành viên',
+                  coveredSources: safeArray(row.coveredSources),
+                  groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
+                }));
+              });
+              setSelectMode(false);
+              setSelectModeSelected(new Set());
             }}
-          >
-            Tạo QR · {qrSelected.size} member
-          </button>
+            style={{ ...miniDashButton('#22c55e', '#052e16'), padding: '7px 11px', fontSize: 11, fontWeight: 900 }}
+          >✓ ĐÃ TT</button>
+          <button
+            onClick={() => { setSelectMode(false); setSelectModeSelected(new Set()); }}
+            style={{ background: 'transparent', border: 'none', color: '#94a3b8', padding: '7px 8px', fontSize: 11, cursor: 'pointer' }}
+          >✕</button>
         </div>
       )}
 
@@ -1311,7 +1354,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <MultiMemberQRSheet
           members={qrSheetMembers}
           paymentTarget={data?.paymentTarget}
-          onClose={() => { setQrSheetMembers(null); setQrSheetIndex(0); setQrMode(false); setQrSelected(new Set()); }}
+          onClose={() => { setQrSheetMembers(null); setQrSheetIndex(0); setSelectMode(false); setSelectModeSelected(new Set()); }}
         />
       )}
     </div>
