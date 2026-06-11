@@ -223,6 +223,8 @@ const handleSessionPinSubmit = async (session) => {
       }
       setExpandedPinSessionId(null);
       setSessionPinValue('');
+      const pinKey = session.profileId || session.memberId;
+      if (pinKey) sessionStorage.setItem('spliteasy_pin_unlocked', pinKey);
       await onAction?.('resumeRecentSession', session);
     } catch {
       setSessionPinError('Lỗi xác minh. Thử lại.');
