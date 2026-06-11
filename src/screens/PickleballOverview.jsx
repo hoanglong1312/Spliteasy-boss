@@ -370,7 +370,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   onChange={(e) => setClubNameEdit(e.target.value)}
                   style={{
                     width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+                    borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 16, fontWeight: 600,
                     fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: 10,
                   }}
                 />
@@ -402,12 +402,12 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                     <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>Giờ chơi</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 5 }}>
                       <input type="time" value={timeStart} onChange={(e) => setTimeParts([e.target.value, timeEnd])} style={timeInputStyle} />
-                      <span style={{ color: colors.textMuted, fontSize: 12, fontWeight: 700 }}>–</span>
+                      <span style={{ color: colors.textMuted, fontSize: 16, fontWeight: 700 }}>–</span>
                       <input type="time" value={timeEnd} onChange={(e) => setTimeParts([timeStart, e.target.value])} style={timeInputStyle} />
                     </div>
                   </div>
                   <div>
-                    <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>Ngày bắt đầu</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: colors.textSecondary, marginBottom: 6 }}>Ngày bắt đầu</div>
                     <input
                       type="date"
                       value={startDate ? (startDate.includes('-') ? startDate : startDate.split('/').reverse().join('-')) : ''}
@@ -417,7 +417,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                       }}
                       style={{
                         width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-                        borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
+                        borderRadius: 10, padding: '10px 12px', color: '#f1f5f9', fontSize: 16, fontWeight: 600,
                         fontFamily: 'inherit', boxSizing: 'border-box', colorScheme: 'dark',
                       }}
                     />

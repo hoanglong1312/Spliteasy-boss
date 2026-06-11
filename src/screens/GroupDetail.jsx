@@ -1182,7 +1182,7 @@ function Field({ label, value, onChange, autoFocus, maxLength, inputMode, placeh
   return (
     <label style={{ display: 'block', marginTop: 12 }}>
       <div style={{
-        fontSize: 9,
+        fontSize: 16,
         fontWeight: 700,
         textTransform: 'uppercase',
         letterSpacing: '1.2px',

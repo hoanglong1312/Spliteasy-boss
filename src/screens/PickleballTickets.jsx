@@ -484,7 +484,7 @@ function AddTicketSheet({ data, onClose, onSave }) {
             }}
             style={{ accentColor: colors.pickleball }}
           />
-          <span style={{ fontSize: 13, fontWeight: 800 }}>Quỹ team trả</span>
+          <span style={{ fontSize: 16, fontWeight: 800 }}>Quỹ team trả</span>
         </label>
 
         {error && (

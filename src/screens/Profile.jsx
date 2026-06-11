@@ -174,7 +174,7 @@ export default function Profile({ data, isTreasurer = true, onAction }) {
               width: 28, height: 28, borderRadius: '50%',
               background: colors.shellBg, border: '2px solid #1e1b4b',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 13, cursor: 'pointer',
+              fontSize: 16, cursor: 'pointer',
             }}>📷</button>
             {currentPhotoUrl && (
               <button
@@ -393,7 +393,7 @@ function BankInput({ label, value, onChange, placeholder, inputMode, list }) {
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 10, padding: '10px 12px',
-          color: '#f1f5f9', fontSize: 13, fontFamily: 'inherit',
+          color: '#f1f5f9', fontSize: 16, fontFamily: 'inherit',
           outline: 'none',
         }}
       />

@@ -363,7 +363,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
                         border: `1px solid ${colors.borderSubtle}`,
                         borderRadius: 8,
                         color: colors.textPrimary,
-                        fontSize: 12,
+                        fontSize: 16,
                         fontWeight: 900,
                         fontFamily: 'inherit',
                         outline: 'none',
@@ -549,7 +549,7 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
               border: `1px solid ${colors.borderSubtle}`,
               borderRadius: 10,
               color: colors.textPrimary,
-              fontSize: 13,
+              fontSize: 16,
               fontWeight: 900,
               fontFamily: 'inherit',
               outline: 'none',
@@ -561,7 +561,7 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
           <label style={paymentRowStyle(paymentMode === 'team_fund')}>
             <input type="radio" checked={paymentMode === 'team_fund'} onChange={() => setPaymentMode('team_fund')} style={{ accentColor: colors.pickleball }} />
-            <span style={{ fontSize: 13, fontWeight: 800 }}>Quỹ team trả</span>
+            <span style={{ fontSize: 16, fontWeight: 800 }}>Quỹ team trả</span>
           </label>
           <label style={paymentRowStyle(paymentMode === 'advancer')}>
             <input type="radio" checked={paymentMode === 'advancer'} onChange={() => setPaymentMode('advancer')} style={{ accentColor: colors.pickleball }} />
@@ -572,7 +572,7 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
           </label>
         </div>
 
-        {error && <div style={{ marginTop: 10, color: colors.danger, fontSize: 11, fontWeight: 800 }}>{error}</div>}
+        {error && <div style={{ marginTop: 10, color: colors.danger, fontSize: 16, fontWeight: 800 }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <Button type="button" variant="ghost" block onClick={onClose} style={{ padding: 12 }}>Hủy</Button>
@@ -916,7 +916,7 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
               setRescheduleDate(event.target.value);
               setRescheduleError('');
             }}
-            inputStyle={{ padding: '10px 11px', fontSize: 12, fontWeight: 800 }}
+            inputStyle={{ padding: '10px 11px', fontSize: 16, fontWeight: 800 }}
             style={{ marginTop: 0 }}
           />
           <Input
@@ -1299,7 +1299,7 @@ function CostInput({ value, disabled, placeholder, suffix, inputMode, onChange, 
           border: `1px solid ${colors.borderSubtle}`,
           borderRadius: 10,
           color: colors.textPrimary,
-          fontSize: 12,
+          fontSize: 16,
           fontWeight: mono ? 800 : 600,
           fontFamily: 'inherit',
           outline: 'none',

@@ -105,7 +105,7 @@ export default function NewGroup({ data, onAction }) {
               background: colors.inputBg,
               border: `1px solid ${colors.borderSubtle}`,
               borderRadius: 12, color: colors.textPrimary,
-              fontSize: 15, fontWeight: 700,
+              fontSize: 16, fontWeight: 700,
               fontFamily: 'inherit', outline: 'none',
             }}
           />
@@ -174,7 +174,7 @@ export default function NewGroup({ data, onAction }) {
             background: colors.inputBg,
             border: `1px solid ${colors.borderSubtle}`,
             borderRadius: 12, color: colors.textPrimary,
-            fontSize: 14, fontWeight: 500,
+            fontSize: 16, fontWeight: 500,
             fontFamily: 'inherit', outline: 'none',
           }}
         />

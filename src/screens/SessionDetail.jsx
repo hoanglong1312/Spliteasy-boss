@@ -150,7 +150,7 @@ export default function SessionDetail({ data, isTreasurer = false, onAction }) {
                   background: colors.inputBg,
                   border: `1px solid ${colors.borderSubtle}`,
                   borderRadius: 12, color: colors.textPrimary,
-                  fontSize: 12, fontWeight: 700,
+                  fontSize: 16, fontWeight: 700,
                   fontFamily: 'inherit', outline: 'none',
                   fontVariantNumeric: 'tabular-nums',
                 }}

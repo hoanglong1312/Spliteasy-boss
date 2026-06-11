@@ -524,13 +524,13 @@ export function Input({ label, suffix, style, inputStyle, ...rest }) {
           background: colors.inputBg,
           border: `1px solid ${colors.borderSubtle}`,
           borderRadius: 12, color: colors.textPrimary,
-          fontSize: 14, fontWeight: 500,
+          fontSize: 16, fontWeight: 500,
           fontFamily: 'inherit', outline: 'none',
           ...inputStyle,
         }} {...rest} />
         {suffix && <span style={{
           position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-          color: colors.textMuted, fontSize: 13, fontWeight: 600,
+          color: colors.textMuted, fontSize: 16, fontWeight: 600,
         }}>{suffix}</span>}
       </div>
     </div>
@@ -561,7 +561,7 @@ export function SearchInput({ value, onChange, placeholder = 'Tìm kiếm...', s
           border: 'none',
           outline: 'none',
           color: colors.textPrimary,
-          fontSize: 13,
+          fontSize: 16,
           fontFamily: 'inherit',
           fontWeight: 600,
           ...inputStyle,

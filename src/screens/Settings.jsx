@@ -282,7 +282,7 @@ function BankInput({ label, value, onChange, placeholder }) {
           background: 'rgba(255,255,255,0.05)',
           border: '1px solid rgba(255,255,255,0.12)',
           borderRadius: 10, padding: '10px 12px',
-          color: '#f1f5f9', fontSize: 13, fontFamily: 'inherit',
+          color: '#f1f5f9', fontSize: 16, fontFamily: 'inherit',
           outline: 'none',
         }}
       />

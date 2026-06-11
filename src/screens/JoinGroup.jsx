@@ -557,7 +557,7 @@ const handleSessionPinSubmit = async (session) => {
                 outline: 'none',
                 color: colors.textPrimary,
                 opacity: inviteToken ? 0.45 : 1,
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: 800,
                 letterSpacing: '0.5px',
                 fontFamily: "'JetBrains Mono', monospace",
@@ -770,7 +770,7 @@ const handleSessionPinSubmit = async (session) => {
                   background: colors.inputBg,
                   border: `1px solid ${colors.borderSubtle}`,
                   borderRadius: 12, color: colors.textPrimary,
-                  fontSize: 13, fontWeight: 500,
+                  fontSize: 16, fontWeight: 500,
                   fontFamily: 'inherit', outline: 'none',
                 }}
               />
