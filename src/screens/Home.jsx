@@ -1251,7 +1251,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       {qrSheetMembers && (
         <MultiMemberQRSheet
           members={qrSheetMembers}
-          paymentTarget={data?.paymentSummary?.paymentTarget}
+          paymentTarget={data?.paymentTarget}
           onClose={() => { setQrSheetMembers(null); setQrSheetIndex(0); setQrMode(false); setQrSelected(new Set()); }}
         />
       )}
