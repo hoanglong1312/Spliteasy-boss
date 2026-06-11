@@ -148,7 +148,7 @@ function TabItem({ tabKey, label, active, onClick }) {
       style={{
         flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: '6px 4px', fontSize: 10, fontWeight: 600,
-        color: active ? colors.brandLight : colors.textMuted,
+        color: active ? colors.brandLight : colors.textSecondary,
         letterSpacing: '0.2px', background: 'transparent', border: 'none',
         fontFamily: 'inherit', cursor: 'pointer',
         transform: pressed ? 'scale(0.88)' : 'scale(1)',
@@ -156,7 +156,7 @@ function TabItem({ tabKey, label, active, onClick }) {
       }}>
       <span style={{
         lineHeight: 1,
-        opacity: active ? 1 : 0.4,
+        opacity: active ? 1 : 0.55,
         filter: active ? 'drop-shadow(0 0 8px rgba(129,140,248,0.7))' : 'none',
       }}>{TAB_ICONS[tabKey]}</span>
       {label}

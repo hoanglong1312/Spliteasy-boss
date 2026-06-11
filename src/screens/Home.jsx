@@ -2,7 +2,6 @@
 // Props: data { user, monthLabel, totalBalance, owedTo, pickleball, groups, todaySession, transactions[] }
 
 import React, { useState, useEffect } from 'react';
-import { Bell } from '@phosphor-icons/react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card,
@@ -67,7 +66,6 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
               {d.user.dateLabel}
             </div>
           </div>
-          <IconButton dot={d.user.hasNotifications} onClick={() => onAction?.('notifications')}><Bell size={18} weight="fill" /></IconButton>
         </div>
 
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
@@ -1881,13 +1879,13 @@ function PrevMonthNotice({ label, balance, onView }) {
       padding: '9px 12px',
       marginTop: 6,
       borderRadius: 10,
-      background: 'rgba(251,191,36,0.07)',
-      border: '1px solid rgba(251,191,36,0.22)',
-      borderLeft: '3px solid #fbbf24',
+      background: 'rgba(251,191,36,0.14)',
+      border: '1px solid rgba(251,191,36,0.4)',
+      borderLeft: '4px solid #fbbf24',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: colors.warning }}>
-          {label} chưa trả ·
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24', textShadow: '0 0 8px rgba(251,191,36,0.5)' }}>
+          ⚠️ {label} chưa trả ·
         </span>
         <span style={{ fontSize: 11, fontWeight: 900, color: '#fca5a5', marginLeft: 4, ...type.mono }}>
           {formatVND(Math.abs(balance))}
@@ -1900,11 +1898,11 @@ function PrevMonthNotice({ label, balance, onView }) {
           flexShrink: 0,
           padding: '5px 10px',
           borderRadius: 8,
-          background: 'rgba(251,191,36,0.14)',
-          border: '1px solid rgba(251,191,36,0.32)',
+          background: 'rgba(251,191,36,0.25)',
+          border: '1px solid rgba(251,191,36,0.5)',
           color: colors.warning,
           fontSize: 11,
-          fontWeight: 800,
+          fontWeight: 900,
           fontFamily: 'inherit',
           cursor: 'pointer',
         }}
