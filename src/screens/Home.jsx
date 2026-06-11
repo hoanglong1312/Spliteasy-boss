@@ -746,7 +746,6 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             onViewPaymentRecord={onViewPaymentRecord}
             onConfirmRefund={onConfirmRefund}
           />
-          <PaymentManagementZone records={paymentRecords} onAction={onAction} onViewRecord={onViewPaymentRecord} />
         </>
       )}
 
@@ -1103,6 +1102,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         >
           {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => (
             <PaymentDashboardRow key={record.notificationId || record.id} row={record} tone="confirmed">
+              <button type="button" onClick={() => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={miniDashButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
               <button type="button" onClick={() => withLoading(() => onAction?.('cancelPaymentRecord', record))} style={miniDashButton(colors.danger, '#fff')}>Hủy</button>
             </PaymentDashboardRow>
           )) : (
