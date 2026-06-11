@@ -2257,6 +2257,29 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'markMemberPaid') {
+      await dispatch({
+        type: 'TREASURER_CONFIRM_PAYMENT',
+        memberId: payload?.memberId,
+        amount: payload?.amount,
+        monthLabel: payload?.monthLabel,
+        memberName: payload?.memberName,
+        coveredSources: payload?.coveredSources,
+        groupId: payload?.groupId,
+      })
+      dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu ${payload?.memberName || 'thành viên'} đã thanh toán.` })
+      return
+    }
+
+    if (type === 'cancelPaymentRecord') {
+      await dispatch({
+        type: 'DELETE_PAYMENT_NOTIFICATION',
+        notificationId: payload?.notificationId || payload?.id,
+      })
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã hủy bản ghi thanh toán. Số dư sẽ được tính lại.' })
+      return
+    }
+
     if (type === 'deletePaymentNotice') {
       await dispatch({
         type: 'DELETE_PAYMENT_NOTIFICATION',

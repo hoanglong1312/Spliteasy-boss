@@ -970,10 +970,12 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
   const [unpaidExpanded, setUnpaidExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
+  const [confirmedExpanded, setConfirmedExpanded] = useState(true);
   const [refundExpanded, setRefundExpanded] = useState(false);
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [shareMember, setShareMember] = useState(null);
+  const [loading, setLoading] = useState(false);
   // New QR states
   const [qrMode, setQrMode] = useState(false);
   const [qrSelected, setQrSelected] = useState(new Set());
@@ -982,11 +984,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const rows = safeArray(progressRows);
   const pending = safeArray(pendingRecords);
   const refunds = safeArray(refundRows);
-  const confirmedRows = rows.filter(row => String(row.status || '').toLowerCase() === 'confirmed');
+  const confirmedRecords = pending.filter(record => String(record.status || '').toLowerCase() === 'confirmed');
   const pendingRowsRaw = rows.filter(row => String(row.status || '').toLowerCase() === 'pending');
   const unpaidRowsRaw = rows.filter(row => String(row.status || '').toLowerCase() === 'unpaid');
   const matchSearch = makeMatcher(searchQuery);
-  const pendingRecordsFiltered = pending.filter(record => matchSearch(record.memberName || record.name));
+  const pendingRecordsRaw = pending.filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
+  const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
+  const confirmedRecordsFiltered = confirmedRecords.filter(record => matchSearch(record.memberName || record.name));
   const pendingRows = pendingRowsRaw.filter(row => matchSearch(row.name || row.memberName));
   const unpaidRows = unpaidRowsRaw.filter(row => matchSearch(row.name || row.memberName));
   const refundsFiltered = refunds.filter(row => matchSearch(row.name || row.memberName));
@@ -1006,6 +1010,16 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const totalRefund = refunds.reduce((sum, row) => sum + Math.max(0, Number(row.amount) || 0), 0);
   const isSearching = Boolean(searchQuery.trim());
 
+  async function withLoading(action) {
+    if (loading) return;
+    setLoading(true);
+    try {
+      await action?.();
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const handleOpenQrSheet = () => {
     const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId));
     setQrSheetMembers(rows.map(r => ({
@@ -1018,7 +1032,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
 
 
   return (
-    <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
+    <div style={{ position: 'relative', display: 'grid', gap: 12, minWidth: 0 }}>
+      {loading && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.58)', borderRadius: 14 }}>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ width: 34, height: 34, borderRadius: '50%', border: '3px solid rgba(255,255,255,0.24)', borderTopColor: '#6ee7b7', animation: 'spin 800ms linear infinite' }} />
+        </div>
+      )}
       <Card style={{ padding: 14, borderColor: 'rgba(59,130,246,0.24)', background: 'rgba(59,130,246,0.07)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>Tiến độ thu</div>
@@ -1027,8 +1047,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <div style={{ fontSize: 22, fontWeight: 950, color: '#f8fafc', marginTop: 4, ...type.mono, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatVND(totalNeedCollect)}</div>
         <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Còn theo dõi · {data?.monthLabel || 'tháng này'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 6, marginTop: 10 }}>
-          <ProgressStat label="Đã nhận" count={confirmedRows.length} color="#6ee7b7" />
-          <ProgressStat label="Chờ duyệt" count={pendingRowsRaw.length || pending.length} color="#fcd34d" />
+          <ProgressStat label="Đã nhận" count={confirmedRecords.length} color="#6ee7b7" />
+          <ProgressStat label="Chờ duyệt" count={pendingRowsRaw.length || pendingRecordsRaw.length} color="#fcd34d" />
           <ProgressStat label="Chưa thu" count={unpaidRowsRaw.length} color="#fca5a5" />
         </div>
       </Card>
@@ -1039,9 +1059,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         placeholder="Tìm thành viên trong danh sách"
       />
 
-      {pending.length > 0 && (
+      {pendingRecordsRaw.length > 0 && (
         <DashboardSection
-          title={`Chờ duyệt · ${pendingRecordsFiltered.length}${isSearching ? `/${pending.length}` : ''}`}
+          title={`Chờ duyệt · ${pendingRecordsFiltered.length}${isSearching ? `/${pendingRecordsRaw.length}` : ''}`}
           subtitle="Member đã bấm xác nhận thanh toán"
           amount={pendingRecordsFiltered.reduce((sum, record) => sum + (Number(record.amount) || 0), 0)}
           icon="⏳"
@@ -1062,8 +1082,29 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
               })}
             >
               <button type="button" onClick={() => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={miniDashButton('rgba(99,102,241,0.18)', colors.brandLight)}>Xem</button>
-              <button type="button" onClick={() => onAction?.('confirmPaymentNotice', record)} style={miniDashButton('#22c55e', '#052e16')}>Đã nhận</button>
-              <button type="button" onClick={() => onAction?.('rejectPaymentNotice', record)} style={miniDashButton(colors.danger, '#fff')}>Chưa nhận</button>
+              <button type="button" onClick={() => withLoading(() => onAction?.('confirmPaymentNotice', record))} style={miniDashButton('#22c55e', '#052e16')}>Đã nhận</button>
+              <button type="button" onClick={() => withLoading(() => onAction?.('rejectPaymentNotice', record))} style={miniDashButton(colors.danger, '#fff')}>Chưa nhận</button>
+            </PaymentDashboardRow>
+          )) : (
+            <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>Không có member khớp tìm kiếm.</div>
+          )}
+        </DashboardSection>
+      )}
+
+      {confirmedRecords.length > 0 && (
+        <DashboardSection
+          title={`Đã nhận · ${confirmedRecordsFiltered.length}${isSearching ? `/${confirmedRecords.length}` : ''}`}
+          subtitle="Các báo thanh toán đã xác nhận"
+          amount={confirmedRecordsFiltered.reduce((sum, record) => sum + (Number(record.amount) || 0), 0)}
+          icon="✓"
+          color="#6ee7b7"
+          expanded={confirmedExpanded}
+          onToggle={() => setConfirmedExpanded(value => !value)}
+          listScroll
+        >
+          {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => (
+            <PaymentDashboardRow key={record.notificationId || record.id} row={record} tone="confirmed">
+              <button type="button" onClick={() => withLoading(() => onAction?.('cancelPaymentRecord', record))} style={miniDashButton(colors.danger, '#fff')}>Hủy</button>
             </PaymentDashboardRow>
           )) : (
             <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>Không có member khớp tìm kiếm.</div>
@@ -1164,7 +1205,25 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                     memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
                     groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
                   })}
-                />
+                >
+                  {!qrMode && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        withLoading(() => onAction?.('markMemberPaid', {
+                          memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
+                          amount: Math.abs(Number(row.amount) || 0),
+                          monthLabel: data?.monthLabel || row.monthLabel || '',
+                          memberName: row.name || row.memberName || 'Thành viên',
+                          coveredSources: safeArray(row.coveredSources),
+                          groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
+                        }));
+                      }}
+                      style={miniDashButton('#22c55e', '#052e16')}
+                    >Đã TT</button>
+                  )}
+                </PaymentDashboardRow>
               </div>
             </div>
           );
@@ -1494,7 +1553,7 @@ function DashboardSection({ title, subtitle, amount, icon, color, expanded, onTo
 }
 
 function PaymentDashboardRow({ row, tone = 'unpaid', arrow = '', onSelect, children }) {
-  const color = tone === 'refund' ? '#6ee7b7' : tone === 'pending' ? '#fcd34d' : '#fca5a5';
+  const color = tone === 'refund' || tone === 'confirmed' ? '#6ee7b7' : tone === 'pending' ? '#fcd34d' : '#fca5a5';
   const childArray = React.Children.toArray(children);
   return (
     <Card

@@ -1997,6 +1997,24 @@ export function AppProvider({ children }) {
         return data
       }
 
+      case 'TREASURER_CONFIRM_PAYMENT': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('treasurer_confirm_payment', {
+          p_from_member_id: action.memberId || action.fromMemberId || action.from_member_id || null,
+          p_amount: Number(action.amount) || 0,
+          p_month_label: action.monthLabel || '',
+          p_member_name: action.memberName || '',
+          p_covered_sources: safeArray(action.coveredSources),
+          p_group_id: action.groupId || state.currentGroupId || null,
+        })
+        if (error) {
+          console.error('[store] TREASURER_CONFIRM_PAYMENT:', error)
+          throw error
+        }
+        await dispatch({ type: 'REFRESH' })
+        return data
+      }
+
       case 'DELETE_PAYMENT_NOTIFICATION': {
         if (!sb || !state.currentUserId) return null
         const notificationId = action.notificationId || action.id
