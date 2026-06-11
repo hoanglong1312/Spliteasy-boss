@@ -310,7 +310,7 @@ const handleSessionPinSubmit = async (session) => {
               }}>👑 Đăng nhập nhanh · Admin</div>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 14px', borderRadius: '12px 12px 0 0',
+                padding: '12px 14px', borderRadius: '12px 12px 0px 0px',
                 background: 'rgba(251,191,36,0.08)',
                 border: '1px solid rgba(251,191,36,0.25)', borderBottom: 'none',
               }}>
