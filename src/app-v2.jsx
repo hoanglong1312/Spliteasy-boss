@@ -1948,11 +1948,7 @@ export default function AppV2() {
       const member = safeArray(state?.members).find(m => String(m.id) === String(manualSession.memberId))
       const pinKey = member?.profileId || member?.profile_id || manualSession.memberId
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
-        setPendingPinSession(manualSession)
-        setAwaitingPin(true)
-        setPinError('')
-        setPinInput('')
-        return
+        return { status: 'requires_pin', memberId: manualSession.memberId, memberName: manualSession.memberName }
       }
       setStack([])
       setActiveTab('home')

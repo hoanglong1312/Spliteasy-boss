@@ -42,6 +42,7 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [chipPinValue, setChipPinValue] = useState('');
   const [chipPinError, setChipPinError] = useState('');
   const [chipPinLoading, setChipPinLoading] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
   const SESSION_AVATAR_COLORS = [
   'linear-gradient(135deg, #4a6cf7, #7c3aed)',
   'linear-gradient(135deg, #10b981, #059669)',
@@ -239,7 +240,7 @@ const handleSessionPinSubmit = async (session) => {
 
   return (
     <PhoneFrame>
-      {sessionPinLoading && (
+      {(sessionPinLoading || resumeLoading) && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
           background: 'rgba(0,0,0,0.55)',
@@ -412,13 +413,15 @@ const handleSessionPinSubmit = async (session) => {
                   >
                     {/* Card header row */}
                     <div
-                      onClick={!isExpanded ? () => {
+                      onClick={!isExpanded ? async () => {
                         if (session.hasPin) {
                           setExpandedPinSessionId(sessionKey);
                           setSessionPinValue('');
                           setSessionPinError('');
                         } else {
-                          onAction?.('resumeRecentSession', session);
+                          setResumeLoading(true);
+                          await onAction?.('resumeRecentSession', session);
+                          setResumeLoading(false);
                         }
                       } : undefined}
                       style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px', cursor: !isExpanded ? 'pointer' : 'default' }}
@@ -937,7 +940,16 @@ const handleSessionPinSubmit = async (session) => {
                 setJoining(false);
                 return;
               }
-              await onAction?.('joinGroup', { code: code.trim(), memberName });
+              const joinResult = await onAction?.('joinGroup', { code: code.trim(), memberName });
+              if (joinResult?.status === 'requires_pin') {
+                setPinRequired(true);
+                setPinRequiredMemberId(joinResult.memberId);
+                setPinRequiredMemberName(joinResult.memberName || memberName);
+                setInvitePinValue('');
+                setInvitePinError('');
+                setJoining(false);
+                return;
+              }
               setJoining(false);
             } catch (err) {
               setJoinError(err?.message || 'Mã mời không đúng hoặc kết nối có vấn đề. Thử lại.');
