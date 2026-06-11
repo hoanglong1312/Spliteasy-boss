@@ -775,6 +775,94 @@ const handleSessionPinSubmit = async (session) => {
                 }}
               />
             </Card>
+
+            {pinRequired && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>
+                  Xác minh danh tính
+                </div>
+                <div style={{
+                  borderRadius: 14,
+                  border: '1px solid rgba(99,102,241,0.5)',
+                  background: 'rgba(99,102,241,0.06)',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 11, padding: '12px 14px',
+                    borderBottom: '1px solid rgba(99,102,241,0.2)',
+                    background: 'rgba(99,102,241,0.10)',
+                  }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                      background: getSessionAvatarColor(pinRequiredMemberName || 'T'),
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 16, fontWeight: 800, color: '#fff',
+                    }}>
+                      {(pinRequiredMemberName || 'T')[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>
+                        {pinRequiredMemberName || 'Thành viên'}
+                      </div>
+                      <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                        {foundGroup?.name || ''} · Có PIN
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 11, color: colors.textSecondary }}>
+                      🔒 Nhập PIN để xác minh danh tính
+                    </div>
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="Nhập mã PIN"
+                      value={invitePinValue}
+                      onChange={e => { setInvitePinValue(e.target.value); setInvitePinError(''); }}
+                      onKeyDown={e => e.key === 'Enter' && !invitePinLoading && handleInvitePinSubmit()}
+                      disabled={invitePinLoading}
+                      autoFocus
+                      style={{
+                        width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
+                        border: `1px solid ${invitePinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
+                        background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
+                        fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
+                        WebkitTextSecurity: 'disc', boxSizing: 'border-box',
+                      }}
+                    />
+                    {invitePinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{invitePinError}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button type="button"
+                        onClick={() => { setPinRequired(false); setInvitePinValue(''); setInvitePinError(''); }}
+                        style={{
+                          flex: 1, padding: '9px 0', borderRadius: 8,
+                          border: `1px solid ${colors.borderNormal}`, background: 'transparent',
+                          color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        }}>Hủy</button>
+                      <button type="button" onClick={handleInvitePinSubmit} disabled={invitePinLoading}
+                        style={{
+                          flex: 2, padding: '9px 0', borderRadius: 8, border: 'none',
+                          background: invitePinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)',
+                          color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
+                          cursor: invitePinLoading ? 'default' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}>
+                        {invitePinLoading && (
+                          <span style={{
+                            width: 14, height: 14, borderRadius: '50%',
+                            border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
+                            display: 'inline-block', animation: 'pickleballLoadingSpin 0.8s linear infinite',
+                          }} />
+                        )}
+                        {invitePinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -794,96 +882,6 @@ const handleSessionPinSubmit = async (session) => {
             border: '1px solid rgba(52,211,153,0.25)',
             borderRadius: 10, fontSize: 11, color: '#6ee7b7',
           }}>Đã gửi yêu cầu tham gia. Chờ thủ quỹ duyệt trước khi xem dữ liệu nhóm.</div>
-        )}
-
-        {pinRequired && (
-          <div style={{ marginTop: 10 }}>
-            <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>
-              Xác minh danh tính
-            </div>
-            <div style={{
-              borderRadius: 14,
-              border: '1px solid rgba(99,102,241,0.5)',
-              background: 'rgba(99,102,241,0.06)',
-              overflow: 'hidden',
-            }}>
-              {/* Name header */}
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 11, padding: '12px 14px',
-                borderBottom: '1px solid rgba(99,102,241,0.2)',
-                background: 'rgba(99,102,241,0.10)',
-              }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
-                  background: getSessionAvatarColor(pinRequiredMemberName || 'T'),
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 16, fontWeight: 800, color: '#fff',
-                }}>
-                  {(pinRequiredMemberName || 'T')[0].toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.textPrimary }}>
-                    {pinRequiredMemberName || 'Thành viên'}
-                  </div>
-                  <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                    {foundGroup?.name || ''} · Có PIN
-                  </div>
-                </div>
-              </div>
-              {/* PIN input */}
-              <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, color: colors.textSecondary }}>
-                  🔒 Nhập PIN để xác minh danh tính
-                </div>
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  placeholder="Nhập mã PIN"
-                  value={invitePinValue}
-                  onChange={e => { setInvitePinValue(e.target.value); setInvitePinError(''); }}
-                  onKeyDown={e => e.key === 'Enter' && !invitePinLoading && handleInvitePinSubmit()}
-                  disabled={invitePinLoading}
-                  autoFocus
-                  style={{
-                    width: '100%', fontSize: 16, padding: '9px 12px', borderRadius: 8,
-                    border: `1px solid ${invitePinError ? 'rgba(248,113,113,0.5)' : 'rgba(99,102,241,0.3)'}`,
-                    background: 'rgba(0,0,0,0.3)', color: colors.textPrimary,
-                    fontFamily: 'inherit', outline: 'none', letterSpacing: '0.2em',
-                    WebkitTextSecurity: 'disc', boxSizing: 'border-box',
-                  }}
-                />
-                {invitePinError && <div style={{ fontSize: 12, color: '#fca5a5' }}>{invitePinError}</div>}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="button"
-                    onClick={() => { setPinRequired(false); setInvitePinValue(''); setInvitePinError(''); }}
-                    style={{
-                      flex: 1, padding: '9px 0', borderRadius: 8,
-                      border: `1px solid ${colors.borderNormal}`, background: 'transparent',
-                      color: colors.textSecondary, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    }}>Hủy</button>
-                  <button type="button" onClick={handleInvitePinSubmit} disabled={invitePinLoading}
-                    style={{
-                      flex: 2, padding: '9px 0', borderRadius: 8, border: 'none',
-                      background: invitePinLoading ? 'rgba(99,102,241,0.5)' : 'rgba(99,102,241,0.9)',
-                      color: '#fff', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-                      cursor: invitePinLoading ? 'default' : 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    }}>
-                    {invitePinLoading && (
-                      <span style={{
-                        width: 14, height: 14, borderRadius: '50%',
-                        border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff',
-                        display: 'inline-block', animation: 'pickleballLoadingSpin 0.8s linear infinite',
-                      }} />
-                    )}
-                    {invitePinLoading ? 'Đang xác nhận...' : 'Xác nhận'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
 
                 {hasGroupPreview && !pinRequired && !pinSession && <Button block variant="brand" style={{ marginTop: 10, opacity: joining ? 0.6 : 1 }}
