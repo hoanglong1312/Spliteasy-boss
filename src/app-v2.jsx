@@ -525,6 +525,7 @@ export default function AppV2() {
         groupId: payload.groupId,
         memberName: payload.memberName,
         groupName: payload.groupName,
+        inviteCode: payload.inviteCode || '',
       })
       return
     }
