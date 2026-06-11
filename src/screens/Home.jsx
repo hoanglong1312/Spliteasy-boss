@@ -979,6 +979,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   // New QR states
   const [selectMode, setSelectMode] = useState(false);
   const [selectModeSelected, setSelectModeSelected] = useState(new Set());
+  const [localPaidSet, setLocalPaidSet] = useState(new Set());
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
   const [qrSheetIndex, setQrSheetIndex] = useState(0);
   const rows = safeArray(progressRows);
@@ -1125,7 +1126,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           headerRight={
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 const next = !selectMode;
                 setSelectMode(next);
                 setSelectModeSelected(new Set());
@@ -1150,6 +1152,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           const rowKey = row.linkMemberId || row.memberId;
           const rowAmount = Number(row.amount) || 0;
           const isSelected = selectMode && selectModeSelected.has(rowKey) && rowAmount > 0;
+          const isPaidLocal = localPaidSet.has(row.linkMemberId || row.memberId);
 
           return (
             <div
@@ -1231,17 +1234,15 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        withLoading(() => onAction?.('markMemberPaid', {
-                          memberId: row.linkMemberId || row.memberId || safeArray(row.memberIds)[0] || '',
-                          amount: Math.abs(Number(row.amount) || 0),
-                          monthLabel: data?.monthLabel || row.monthLabel || '',
-                          memberName: row.name || row.memberName || 'Thành viên',
-                          coveredSources: safeArray(row.coveredSources),
-                          groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-                        }));
+                        const key = row.linkMemberId || row.memberId;
+                        setLocalPaidSet(prev => {
+                          const next = new Set(prev);
+                          next.has(key) ? next.delete(key) : next.add(key);
+                          return next;
+                        });
                       }}
-                      style={{ ...miniDashButton('#22c55e', '#052e16'), padding: '6px 10px', fontSize: 11, fontWeight: 900 }}
-                    >✓TT</button>
+                      style={{ ...miniDashButton(isPaidLocal ? 'rgba(34,197,94,0.20)' : '#22c55e', isPaidLocal ? '#6ee7b7' : '#052e16'), padding: '6px 10px', fontSize: 11, fontWeight: 900 }}
+                    >{isPaidLocal ? '✓ Đã TT' : '✓TT'}</button>
                   </div>
                 )}
               </div>
@@ -1299,6 +1300,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
 
       {selectMode && selectModeSelected.size > 0 && (
         <div style={{
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 10,
           padding: '10px 12px',
           background: '#1e40af',
           borderRadius: 12,

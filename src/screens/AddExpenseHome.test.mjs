@@ -146,6 +146,26 @@ test('GroupDetail lets group creators manage members without treasurer role', ()
   assert.match(screenDataSource, /isGroupCreator,/);
 });
 
+test('Treasurer payment dashboard keeps unpaid selection controls local and visible', () => {
+  const dashboardSource = homeSource.slice(
+    homeSource.indexOf('function TreasurerPaymentDashboard'),
+    homeSource.indexOf('function PaymentDashboardRow')
+  );
+
+  assert.match(dashboardSource, /const \[localPaidSet, setLocalPaidSet\] = useState\(new Set\(\)\)/);
+  assert.match(dashboardSource, /onClick=\{\(e\) => \{\s*e\.stopPropagation\(\);\s*const next = !selectMode;/);
+  assert.match(dashboardSource, /position: 'sticky',[\s\S]*bottom: 0,[\s\S]*zIndex: 10,/);
+  assert.match(dashboardSource, /const isPaidLocal = localPaidSet\.has\(row\.linkMemberId \|\| row\.memberId\)/);
+  assert.match(dashboardSource, /setLocalPaidSet\(prev => \{[\s\S]*const next = new Set\(prev\);[\s\S]*next\.has\(key\) \? next\.delete\(key\) : next\.add\(key\);[\s\S]*return next;[\s\S]*\}\)/);
+  assert.match(dashboardSource, /\{isPaidLocal \? '✓ Đã TT' : '✓TT'\}/);
+
+  const perRowButtonSource = dashboardSource.slice(
+    dashboardSource.indexOf('const isPaidLocal = localPaidSet.has'),
+    dashboardSource.indexOf('{refunds.length > 0 &&')
+  );
+  assert.doesNotMatch(perRowButtonSource, /onAction\?\.\('markMemberPaid'/);
+});
+
 test('GroupDetail hero balances amount on the right', () => {
   const heroBalanceSource = groupDetailSource.slice(
     groupDetailSource.indexOf('<ModuleHero'),
