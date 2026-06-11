@@ -1007,7 +1007,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const isSearching = Boolean(searchQuery.trim());
 
   const handleOpenQrSheet = () => {
-    const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId));
+    const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId) && (Number(r.amount) || 0) > 0);
     setQrSheetMembers(rows.map(r => ({ 
       name: r.name || r.memberName, 
       amount: Math.abs(Number(r.amount) || 0), 
@@ -1107,12 +1107,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         >
         {unpaidRows.length > 0 ? unpaidRows.map(row => {
           const rowKey = row.linkMemberId || row.memberId;
-          const isSelected = qrMode && qrSelected.has(rowKey);
+          const rowAmount = Number(row.amount) || 0;
+          const isSelected = qrMode && qrSelected.has(rowKey) && rowAmount > 0;
           return (
             <div
               key={row.profileId || row.name}
               onClick={() => {
-                if (qrMode) {
+                if (qrMode && (Number(row.amount) || 0) > 0) {
                   const newSet = new Set(qrSelected);
                   if (newSet.has(rowKey)) {
                     newSet.delete(rowKey);
@@ -1135,6 +1136,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                 background: isSelected ? 'rgba(99,102,241,0.10)' : 'transparent',
                 padding: isSelected ? 8 : 0,
                 borderRadius: isSelected ? 12 : 0,
+                opacity: (qrMode && rowAmount <= 0) ? 0.5 : 1,
               }}
             >
               {qrMode && (
@@ -1216,7 +1218,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       )}
 
       {qrMode && qrSelected.size > 0 && (
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: '12px 16px', background: 'rgba(15,15,20,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)', zIndex: 100 }}>
+        <div style={{ padding: '12px 16px', background: 'rgba(15,15,20,0.95)', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
           <button
             onClick={handleOpenQrSheet}
             style={{
@@ -1249,8 +1251,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <MultiMemberQRSheet
           members={qrSheetMembers}
           paymentTarget={data?.paymentSummary?.paymentTarget}
-          currentIndex={qrSheetIndex}
-          onIndexChange={setQrSheetIndex}
           onClose={() => { setQrSheetMembers(null); setQrSheetIndex(0); setQrMode(false); setQrSelected(new Set()); }}
         />
       )}
@@ -1333,9 +1333,35 @@ function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {
   );
 }
 
-function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChange, onClose }) {
-  const member = members[currentIndex];
-  const canShowQr = paymentTarget?.code && paymentTarget?.account && paymentTarget?.holder && member?.amount > 0;
+function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
+  // When multiple members: combine into 1 QR
+  // When single member: show that member's QR
+  
+  const isCombined = members.length > 1;
+  
+  // Calculate total and generate short description
+  let totalAmount = 0;
+  let shortNames = '';
+  
+  if (isCombined) {
+    totalAmount = members.reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+    // Take first 2 names, join with ' + '
+    const names = members.slice(0, 2).map(m => m.name);
+    shortNames = names.join(' + ');
+    if (members.length > 2) shortNames += ` (+${members.length - 2})`;
+    // Truncate to max 30 chars
+    if (shortNames.length > 30) {
+      shortNames = shortNames.substring(0, 27) + '...';
+    }
+  }
+  
+  const currentAmount = isCombined ? totalAmount : (members[0]?.amount || 0);
+  const currentName = isCombined ? shortNames : members[0]?.name;
+  const description = isCombined 
+    ? `Spliteasy ${shortNames}`
+    : `Spliteasy ${members[0]?.name}`;
+  
+  const canShowQr = paymentTarget?.code && paymentTarget?.account && paymentTarget?.holder && currentAmount > 0;
   
   let qrUrl = '';
   if (canShowQr) {
@@ -1344,8 +1370,8 @@ function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChang
         bankId: paymentTarget.code,
         account: paymentTarget.account,
         accountName: paymentTarget.holder,
-        amount: member.amount,
-        description: `Spliteasy ${member.name}`,
+        amount: currentAmount,
+        description: description,
       });
     } catch (err) {
       // Silently fail if QR generation doesn't work
@@ -1360,7 +1386,7 @@ function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChang
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `vietqr-thanh-toan-${member.name || 'spliteasy'}.png`;
+      a.download = `vietqr-thanh-toan-${currentName || 'spliteasy'}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1380,7 +1406,7 @@ function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChang
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
-            QR thanh toán{members.length > 1 ? ` · ${members.length} member` : ''}
+            QR thanh toán{isCombined ? ` · ${members.length} người` : ''}
           </div>
           <button
             onClick={onClose}
@@ -1400,13 +1426,10 @@ function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChang
           </button>
         </div>
 
-        {/* Member name + amount */}
-        <div style={{ textAlign: 'center', marginBottom: 12 }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
-            {member.name}
-          </div>
+        {/* Total amount — center, large */}
+        <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171' }}>
-            {member.amount?.toLocaleString('vi-VN')} đ
+            {currentAmount?.toLocaleString('vi-VN')} đ
           </div>
         </div>
 
@@ -1420,9 +1443,18 @@ function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChang
               height={210}
               style={{ borderRadius: 12 }}
             />
-            <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center' }}>
-              Đưa QR này cho {member.name} quét để thanh toán
-            </div>
+            
+            {/* List members with their amounts when combined */}
+            {isCombined && (
+              <div style={{ width: '100%', fontSize: 13, color: '#cbd5e1', textAlign: 'center', marginTop: 8 }}>
+                {members.map((m, i) => (
+                  <div key={i} style={{ padding: '4px 0' }}>
+                    {m.name} · {(Number(m.amount) || 0)?.toLocaleString('vi-VN')} đ
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <button
               onClick={handleDownload}
               style={{
@@ -1445,63 +1477,11 @@ function MultiMemberQRSheet({ members, paymentTarget, currentIndex, onIndexChang
             Chưa có thông tin ngân hàng để tạo QR
           </div>
         )}
-
-        {/* Navigation dots — only if multiple members */}
-        {members.length > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 20 }}>
-            <button
-              onClick={() => onIndexChange(Math.max(0, currentIndex - 1))}
-              disabled={currentIndex === 0}
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: 'none',
-                borderRadius: 6,
-                padding: '6px 14px',
-                color: currentIndex === 0 ? '#4b5563' : '#f8fafc',
-                cursor: currentIndex === 0 ? 'default' : 'pointer',
-                fontSize: 16,
-                fontFamily: 'inherit',
-              }}
-            >
-              ‹
-            </button>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {members.map((_, i) => (
-                <div
-                  key={i}
-                  onClick={() => onIndexChange(i)}
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: i === currentIndex ? '#6366f1' : 'rgba(255,255,255,0.2)',
-                    cursor: 'pointer',
-                  }}
-                />
-              ))}
-            </div>
-            <button
-              onClick={() => onIndexChange(Math.min(members.length - 1, currentIndex + 1))}
-              disabled={currentIndex === members.length - 1}
-              style={{
-                background: 'rgba(255,255,255,0.08)',
-                border: 'none',
-                borderRadius: 6,
-                padding: '6px 14px',
-                color: currentIndex === members.length - 1 ? '#4b5563' : '#f8fafc',
-                cursor: currentIndex === members.length - 1 ? 'default' : 'pointer',
-                fontSize: 16,
-                fontFamily: 'inherit',
-              }}
-            >
-              ›
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
 }
+
 
 function ProgressStat({ label, count, color }) {
   return (
