@@ -2752,7 +2752,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
 
 function memberWaterShare(sessions, memberId, members = []) {
   return safeArray(sessions).reduce((sum, session) => {
-    const presentIds = effectiveSessionMemberIds(session, members)
+    const presentIds = effectiveSessionMemberIds(session, members, false)
     if (!presentIds.some(id => String(id) === String(memberId))) return sum
     const splitCount = presentIds.length + sessionGuests(session).length
     return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
