@@ -1007,14 +1007,15 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const isSearching = Boolean(searchQuery.trim());
 
   const handleOpenQrSheet = () => {
-    const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId) && (Number(r.amount) || 0) > 0);
-    setQrSheetMembers(rows.map(r => ({ 
-      name: r.name || r.memberName, 
-      amount: Math.abs(Number(r.amount) || 0), 
-      memberId: r.linkMemberId || r.memberId 
+    const rows = unpaidRows.filter(r => qrSelected.has(r.linkMemberId || r.memberId));
+    setQrSheetMembers(rows.map(r => ({
+      name: r.name || r.memberName,
+      amount: Math.abs(Number(r.amount) || 0),
+      memberId: r.linkMemberId || r.memberId,
     })));
     setQrSheetIndex(0);
   };
+
 
   return (
     <div style={{ display: 'grid', gap: 12, minWidth: 0 }}>
@@ -1083,7 +1084,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           headerRight={
             <button
               type="button"
-              onClick={() => { setQrMode(!qrMode); setQrSelected(new Set()); }}
+              onClick={() => { const next = !qrMode; setQrMode(next); setQrSelected(new Set()); if (next) setUnpaidExpanded(true); }}
               style={{
                 width: 28,
                 height: 28,
@@ -1397,36 +1398,11 @@ function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      {/* Backdrop */}
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)' }} onClick={onClose} />
-      
-      {/* Sheet */}
-      <div style={{ position: 'relative', background: '#12121a', borderRadius: '16px 16px 0 0', padding: '20px 20px 32px', maxHeight: '85vh', overflowY: 'auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
-            QR thanh toán{isCombined ? ` · ${members.length} người` : ''}
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: 'none',
-              borderRadius: 8,
-              width: 28,
-              height: 28,
-              cursor: 'pointer',
-              color: '#94a3b8',
-              fontSize: 14,
-              fontFamily: 'inherit',
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Total amount — center, large */}
+    <BottomSheet
+      title={`QR thanh toán${isCombined ? ` · ${members.length} người` : ''}`}
+      onClose={onClose}
+    >
+      {/* Total amount — center, large */}
         <div style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: '#f87171' }}>
             {currentAmount?.toLocaleString('vi-VN')} đ
@@ -1477,8 +1453,7 @@ function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
             Chưa có thông tin ngân hàng để tạo QR
           </div>
         )}
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
