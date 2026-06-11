@@ -228,7 +228,12 @@ export default function AppV2() {
       setAccessLinkLoading(true)
       setAccessLinkError('')
       const sb = createSupabase()
-      const { data, error } = await sb.rpc('consume_member_access_link', { p_token: memberAccessToken })
+      const urlParams = new URLSearchParams(window.location.search || '')
+      const isProfileLink = urlParams.get('profile') === '1'
+      const { data, error } = await sb.rpc(
+        isProfileLink ? 'consume_profile_access_link' : 'consume_member_access_link',
+        { p_token: memberAccessToken },
+      )
       if (!alive) return
       if (error || data?.error || !data?.authToken) {
         setAccessLinkError('Link đăng nhập không còn hiệu lực. Nhờ thủ quỹ gửi lại link mới.')
@@ -1451,6 +1456,34 @@ export default function AppV2() {
         dispatch({ type: 'SHOW_TOAST', message: 'Đã sao chép link cá nhân.' })
       }
       return url
+    }
+
+    if (type === 'copyProfileShareLink') {
+      const { token } = getStoredAuth()
+      if (!token) return
+      const { profileId, name } = payload || {}
+      if (!profileId) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Không tìm thấy profile' })
+        return
+      }
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('create_profile_access_link', {
+        p_profile_id: profileId,
+      })
+      if (error || data?.error) {
+        dispatch({ type: 'SHOW_TOAST', message: 'Lỗi tạo link' })
+        console.error(error || data?.error)
+        return
+      }
+      const shareToken = data?.urlToken
+      const url = `${window.location.origin}${window.location.pathname}?access=${encodeURIComponent(shareToken)}&profile=1`
+      try {
+        await navigator.clipboard.writeText(url)
+        dispatch({ type: 'SHOW_TOAST', message: `Đã copy link của ${name || 'member'}` })
+      } catch {
+        dispatch({ type: 'SHOW_TOAST', message: 'Không copy được link' })
+      }
+      return
     }
 
     if (type === 'createGroupInviteShare') {
