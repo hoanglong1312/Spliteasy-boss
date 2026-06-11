@@ -35,6 +35,9 @@ export default function JoinGroup({ data, onAction, pinSession, pinValue = '', p
   const [sessionPinError, setSessionPinError] = useState('');
   const [sessionPinLoading, setSessionPinLoading] = useState(false);
   const [localSessions, setLocalSessions] = useState(() => getRecentSessions());
+  const [savedInviteCodes, setSavedInviteCodes] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('spliteasy_invite_codes') || '[]') } catch { return [] }
+  });
   const [chipPinName, setChipPinName] = useState(null);
   const [chipPinValue, setChipPinValue] = useState('');
   const [chipPinError, setChipPinError] = useState('');
@@ -236,6 +239,21 @@ const handleSessionPinSubmit = async (session) => {
 
   return (
     <PhoneFrame>
+      {sessionPinLoading && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.55)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999,
+        }}>
+          <div style={{
+            width: 22, height: 22, borderRadius: '50%',
+            border: '3px solid rgba(255,255,255,0.3)', borderTopColor: '#fff',
+            animation: 'pickleballLoadingSpin 0.8s linear infinite',
+          }} />
+          <div style={{ marginTop: 12, color: '#fff', fontSize: 13, fontWeight: 600 }}>Đang xác nhận...</div>
+        </div>
+      )}
       <Screen style={{ paddingBottom: 24 }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0 14px' }}>
@@ -426,6 +444,11 @@ const handleSessionPinSubmit = async (session) => {
                         onClick={(e) => {
                           e.stopPropagation();
                           if (isExpanded) { setExpandedPinSessionId(null); setSessionPinValue(''); setSessionPinError(''); }
+                          if (session.inviteCode && session.inviteCode.trim()) {
+                            const next = [...new Set([session.inviteCode, ...savedInviteCodes])].slice(0, 5);
+                            localStorage.setItem('spliteasy_invite_codes', JSON.stringify(next));
+                            setSavedInviteCodes(next);
+                          }
                           const updated = removeRecentSession(session);
                           setLocalSessions(updated);
                         }}
@@ -548,11 +571,14 @@ const handleSessionPinSubmit = async (session) => {
         {/* Recent code suggestions */}
         {!inviteToken && !code && codeFocused && (() => {
           const seen = new Set();
-          const suggestions = localSessions
-            .filter(s => s.inviteCode && s.inviteCode.trim())
-            .map(s => ({ code: s.inviteCode, label: s.inviteCode }))
-            .filter(s => !seen.has(s.label) && seen.add(s.label))
-            .slice(0, 3);
+          const allCodes = [
+            ...localSessions.filter(s => s.inviteCode && s.inviteCode.trim()).map(s => s.inviteCode),
+            ...savedInviteCodes,
+          ];
+          const suggestions = allCodes
+            .filter(c => c && !seen.has(c) && seen.add(c))
+            .slice(0, 3)
+            .map(c => ({ code: c, label: c }));
           if (!suggestions.length) return null;
           return (
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
