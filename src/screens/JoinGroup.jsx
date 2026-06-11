@@ -223,7 +223,7 @@ const handleSessionPinSubmit = async (session) => {
       }
       setExpandedPinSessionId(null);
       setSessionPinValue('');
-      await onAction?.('resumeSession', session);
+      await onAction?.('resumeRecentSession', session);
     } catch {
       setSessionPinError('Lỗi xác minh. Thử lại.');
     } finally {
@@ -391,7 +391,18 @@ const handleSessionPinSubmit = async (session) => {
                     }}
                   >
                     {/* Card header row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px' }}>
+                    <div
+                      onClick={!isExpanded ? () => {
+                        if (session.hasPin) {
+                          setExpandedPinSessionId(sessionKey);
+                          setSessionPinValue('');
+                          setSessionPinError('');
+                        } else {
+                          onAction?.('resumeRecentSession', session);
+                        }
+                      } : undefined}
+                      style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 12px', cursor: !isExpanded ? 'pointer' : 'default' }}
+                    >
                       <div style={{
                         width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
                         background: getSessionAvatarColor(session.memberName),
@@ -404,29 +415,14 @@ const handleSessionPinSubmit = async (session) => {
                         {session.memberName}
                       </div>
                       {!isExpanded && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (session.hasPin) {
-                              setExpandedPinSessionId(sessionKey);
-                              setSessionPinValue('');
-                              setSessionPinError('');
-                            } else {
-                              onAction?.('resumeSession', session);
-                            }
-                          }}
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            fontSize: 18, color: colors.brand, padding: '4px 8px',
-                            lineHeight: 1,
-                          }}
-                        >
+                        <span style={{ fontSize: 18, color: colors.brand, padding: '4px 8px', lineHeight: 1 }}>
                           {session.hasPin ? '🔒' : '›'}
-                        </button>
+                        </span>
                       )}
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           if (isExpanded) { setExpandedPinSessionId(null); setSessionPinValue(''); setSessionPinError(''); }
                           const updated = removeRecentSession(session);
                           setLocalSessions(updated);
