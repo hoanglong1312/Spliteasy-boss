@@ -1367,7 +1367,7 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
   const ticketRows = buildTeamFundTicketRows(state, today)
   const ticketParticipantRows = buildTeamFundTicketParticipantRows(state, today)
   const currentFixedMembers = currentGroupMembers(state)
-    .filter(member => isActiveMember(member) && memberType(member) === 'fixed')
+    .filter(member => isActiveMember(member) && isFixedForMonth(state, member, currentYearMonth))
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
   const nextCourtFeeTotal = Number(nextMonthlyConfig?.courtFee ?? nextMonthlyConfig?.court_fee ?? courtFeeTotal) || 0
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
