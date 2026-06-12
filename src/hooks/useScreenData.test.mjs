@@ -1188,3 +1188,71 @@ test('Pickleball overview and member detail include individual-ticket balances',
   assert.match(dataSource, /ticketShare/)
   assert.match(dataSource, /p2pBalance/)
 })
+
+test('pickleball casual member pays zero water when no attendance record', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'viet-hoang',
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', groupType: 'pickleball', name: 'Nhóm Test', members: ['fixed-a', 'viet-hoang'] },
+    members: [
+      { id: 'fixed-a', groupId: 'pickle-1', name: 'Thành viên A', memberType: 'fixed', isActive: true },
+      { id: 'viet-hoang', groupId: 'pickle-1', name: 'Việt Hoàng', memberType: 'casual', isActive: true },
+    ],
+    pickle: {
+      monthlyCourtFee: 0,
+      monthlyConfigs: [{ yearMonth: '2026-05', courtFee: 0, sessionsCount: 1 }],
+      sessions: [{
+        id: 's1',
+        groupId: 'pickle-1',
+        session_date: '2026-05-10',
+        status: 'completed',
+        water_amount: 120000,
+        attendanceRecords: [
+          { memberId: 'fixed-a', status: 'present' },
+        ],
+      }],
+      externalTickets: [],
+    },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state.pickle, 'viet-hoang', state.members, '2026-05')
+
+  // summaryCards[1] = water card; amount = -waterFee; casual with no record → waterFee must be 0
+  assert.equal(data.yourBalance.summaryCards[1].amount, 0)
+})
+
+test('pickleball fixed member still pays water when no attendance record (fallback=true preserved)', () => {
+  const { buildPickleballOverviewData } = loadScreenDataBuilders()
+  const state = {
+    currentUserId: 'fixed-a',
+    currentGroupId: 'pickle-1',
+    currentGroup: { id: 'pickle-1', groupType: 'pickleball', name: 'Nhóm Test', members: ['fixed-a', 'viet-hoang'] },
+    members: [
+      { id: 'fixed-a', groupId: 'pickle-1', name: 'Thành viên A', memberType: 'fixed', isActive: true },
+      { id: 'viet-hoang', groupId: 'pickle-1', name: 'Việt Hoàng', memberType: 'casual', isActive: true },
+    ],
+    pickle: {
+      monthlyCourtFee: 0,
+      monthlyConfigs: [{ yearMonth: '2026-05', courtFee: 0, sessionsCount: 1 }],
+      sessions: [{
+        id: 's1',
+        groupId: 'pickle-1',
+        session_date: '2026-05-10',
+        status: 'completed',
+        water_amount: 120000,
+        attendanceRecords: [
+          { memberId: 'viet-hoang', status: 'present' },
+          // fixed-a has no record → fallback should treat them as present
+        ],
+      }],
+      externalTickets: [],
+    },
+  }
+
+  const data = buildPickleballOverviewData(state, state.pickle, state.pickle, 'fixed-a', state.members, '2026-05')
+
+  // fixed member with no record and no explicit absence → fallback=true → charged water
+  // Water is 120000 split 2 ways (fixed-a + viet-hoang) = 60000 → summaryCards[1].amount = -60000
+  assert.equal(data.yourBalance.summaryCards[1].amount, -60000)
+})
