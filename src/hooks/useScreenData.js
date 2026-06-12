@@ -2729,8 +2729,8 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   const courtFee = courtConfirmed
     ? (!isFixedForMonth(state, member, currentYearMonth) ? casualCharge : Math.round(fixedNetCost))
     : 0
-  const waterFee = memberWaterShare(sessions, memberId, members)
-  const extras = memberExtrasShare(sessions, memberId, state, members)
+  const waterFee = memberWaterShare(sessions, memberId, fixedMembers, casualMembers)
+  const extras = memberExtrasShare(sessions, memberId, state, fixedMembers, casualMembers)
   const ticketShare = memberTeamFundTicketShare(state, memberId, date)
   const p2pBalance = memberTicketBalance(state, memberId, date)
   const netBalance = Math.round(p2pBalance - courtFee - waterFee - extras - ticketShare)
@@ -2750,9 +2750,11 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   }
 }
 
-function memberWaterShare(sessions, memberId, members = []) {
+function memberWaterShare(sessions, memberId, fixedMembers = [], casualMembers = []) {
   return safeArray(sessions).reduce((sum, session) => {
-    const presentIds = effectiveSessionMemberIds(session, members, true)
+    const fixedPresentIds = effectiveSessionMemberIds(session, fixedMembers, true)
+    const casualPresentIds = effectiveSessionMemberIds(session, casualMembers, false)
+    const presentIds = [...new Set([...fixedPresentIds, ...casualPresentIds])]
     if (!presentIds.some(id => String(id) === String(memberId))) return sum
     const splitCount = presentIds.length + sessionGuests(session).length
     return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
@@ -2769,9 +2771,11 @@ function memberTicketWaterShare(state, memberId, date) {
   }, 0)
 }
 
-function memberExtrasShare(sessions, memberId, state, members = []) {
+function memberExtrasShare(sessions, memberId, state, fixedMembers = [], casualMembers = []) {
   return safeArray(sessions).reduce((sum, session) => {
-    const presentIds = effectiveSessionMemberIds(session, members)
+    const fixedPresentIds = effectiveSessionMemberIds(session, fixedMembers, true)
+    const casualPresentIds = effectiveSessionMemberIds(session, casualMembers, false)
+    const presentIds = [...new Set([...fixedPresentIds, ...casualPresentIds])]
     const itemShare = (state ? sessionItemsForSession(state, session) : safeArray(session?.sessionItems || session?.session_items))
       .filter(item => !isWaterSessionItem(item))
       .reduce((itemSum, item) => {
