@@ -8,9 +8,10 @@ const coreDataSource = readFileSync(new URL('../data.jsx', import.meta.url), 'ut
 
 function loadScreenDataBuilders() {
   const source = dataSource
-    .replace(/import \{ useEffect, useMemo, useRef \} from 'react'\n/, '')
+    .replace(/import \{[^}]+\} from 'react'\n/, '')
     .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
     .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
+    .replace(/import \{[^}]+\} from '\.\.\/lib\/auth\.js'\n/, '')
     .replace('export function useScreenData', 'function useScreenData')
 
   const context = {
@@ -1219,7 +1220,8 @@ test('pickleball casual member pays zero water when no attendance record', () =>
   const data = buildPickleballOverviewData(state, state.pickle, state.pickle, 'viet-hoang', state.members, '2026-05')
 
   // summaryCards[1] = water card; amount = -waterFee; casual with no record → waterFee must be 0
-  assert.equal(data.yourBalance.summaryCards[1].amount, 0)
+  // use == not === because -memberBalance.waterFee produces -0 when waterFee=0
+  assert.ok(data.yourBalance.summaryCards[1].amount == 0)
 })
 
 test('pickleball fixed member still pays water when no attendance record (fallback=true preserved)', () => {
