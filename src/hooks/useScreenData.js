@@ -1277,7 +1277,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const ticketWaterTotal = monthTickets.reduce((sum, t) => sum + Number(t?.waterAmount ?? t?.water_amount ?? 0), 0)
   const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0) + ticketWaterTotal
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
-  const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && memberType(member) === 'fixed')
+  const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && isFixedForMonth(state, member, currentYearMonth))
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
   const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
   const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId, today)
