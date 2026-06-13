@@ -112,8 +112,11 @@ test('reactivate Minh Anh in expense group calls add_expense_group_member rpc', 
   await page.click('text=Nhóm')
   await page.click('text=Chi tiêu Virgo 246')
   await page.click('text=Thành viên')
+  // "Thêm thành viên" is inside the FAB menu — open FAB first via aria-label
+  await page.click('button[aria-label="Thêm"]', { timeout: 5000 })
+  await page.waitForSelector('text=Thêm thành viên', { timeout: 3000 })
   await page.click('text=Thêm thành viên')
-  await page.waitForSelector('text=DANH SÁCH CHỜ THÊM LẠI')
+  await page.waitForSelector('text=Thêm lại vào nhóm', { timeout: 5000 })
   await page.click('text=Minh Anh')
   await page.click('button:has-text("Thêm 1 thành viên")')
 
