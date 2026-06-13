@@ -2,13 +2,22 @@
 
 ## Lệnh Chạy Test
 
+### Unit Tests (Vitest) — Codex chạy được
+```bash
+npm test
+```
+- Vitest `v4.1.8`, 265ms, không cần browser
+- Test file: `src/hooks/useScreenData.test.js` — 9 tests cho `attendanceByMemberId`, `effectiveSessionMemberIds`, `memberWaterShare`
+- Codex tự loop: fix → `npm test` → fix → `npm test`
+- Khi sửa 3 functions trên → thêm test tương ứng
+
+### E2E Tests (Playwright) — chỉ Claude main chạy được
 ```bash
 npx playwright test --reporter=line
 ```
+⚠️ Codex sandbox EPERM khi bind port.
 
-⚠️ Chỉ Claude main chạy được — Codex sandbox bị EPERM khi bind port.
-
-**Pass condition:** `npm run build` ✅ + Playwright ✅
+**Pass condition:** `npm run build` ✅ + `npm test` ✅ + Playwright ✅
 
 ## UI Verification — Dùng localhost trước khi deploy
 
