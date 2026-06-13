@@ -2634,7 +2634,7 @@ function buildTicketFundSummary(state, date) {
 }
 
 function toPickleballMemberRow(member, sessions, totalSessions, members = []) {
-  const sessionsAttended = attendanceByMemberId(sessions, member.id, members, false)
+  const sessionsAttended = attendanceByMemberId(sessions, member.id, members, true)
   const sessionsTotal = totalSessions ?? sessions.length
   const progressPct = sessionsTotal > 0 ? Math.min(100, Math.round((sessionsAttended / sessionsTotal) * 100)) : 0
   const rank = calculateMemberRank(progressPct)
