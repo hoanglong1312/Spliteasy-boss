@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test:node": "node --test $(rg --files src | rg '\\.test\\.mjs$')",
     "qa:codex": "npm run test:node && npm run build",
-    "qa:claude": "npx playwright test --reporter=line"
+    "qa:claude": "npx playwright test --reporter=line",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@fontsource/geist": "^5.2.9",
@@ -21,6 +23,7 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^4.1.8"
   }
 }

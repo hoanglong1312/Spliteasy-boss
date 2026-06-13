@@ -3,4 +3,8 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    include: ['src/**/*.test.js'],
+    exclude: ['.claude/**', 'node_modules/**'],
+  },
 })

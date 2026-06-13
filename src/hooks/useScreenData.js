@@ -2750,7 +2750,7 @@ function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
   }
 }
 
-function memberWaterShare(sessions, memberId, fixedMembers = [], casualMembers = []) {
+export function memberWaterShare(sessions, memberId, fixedMembers = [], casualMembers = []) {
   return safeArray(sessions).reduce((sum, session) => {
     const fixedPresentIds = effectiveSessionMemberIds(session, fixedMembers, true)
     const casualPresentIds = effectiveSessionMemberIds(session, casualMembers, false)
@@ -2800,7 +2800,7 @@ function memberExtrasShare(sessions, memberId, state, fixedMembers = [], casualM
   }, 0)
 }
 
-function attendanceByMemberId(sessions, memberId, members = [], fallback = false) {
+export function attendanceByMemberId(sessions, memberId, members = [], fallback = false) {
   return safeArray(sessions).filter(session => (
     effectiveSessionMemberIds(session, members, fallback).some(id => String(id) === String(memberId))
   )).length
@@ -4305,7 +4305,7 @@ function sessionAttendanceRecords(session) {
     .filter(record => record.memberId)
 }
 
-function effectiveSessionMemberIds(session, members = [], fallbackPresentMembers = true) {
+export function effectiveSessionMemberIds(session, members = [], fallbackPresentMembers = true) {
   const memberIds = safeArray(members).map(member => member?.id || member?.member_id).filter(Boolean)
   const records = sessionAttendanceRecords(session)
   const sessionIds = sessionMemberIds(session)
