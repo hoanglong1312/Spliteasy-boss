@@ -202,12 +202,12 @@ function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle,
   const prevExpenseGroups = safeGroups
     .filter(group => groupKind(group) !== 'pickleball')
     .map(group => groupWithMonthExpenses(group, prevDate))
-  const prevExpenseBalance = prevExpenseGroups.reduce((sum, group) => (
-    sum + groupNetForMember(group, currentUserId, members, state?.currentUserName)
-  ), 0)
   const prevSessions = getStateMonthSessions(pickleballState, prevDate)
-  const prevPickleBalance = buildMemberMonthBalance(pickleballState, pickle, prevSessions, pickleballMemberId, prevDate).netBalance || 0
-  const prevTotal = prevExpenseBalance + prevPickleBalance
+  const prevSourceBalances = buildHomeSourceBalances(state, prevExpenseGroups, pickleballState, pickle, prevSessions, members, prevDate)
+  const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  const prevSourceBreakdown = currentProfileSourceBreakdown(prevSourceBalances, currentUserId, members)
+  const prevPaymentSummary = buildHomePaymentSummary(state, prevSourceBreakdown, null, members, me, prevDate)
+  const prevTotal = prevPaymentSummary.netBalance
   if (prevTotal >= 0) return null
   return {
     yearMonth: prevYearMonth,
