@@ -1270,7 +1270,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const autoGenerateConfig = buildSessionGenerationConfig(state, currentYearMonth)
   const overviewScheduleTime = configuredPickleScheduleTime(state, currentYearMonth)
   const shouldAutoGenerate = !state?._pickleRegenInProgress && hasMissingGeneratedSessions(state, currentYearMonth, monthSessions, autoGenerateConfig)
-  const completedSessions = monthSessions.filter(s => isDoneStatus(s?.status)).length
+  const completedMonthSessions = monthSessions.filter(s => isDoneStatus(s?.status))
+  const completedSessions = completedMonthSessions.length
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, today)
   const monthTickets = monthTicketsForState(state, today)
@@ -1280,6 +1281,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && isFixedForMonth(state, member, currentYearMonth))
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
   const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
+  const myAttendedCount = attendanceByMemberId(completedMonthSessions, currentPickleballMemberId, members, true)
   const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId, today)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId, today)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
@@ -1317,9 +1319,9 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     memberCount: activeMemberIds.length,
     todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime) : null,
     progress: {
-      attended: completedSessions,
-      total: monthSessions.length || 1,
-      actualTotal: monthSessions.length,
+      attended: myAttendedCount,
+      total: completedSessions || 1,
+      actualTotal: completedSessions,
     },
     monthCosts: {
       court: courtFee,
