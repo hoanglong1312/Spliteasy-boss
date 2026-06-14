@@ -2520,15 +2520,32 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
   ]
 }
 
+export function buildPersonalWaterSessionRows(monthSessions, memberId, members = []) {
+  return monthSessions
+    .filter(s => sessionWaterAmount(s) > 0)
+    .map(s => {
+      const attendees = effectiveSessionMemberIds(s, members)
+      const memberPresent = attendees.some(id => String(id) === String(memberId))
+      if (!memberPresent) return null
+      const share = Math.round(sessionWaterAmount(s) / attendees.length)
+      return {
+        label: `Buổi #${sessionNumber(s, monthSessions) || ''} · ${formatDayMonth(sessionDate(s)) || ''}`,
+        amount: share,
+      }
+    })
+    .filter(Boolean)
+}
+
 function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = []) {
+  const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members)
   const waterSessions = monthSessions.filter(s => (
     sessionWaterAmount(s) > 0 &&
     effectiveSessionMemberIds(s, members).some(id => String(id) === String(memberId))
   )).length
   return [
     { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' },
-    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước` },
-    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: -ticketAdjustment, sub: 'Qua quỹ team' },
+    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows },
+    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: -ticketAdjustment, sub: 'Qua quỹ team', key: 'ticket' },
   ]
 }
 

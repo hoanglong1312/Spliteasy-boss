@@ -54,6 +54,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
   ];
   const [tab, setTab] = useState('overview');
   const [configExpanded, setConfigExpanded] = useState(false);
+  const [expandedCard, setExpandedCard] = useState(null);
   const [weekdays, setWeekdays] = useState(new Set(sc.weekdays || []));
   const [autoGen, setAutoGen] = useState(sc.autoGenerate ?? true);
   const [[timeStart, timeEnd], setTimeParts] = useState(() => splitTimeRange(sc.timeRange));
@@ -211,9 +212,39 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </Card>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'space-between' }}>
-            {personalSummaryCards.map(card => (
-              <CompactCostCard key={card.label} icon={card.icon} label={card.label} value={card.amount} sub={card.sub} style={{ flex: 1 }} />
-            ))}
+            {personalSummaryCards.map(card => {
+              const isExpandable = card.rows || card.key === 'ticket';
+              const isExpanded = expandedCard === card.label;
+              const displayRows = card.key === 'ticket' ? (yourTickets.rows || []).map(r => ({ label: r.dateLabel || r.label || '', amount: Math.abs(r.personalAmount || r.displayAmount || 0) })) : (card.rows || []);
+              return (
+                <div key={card.label}>
+                  <div 
+                    onClick={isExpandable ? () => setExpandedCard(isExpanded ? null : card.label) : undefined}
+                    style={{ position: 'relative', cursor: isExpandable ? 'pointer' : 'default' }}
+                  >
+                    <CompactCostCard icon={card.icon} label={card.label} value={card.amount} sub={card.sub} style={{ flex: 1, paddingRight: isExpandable ? 28 : 9 }} />
+                    {isExpandable && (
+                      <div style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: colors.textSecondary, fontWeight: 700 }}>
+                        {isExpanded ? '▼' : '›'}
+                      </div>
+                    )}
+                  </div>
+                  {isExpanded && displayRows.length > 0 && (
+                    <div style={{ marginTop: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 8, padding: 8 }}>
+                      {displayRows.map((row, idx) => (
+                        <div key={idx}>
+                          {idx > 0 && <div style={{ borderTop: `1px solid ${colors.borderSubtle}` }} />}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 11 }}>
+                            <div style={{ color: colors.textSecondary }}>{row.label}</div>
+                            <div style={{ fontWeight: 700, ...type.mono }}>-{formatVND(row.amount)}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 

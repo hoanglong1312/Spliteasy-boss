@@ -3,6 +3,7 @@ import {
   attendanceByMemberId,
   effectiveSessionMemberIds,
   memberWaterShare,
+  buildPersonalWaterSessionRows,
 } from './useScreenData.js'
 
 const fixedMembers = [
@@ -130,5 +131,79 @@ describe('memberWaterShare', () => {
     ]
 
     expect(memberWaterShare(sessions, 'fixed-1', fixedMembers, casualMembers)).toBe(0)
+  })
+})
+describe('buildPersonalWaterSessionRows', () => {
+  test('returns empty array when member not present in water sessions', () => {
+    const sessions = [
+      {
+        id: '1',
+        date: '2026-05-10',
+        water_amount: 100000,
+        attendance_records: [
+          { member_id: 'member-1', status: 'absent' },
+          { member_id: 'other-1', status: 'present' },
+        ],
+      },
+    ]
+    const members = [
+      { id: 'member-1', name: 'Member One' },
+      { id: 'other-1', name: 'Other One' },
+    ]
+    
+    const result = buildPersonalWaterSessionRows(sessions, 'member-1', members)
+    expect(result).toEqual([])
+  })
+
+  test('calculates per-session water share for member', () => {
+    const sessions = [
+      {
+        id: '1',
+        date: '2026-05-10',
+        number: 1,
+        water_amount: 120000,
+        attendance_records: [
+          { member_id: 'member-1', status: 'present' },
+          { member_id: 'member-2', status: 'present' },
+        ],
+      },
+    ]
+    const members = [
+      { id: 'member-1', name: 'Member One' },
+      { id: 'member-2', name: 'Member Two' },
+    ]
+    
+    const result = buildPersonalWaterSessionRows(sessions, 'member-1', members)
+    expect(result.length).toBe(1)
+    expect(result[0].amount).toBe(60000) // 120000 / 2
+  })
+
+  test('filters out sessions with no water amount', () => {
+    const sessions = [
+      {
+        id: '1',
+        date: '2026-05-10',
+        number: 1,
+        water_amount: 100000,
+        attendance_records: [
+          { member_id: 'member-1', status: 'present' },
+        ],
+      },
+      {
+        id: '2',
+        date: '2026-05-11',
+        number: 2,
+        water_amount: 0,
+        attendance_records: [
+          { member_id: 'member-1', status: 'present' },
+        ],
+      },
+    ]
+    const members = [
+      { id: 'member-1', name: 'Member One' },
+    ]
+    
+    const result = buildPersonalWaterSessionRows(sessions, 'member-1', members)
+    expect(result.length).toBe(1)
   })
 })
