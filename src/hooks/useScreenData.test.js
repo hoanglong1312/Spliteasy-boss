@@ -1,9 +1,10 @@
-import { describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   attendanceByMemberId,
+  buildPrevMonthUnpaid,
+  buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
   memberWaterShare,
-  buildPersonalWaterSessionRows,
 } from './useScreenData.js'
 
 const fixedMembers = [
@@ -206,4 +207,36 @@ describe('buildPersonalWaterSessionRows', () => {
     const result = buildPersonalWaterSessionRows(sessions, 'member-1', members)
     expect(result.length).toBe(1)
   })
+})
+
+describe('buildPrevMonthUnpaid', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('returns null when selectedYearMonth is not current month', () => {
+    const result = buildPrevMonthUnpaid({}, 'user-1', [], [], null, {}, null, '2025-01')
+    expect(result).toBeNull()
+  })
+
+  test('returns null when prev month balance is zero (no expenses, no pickle)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-14'))
+    const members = [{ id: 'user-1', profile_id: 'profile-1', name: 'Test' }]
+    const result = buildPrevMonthUnpaid(
+      { notifications: [], groups: [], members },
+      'user-1',
+      members,
+      [],
+      null,
+      { currentGroup: null, sessions: [], configs: [] },
+      null,
+      '2026-06',
+    )
+    expect(result).toBeNull()
+  })
+
+  // TODO: add integration test for payment-adjusted balance
+  // Scenario: gross = -789852, confirmed payment = 752866 → net = -36986
+  // Requires full mock of expense groups + state.notifications format
 })

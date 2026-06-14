@@ -195,7 +195,7 @@ export function useScreenData() {
   return screenData
 }
 
-function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth) {
+export function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth) {
   if (selectedYearMonth !== monthKey(new Date())) return null
   const prevYearMonth = shiftMonthKey(selectedYearMonth, -1)
   const prevDate = dateFromYearMonth(prevYearMonth)
