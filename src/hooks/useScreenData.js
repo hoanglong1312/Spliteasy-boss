@@ -197,6 +197,14 @@ export function useScreenData() {
 
 export function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth) {
   if (selectedYearMonth !== monthKey(new Date())) return null
+  const prevYearMonthEarly = shiftMonthKey(selectedYearMonth, -1)
+  const settlements = safeArray(state?.monthSettlements)
+  const settledMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  if (settledMember && settlements.some(s =>
+    String(s.member_id) === String(currentUserId) &&
+    String(s.month) === String(prevYearMonthEarly) &&
+    String(s.group_id) === String(settledMember.group_id || settledMember.groupId || '')
+  )) return null
   const prevYearMonth = shiftMonthKey(selectedYearMonth, -1)
   const prevDate = dateFromYearMonth(prevYearMonth)
   const prevExpenseGroups = safeGroups
@@ -235,6 +243,28 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
   const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
+  const prevYM = shiftMonthKey(selectedYearMonth, -1)
+  const prevDate = dateFromYearMonth(prevYM)
+  const prevExpenseGroups = safeGroups
+    .filter(group => groupKind(group) !== 'pickleball')
+    .map(group => groupWithMonthExpenses(group, prevDate))
+  const prevSessions = getStateMonthSessions(pickleballState, prevDate)
+  const prevSourceBalances = buildHomeSourceBalances(state, prevExpenseGroups, pickleballState, pickle, prevSessions, members, prevDate)
+  const prevProfileBreakdown = aggregateBalancesByProfile(prevSourceBalances, members)
+  const prevMonthUnpaidByMember = {}
+  safeArray(prevProfileBreakdown).forEach(row => {
+    if (Number(row.amount) < 0) {
+      const settled = safeArray(state?.monthSettlements).some(s =>
+        safeArray(row.memberIds || []).map(String).includes(String(s.member_id)) &&
+        String(s.month) === prevYM
+      )
+      if (!settled) {
+        safeArray(row.memberIds || []).forEach(memberId => {
+          prevMonthUnpaidByMember[String(memberId)] = Math.abs(Number(row.amount) || 0)
+        })
+      }
+    }
+  })
   const paymentSummary = buildHomePaymentSummary(state, rawSourceBreakdown, profileBreakdown, members, me, today)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
@@ -303,6 +333,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     profileBreakdown,
     paymentSummary,
     prevMonthUnpaid,
+    prevMonthUnpaidByMember,
     pendingTickets,
   }
 }
@@ -326,7 +357,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     paymentStatusLabel: netBalance < 0 && coverage.confirmedAmount > 0 ? 'Cần nộp thêm' : paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     memberBank: bankData(me, true),
-    paymentProgress: buildPaymentProgressRows(profileBreakdown, members, state, monthLabel),
+    paymentProgress: buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, safeArray(state?.monthSettlements), monthKey(monthDate)),
     payForRows: safeArray(profileBreakdown)
       .filter(row => Number(row.amount) < 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),
@@ -340,7 +371,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   }
 }
 
-function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel) {
+export function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, settlements = [], selectedYearMonth = '') {
   const rowsByProfile = new Map()
   const putRow = (row) => {
     const profileId = String(row.profileId || row.profile_id || row.memberId || row.member_id || row.name || '')
@@ -364,6 +395,8 @@ function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel) 
         amount,
         status: nextStatus,
         sourceSummary: row.sourceSummary || row.source_summary || `${safeArray(row.sources).length || 1} nguồn tiền`,
+        prevMonthResidual: 0,
+        prevMonthSettled: false,
       })
     }
   }
@@ -409,7 +442,20 @@ function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel) 
       })
     })
 
+  const prevMonth = selectedYearMonth ? shiftMonthKey(selectedYearMonth, -1) : ''
   return [...rowsByProfile.values()]
+    .map(row => {
+      const memberIds = safeArray(row.memberIds).map(String)
+      const settlement = prevMonth ? safeArray(settlements).find(s =>
+        memberIds.includes(String(s.member_id)) && String(s.month) === prevMonth
+      ) : null
+      return {
+        ...row,
+        prevMonthSettled: Boolean(settlement),
+        settlementId: settlement?.id || null,
+        settlementExpenseId: settlement?.expense_id || null,
+      }
+    })
     .sort((a, b) => paymentProgressStatusRank(b.status) - paymentProgressStatusRank(a.status) || b.amount - a.amount || a.name.localeCompare(b.name, 'vi'))
 }
 

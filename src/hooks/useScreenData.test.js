@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   attendanceByMemberId,
+  buildPaymentProgressRows,
   buildPrevMonthUnpaid,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
@@ -256,7 +257,66 @@ describe('buildPrevMonthUnpaid', () => {
     expect(result).toBeNull()
   })
 
+  test('returns null when previous month balance has been settled', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-14'))
+    const members = [
+      { id: 'user-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Test' },
+      { id: 'payer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Payer' },
+    ]
+    const safeGroups = [{
+      id: 'group-1',
+      name: 'Group',
+      members,
+      expenses: [{
+        id: 'expense-1',
+        amount: 100000,
+        expenseDate: '2026-05-10',
+        paidBy: 'payer-1',
+        participants: ['user-1', 'payer-1'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'user-1',
+      currentUserName: 'Test',
+      notifications: [],
+      monthSettlements: [{ id: 'settlement-1', member_id: 'user-1', group_id: 'group-1', month: '2026-05' }],
+    }
+
+    const result = buildPrevMonthUnpaid(
+      state,
+      'user-1',
+      members,
+      safeGroups,
+      null,
+      { currentGroup: null, sessions: [], configs: [] },
+      null,
+      '2026-06',
+    )
+
+    expect(result).toBeNull()
+  })
+
   // TODO: add integration test for payment-adjusted balance
   // Scenario: gross = -789852, confirmed payment = 752866 → net = -36986
   // Requires full mock of expense groups + state.notifications format
+})
+
+describe('buildPaymentProgressRows', () => {
+  test('marks rows settled for previous month with settlement id', () => {
+    const rows = buildPaymentProgressRows(
+      [{ profileId: 'profile-1', memberIds: ['member-1'], name: 'Member One', amount: -100000, sources: [] }],
+      [{ id: 'member-1', profile_id: 'profile-1', name: 'Member One' }],
+      { notifications: [] },
+      'Tháng 6',
+      [{ id: 'settlement-1', member_id: 'member-1', month: '2026-05', expense_id: 'expense-1' }],
+      '2026-06',
+    )
+
+    expect(rows[0]).toMatchObject({
+      prevMonthSettled: true,
+      settlementId: 'settlement-1',
+      settlementExpenseId: 'expense-1',
+    })
+  })
 })
