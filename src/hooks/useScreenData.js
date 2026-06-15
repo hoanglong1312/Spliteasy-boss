@@ -4337,7 +4337,11 @@ export function effectiveSessionMemberIds(session, members = [], fallbackPresent
   ].map(String))
 
   if (fallbackPresentMembers) {
-    memberIds.forEach(memberId => {
+    safeArray(members).forEach(member => {
+      const memberId = member?.id || member?.member_id
+      if (!memberId) return
+      const memberType = member?.member_type || member?.memberType
+      if (memberType === 'casual') return
       if (!absentIds.has(String(memberId))) presentIds.add(String(memberId))
     })
   }

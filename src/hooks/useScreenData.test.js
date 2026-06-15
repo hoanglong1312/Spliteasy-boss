@@ -27,6 +27,26 @@ describe('effectiveSessionMemberIds', () => {
     expect(effectiveSessionMemberIds(session, fixedMembers, true)).toEqual(['fixed-1', 'fixed-2'])
   })
 
+  test('does not count casual member without explicit attendance when fallback is enabled', () => {
+    const session = {
+      attendance_records: [
+        { member_id: 'fixed-1', status: 'present' },
+      ],
+    }
+
+    expect(effectiveSessionMemberIds(session, [...fixedMembers, ...casualMembers], true)).toEqual(['fixed-1', 'fixed-2'])
+  })
+
+  test('counts fixed member without explicit attendance when fallback is enabled', () => {
+    const session = {
+      attendance_records: [
+        { member_id: 'fixed-1', status: 'present' },
+      ],
+    }
+
+    expect(effectiveSessionMemberIds(session, [...fixedMembers, ...casualMembers], true)).toContain('fixed-2')
+  })
+
   test('does not count member marked absent when session has records and fallback is enabled', () => {
     const session = {
       attendance_records: [
