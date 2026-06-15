@@ -71,10 +71,10 @@ const getSessionAvatarColor = (name) => {
     });
   const joinButtonText = joining
     ? 'Đang tham gia...'
-    : isInviteLinkFlow
-      ? 'Gửi yêu cầu tham gia'
-      : selected && !newName
-        ? 'Vào nhóm'
+    : selected && !newName
+      ? 'Vào nhóm'
+      : isInviteLinkFlow
+        ? 'Gửi yêu cầu tham gia'
         : 'Tham gia';
 
   const existingNames = hasGroupPreview
@@ -957,8 +957,8 @@ const handleSessionPinSubmit = async (session) => {
           {joinButtonText}
         </Button>}
 
-        {/* Pending hint */}
-        {hasGroupPreview && <div style={{
+        {/* Pending hint — only for new member invite-link flow before/after submit */}
+        {hasGroupPreview && isInviteLinkFlow && !selected && <div style={{
           display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center',
           marginTop: 14, padding: 12, borderRadius: 12,
           background: 'rgba(251,191,36,0.08)',
