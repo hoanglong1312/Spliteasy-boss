@@ -2111,15 +2111,6 @@ export default function AppV2() {
           }
         }
       }
-      const { error } = await sb
-        .from('pickle_attendees')
-        .insert({
-          session_id: sessionId,
-          guest_name: guestName,
-          attendee_type: 'guest',
-          attended: true,
-        })
-      if (error) throw error
       const existingMember = await findCasualMemberByName(sb, groupId, guestName)
       if (!existingMember) {
         const parts = memberNameParts(guestName)
@@ -2178,6 +2169,13 @@ export default function AppV2() {
           if (attendanceError) throw attendanceError
         }
       }
+      // Clean up any stale guest row for same session/name from old data
+      await sb
+        .from('pickle_attendees')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('attendee_type', 'guest')
+        .ilike('guest_name', guestName)
       await dispatch({ type: 'REFRESH' })
       return
     }
