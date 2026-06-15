@@ -158,7 +158,13 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
 
       <PaymentSheet
         open={paymentOpen || paymentSheetOpen}
-        data={d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }}
+        data={{
+          ...(d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }),
+          yearMonth: d.yearMonth || '',
+          currentGroupId: d.currentGroupId || '',
+          monthSettlements: d.monthSettlements || [],
+          prevMonthUnpaidByMember: d.prevMonthUnpaidByMember || {},
+        }}
         paymentRecords={d.paymentRecords || []}
         isTreasurer={isTreasurer}
         confirmedRefunds={confirmedRefunds}
@@ -745,6 +751,10 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             onAction={onAction}
             onViewPaymentRecord={onViewPaymentRecord}
             onConfirmRefund={onConfirmRefund}
+            monthSettlements={data?.monthSettlements || []}
+            prevMonthUnpaidByMember={data?.prevMonthUnpaidByMember || {}}
+            onDeferMonthBalance={(payload) => onAction?.('deferMonthBalance', payload)}
+            onUndoDeferMonthBalance={(payload) => onAction?.('undoDeferMonthBalance', payload)}
           />
         </>
       )}
@@ -964,7 +974,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   );
 }
 
-function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
+function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, prevMonthUnpaidByMember, onDeferMonthBalance, onUndoDeferMonthBalance }) {
   const [unpaidExpanded, setUnpaidExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [confirmedExpanded, setConfirmedExpanded] = useState(true);
@@ -980,6 +990,26 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
   const [qrSheetIndex, setQrSheetIndex] = useState(0);
   const rows = safeArray(progressRows);
+  const currentYM = data?.yearMonth || '';
+  const prevMonthStr = currentYM ? (() => {
+    const [year, month] = currentYM.split('-').map(Number);
+    const prevMonth = month - 1 === 0 ? 12 : month - 1;
+    const prevYear = month - 1 === 0 ? year - 1 : year;
+    return `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+  })() : '';
+  const nextMonthNum = currentYM ? (() => {
+    const month = Number(currentYM.split('-')[1]);
+    return month === 12 ? 1 : month + 1;
+  })() : '';
+  const nextMonthLabel = nextMonthNum ? `T${nextMonthNum}` : '';
+  const nextMonthFirstDay = currentYM ? (() => {
+    const [year, month] = currentYM.split('-').map(Number);
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    return `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
+  })() : '';
+  const safeSettlements = safeArray(monthSettlements);
+  const safePrevUnpaid = prevMonthUnpaidByMember || {};
   const pending = safeArray(pendingRecords);
   const refunds = safeArray(refundRows);
   const confirmedRecords = pending.filter(record => String(record.status || '').toLowerCase() === 'confirmed');
@@ -1100,12 +1130,49 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           onToggle={() => setConfirmedExpanded(value => !value)}
           listScroll
         >
-          {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => (
-            <PaymentDashboardRow key={record.notificationId || record.id} row={record} tone="confirmed">
-              <button type="button" onClick={() => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={miniDashButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
-              <button type="button" onClick={() => withLoading(() => onAction?.('cancelPaymentRecord', record))} style={miniDashButton(colors.danger, '#fff')}>Hủy</button>
-            </PaymentDashboardRow>
-          )) : (
+          {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => {
+            const memberIds = safeArray(record.memberIds || [record.memberId]).map(String);
+            const residual = memberIds.reduce((max, memberId) => Math.max(max, Number(safePrevUnpaid[memberId]) || 0), 0);
+            const settlement = prevMonthStr ? safeSettlements.find(s =>
+              memberIds.includes(String(s.member_id)) && String(s.month) === prevMonthStr
+            ) : null;
+            const isSettled = Boolean(settlement);
+            return (
+              <PaymentDashboardRow key={record.notificationId || record.id} row={record} tone="confirmed">
+                <button type="button" onClick={() => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={miniDashButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
+                <button type="button" onClick={() => withLoading(() => onAction?.('cancelPaymentRecord', record))} style={miniDashButton(colors.danger, '#fff')}>Hủy</button>
+                {residual > 0 && !isSettled && (
+                  <button
+                    type="button"
+                    onClick={() => withLoading(() => onDeferMonthBalance?.({
+                      memberId: memberIds[0] || record.memberId,
+                      profileId: record.profileId,
+                      month: prevMonthStr,
+                      amount: residual,
+                      nextMonthDate: nextMonthFirstDay,
+                      memberName: record.name || record.memberName || '',
+                      groupId: data?.currentGroupId || '',
+                    }))}
+                    style={miniDashButton('#f59e0b', '#1c1917')}
+                  >
+                    Gộp → {nextMonthLabel}
+                  </button>
+                )}
+                {isSettled && (
+                  <>
+                    <span style={{ fontSize: 10, background: 'rgba(34,197,94,0.18)', color: '#4ade80', borderRadius: 6, padding: '3px 8px', fontWeight: 700 }}>✓ Gộp {nextMonthLabel}</span>
+                    <button
+                      type="button"
+                      onClick={() => withLoading(() => onUndoDeferMonthBalance?.({ settlementId: settlement.id }))}
+                      style={miniDashButton(colors.danger, '#fff')}
+                    >
+                      Hủy gộp
+                    </button>
+                  </>
+                )}
+              </PaymentDashboardRow>
+            );
+          }) : (
             <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>Không có member khớp tìm kiếm.</div>
           )}
         </DashboardSection>

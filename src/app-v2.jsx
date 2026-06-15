@@ -2302,6 +2302,24 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'deferMonthBalance') {
+      await dispatch({
+        type: 'DEFER_MONTH_BALANCE',
+        ...payload,
+      })
+      dispatch({ type: 'SHOW_TOAST', message: `Đã gộp số dư ${payload?.memberName || 'thành viên'} sang tháng sau.` })
+      return
+    }
+
+    if (type === 'undoDeferMonthBalance') {
+      await dispatch({
+        type: 'UNDO_DEFER_MONTH_BALANCE',
+        settlementId: payload?.settlementId,
+      })
+      dispatch({ type: 'SHOW_TOAST', message: 'Đã hủy gộp số dư sang tháng sau.' })
+      return
+    }
+
     if (type === 'cancelPaymentRecord') {
       await dispatch({
         type: 'DELETE_PAYMENT_NOTIFICATION',

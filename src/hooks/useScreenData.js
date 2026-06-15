@@ -307,7 +307,9 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
       dateLabel: formatFullDate(today),
       hasNotifications: safeArray(state?.notifications).some(n => n.is_read === false),
     },
+    yearMonth: selectedYearMonth,
     monthLabel: formatMonthLabel(today),
+    currentGroupId: state?.currentGroupId || state?.currentGroup?.id || '',
     totalBalance,
     owedTo: sourceBreakdown.filter(source => Number(source.amount) < 0).length,
     pickleball: {
@@ -334,6 +336,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     paymentSummary,
     prevMonthUnpaid,
     prevMonthUnpaidByMember,
+    monthSettlements: safeArray(state?.monthSettlements),
     pendingTickets,
   }
 }

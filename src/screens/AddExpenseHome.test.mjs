@@ -645,13 +645,23 @@ test('Home hero review chip is an explicit settle-all action', () => {
 });
 
 test('Home payment sheet gives treasurers a payment progress dashboard', () => {
-  assert.match(screenDataSource, /paymentProgress: buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel\)/);
-  assert.match(screenDataSource, /function buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel\)/);
+  assert.match(screenDataSource, /paymentProgress: buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel, safeArray\(state\?\.monthSettlements\), monthKey\(monthDate\)\)/);
+  assert.match(screenDataSource, /function buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel, settlements = \[\], selectedYearMonth = ''\)/);
   assert.match(screenDataSource, /value === 'confirmed'/);
   assert.match(screenDataSource, /value === 'pending'/);
   assert.match(screenDataSource, /status: Number\(row\.pendingAmount\) > 0 \? 'pending' : 'unpaid'/);
-  assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{data\?\.paymentProgress \|\| \[\]\}[\s\S]*paymentRecords=\{paymentRecords\}/);
-  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund \}\)/);
+  assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{data\?\.paymentProgress \|\| \[\]\}[\s\S]*monthSettlements=\{data\?\.monthSettlements \|\| \[\]\}/);
+  assert.match(homeSource, /prevMonthUnpaidByMember=\{data\?\.prevMonthUnpaidByMember \|\| \{\}\}/);
+  assert.match(homeSource, /onDeferMonthBalance=\{\(payload\) => onAction\?\.\('deferMonthBalance', payload\)\}/);
+  assert.match(homeSource, /onUndoDeferMonthBalance=\{\(payload\) => onAction\?\.\('undoDeferMonthBalance', payload\)\}/);
+  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, prevMonthUnpaidByMember, onDeferMonthBalance, onUndoDeferMonthBalance \}\)/);
+  assert.match(homeSource, /const currentYM = data\?\.yearMonth \|\| ''/);
+  assert.match(homeSource, /Gộp → \{nextMonthLabel\}/);
+  assert.match(homeSource, /Hủy gộp/);
+  assert.match(appSource, /type === 'deferMonthBalance'/);
+  assert.match(appSource, /type: 'DEFER_MONTH_BALANCE'/);
+  assert.match(appSource, /type === 'undoDeferMonthBalance'/);
+  assert.match(appSource, /type: 'UNDO_DEFER_MONTH_BALANCE'/);
   assert.match(homeSource, /Tiến độ thu/);
   assert.match(homeSource, /Đã nhận/);
   assert.match(homeSource, /Chờ duyệt/);
