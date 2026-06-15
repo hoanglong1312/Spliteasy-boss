@@ -21,15 +21,42 @@ npx playwright test --reporter=line
 
 ## UI Verification — Dùng localhost trước khi deploy
 
-Với thay đổi UI, verify trên localhost trước để tránh deploy vòng:
+Với thay đổi UI, verify trên localhost trước để tránh deploy vòng.
 
-1. Chạy dev server (background):
+**Tool ưu tiên: `cmux browser` qua Bash** (không cần mở Chrome riêng — dùng WKWebView tích hợp).  
+Chrome DevTools MCP chỉ dùng khi cần network intercept hoặc DevTools panel chi tiết.
+
+### Workflow cmux browser
+
 ```bash
-npm run dev
+# 1. Chạy dev server (nếu chưa chạy)
+npm run dev &
+
+# 2. Mở browser surface — trả về surface handle
+cmux browser open http://localhost:5173
+# → OK surface=surface:N pane=pane:M placement=reuse
+
+# 3. Snapshot xem UI (dùng handle từ bước 2)
+cmux browser surface:N snapshot --compact
+
+# 4. Navigate đến page cụ thể
+cmux browser surface:N goto http://localhost:5173/path
+
+# 5. Interact: click, fill, type
+cmux browser surface:N click [ref=eX]
+cmux browser surface:N fill [ref=eX] "text"
+
+# 6. Screenshot để xem visual
+cmux browser surface:N screenshot
+
+# 7. Wait sau action
+cmux browser surface:N wait --text "Done" --timeout-ms 5000
 ```
 
-2. Dùng Chrome DevTools MCP navigate `http://localhost:5173` → screenshot → verify visual.
+**Lưu ý:**
+- `cmux browser open` reuse surface nếu URL cùng origin — không mở tab mới mỗi lần
+- Surface handle (`surface:N`) chỉ valid trong session cmux hiện tại
+- Dùng `--compact` cho snapshot ngắn, bỏ `--compact` khi cần full a11y tree
+- Localhost không bị PIN gate như production → Claude có thể tự verify
 
-3. Chỉ deploy khi localhost đã đúng.
-
-⚠️ Localhost không bị PIN gate như production → Claude có thể tự verify mà không cần user nhập PIN.
+**Chỉ deploy khi localhost đã pass.**

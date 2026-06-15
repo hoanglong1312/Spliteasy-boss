@@ -21,7 +21,7 @@ git add [files Codex báo]
 git commit -m "[message Codex đề xuất]"
 ```
 
-**Browser Debugging:** Ưu tiên Browser/Playwright cho reproduce/verify UI. Dùng Chrome DevTools MCP khi cần console, network request/response, Supabase payload, storage hoặc performance. Nếu Playwright không chạy được trong Claude Code, Chrome DevTools MCP là fallback để kiểm tra localhost bằng Chrome profile tách biệt. MCP này chạy qua Node bundle của Codex runtime vì package yêu cầu Node `20.19.0+`.
+**Browser Debugging:** Tool ưu tiên là `cmux browser` qua Bash — không cần mở Chrome riêng, dùng WKWebView tích hợp trong cmux. Xem workflow đầy đủ trong `rules/testing.md`. Chrome DevTools MCP chỉ dùng khi cần DevTools panel chi tiết (network intercept, heap snapshot, performance trace). Playwright là E2E test framework, không phải browser verify tool.
 
 ### Token Discipline Cho Bug Nhỏ
 
