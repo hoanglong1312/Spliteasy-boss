@@ -602,7 +602,7 @@ function memberHasPin(member, profile = null) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, prR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, jR] = await Promise.all([
+  const [mR, prR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, jR, msR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('profiles').select('*'),
     sb.from('groups').select('*'),
@@ -624,6 +624,7 @@ async function fetchGroupData(token) {
     sb.from('expense_disputes').select('id').eq('status', 'open'),
     sb.rpc('list_visible_notifications'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
+    sb.from('member_month_settlements').select('*'),
   ])
   if (mR.error) throw mR.error
   if (prR.error) console.warn('[store] profiles query failed:', prR.error)
@@ -641,6 +642,7 @@ async function fetchGroupData(token) {
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (nR.error) console.warn('[store] notifications query failed:', nR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
+  if (msR.error) console.warn('[store] member_month_settlements query failed:', msR.error)
   return {
     members:         mR.data || [],
     profiles:        prR.data || [],
@@ -663,6 +665,7 @@ async function fetchGroupData(token) {
     disputeCount:    (dR.data || []).length,
     notifications:   nR.data || [],
     joinRequests:    jR.data || [],
+    monthSettlements: msR.data || [],
   }
 }
 
@@ -931,6 +934,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     disputeCount,
     notifications = [],
     joinRequests = [],
+    monthSettlements = [],
   } = raw
   const activeGroups = safeArray(groups).filter(group => !group.deleted_at && !group.deletedAt)
   if (activeGroups.length === 0) return null  // signal: data empty but keep session
@@ -1366,6 +1370,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     groups: typedGroups,
     expenses: normalExpenses,
     joinRequests: normalJoinRequests,
+    monthSettlements: safeArray(monthSettlements),
     settlementPeriods: normalSettlementPeriods,
     pickle: null,
     _allPickle: {
@@ -2012,6 +2017,39 @@ export function AppProvider({ children }) {
           throw error
         }
         await dispatch({ type: 'REFRESH' })
+        return data
+      }
+
+      case 'DEFER_MONTH_BALANCE': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('defer_member_month_balance', {
+          p_member_id: action.memberId,
+          p_group_id: action.groupId || state.currentGroupId,
+          p_month: action.month,
+          p_amount: Number(action.amount),
+          p_next_month_date: action.nextMonthDate,
+          p_member_name: action.memberName || '',
+          p_treasurer_member_id: state.currentUserId,
+        })
+        if (error) {
+          console.error('[store] DEFER_MONTH_BALANCE:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
+      case 'UNDO_DEFER_MONTH_BALANCE': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('undo_defer_member_month_balance', {
+          p_settlement_id: action.settlementId,
+          p_treasurer_member_id: state.currentUserId,
+        })
+        if (error) {
+          console.error('[store] UNDO_DEFER_MONTH_BALANCE:', error)
+          throw error
+        }
+        await refresh()
         return data
       }
 
