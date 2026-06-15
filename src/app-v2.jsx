@@ -2111,6 +2111,13 @@ export default function AppV2() {
           }
         }
       }
+      // Clean up stale guest rows before creating member (runs regardless of insert outcome)
+      await sb
+        .from('pickle_attendees')
+        .delete()
+        .eq('session_id', sessionId)
+        .eq('attendee_type', 'guest')
+        .eq('guest_name', guestName)
       const existingMember = await findCasualMemberByName(sb, groupId, guestName)
       if (!existingMember) {
         const parts = memberNameParts(guestName)
@@ -2169,13 +2176,6 @@ export default function AppV2() {
           if (attendanceError) throw attendanceError
         }
       }
-      // Clean up any stale guest row for same session/name from old data
-      await sb
-        .from('pickle_attendees')
-        .delete()
-        .eq('session_id', sessionId)
-        .eq('attendee_type', 'guest')
-        .ilike('guest_name', guestName)
       await dispatch({ type: 'REFRESH' })
       return
     }
