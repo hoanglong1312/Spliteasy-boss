@@ -224,7 +224,7 @@ export function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, 
   }
 }
 
-function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state, selectedYearMonth = monthKey(new Date())) {
+export function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state, selectedYearMonth = monthKey(new Date())) {
   const today = dateFromYearMonth(selectedYearMonth)
   const safeGroups = safeArray(groups).map(safeGroup)
   const expenseGroups = safeGroups
@@ -243,26 +243,12 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
   const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
-  const prevYM = shiftMonthKey(selectedYearMonth, -1)
-  const prevDate = dateFromYearMonth(prevYM)
-  const prevExpenseGroups = safeGroups
-    .filter(group => groupKind(group) !== 'pickleball')
-    .map(group => groupWithMonthExpenses(group, prevDate))
-  const prevSessions = getStateMonthSessions(pickleballState, prevDate)
-  const prevSourceBalances = buildHomeSourceBalances(state, prevExpenseGroups, pickleballState, pickle, prevSessions, members, prevDate)
-  const prevProfileBreakdown = aggregateBalancesByProfile(prevSourceBalances, members)
-  const prevMonthUnpaidByMember = {}
-  safeArray(prevProfileBreakdown).forEach(row => {
-    if (Number(row.amount) < 0) {
-      const settled = safeArray(state?.monthSettlements).some(s =>
-        safeArray(row.memberIds || []).map(String).includes(String(s.member_id)) &&
-        String(s.month) === prevYM
-      )
-      if (!settled) {
-        safeArray(row.memberIds || []).forEach(memberId => {
-          prevMonthUnpaidByMember[String(memberId)] = Math.abs(Number(row.amount) || 0)
-        })
-      }
+  const currentMonthResidualByMember = {}
+  safeArray(profileBreakdown).forEach(row => {
+    if (Number(row.amount) < 0 && Number(row.paidAmount) > 0) {
+      safeArray(row.memberIds || memberIdsForProfile(row.profileId, members)).forEach(memberId => {
+        currentMonthResidualByMember[String(memberId)] = Math.abs(Number(row.amount))
+      })
     }
   })
   const paymentSummary = buildHomePaymentSummary(state, rawSourceBreakdown, profileBreakdown, members, me, today)
@@ -335,7 +321,7 @@ function buildHomeData(state, currentUserId, members, groups, pickle, pickleball
     profileBreakdown,
     paymentSummary,
     prevMonthUnpaid,
-    prevMonthUnpaidByMember,
+    currentMonthResidualByMember,
     monthSettlements: safeArray(state?.monthSettlements),
     pendingTickets,
   }

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   attendanceByMemberId,
+  buildHomeData,
   buildPaymentProgressRows,
   buildPrevMonthUnpaid,
   buildPersonalWaterSessionRows,
@@ -318,5 +319,51 @@ describe('buildPaymentProgressRows', () => {
       settlementId: 'settlement-1',
       settlementExpenseId: 'expense-1',
     })
+  })
+})
+
+describe('buildHomeData', () => {
+  test('returns current month residual for confirmed members who still owe after payment', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'payer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Payer One' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'payer-1'],
+      expenses: [{
+        id: 'expense-1',
+        amount: 100000,
+        expense_date: '2026-06-10',
+        paid_by_member_id: 'payer-1',
+        participants: ['member-1', 'payer-1'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'notice-1',
+        type: 'payment',
+        actorMemberId: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          amount: 30000,
+          memberName: 'Member One',
+          monthLabel: 'Tháng 6 · 2026',
+          coveredMembers: [{ profileId: 'profile-1', memberId: 'member-1', amount: 30000 }],
+        },
+      }],
+      monthSettlements: [{ id: 'old-settlement', member_id: 'member-1', group_id: 'group-1', month: '2026-05' }],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+
+    expect(result.currentMonthResidualByMember).toEqual({ 'member-1': 20000 })
+    expect(result.prevMonthUnpaidByMember).toBeUndefined()
   })
 })
