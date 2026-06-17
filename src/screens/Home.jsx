@@ -45,6 +45,11 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const [savingAction, setSavingAction] = useState('');
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
+  const isCarryForwardSettled = Boolean(
+    (d.monthSettlements || []).find(
+      s => String(s.member_id) === String(d.currentUserId) && String(s.month) === String(d.yearMonth)
+    )
+  );
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
   const pendingPayments = d.pendingPayments || [];
@@ -76,6 +81,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           balanceLabel={balanceLabel}
           owedTo={d.owedTo}
           paymentStatus={d.paymentSummary?.paymentStatus}
+          isCarryForwardSettled={isCarryForwardSettled}
           onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
         />
@@ -498,7 +504,7 @@ function approvalButton(background, color) {
   };
 }
 
-function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction }) {
+function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', isCarryForwardSettled = false, onOpenPayment, onAction }) {
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
   const total = sourceRows.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
@@ -508,12 +514,13 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
   const normalizedPaymentStatus = String(paymentStatus || '').toLowerCase();
   const paidConfirmed = normalizedPaymentStatus === 'confirmed';
   const paymentPending = normalizedPaymentStatus === 'pending';
-  const paymentChipLabel = paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : isZeroTotal ? '0' : '💳 Thanh toán';
-  const paymentChipBg = paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isZeroTotal ? 'rgba(148,163,184,0.12)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
-  const paymentChipBorder = paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isZeroTotal ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
-  const paymentChipColor = paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isZeroTotal ? colors.textSecondary : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
-  const paymentDisabled = isZeroTotal || paidConfirmed || paymentPending;
-  const displayBalanceLabel = paidConfirmed ? 'Đã thanh toán' : isZeroTotal ? 'Số dư tháng này' : balanceLabel;
+  const paymentChipLabel = isCarryForwardSettled ? '↪ Đã gộp' : paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : isZeroTotal ? '0' : '💳 Thanh toán';
+  const paymentChipBg = isCarryForwardSettled ? 'rgba(99,102,241,0.16)' : paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isZeroTotal ? 'rgba(148,163,184,0.12)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
+  const paymentChipBorder = isCarryForwardSettled ? 'rgba(99,102,241,0.34)' : paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isZeroTotal ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
+  const paymentChipColor = isCarryForwardSettled ? '#a5b4fc' : paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isZeroTotal ? colors.textSecondary : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
+  const paymentDisabled = isCarryForwardSettled || isZeroTotal || paidConfirmed || paymentPending;
+  const displayBalanceLabel = isCarryForwardSettled ? 'Đã gộp sang tháng sau' : paidConfirmed ? 'Đã thanh toán' : isZeroTotal ? 'Số dư tháng này' : balanceLabel;
+  const displayTotalBalance = isCarryForwardSettled ? 0 : totalBalance;
   return (
     <>
       <SectionLabel>Theo nguồn tiền</SectionLabel>
@@ -552,7 +559,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
               <div style={{
                 fontSize: 10,
                 fontWeight: 850,
-                color: isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
+                color: isCarryForwardSettled ? '#a5b4fc' : isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
                 textTransform: 'uppercase',
                 letterSpacing: '1.4px',
               }}>
@@ -566,7 +573,7 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
                 whiteSpace: 'nowrap',
                 ...type.mono,
               }}>
-                {formatVND(Math.abs(totalBalance))}
+                {formatVND(Math.abs(displayTotalBalance))}
               </div>
             </div>
             <div style={{
@@ -1054,7 +1061,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
 
 
   return (
-    <div style={{ position: 'relative', display: 'grid', gap: 12, minWidth: 0 }}>
+    <div style={{ position: 'relative', display: 'grid', gap: 12, minWidth: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
       {loading && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(15,23,42,0.58)', borderRadius: 14 }}>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -1673,18 +1680,20 @@ function ProgressStat({ label, count, color }) {
 function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, listScroll = false, headerRight, children }) {
   return (
     <section style={{ minWidth: 0 }}>
-      <button type="button" aria-expanded={expanded} onClick={onToggle} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33`, color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-        <div style={{ width: 30, height: 30, borderRadius: 10, background: `${color}20`, border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{icon}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 900, color, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-          {subtitle && <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
-          <div style={{ fontSize: 12, fontWeight: 900, color, marginTop: 2, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatVND(amount)}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {headerRight}
-          <div style={{ fontSize: 18, color, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</div>
-        </div>
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33` }}>
+        <button type="button" aria-expanded={expanded} onClick={onToggle} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <div style={{ width: 30, height: 30, borderRadius: 10, background: `${color}20`, border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{icon}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+            {subtitle && <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+            <div style={{ fontSize: 12, fontWeight: 900, color, marginTop: 2, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatVND(amount)}</div>
+          </div>
+          <div style={{ fontSize: 18, color, lineHeight: 1, flexShrink: 0 }}>{expanded ? '⌃' : '⌄'}</div>
+        </button>
+        {headerRight && (
+          <div style={{ flexShrink: 0, paddingRight: 8 }}>{headerRight}</div>
+        )}
+      </div>
       {expanded && (
         <div
           className={listScroll ? 'screen-scroll' : undefined}
