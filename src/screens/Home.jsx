@@ -1129,6 +1129,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           color="#6ee7b7"
           expanded={confirmedExpanded}
           onToggle={() => setConfirmedExpanded(value => !value)}
+          collapsible={false}
           listScroll
         >
           {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => (
@@ -1161,6 +1162,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             color="#f59e0b"
             expanded
             onToggle={() => {}}
+            collapsible={false}
           >
             {chotSoRows.map(record => {
               const memberIds = safeArray(record.memberIds || [record.memberId]).map(String);
@@ -1677,19 +1679,26 @@ function ProgressStat({ label, count, color }) {
   );
 }
 
-function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, listScroll = false, headerRight, children }) {
+function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, listScroll = false, headerRight, collapsible = true, children }) {
+  const headerInner = (
+    <>
+      <div style={{ width: 28, height: 28, borderRadius: 9, background: `${color}20`, border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 900, color, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
+        <div style={{ fontSize: 11, fontWeight: 900, color, marginTop: 1, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatVND(amount)}</div>
+      </div>
+      {collapsible && <div style={{ fontSize: 16, color, lineHeight: 1, flexShrink: 0 }}>{expanded ? '⌃' : '⌄'}</div>}
+    </>
+  );
+  const headerStyle = { flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9, padding: '9px 11px', background: 'transparent', border: 'none', color: 'inherit', cursor: collapsible ? 'pointer' : 'default', fontFamily: 'inherit', textAlign: 'left' };
   return (
     <section style={{ minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', borderRadius: 14, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33` }}>
-        <button type="button" aria-expanded={expanded} onClick={onToggle} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px', background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-          <div style={{ width: 30, height: 30, borderRadius: 10, background: `${color}20`, border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>{icon}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 900, color, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-            {subtitle && <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
-            <div style={{ fontSize: 12, fontWeight: 900, color, marginTop: 2, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatVND(amount)}</div>
-          </div>
-          <div style={{ fontSize: 18, color, lineHeight: 1, flexShrink: 0 }}>{expanded ? '⌃' : '⌄'}</div>
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', borderRadius: 13, background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}33` }}>
+        {collapsible
+          ? <button type="button" aria-expanded={expanded} onClick={onToggle} style={headerStyle}>{headerInner}</button>
+          : <div style={headerStyle}>{headerInner}</div>
+        }
         {headerRight && (
           <div style={{ flexShrink: 0, paddingRight: 8 }}>{headerRight}</div>
         )}
@@ -1697,7 +1706,7 @@ function DashboardSection({ title, subtitle, amount, icon, color, expanded, onTo
       {expanded && (
         <div
           className={listScroll ? 'screen-scroll' : undefined}
-          style={{ display: 'grid', gap: 8, marginTop: 8, minWidth: 0, ...(listScroll ? { maxHeight: 320, overflowY: 'auto', paddingRight: 2 } : {}) }}
+          style={{ display: 'grid', gap: 5, marginTop: 6, minWidth: 0, ...(listScroll ? { maxHeight: 340, overflowY: 'auto', paddingRight: 2 } : {}) }}
         >
           {children}
         </div>
@@ -1710,12 +1719,11 @@ function PaymentDashboardRow({ row, tone = 'unpaid', arrow = '', onSelect, child
   const color = tone === 'refund' || tone === 'confirmed' ? '#6ee7b7' : tone === 'pending' ? '#fcd34d' : '#fca5a5';
   const childArray = React.Children.toArray(children);
   return (
-    <Card
+    <div
       style={{
-        padding: 10,
-        display: 'grid',
-        gap: 8,
-        background: 'rgba(255,255,255,0.035)',
+        padding: '6px 10px',
+        borderRadius: 10,
+        background: 'rgba(255,255,255,0.03)',
         minWidth: 0,
         cursor: onSelect ? 'pointer' : 'default',
       }}
@@ -1723,36 +1731,27 @@ function PaymentDashboardRow({ row, tone = 'unpaid', arrow = '', onSelect, child
       tabIndex={onSelect ? 0 : undefined}
       onClick={onSelect}
       onKeyDown={onSelect ? (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onSelect();
-        }
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(); }
       } : undefined}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', alignItems: 'center', gap: 8 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 900, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.memberName || row.name}</div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.sourceSummary || row.monthLabel || 'Nguồn tiền'}</div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 950, color, ...type.mono, whiteSpace: 'nowrap' }}>{formatVND(Math.abs(Number(row.amount) || 0))}</div>
-          {!childArray.length && <div style={{ color: colors.textMuted, fontSize: 17 }}>{arrow}</div>}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 900, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{row.memberName || row.name}</div>
+        <div style={{ fontSize: 12, fontWeight: 950, color, ...type.mono, whiteSpace: 'nowrap', flexShrink: 0 }}>{formatVND(Math.abs(Number(row.amount) || 0))}</div>
       </div>
-      {childArray.length > 0 && (
-        <div
-          style={{ display: 'grid', gridTemplateColumns: `repeat(${childArray.length}, minmax(0,1fr))`, gap: 6 }}
-          onClick={event => event.stopPropagation()}
-        >
-          {childArray}
-        </div>
-      )}
-    </Card>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 3 }} onClick={event => event.stopPropagation()}>
+        <div style={{ fontSize: 10, color: colors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{row.sourceSummary || row.monthLabel || ''}</div>
+        {childArray.length > 0 ? (
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>{childArray}</div>
+        ) : arrow ? (
+          <div style={{ color: colors.textMuted, fontSize: 15, flexShrink: 0 }}>{arrow}</div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
 function miniDashButton(background, color) {
-  return { border: 'none', borderRadius: 9, padding: '7px 7px', background, color, fontSize: 10, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' };
+  return { border: 'none', borderRadius: 7, padding: '4px 7px', background, color, fontSize: 10, fontWeight: 900, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' };
 }
 
 function dashLinkButton(background, color) {
