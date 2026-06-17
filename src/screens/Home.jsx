@@ -985,6 +985,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [unpaidExpanded, setUnpaidExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [confirmedExpanded, setConfirmedExpanded] = useState(true);
+  const [chotSoExpanded, setChotSoExpanded] = useState(true);
   const [refundExpanded, setRefundExpanded] = useState(false);
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1129,7 +1130,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           color="#6ee7b7"
           expanded={confirmedExpanded}
           onToggle={() => setConfirmedExpanded(value => !value)}
-          collapsible={false}
           listScroll
         >
           {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => (
@@ -1160,9 +1160,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             }, 0)}
             icon="⟳"
             color="#f59e0b"
-            expanded
-            onToggle={() => {}}
-            collapsible={false}
+            expanded={chotSoExpanded}
+            onToggle={() => setChotSoExpanded(v => !v)}
           >
             {chotSoRows.map(record => {
               const memberIds = safeArray(record.memberIds || [record.memberId]).map(String);
