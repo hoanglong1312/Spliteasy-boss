@@ -21,7 +21,7 @@ git add [files Codex báo]
 git commit -m "[message Codex đề xuất]"
 ```
 
-**Browser Debugging:** Tool ưu tiên là `cmux browser` qua Bash — không cần mở Chrome riêng, dùng WKWebView tích hợp trong cmux. Xem workflow đầy đủ trong `rules/testing.md`. Chrome DevTools MCP chỉ dùng khi cần DevTools panel chi tiết (network intercept, heap snapshot, performance trace). Playwright là E2E test framework, không phải browser verify tool.
+**Browser Debugging:** Dùng `cmux browser` qua Bash — WKWebView tích hợp, hỗ trợ click/fill/screenshot/snapshot/console/network. Xem workflow đầy đủ trong `rules/testing.md`. Chrome DevTools MCP đã bị xóa. Playwright là E2E test framework, không phải browser verify tool.
 
 ### Token Discipline Cho Bug Nhỏ
 

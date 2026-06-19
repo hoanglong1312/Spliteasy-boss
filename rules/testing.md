@@ -23,8 +23,9 @@ npx playwright test --reporter=line
 
 Với thay đổi UI, verify trên localhost trước để tránh deploy vòng.
 
-**Tool ưu tiên: `cmux browser` qua Bash** (không cần mở Chrome riêng — dùng WKWebView tích hợp).  
-Chrome DevTools MCP chỉ dùng khi cần network intercept hoặc DevTools panel chi tiết.
+**Tool duy nhất: `cmux browser` qua Bash** (WKWebView tích hợp cmux). Hỗ trợ đủ: click, fill, screenshot, snapshot DOM, console logs (`console list`), network requests (`network requests`), JS eval.
+
+Chrome DevTools MCP đã bị xóa khỏi `.mcp.json`. Không dùng lại trừ khi cần heap snapshot hoặc Lighthouse.
 
 ### Workflow cmux browser
 
