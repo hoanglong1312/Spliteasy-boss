@@ -1355,8 +1355,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime, monthSessions, state?.currentGroup?.name || '') : null,
     progress: {
       attended: myAttendedCount,
-      total: completedSessions || 1,
-      actualTotal: completedSessions,
+      total: monthSessions.length || 1,
+      completed: completedSessions,
     },
     monthCosts: {
       court: courtFee,
@@ -4322,9 +4322,14 @@ function toTodaySessionCard(session, pickle, members) {
 
 function toOverviewSessionCard(session, pickle, members, scheduleTime = '', monthSessions = null, groupName = '') {
   const sessionList = monthSessions || uniqueSessions([...safeArray(pickle?.sessions), ...safeArray(pickle?.upcoming)])
+  const sorted = safeArray(sessionList).slice().sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
+  const sessionDateStr = dateKey(sessionDate(session))
+  let idx = session?.id ? sorted.findIndex(s => String(s.id) === String(session.id)) : -1
+  if (idx < 0 && sessionDateStr) idx = sorted.findIndex(s => dateKey(sessionDate(s)) === sessionDateStr)
+  const monthNumber = idx >= 0 ? idx + 1 : (session?.number || 1)
   return {
     id: session.id,
-    number: sessionNumber(session, sessionList),
+    number: monthNumber,
     statusLabel: isToday(sessionDate(session)) ? 'Hôm nay' : 'Buổi tới',
     timeRange: scheduleTime || sessionTimeRange(session),
     dateLabel: formatDayMonth(sessionDate(session)),

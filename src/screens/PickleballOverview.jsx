@@ -173,9 +173,18 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
               Tiến độ tháng
             </div>
-            <ProgressDonut value={d.progress.attended} max={d.progress.total} />
+            <ProgressDonut value={d.progress.completed} max={d.progress.total} />
             <div style={{ textAlign: 'center', fontSize: 11, color: '#6ee7b7', fontWeight: 600 }}>
-              {Math.round(d.progress.attended / d.progress.total * 100)}% hoàn thành
+              {d.progress.completed}/{d.progress.total} buổi · {Math.round(d.progress.completed / d.progress.total * 100)}% xong
+            </div>
+            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                background: 'rgba(52,211,153,0.13)', border: '1px solid rgba(52,211,153,0.28)',
+                borderRadius: 999, padding: '4px 10px', fontSize: 11, fontWeight: 700, color: '#6ee7b7',
+              }}>
+                🏸 Bạn đã đánh {d.progress.attended} buổi
+              </div>
             </div>
             {d.todaySession && (
               <div style={{
