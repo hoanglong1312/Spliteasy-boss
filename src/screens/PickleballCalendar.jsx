@@ -707,10 +707,15 @@ function SessionDetailPanel({ session, casualMembers = [], isTreasurer, savingAc
       if (session.isCompleted) {
         await onAction?.('reopenSession', session.id);
       } else {
-        if (Object.keys(localAttendance).length > 0) {
+        const fixedAttendees = (session.attendees || []).filter(a => a.kind !== 'guest' && a.kind !== 'casual')
+        const attendanceChanges = fixedAttendees.map(a => ({
+          memberId: a.id,
+          status: localAttendance[a.id] !== undefined ? localAttendance[a.id] : a.kind,
+        }))
+        if (attendanceChanges.length > 0) {
           await onAction?.('batchMarkAttendance', {
             sessionId: session.id,
-            changes: Object.entries(localAttendance).map(([memberId, status]) => ({ memberId, status })),
+            changes: attendanceChanges,
           })
           setLocalAttendance({})
         }
