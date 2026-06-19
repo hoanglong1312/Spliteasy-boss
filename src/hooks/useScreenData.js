@@ -1375,7 +1375,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       color: currentMember?.color,
       statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
       ticketAdjustment,
-      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, members),
+      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember)),
       breakdown,
     },
     yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId, today),
@@ -4336,7 +4336,11 @@ function toOverviewSessionCard(session, pickle, members, scheduleTime = '') {
 function sessionNumber(session, sessions) {
   if (session?.number) return session.number
   const sorted = safeArray(sessions).slice().sort((a, b) => parseDateValue(sessionDate(a)) - parseDateValue(sessionDate(b)))
-  const index = sorted.findIndex(item => String(item.id) === String(session?.id))
+  let index = session?.id ? sorted.findIndex(item => String(item.id) === String(session.id)) : -1
+  if (index < 0) {
+    const dateStr = dateKey(sessionDate(session))
+    index = dateStr ? sorted.findIndex(item => dateKey(sessionDate(item)) === dateStr) : -1
+  }
   return index >= 0 ? index + 1 : 1
 }
 
