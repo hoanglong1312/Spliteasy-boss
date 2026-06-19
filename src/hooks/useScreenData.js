@@ -1308,7 +1308,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const completedMonthSessions = monthSessions.filter(s => isDoneStatus(s?.status))
   const completedSessions = completedMonthSessions.length
   const summary = pickleSummary(pickle || {})
-  const todaySession = findNearestOpenSession(pickle, today)
+  const todaySession = findNearestOpenSession(pickle, new Date())
   const monthTickets = monthTicketsForState(state, today)
   const ticketWaterTotal = monthTickets.reduce((sum, t) => sum + Number(t?.waterAmount ?? t?.water_amount ?? 0), 0)
   const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0) + ticketWaterTotal

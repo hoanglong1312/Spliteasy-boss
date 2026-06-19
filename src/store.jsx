@@ -669,6 +669,7 @@ async function fetchGroupData(token) {
   }
 }
 
+
 export async function fetchPickleballSessions(token, yearMonth) {
   const { start, end } = getMonthRange(yearMonth)
   const sb = createSupabase(token)

@@ -728,6 +728,7 @@ export function BottomSheet({ title, children, onClose, tone = 'finance', style 
         width: '100%',
         maxHeight: '86%',
         overflowY: 'auto',
+        overflowX: 'hidden',
         background: colors.shellBg,
         border: `1px solid ${colors.borderNormal}`,
         borderRadius: 20,
