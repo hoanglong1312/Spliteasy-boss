@@ -1352,7 +1352,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       autoGenerate: pickleConfig?.autoGenerate ?? pickleConfig?.auto_generate ?? true,
     },
     memberCount: activeMemberIds.length,
-    todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime) : null,
+    todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime, monthSessions, state?.currentGroup?.name || '') : null,
     progress: {
       attended: myAttendedCount,
       total: completedSessions || 1,
@@ -4320,14 +4320,15 @@ function toTodaySessionCard(session, pickle, members) {
   }
 }
 
-function toOverviewSessionCard(session, pickle, members, scheduleTime = '') {
+function toOverviewSessionCard(session, pickle, members, scheduleTime = '', monthSessions = null, groupName = '') {
+  const sessionList = monthSessions || uniqueSessions([...safeArray(pickle?.sessions), ...safeArray(pickle?.upcoming)])
   return {
     id: session.id,
-    number: sessionNumber(session, uniqueSessions([...safeArray(pickle?.sessions), ...safeArray(pickle?.upcoming)])),
+    number: sessionNumber(session, sessionList),
     statusLabel: isToday(sessionDate(session)) ? 'Hôm nay' : 'Buổi tới',
     timeRange: scheduleTime || sessionTimeRange(session),
     dateLabel: formatDayMonth(sessionDate(session)),
-    venue: sessionCourt(session),
+    venue: groupName || sessionCourt(session),
     present: sessionMemberIds(session).length,
     total: safeArray(pickle?.fixedMembers).length || members.length,
   }
