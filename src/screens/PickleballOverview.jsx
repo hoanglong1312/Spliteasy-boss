@@ -169,65 +169,69 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
 
         {/* Progress + costs grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.28fr 0.72fr', gap: 10, marginTop: 10 }}>
-          <Card accent="pickleball" style={{ padding: '17px 14px' }}>
+          <Card accent="pickleball" style={{ padding: '14px 14px 16px' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
               Tiến độ tháng
             </div>
-            <ProgressDonut value={d.progress.completed} max={d.progress.total} />
-            <div style={{ textAlign: 'center', fontSize: 11, color: '#6ee7b7', fontWeight: 600 }}>
-              {d.progress.completed}/{d.progress.total} buổi · {Math.round(d.progress.completed / d.progress.total * 100)}% xong
-            </div>
-            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'center' }}>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: 'rgba(52,211,153,0.13)', border: '1px solid rgba(52,211,153,0.28)',
-                borderRadius: 999, padding: '4px 10px', fontSize: 11, fontWeight: 700, color: '#6ee7b7',
-              }}>
-                🏸 Bạn đã đánh {d.progress.attended} buổi
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
+              <ProgressDonut value={d.progress.completed} max={d.progress.total} size={80} />
+              <div>
+                <div style={{ fontSize: 28, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
+                  {Math.round(d.progress.completed / d.progress.total * 100)}%
+                </div>
+                <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, marginTop: 5, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                  buổi<br/>hoàn thành
+                </div>
               </div>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              background: 'rgba(52,211,153,0.13)',
+              border: '1.5px solid rgba(52,211,153,0.38)',
+              borderRadius: 11, padding: '10px 12px', marginTop: 12,
+              boxShadow: 'inset 0 0 18px rgba(52,211,153,0.08)',
+            }}>
+              <span style={{ fontSize: 15 }}>🏸</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#6ee7b7', letterSpacing: '0.2px' }}>Bạn đã đánh</span>
+              <span style={{ fontSize: 26, fontWeight: 900, color: '#34d399', ...type.mono, lineHeight: 1, letterSpacing: '-0.5px' }}>{d.progress.attended}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#6ee7b7' }}>buổi</span>
             </div>
             {d.todaySession && (
               <div style={{
-                marginTop: 12,
-                padding: '12px 12px',
-                borderRadius: 12,
-                background: 'linear-gradient(135deg, rgba(6,95,70,0.92), rgba(16,185,129,0.42))',
-                border: '1px solid rgba(52,211,153,0.38)',
-                boxShadow: '0 10px 24px rgba(16,185,129,0.16)',
+                marginTop: 10,
+                borderRadius: 10,
+                overflow: 'hidden',
+                border: '1px solid rgba(251,191,36,0.22)',
+                display: 'flex',
               }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 8,
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#6ee7b7' }}>
+                <div style={{ width: 4, background: '#fbbf24', flexShrink: 0 }} />
+                <div style={{ flex: 1, padding: '9px 11px', background: 'rgba(10,15,12,0.75)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#fbbf24' }}>
                       {d.todaySession.statusLabel}
                     </div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: '#a7f3d0', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...type.mono }}>
-                      {displayTimeRange(d.todaySession.timeRange)}
+                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(251,191,36,0.65)', ...type.mono }}>
+                      Buổi #{d.todaySession.number}
                     </div>
-                    <div style={{ fontSize: 15, fontWeight: 900, marginTop: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Buổi #{d.todaySession.number} · {d.todaySession.dateLabel}
-                    </div>
-                    <div style={{ fontSize: 11, color: '#a7f3d0', marginTop: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {d.todaySession.venue}
-                    </div>
+                  </div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginTop: 4, ...type.mono, letterSpacing: '-0.2px' }}>
+                    {displayTimeRange(d.todaySession.timeRange)}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.50)', marginTop: 3 }}>
+                    {d.todaySession.dateLabel} · {d.todaySession.venue}
                   </div>
                 </div>
               </div>
             )}
           </Card>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {personalSummaryCards.map(card => {
               const isExpandable = card.rows || card.key === 'ticket';
-              const displayRows = card.key === 'ticket' ? (yourTickets.rows || []).map(r => ({ label: r.dateLabel || r.label || '', amount: Math.abs(r.personalAmount || r.displayAmount || 0) })) : (card.rows || []);
               return (
                 <div key={card.label}
                   onClick={isExpandable ? () => setPopupCard(card) : undefined}
-                  style={{ position: 'relative', cursor: isExpandable ? 'pointer' : 'default' }}
+                  style={{ position: 'relative', cursor: isExpandable ? 'pointer' : 'default', flex: 1, display: 'flex', flexDirection: 'column' }}
                 >
                   <CompactCostCard icon={card.icon} label={card.label} value={card.amount} sub={card.sub} style={{ flex: 1, paddingRight: isExpandable ? 28 : 9 }} />
                   {isExpandable && (
@@ -619,13 +623,14 @@ function displayTimeRange(value) {
   return String(value || '').replace(/(\d{1,2}:\d{2}):00/g, '$1');
 }
 
-function ProgressDonut({ value, max }) {
-  const circumference = 2 * Math.PI * 42; // 263.9
+function ProgressDonut({ value, max, size = 100 }) {
+  const circumference = 2 * Math.PI * 42; // 263.9, based on r=42 in 100-unit viewBox
   const pct = value / max;
   const offset = circumference * (1 - pct);
+  const fs = size / 100;
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', margin: '10px 0 6px', position: 'relative' }}>
-      <svg width="100" height="100" viewBox="0 0 100 100">
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox="0 0 100 100">
         <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="10" />
         <circle cx="50" cy="50" r="42" fill="none" stroke={colors.pickleball} strokeWidth="10"
           strokeDasharray={circumference} strokeDashoffset={offset}
@@ -635,10 +640,10 @@ function ProgressDonut({ value, max }) {
         position: 'absolute', inset: 0,
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       }}>
-        <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.5px', ...type.mono }}>
-          {value}<span style={{ fontSize: 12, color: colors.textMuted }}>/{max}</span>
+        <div style={{ fontSize: Math.round(22 * fs), fontWeight: 900, letterSpacing: '-0.5px', ...type.mono }}>
+          {value}<span style={{ fontSize: Math.round(12 * fs), color: colors.textMuted }}>/{max}</span>
         </div>
-        <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 600, letterSpacing: '0.5px' }}>BUỔI</div>
+        <div style={{ fontSize: Math.round(9 * fs), color: colors.textSecondary, fontWeight: 600, letterSpacing: '0.5px' }}>BUỔI</div>
       </div>
     </div>
   );

@@ -504,7 +504,8 @@ function approvalButton(background, color) {
   };
 }
 
-function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', isCarryForwardSettled = false, onOpenPayment, onAction }) {
+export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', isCarryForwardSettled = false, onOpenPayment, onAction }) {
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
   const total = sourceRows.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
@@ -521,157 +522,161 @@ function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo 
   const paymentDisabled = isCarryForwardSettled || isZeroTotal || paidConfirmed || paymentPending;
   const displayBalanceLabel = isCarryForwardSettled ? 'Đã gộp sang tháng sau' : paidConfirmed ? 'Đã thanh toán' : isZeroTotal ? 'Số dư tháng này' : balanceLabel;
   const displayTotalBalance = isCarryForwardSettled ? 0 : totalBalance;
+  const ctaBg = paymentDisabled ? 'rgba(148,163,184,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.20)' : 'rgba(52,211,153,0.18)';
+  const ctaBorder = paymentDisabled ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.40)' : 'rgba(52,211,153,0.38)';
+  const ctaColor = paymentDisabled ? colors.textSecondary : isNegativeTotal ? '#fecaca' : '#86efac';
   return (
-    <>
-      <SectionLabel>Theo nguồn tiền</SectionLabel>
-      <Card style={{ padding: hasSources ? '14px 14px 6px' : 14 }}>
+    <Card style={{ padding: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '8px 6px 14px' }}>
+        <div style={{
+          padding: '7px 12px',
+          borderRadius: 999,
+          background: paymentChipBg,
+          border: `1px solid ${paymentChipBorder}`,
+          color: paymentChipColor,
+          fontSize: 12,
+          fontWeight: 900,
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+        }}>
+          {paymentChipLabel}
+        </div>
+        <div style={{
+          marginTop: 12,
+          fontSize: 34,
+          fontWeight: 950,
+          lineHeight: 1,
+          color: '#f8fafc',
+          whiteSpace: 'nowrap',
+          ...type.mono,
+        }}>
+          {formatVND(Math.abs(displayTotalBalance))}
+        </div>
+        <div style={{
+          marginTop: 8,
+          fontSize: 12,
+          fontWeight: 850,
+          color: isCarryForwardSettled ? '#a5b4fc' : isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
+        }}>
+          {displayBalanceLabel}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
+        disabled={paymentDisabled}
+        onPointerUp={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
+        onClick={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
+        style={{
+          width: '100%',
+          minHeight: 48,
+          borderRadius: 14,
+          border: `1px solid ${ctaBorder}`,
+          background: ctaBg,
+          color: ctaColor,
+          fontSize: 14,
+          fontWeight: 900,
+          fontFamily: 'inherit',
+          cursor: paymentDisabled ? 'default' : 'pointer',
+        }}
+      >
+        {paymentChipLabel}
+      </button>
+
+      {hasSources && (
         <button
           type="button"
-          aria-label={isNegativeTotal ? `Xem ${owedTo} quỹ cần kiểm tra` : 'Xem nguồn tiền'}
-          onPointerUp={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
-          onClick={(event) => { event.stopPropagation(); if (!paymentDisabled) onOpenPayment?.(); }}
+          aria-expanded={sourcesOpen}
+          onClick={() => setSourcesOpen(open => !open)}
           style={{
             width: '100%',
             display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'flex-start',
-            gap: 8,
-            padding: hasSources ? '0 0 12px' : 0,
-            marginBottom: hasSources ? 8 : 0,
-            border: 'none',
-            borderBottom: hasSources ? '1px solid rgba(255,255,255,0.08)' : 'none',
-            background: 'transparent',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginTop: 12,
+            padding: '11px 12px',
+            borderRadius: 14,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.035)',
             color: 'inherit',
-            cursor: paymentDisabled ? 'default' : 'pointer',
+            cursor: 'pointer',
             fontFamily: 'inherit',
             textAlign: 'left',
           }}
         >
-          <div style={{
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            minHeight: 62,
-          }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{
-                fontSize: 10,
-                fontWeight: 850,
-                color: isCarryForwardSettled ? '#a5b4fc' : isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
-                textTransform: 'uppercase',
-                letterSpacing: '1.4px',
-              }}>
-                {displayBalanceLabel}
+          <span style={{ fontSize: 12, fontWeight: 850, color: colors.textSecondary }}>
+            {sourceRows.length} nguồn · <span style={{ color: total < 0 ? colors.danger : colors.success, ...type.mono }}>{total < 0 ? '' : '+'}{formatVND(total)}</span>
+          </span>
+          <span style={{ color: colors.textMuted, fontSize: 16, lineHeight: 1 }}>{sourcesOpen ? '↑' : '↓'}</span>
+        </button>
+      )}
+
+      {sourcesOpen && sourceRows.map((source, index) => {
+        const amount = Number(source.amount) || 0;
+        const isPickleball = source.sourceType === 'pickleball';
+        const isNegative = amount < 0;
+        const openSource = () => {
+          if (isPickleball) {
+            onAction?.('tab', 'pickleball');
+            return;
+          }
+          onAction?.('open', source.sourceId);
+        };
+        return (
+          <button
+            key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`}
+            type="button"
+            aria-label={`Mở ${source.sourceLabel}`}
+            onClick={openSource}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '11px 10px',
+              marginTop: 8,
+              background: isPickleball ? 'rgba(52,211,153,0.10)' : 'transparent',
+              border: isPickleball ? '1px solid rgba(52,211,153,0.26)' : '1px solid rgba(255,255,255,0.06)',
+              borderRadius: 12,
+              boxShadow: isPickleball ? '0 10px 24px rgba(16,185,129,0.10)' : 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              textAlign: 'left',
+            }}>
+            <div style={{
+              width: 34,
+              height: 34,
+              borderRadius: 10,
+              background: isPickleball ? 'rgba(52,211,153,0.18)' : 'rgba(99,102,241,0.12)',
+              border: isPickleball ? '1px solid rgba(52,211,153,0.34)' : '1px solid transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              flexShrink: 0,
+            }}>{isPickleball ? '🏸' : '👥'}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {source.sourceLabel}
               </div>
-              <div style={{
-                fontSize: 26,
-                fontWeight: 900,
-                marginTop: 5,
-                color: '#f8fafc',
-                whiteSpace: 'nowrap',
-                ...type.mono,
-              }}>
-                {formatVND(Math.abs(displayTotalBalance))}
+              <div style={{ fontSize: 11, color: isPickleball ? '#6ee7b7' : colors.textSecondary, marginTop: 2 }}>
+                {isPickleball ? 'Pickleball' : 'Chi tiêu nhóm'}
               </div>
             </div>
             <div style={{
-              padding: '8px 13px',
-              borderRadius: 100,
-              background: paymentChipBg,
-              border: `1px solid ${paymentChipBorder}`,
-              color: paymentChipColor,
-              fontSize: 12,
-              fontWeight: 900,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}>
-              {paymentChipLabel}
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: -2 }}>
-            Tổng hợp tất cả nguồn tiền tháng này
-          </div>
-        </button>
-        {sourceRows.map((source, index) => {
-          const amount = Number(source.amount) || 0;
-          const isPickleball = source.sourceType === 'pickleball';
-          const isNegative = amount < 0;
-          const openSource = () => {
-            if (isPickleball) {
-              onAction?.('tab', 'pickleball');
-              return;
-            }
-            onAction?.('open', source.sourceId);
-          };
-          return (
-            <button
-              key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`}
-              type="button"
-              aria-label={`Mở ${source.sourceLabel}`}
-              onClick={openSource}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '11px 10px',
-                marginTop: index === 0 ? 0 : 4,
-                background: isPickleball ? 'rgba(52,211,153,0.10)' : 'transparent',
-                border: isPickleball ? '1px solid rgba(52,211,153,0.26)' : '1px solid transparent',
-                borderRadius: 12,
-                borderBottom: isPickleball ? '1px solid rgba(52,211,153,0.26)' : index === sources.length - 1 ? '1px solid transparent' : '1px solid rgba(255,255,255,0.05)',
-                boxShadow: isPickleball ? '0 10px 24px rgba(16,185,129,0.10)' : 'none',
-                color: 'inherit',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                textAlign: 'left',
-              }}>
-              <div style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
-                background: isPickleball ? 'rgba(52,211,153,0.18)' : 'rgba(99,102,241,0.12)',
-                border: isPickleball ? '1px solid rgba(52,211,153,0.34)' : '1px solid transparent',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 16,
-                flexShrink: 0,
-              }}>{isPickleball ? '🏸' : '👥'}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {source.sourceLabel}
-                </div>
-                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                  {isPickleball ? 'Pickleball' : 'Chi tiêu nhóm'}
-                </div>
-              </div>
-              <div style={{
-                fontSize: 13,
-                fontWeight: 800,
-                color: isNegative ? colors.danger : colors.success,
-                ...type.mono,
-              }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
-              <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
-            </button>
-          );
-        })}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          paddingTop: 10,
-          marginTop: 2,
-          fontSize: 12,
-          fontWeight: 800,
-        }}>
-          <span style={{ color: colors.textSecondary }}>Tổng tháng này</span>
-          <span style={{ color: total < 0 ? colors.danger : colors.success, ...type.mono }}>{total < 0 ? '' : '+'}{formatVND(total)}</span>
-        </div>
-      </Card>
-    </>
+              fontSize: 13,
+              fontWeight: 800,
+              color: isNegative ? colors.danger : colors.success,
+              ...type.mono,
+            }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
+            <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
+          </button>
+        );
+      })}
+    </Card>
   );
 }
 

@@ -1352,10 +1352,10 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       autoGenerate: pickleConfig?.autoGenerate ?? pickleConfig?.auto_generate ?? true,
     },
     memberCount: activeMemberIds.length,
-    todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime, monthSessions, state?.currentGroup?.name || '') : null,
+    todaySession: todaySession ? toOverviewSessionCard(todaySession, pickle, members, overviewScheduleTime, monthSessions.filter(s => !isMovedSession(s)), state?.currentGroup?.name || '') : null,
     progress: {
       attended: myAttendedCount,
-      total: monthSessions.length || 1,
+      total: monthSessions.filter(s => !isMovedSession(s)).length || 1,
       completed: completedSessions,
     },
     monthCosts: {
