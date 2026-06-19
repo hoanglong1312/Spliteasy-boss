@@ -984,8 +984,8 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, currentMonthResidualByMember, onDeferMonthBalance, onUndoDeferMonthBalance }) {
   const [unpaidExpanded, setUnpaidExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
-  const [confirmedExpanded, setConfirmedExpanded] = useState(true);
-  const [chotSoExpanded, setChotSoExpanded] = useState(true);
+  const [confirmedExpanded, setConfirmedExpanded] = useState(false);
+  const [chotSoExpanded, setChotSoExpanded] = useState(false);
   const [refundExpanded, setRefundExpanded] = useState(false);
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
