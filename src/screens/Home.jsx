@@ -45,6 +45,14 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const [savingAction, setSavingAction] = useState('');
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
+  const progressRowsForHero = isTreasurer ? (d.paymentSummary?.paymentProgress || []) : [];
+  const outstandingAmount = progressRowsForHero
+    .filter(r => ['pending', 'unpaid'].includes(String(r.status || '').toLowerCase()))
+    .reduce((sum, r) => sum + Math.abs(Number(r.amount) || 0), 0);
+  const heroBalance = isTreasurer ? outstandingAmount : d.totalBalance;
+  const heroBalanceLabel = isTreasurer
+    ? (outstandingAmount > 0 ? 'Còn cần thu' : 'Đã thu đủ')
+    : balanceLabel;
   const isCarryForwardSettled = Boolean(
     (d.monthSettlements || []).find(
       s => String(s.member_id) === String(d.currentUserId) && String(s.month) === String(d.yearMonth)
@@ -77,8 +85,8 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
 
         <SourceBreakdown
           sources={d.sourceBreakdown || []}
-          totalBalance={d.totalBalance}
-          balanceLabel={balanceLabel}
+          totalBalance={heroBalance}
+          balanceLabel={heroBalanceLabel}
           owedTo={d.owedTo}
           paymentStatus={d.paymentSummary?.paymentStatus}
           isCarryForwardSettled={isCarryForwardSettled}
