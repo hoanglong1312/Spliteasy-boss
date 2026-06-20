@@ -45,7 +45,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const [savingAction, setSavingAction] = useState('');
   const isNeg = d.totalBalance < 0;
   const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
-  const progressRowsForHero = isTreasurer ? (d.paymentSummary?.paymentProgress || []) : [];
+  const progressRowsForHero = isTreasurer ? (d.paymentSummary?.paymentProgress || []).filter(r => !d.currentProfileId || String(r.profileId || '') !== String(d.currentProfileId)) : [];
   const outstandingAmount = progressRowsForHero
     .filter(r => ['pending', 'unpaid'].includes(String(r.status || '').toLowerCase()))
     .reduce((sum, r) => sum + Math.abs(Number(r.amount) || 0), 0);
@@ -175,6 +175,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         data={{
           ...(d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }),
           yearMonth: d.yearMonth || '',
+          currentProfileId: d.currentProfileId || '',
           currentGroupId: d.currentGroupId || '',
           monthSettlements: d.monthSettlements || [],
           currentMonthResidualByMember: d.currentMonthResidualByMember || {},
@@ -763,7 +764,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         <>
           <TreasurerPaymentDashboard
             data={data}
-            progressRows={data?.paymentProgress || []}
+            progressRows={(data?.paymentProgress || []).filter(row => !data?.currentProfileId || String(row.profileId || '') !== String(data.currentProfileId))}
             paymentRecords={paymentRecords}
             pendingRecords={paymentRecords}
             refundRows={refundRows}
@@ -1067,7 +1068,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
     const rows = unpaidRows.filter(r => selectModeSelected.has(r.linkMemberId || r.memberId));
     setQrSheetMembers(rows.map(r => ({
       name: r.name || r.memberName,
-      amount: Math.abs(Number(r.amount) || 0),
+      amount: Math.abs(Number(r.amount) || 0) + (Number(r.prevMonthResidual) || 0),
       memberId: r.linkMemberId || r.memberId,
     })));
     setQrSheetIndex(0);
@@ -1228,6 +1229,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           amount={unpaidRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0)}
           icon="⌁"
           color="#fca5a5"
+          amountPrefix="-"
           expanded={unpaidExpanded}
           onToggle={() => setUnpaidExpanded(value => !value)}
           listScroll
@@ -1259,6 +1261,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         {unpaidRows.length > 0 ? unpaidRows.map(row => {
           const rowKey = row.linkMemberId || row.memberId;
           const rowAmount = Number(row.amount) || 0;
+          const prevMonthResidual = Number(row.prevMonthResidual) || 0;
+          const payableAmount = Math.abs(rowAmount) + prevMonthResidual;
           const isSelected = selectMode && selectModeSelected.has(rowKey) && rowAmount > 0;
           const isPaidLocal = localPaidSet.has(row.linkMemberId || row.memberId);
 
@@ -1306,7 +1310,12 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                   </div>
                   <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
                     {row.sourceSummary || (row.sourceCount ? `${row.sourceCount} nguồn` : 'nguồn tiền')}
-                    {rowAmount > 0 && <span style={{ color: '#f87171', marginLeft: 4 }}>· {(rowAmount).toLocaleString('vi-VN')} đ</span>}
+                    {rowAmount > 0 && <span style={{ color: '#f87171', marginLeft: 4 }}>· -{(rowAmount).toLocaleString('vi-VN')} đ</span>}
+                    {row.prevMonthResidual > 0 && (
+                      <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', borderRadius: 5, padding: '1px 5px', fontSize: 9, fontWeight: 700, marginLeft: 4 }}>
+                        +{formatVND(row.prevMonthResidual)} tháng trước
+                      </span>
+                    )}
                   </div>
                 </div>
                 {!selectMode && (
@@ -1332,7 +1341,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                         setQrSheetMembers([{
                           name: row.name || row.memberName,
                           memberId: row.linkMemberId || row.memberId || '',
-                          amount: rowAmount,
+                          amount: rowAmount + prevMonthResidual,
                         }]);
                         setQrSheetIndex(0);
                       }}
@@ -1346,7 +1355,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                         if (!isPaidLocal) {
                           withLoading(() => onAction?.('markMemberPaid', {
                             memberId: row.linkMemberId || row.memberId || '',
-                            amount: Math.abs(rowAmount),
+                            amount: payableAmount,
                             monthLabel: data?.monthLabel || '',
                             memberName: row.name || row.memberName || 'Thành viên',
                             coveredSources: safeArray(row.coveredSources),
@@ -1389,7 +1398,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             return (
               <React.Fragment key={key}>
                 <button type="button" onClick={() => setSelectedRefundKey(selected ? '' : key)} style={{ width: '100%', border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', padding: 0, cursor: 'pointer' }}>
-                  <PaymentDashboardRow row={{ ...row, amount: row.amount, sourceSummary: row.bank?.account ? `${row.bank?.name || 'Ngân hàng'} · ${row.bank.account}` : 'Chưa có STK nhận tiền' }} tone="refund" arrow={selected ? '⌃' : '›'} />
+                  <PaymentDashboardRow row={{ ...row, amount: row.amount, sourceSummary: row.bank?.account ? `${row.bank?.name || 'Ngân hàng'} · ${row.bank.account}` : 'Chưa có STK nhận tiền' }} tone="refund" sign="+" arrow={selected ? '⌃' : '›'} />
                 </button>
                 {selected && selectedRefund && (
                   <Card style={{ padding: 12, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
@@ -1444,7 +1453,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
               selectedRows.forEach(row => {
                 withLoading(() => onAction?.('markMemberPaid', {
                   memberId: row.linkMemberId || row.memberId || '',
-                  amount: Math.abs(Number(row.amount) || 0),
+                  amount: Math.abs(Number(row.amount) || 0) + (Number(row.prevMonthResidual) || 0),
                   monthLabel: data?.monthLabel || '',
                   memberName: row.name || row.memberName || 'Thành viên',
                   coveredSources: safeArray(row.coveredSources),
@@ -1691,14 +1700,14 @@ function ProgressStat({ label, count, color }) {
   );
 }
 
-function DashboardSection({ title, subtitle, amount, icon, color, expanded, onToggle, listScroll = false, headerRight, collapsible = true, children }) {
+function DashboardSection({ title, subtitle, amount, icon, color, amountPrefix = '', expanded, onToggle, listScroll = false, headerRight, collapsible = true, children }) {
   const headerInner = (
     <>
       <div style={{ width: 28, height: 28, borderRadius: 9, background: `${color}20`, border: `1px solid ${color}4d`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 11, fontWeight: 900, color, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
         {subtitle && <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>}
-        <div style={{ fontSize: 11, fontWeight: 900, color, marginTop: 1, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{formatVND(amount)}</div>
+        <div style={{ fontSize: 11, fontWeight: 900, color, marginTop: 1, ...type.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{amountPrefix}{formatVND(amount)}</div>
       </div>
       {collapsible && <div style={{ fontSize: 16, color, lineHeight: 1, flexShrink: 0 }}>{expanded ? '⌃' : '⌄'}</div>}
     </>
@@ -1727,8 +1736,9 @@ function DashboardSection({ title, subtitle, amount, icon, color, expanded, onTo
   );
 }
 
-function PaymentDashboardRow({ row, tone = 'unpaid', arrow = '', onSelect, children }) {
+function PaymentDashboardRow({ row, tone = 'unpaid', sign, arrow = '', onSelect, children }) {
   const color = tone === 'refund' || tone === 'confirmed' ? '#6ee7b7' : tone === 'pending' ? '#fcd34d' : '#fca5a5';
+  const displaySign = sign !== undefined ? sign : (tone === 'refund' ? '+' : tone === 'confirmed' ? '' : '-');
   const childArray = React.Children.toArray(children);
   return (
     <div
@@ -1748,7 +1758,7 @@ function PaymentDashboardRow({ row, tone = 'unpaid', arrow = '', onSelect, child
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ fontSize: 12, fontWeight: 900, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{row.memberName || row.name}</div>
-        <div style={{ fontSize: 12, fontWeight: 950, color, ...type.mono, whiteSpace: 'nowrap', flexShrink: 0 }}>{formatVND(Math.abs(Number(row.amount) || 0))}</div>
+        <div style={{ fontSize: 12, fontWeight: 950, color, ...type.mono, whiteSpace: 'nowrap', flexShrink: 0 }}>{displaySign}{formatVND(Math.abs(Number(row.amount) || 0))}</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 3 }} onClick={event => event.stopPropagation()}>
         <div style={{ fontSize: 10, color: colors.textSecondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{row.sourceSummary || row.monthLabel || ''}</div>

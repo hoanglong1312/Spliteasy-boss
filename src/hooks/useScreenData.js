@@ -440,6 +440,7 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       ) : null
       return {
         ...row,
+        prevMonthResidual: settlement ? (Number(settlement.amount) || 0) : 0,
         prevMonthSettled: Boolean(settlement),
         settlementId: settlement?.id || null,
         settlementExpenseId: settlement?.expense_id || null,
