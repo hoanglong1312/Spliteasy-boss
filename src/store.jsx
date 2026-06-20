@@ -624,7 +624,7 @@ async function fetchGroupData(token) {
     sb.from('expense_disputes').select('id').eq('status', 'open'),
     sb.rpc('list_visible_notifications'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
-    sb.from('member_month_settlements').select('*'),
+    sb.from('member_month_settlements').select('*, expenses(amount)'),
   ])
   if (mR.error) throw mR.error
   if (prR.error) console.warn('[store] profiles query failed:', prR.error)
