@@ -320,6 +320,24 @@ describe('buildPaymentProgressRows', () => {
       settlementExpenseId: 'expense-1',
     })
   })
+
+  test('uses previous month unpaid residual when no settlement exists', () => {
+    const rows = buildPaymentProgressRows(
+      [{ profileId: 'profile-1', memberIds: ['member-1'], name: 'Member One', amount: -100000, sources: [] }],
+      [{ id: 'member-1', profile_id: 'profile-1', name: 'Member One' }],
+      { notifications: [], prevMonthResidualByMember: { 'member-1': 50000 } },
+      'Tháng 6',
+      [],
+      '2026-06',
+    )
+
+    expect(rows[0]).toMatchObject({
+      prevMonthResidual: 50000,
+      prevMonthSettled: false,
+      settlementId: null,
+      settlementExpenseId: null,
+    })
+  })
 })
 
 describe('buildHomeData', () => {
