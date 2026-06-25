@@ -201,6 +201,15 @@ test('PIN unlock session keys prefer profile identity over member identity', () 
   assert.match(appSource, /const pinKey = member\?\.profileId \|\| member\?\.profile_id \|\| payload\?\.memberId/)
 })
 
+test('addGuest casual lookup tolerates duplicate profile names', () => {
+  const helperBlock = appSource.slice(appSource.indexOf('async function findCasualMemberByName'))
+
+  assert.doesNotMatch(helperBlock, /\.from\('profiles'\)[\s\S]*?\.maybeSingle\(\)/)
+  assert.match(helperBlock, /const profileIds = await findProfileIdsByName\(sb, name\)/)
+  assert.match(helperBlock, /return safeArray\(profiles\)\.map\(profile => profile\.id\)\.filter\(Boolean\)/)
+  assert.match(helperBlock, /\.from\('members'\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('member_type', 'casual'\)[\s\S]*?\.in\('profile_id', profileIds\)[\s\S]*?\.limit\(1\)/)
+})
+
 test('AppV2 renders the store toast as a fixed bottom overlay', () => {
   assert.match(appSource, /<ToastOverlay toast=\{state\.toast\} \/>/)
   assert.match(appSource, /function ToastOverlay\(\{ toast \}\) \{/)

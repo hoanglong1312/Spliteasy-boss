@@ -2094,13 +2094,14 @@ export default function AppV2() {
       const { token } = getStoredAuth()
       if (!token) return
       const sb = createSupabase(token)
+      const matchingProfileIds = await findProfileIdsByName(sb, guestName)
       // Skip guest row if this person is already attending as a member in this session
-      const { data: existingProfile } = await sb.from('profiles').select('id').ilike('name', guestName).maybeSingle()
-      if (existingProfile) {
-        const { data: groupMemberIds } = await sb.from('members').select('id').eq('group_id', groupId).eq('profile_id', existingProfile.id)
+      if (matchingProfileIds.length > 0) {
+        const { data: groupMemberIds } = await sb.from('members').select('id').eq('group_id', groupId).in('profile_id', matchingProfileIds)
         if (groupMemberIds?.length) {
           const ids = groupMemberIds.map(r => r.id)
-          const { data: memberAttendance } = await sb.from('pickle_attendees').select('id, attended').eq('session_id', sessionId).eq('attendee_type', 'member').in('member_id', ids).maybeSingle()
+          const { data: memberAttendances } = await sb.from('pickle_attendees').select('id, attended').eq('session_id', sessionId).eq('attendee_type', 'member').in('member_id', ids).limit(1)
+          const memberAttendance = safeArray(memberAttendances)[0]
           if (memberAttendance) {
             if (!memberAttendance.attended) {
               const { error: upErr } = await sb.from('pickle_attendees').update({ attended: true, rsvp_status: 'going' }).eq('id', memberAttendance.id)
@@ -2812,22 +2813,26 @@ function memberNameParts(name) {
 }
 
 async function findCasualMemberByName(sb, groupId, name) {
-  const { data: profile, error: profileError } = await sb
-    .from('profiles')
-    .select('id')
-    .ilike('name', name)
-    .maybeSingle()
-  if (profileError) throw profileError
-  if (!profile) return null
+  const profileIds = await findProfileIdsByName(sb, name)
+  if (profileIds.length === 0) return null
   const { data, error } = await sb
     .from('members')
     .select('id')
     .eq('group_id', groupId)
     .eq('member_type', 'casual')
-    .eq('profile_id', profile.id)
-    .maybeSingle()
+    .in('profile_id', profileIds)
+    .limit(1)
   if (error) throw error
-  return data
+  return safeArray(data)[0] || null
+}
+
+async function findProfileIdsByName(sb, name) {
+  const { data: profiles, error } = await sb
+    .from('profiles')
+    .select('id')
+    .ilike('name', name)
+  if (error) throw error
+  return safeArray(profiles).map(profile => profile.id).filter(Boolean)
 }
 
 function normalizeTicketDate(value) {
