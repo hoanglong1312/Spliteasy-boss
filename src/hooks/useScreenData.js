@@ -1748,7 +1748,7 @@ function buildSessionDetailData(state, pickle, sessionId, currentUserId, members
   }
 }
 
-function buildPickleballCalendarData(state, params = {}) {
+export function buildPickleballCalendarData(state, params = {}) {
   const today = new Date()
   const monthDate = calendarMonthDate(params, today)
   const currentYearMonth = monthKey(monthDate)
@@ -2947,6 +2947,14 @@ function currentGroupMembers(state) {
   return group?.id ? rows : members
 }
 
+function membersForSessionGroup(state, session) {
+  const sessionGroupId = session?.groupId || session?.group_id
+  const members = safeArray(state?.members)
+  if (!sessionGroupId) return currentGroupMembers(state)
+  const rows = members.filter(member => String(member.groupId || member.group_id || '') === String(sessionGroupId))
+  return rows.length ? rows : currentGroupMembers(state)
+}
+
 function getAllSessions(state) {
   return uniqueSessions([
     ...safeArray(state?.sessions),
@@ -3133,7 +3141,7 @@ function ticketIncludesCurrentUser(state, ticket) {
 
 function toCalendarSessionDetail(state, session, allSessions, today) {
   const pickle = state?.pickle || {}
-  const groupMembers = currentGroupMembers(state).filter(isActiveMember)
+  const groupMembers = membersForSessionGroup(state, session).filter(isActiveMember)
   const sessionYearMonth = monthKey(sessionDate(session))
   const isFutureSession = dateKey(sessionDate(session) || '') > dateKey(today)
   const presentIds = effectiveSessionMemberIds(session, groupMembers, !isFutureSession)

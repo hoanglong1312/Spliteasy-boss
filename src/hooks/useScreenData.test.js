@@ -3,6 +3,7 @@ import {
   attendanceByMemberId,
   buildHomeData,
   buildPaymentProgressRows,
+  buildPickleballCalendarData,
   buildPrevMonthUnpaid,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
@@ -154,6 +155,41 @@ describe('memberWaterShare', () => {
     ]
 
     expect(memberWaterShare(sessions, 'fixed-1', fixedMembers, casualMembers)).toBe(0)
+  })
+})
+
+describe('buildPickleballCalendarData', () => {
+  test('uses session group members for explicit attendees', () => {
+    const state = {
+      currentUserId: 'm-current',
+      currentGroupId: 'pickle-group',
+      currentGroup: { id: 'expense-group', name: 'Expense' },
+      members: [
+        { id: 'm-current', groupId: 'expense-group', name: 'Current', memberType: 'fixed' },
+        { id: 'm-anh-quan', groupId: 'pickle-group', name: 'Anh Quân', memberType: 'casual' },
+      ],
+      pickle: {
+        sessions: [
+          {
+            id: 'session-2406',
+            group_id: 'pickle-group',
+            date: '2026-05-20',
+            status: 'scheduled',
+            attendees: [],
+            attendanceRecords: [
+              { sessionId: 'session-2406', memberId: 'm-anh-quan', status: 'present', attendeeType: 'member' },
+            ],
+          },
+        ],
+        fixedMembers: [],
+        monthlyConfigs: [],
+      },
+      _allPickle: { sessions: [], sessionItems: [] },
+    }
+
+    const data = buildPickleballCalendarData(state, { yearMonth: '2026-05' })
+
+    expect(data.selectedSession.attendees.map(member => member.name)).toEqual(['Anh Quân'])
   })
 })
 describe('buildPersonalWaterSessionRows', () => {
