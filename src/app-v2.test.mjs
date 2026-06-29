@@ -483,6 +483,38 @@ test('AppV2 handles expense edit delete and approval actions', () => {
   assert.match(appSource, /p_status: 'rejected'/)
 })
 
+test('GroupDetail exposes an Excel export action', () => {
+  const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
+
+  assert.match(groupDetailSource, />📤 Xuất Excel<\/Button>/)
+  assert.match(groupDetailSource, /onAction\?\.\('exportGroupCsv', d\)/)
+})
+
+test('AppV2 exports group detail CSV with Excel-safe BOM', () => {
+  const exportBlock = appSource.slice(
+    appSource.indexOf('function exportGroupCsv'),
+    appSource.indexOf('function exportStateCsv')
+  )
+
+  assert.match(appSource, /if \(type === 'exportGroupCsv'\) \{[\s\S]*?exportGroupCsv\(payload\)/)
+  assert.match(exportBlock, /const rows = \[\]/)
+  assert.match(exportBlock, /rows\.push\(\['TỔNG QUAN'\]\)/)
+  assert.match(exportBlock, /rows\.push\(\['THÀNH VIÊN'\]\)/)
+  assert.match(exportBlock, /rows\.push\(\['CHI TIÊU'\]\)/)
+  assert.match(exportBlock, /formatCsvNumber\(data\?\.totalSpent\)/)
+  assert.match(exportBlock, /safeArray\(data\?\.members\)\.slice\(\)\.sort\(\(a, b\) => csvMemberName\(members, a\?\.id, a\?\.name\)\.localeCompare\(csvMemberName\(members, b\?\.id, b\?\.name\), 'vi'\)\)/)
+  assert.match(exportBlock, /formatCsvNumber\(balance\)/)
+  assert.match(exportBlock, /csvMemberName\(members, item\?\.paidBy \|\| item\?\.paid_by_member_id \|\| item\?\.paidById, item\?\.paidByName\)/)
+  assert.match(exportBlock, /csvParticipantNames\(members, item\)/)
+  assert.match(exportBlock, /new Blob\(\['﻿' \+ csv\]/)
+  assert.match(exportBlock, /download = `spliteasy-\$\{slugifyCsvFilePart\(data\?\.name \|\| 'nhom'\)\}-\$\{data\?\.currentYearMonth \|\| dateStamp\}\.csv`/)
+  assert.match(exportBlock, /const dateStamp = new Date\(\)\.toISOString\(\)\.slice\(0, 7\)/)
+
+  assert.match(appSource, /function formatCsvNumber\(value\) \{[\s\S]*?if \(value === undefined \|\| value === null \|\| value === ''\) return ''[\s\S]*?toLocaleString\('vi-VN'\)/)
+  assert.match(appSource, /function csvMemberName\(members, memberId, fallback = ''\)/)
+  assert.match(appSource, /function csvParticipantNames\(members, item\) \{[\s\S]*?\.sort\(\(a, b\) => a\.localeCompare\(b, 'vi'\)\)[\s\S]*?\.join\(' \+ '\)/)
+})
+
 test('GroupDetail renders expense action menu and pending approval UI', () => {
   const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
 

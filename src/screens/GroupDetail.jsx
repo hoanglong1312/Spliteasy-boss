@@ -179,9 +179,10 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             tone={heroBalanceTone}
             onOpen={currentMemberRow ? () => setSelectedMember(currentMemberRow) : null}
           />
-          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-            <Button variant="primary" style={{ flex: 1, padding: '7px 6px', fontSize: 11, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost"   style={{ flex: 1, padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán</Button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 18 }}>
+            <Button variant="primary" style={{ padding: '7px 6px', fontSize: 11, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
+            <Button variant="ghost" style={{ padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán</Button>
+            <Button variant="ghost" style={{ gridColumn: '1 / -1', padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('exportGroupCsv', d)}>📤 Xuất Excel</Button>
           </div>
         </ModuleHero>
 

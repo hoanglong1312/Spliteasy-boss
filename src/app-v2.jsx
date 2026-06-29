@@ -2071,6 +2071,11 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'exportGroupCsv') {
+      exportGroupCsv(payload)
+      return
+    }
+
     if (type === 'exportCsv') {
       exportStateCsv(state)
       return
@@ -2929,6 +2934,104 @@ function dateFromLabel(label) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+function exportGroupCsv(data = {}) {
+  const dateStamp = new Date().toISOString().slice(0, 7)
+  const members = safeArray(data?.members)
+  const sortedMembers = safeArray(data?.members).slice().sort((a, b) => csvMemberName(members, a?.id, a?.name).localeCompare(csvMemberName(members, b?.id, b?.name), 'vi'))
+  const activities = safeArray(data?.activities || data?.activitiesByWeek?.flatMap(week => safeArray(week?.items)))
+    .slice()
+    .sort((a, b) => String(a?.title || a?.name || '').localeCompare(String(b?.title || b?.name || ''), 'vi'))
+  const rows = []
+
+  rows.push(['TỔNG QUAN'])
+  rows.push(['Nhóm', data?.name || ''])
+  rows.push(['Tháng', data?.monthLabel || data?.currentYearMonth || ''])
+  rows.push(['Số thành viên', data?.memberCount ?? members.length])
+  rows.push(['Số khoản chi', data?.expenseCount ?? activities.length])
+  rows.push(['Tổng chi', formatCsvNumber(data?.totalSpent)])
+  rows.push(['Số dư của bạn', formatCsvNumber(data?.balance)])
+  rows.push([])
+
+  rows.push(['THÀNH VIÊN'])
+  rows.push(['Tên', 'Vai trò', 'Số dư', 'Trạng thái', 'Ngân hàng', 'Số tài khoản'])
+  sortedMembers.forEach(member => {
+    const balance = Number(member?.balance) || 0
+    rows.push([
+      csvMemberName(members, member?.id, member?.name),
+      member?.role === 'treasurer' ? 'Thủ quỹ' : 'Thành viên',
+      formatCsvNumber(balance),
+      balance > 0 ? 'Cần thu' : balance < 0 ? 'Cần nộp' : 'Cân bằng',
+      member?.bankName || '',
+      member?.bankAccount || '',
+    ])
+  })
+  rows.push([])
+
+  rows.push(['CHI TIÊU'])
+  rows.push(['Ngày', 'Tên khoản', 'Số tiền', 'Người trả', 'Người tham gia', 'Trạng thái'])
+  activities.forEach(item => {
+    rows.push([
+      item?.date || item?.rawDate || '',
+      item?.title || item?.name || '',
+      formatCsvNumber(item?.amount),
+      csvMemberName(members, item?.paidBy || item?.paid_by_member_id || item?.paidById, item?.paidByName),
+      csvParticipantNames(members, item),
+      expenseStatusLabel(item?.status),
+    ])
+  })
+
+  const csv = rows.map(row => row.map(csvCell).join(',')).join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `spliteasy-${slugifyCsvFilePart(data?.name || 'nhom')}-${data?.currentYearMonth || dateStamp}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function formatCsvNumber(value) {
+  if (value === undefined || value === null || value === '') return ''
+  return Number(value || 0).toLocaleString('vi-VN')
+}
+
+function csvMemberName(members, memberId, fallback = '') {
+  const member = safeArray(members).find(member => String(member?.id || '') === String(memberId || ''))
+  return member?.name || member?.displayName || fallback || ''
+}
+
+function csvParticipantNames(members, item) {
+  const ids = safeArray(item?.participants).length > 0
+    ? safeArray(item?.participants).map(participant => participant?.memberId || participant?.member_id || participant?.id || participant)
+    : safeArray(item?.splits).map(split => split?.memberId || split?.member_id || split?.id)
+  const explicitNames = safeArray(item?.participantNames)
+  return (explicitNames.length > 0 ? explicitNames : ids.map(memberId => csvMemberName(members, memberId)))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'vi'))
+    .join(' + ')
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`
+}
+
+function slugifyCsvFilePart(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'nhom'
+}
+
+function expenseStatusLabel(status) {
+  const value = String(status || '').toLowerCase()
+  if (value === 'approved') return 'Đã duyệt'
+  if (value === 'pending') return 'Chờ duyệt'
+  if (value === 'rejected' || value === 'declined') return 'Từ chối'
+  return status || ''
+}
+
 function exportStateCsv(state) {
   const members = (state.members || [])
   const expenses = (state.expenses || [])
@@ -2949,7 +3052,7 @@ function exportStateCsv(state) {
     ])
   })
 
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const csv = rows.map(r => r.map(csvCell).join(',')).join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
