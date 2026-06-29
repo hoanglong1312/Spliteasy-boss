@@ -2089,7 +2089,7 @@ export default function AppV2() {
       const sessionId = payload?.sessionId ?? payload?.session_id ?? (typeof payload === 'string' ? payload : null)
       const guestName = String(payload?.guestName ?? payload?.guest_name ?? '').trim()
       if (!sessionId || !guestName) return
-      const groupId = activePickleballGroupId(state)
+      const groupId = groupIdForPickleballSession(state, sessionId) || activePickleballGroupId(state)
       if (!groupId) return
       const { token } = getStoredAuth()
       if (!token) return
@@ -2110,6 +2110,18 @@ export default function AppV2() {
             await dispatch({ type: 'REFRESH' })
             return
           }
+          const { error: insertMemberAttendanceError } = await sb
+            .from('pickle_attendees')
+            .insert({
+              session_id: sessionId,
+              member_id: ids[0],
+              attendee_type: 'member',
+              rsvp_status: 'going',
+              attended: true,
+            })
+          if (insertMemberAttendanceError) throw insertMemberAttendanceError
+          await dispatch({ type: 'REFRESH' })
+          return
         }
       }
       // Clean up stale guest rows before creating member (runs regardless of insert outcome)
@@ -2891,6 +2903,18 @@ function expenseGroupId(state, expenseId) {
 
 function activePickleballGroupId(state) {
   return state?.pickleballGroupId || state?.pickleballGroup?.id || state?.currentGroupId || state?.currentGroup?.id || null
+}
+
+function groupIdForPickleballSession(state, sessionId) {
+  if (!sessionId) return null
+  const sessions = [
+    ...safeArray(state?.sessions),
+    ...safeArray(state?.pickle?.sessions),
+    ...safeArray(state?.pickle?.upcoming),
+    ...safeArray(state?._allPickle?.sessions),
+  ]
+  const session = sessions.find(item => String(item?.id || '') === String(sessionId))
+  return session?.groupId || session?.group_id || null
 }
 
 function activePickleballGroup(state) {

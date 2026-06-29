@@ -210,6 +210,19 @@ test('addGuest casual lookup tolerates duplicate profile names', () => {
   assert.match(helperBlock, /\.from\('members'\)[\s\S]*?\.eq\('group_id', groupId\)[\s\S]*?\.eq\('member_type', 'casual'\)[\s\S]*?\.in\('profile_id', profileIds\)[\s\S]*?\.limit\(1\)/)
 })
 
+test('addGuest uses the selected session group before active pickleball fallback', () => {
+  const addGuestBlock = appSource.slice(
+    appSource.indexOf("if (type === 'addGuest')"),
+    appSource.indexOf("if (type === 'removeGuest')")
+  )
+
+  assert.match(appSource, /function groupIdForPickleballSession\(state, sessionId\)/)
+  assert.match(appSource, /\.\.\.safeArray\(state\?\._allPickle\?\.sessions\)/)
+  assert.match(addGuestBlock, /const groupId = groupIdForPickleballSession\(state, sessionId\) \|\| activePickleballGroupId\(state\)/)
+  assert.doesNotMatch(addGuestBlock, /const groupId = activePickleballGroupId\(state\)/)
+  assert.match(addGuestBlock, /const \{ error: insertMemberAttendanceError \} = await sb[\s\S]*?\.from\('pickle_attendees'\)[\s\S]*?member_id: ids\[0\]/)
+})
+
 test('AppV2 renders the store toast as a fixed bottom overlay', () => {
   assert.match(appSource, /<ToastOverlay toast=\{state\.toast\} \/>/)
   assert.match(appSource, /function ToastOverlay\(\{ toast \}\) \{/)
