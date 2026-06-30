@@ -487,7 +487,13 @@ test('GroupDetail exposes an Excel export action', () => {
   const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
 
   assert.match(groupDetailSource, />📤 Xuất Excel<\/Button>/)
+  assert.match(groupDetailSource, /const \[exportMenuOpen, setExportMenuOpen\] = useState\(false\)/)
+  assert.match(groupDetailSource, /onClick=\{\(\) => setExportMenuOpen\(true\)\}/)
+  assert.match(groupDetailSource, /CSV danh sách/)
   assert.match(groupDetailSource, /onAction\?\.\('exportGroupCsv', d\)/)
+  assert.match(groupDetailSource, /Excel bảng ngang/)
+  assert.match(groupDetailSource, /onAction\?\.\('exportGroupMatrixXls', d\)/)
+  assert.match(dataSource, /exportExpenses: monthlyExpenses/)
 })
 
 test('AppV2 exports group detail CSV with Excel-safe BOM', () => {
@@ -513,6 +519,26 @@ test('AppV2 exports group detail CSV with Excel-safe BOM', () => {
   assert.match(appSource, /function formatCsvNumber\(value\) \{[\s\S]*?if \(value === undefined \|\| value === null \|\| value === ''\) return ''[\s\S]*?toLocaleString\('vi-VN'\)/)
   assert.match(appSource, /function csvMemberName\(members, memberId, fallback = ''\)/)
   assert.match(appSource, /function csvParticipantNames\(members, item\) \{[\s\S]*?\.sort\(\(a, b\) => a\.localeCompare\(b, 'vi'\)\)[\s\S]*?\.join\(' \+ '\)/)
+})
+
+test('AppV2 exports GroupDetail Excel matrix as real xlsx', () => {
+  const matrixBlock = appSource.slice(
+    appSource.indexOf('function exportGroupMatrixXls'),
+    appSource.indexOf('function exportGroupCsv')
+  )
+
+  assert.match(appSource, /import \* as XLSX from 'xlsx'/)
+  assert.match(appSource, /if \(type === 'exportGroupMatrixXls'\) \{[\s\S]*?exportGroupMatrixXls\(payload\)/)
+  assert.match(matrixBlock, /const expenses = safeArray\(data\?\.exportExpenses \|\| data\?\.activities\)/)
+  assert.match(matrixBlock, /\['STT', 'THÀNH VIÊN', \.\.\.expenses\.map\(expense => expense\?\.title \|\| expense\?\.name \|\| ''\), 'TỔNG PHẢI CHỊU', 'SỐ DƯ'\]/)
+  assert.match(matrixBlock, /sortedMembers\.forEach\(\(member, index\) => \{[\s\S]*?expenses\.map\(expense => \{[\s\S]*?expenseShareForMember\(expense, member\?\.id\)/)
+  assert.match(matrixBlock, /XLSX\.utils\.book_new\(\)/)
+  assert.match(matrixBlock, /XLSX\.utils\.aoa_to_sheet\(rows\)/)
+  assert.match(matrixBlock, /XLSX\.utils\.book_append_sheet\(workbook, worksheet, 'Chi tiết nhóm'\)/)
+  assert.match(matrixBlock, /XLSX\.writeFile\(workbook, `spliteasy-\$\{slugifyCsvFilePart\(data\?\.name \|\| 'nhom'\)\}-\$\{data\?\.currentYearMonth \|\| dateStamp\}-matrix\.xlsx`\)/)
+  assert.doesNotMatch(matrixBlock, /application\/vnd\.ms-excel/)
+  assert.doesNotMatch(matrixBlock, /new Blob\(\[html\]/)
+  assert.match(appSource, /function expenseShareForMember\(expense, memberId\)/)
 })
 
 test('GroupDetail renders expense action menu and pending approval UI', () => {

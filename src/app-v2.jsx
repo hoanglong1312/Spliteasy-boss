@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 
 import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
@@ -2071,6 +2072,11 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'exportGroupMatrixXls') {
+      exportGroupMatrixXls(payload)
+      return
+    }
+
     if (type === 'exportGroupCsv') {
       exportGroupCsv(payload)
       return
@@ -2932,6 +2938,71 @@ function dateFromLabel(label) {
   if (!match) return new Date().toISOString().slice(0, 10)
   const [, day, month, year] = match
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function exportGroupMatrixXls(data = {}) {
+  const dateStamp = new Date().toISOString().slice(0, 7)
+  const members = safeArray(data?.members)
+  const sortedMembers = safeArray(data?.members).slice().sort((a, b) => csvMemberName(members, a?.id, a?.name).localeCompare(csvMemberName(members, b?.id, b?.name), 'vi'))
+  const expenses = safeArray(data?.exportExpenses || data?.activities)
+    .slice()
+    .sort((a, b) => String(a?.title || a?.name || '').localeCompare(String(b?.title || b?.name || ''), 'vi'))
+
+  const expenseTotals = new Map()
+  const rows = [
+    ['STT', 'THÀNH VIÊN', ...expenses.map(expense => expense?.title || expense?.name || ''), 'TỔNG PHẢI CHỊU', 'SỐ DƯ'],
+  ]
+
+  sortedMembers.forEach((member, index) => {
+    let memberTotal = 0
+    const expenseCells = expenses.map(expense => {
+      const share = expenseShareForMember(expense, member?.id)
+      if (share === '') return ''
+      const amount = Number(share) || 0
+      memberTotal += amount
+      expenseTotals.set(String(expense?.id || expense?.title || ''), (expenseTotals.get(String(expense?.id || expense?.title || '')) || 0) + amount)
+      return amount
+    })
+    rows.push([
+      index + 1,
+      csvMemberName(members, member?.id, member?.name).toUpperCase(),
+      ...expenseCells,
+      memberTotal,
+      Number(member?.balance) || 0,
+    ])
+  })
+
+  const totalCells = expenses.map(expense => expenseTotals.get(String(expense?.id || expense?.title || '')) || '')
+  rows.push(['', 'TỔNG', ...totalCells, totalCells.reduce((sum, value) => sum + (Number(value) || 0), 0), ''])
+
+  const workbook = XLSX.utils.book_new()
+  const worksheet = XLSX.utils.aoa_to_sheet(rows)
+  worksheet['!cols'] = [
+    { wch: 5 },
+    { wch: 18 },
+    ...expenses.map(() => ({ wch: 14 })),
+    { wch: 16 },
+    { wch: 14 },
+  ]
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Chi tiết nhóm')
+  XLSX.writeFile(workbook, `spliteasy-${slugifyCsvFilePart(data?.name || 'nhom')}-${data?.currentYearMonth || dateStamp}-matrix.xlsx`)
+}
+
+function expenseShareForMember(expense, memberId) {
+  const splits = safeArray(expense?.splits)
+  const split = splits.find(item => String(item?.memberId || item?.member_id || item?.id || '') === String(memberId || ''))
+  if (split) return split.amount ?? split.shareAmount ?? split.share_amount ?? ''
+  const participants = safeArray(expense?.participants).map(participant => participant?.memberId || participant?.member_id || participant?.id || participant)
+  if (!participants.some(id => String(id || '') === String(memberId || ''))) return ''
+  return participants.length > 0 ? (Number(expense?.amount) || 0) / participants.length : ''
+}
+
+function htmlCell(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function exportGroupCsv(data = {}) {

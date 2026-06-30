@@ -1095,6 +1095,7 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
     balanceLabel: buildBalanceLabel(balanceMap, balance, members),
     currentMemberId: currentGroupMember?.id || null,
     pendingExpenses,
+    exportExpenses: monthlyExpenses,
     activities,
     activitiesByWeek: activities.length > 0 ? [{ label: 'Hoạt động gần đây', items: activities }] : [],
     memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense', groups: appState?.groups }),

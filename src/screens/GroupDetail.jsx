@@ -47,6 +47,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [deleteConfirmMember, setDeleteConfirmMember] = useState(null);
   const [expenseMenu, setExpenseMenu] = useState(null);
   const [deleteConfirmExpense, setDeleteConfirmExpense] = useState(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const pendingExpenses = d.pendingExpenses || [];
   const ownPendingExpenses = pendingExpenses.filter(expense => String(expense.submittedBy || '') === String(d.currentMemberId || ''));
@@ -182,7 +183,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ padding: '7px 6px', fontSize: 11, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
             <Button variant="ghost" style={{ padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán</Button>
-            <Button variant="ghost" style={{ gridColumn: '1 / -1', padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('exportGroupCsv', d)}>📤 Xuất Excel</Button>
+            <Button variant="ghost" style={{ gridColumn: '1 / -1', padding: '7px 6px', fontSize: 11 }} onClick={() => setExportMenuOpen(true)}>📤 Xuất Excel</Button>
           </div>
         </ModuleHero>
 
@@ -302,6 +303,15 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           )}
         </div>
       </Screen>
+
+      {exportMenuOpen && (
+        <BottomSheet title="Xuất dữ liệu" onClose={() => setExportMenuOpen(false)}>
+          <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+            <ActionButton onClick={() => { setExportMenuOpen(false); onAction?.('exportGroupCsv', d); }}>CSV danh sách</ActionButton>
+            <ActionButton onClick={() => { setExportMenuOpen(false); onAction?.('exportGroupMatrixXls', d); }}>Excel bảng ngang (.xlsx)</ActionButton>
+          </div>
+        </BottomSheet>
+      )}
 
       {selectedMember && (
         <BottomSheet title="Chi tiết thành viên" onClose={() => setSelectedMember(null)}>
