@@ -288,7 +288,7 @@ function AddTicketSheet({ data, onClose, onSave }) {
   const today = new Date()
   const members = data.members || []
   const [date, setDate] = useState(toDateInput(today))
-  const [time, setTime] = useState('19:00')
+  const time = '19:00'
   const [memberIds, setMemberIds] = useState([])
   const [paymentMode, setPaymentMode] = useState('team_fund')
   const [advancerId, setAdvancerId] = useState('')
@@ -299,10 +299,18 @@ function AddTicketSheet({ data, onClose, onSave }) {
     const member = members.find(row => String(row.id) === String(id))
     return member?.ticketType !== 'monthly'
   })
+  const monthlyMemberIds = memberIds.filter(id => {
+    const member = members.find(row => String(row.id) === String(id))
+    return member?.ticketType === 'monthly'
+  })
+  const totalSelected = memberIds.length
+  const waterAmount = 0
+  const waterPerPerson = totalSelected > 0 ? Math.round(waterAmount / totalSelected) : 0
+  const perLegPersonAmount = ticketPrice + waterPerPerson
+  const perMonthlyPersonAmount = waterPerPerson
   const totalAmountToSave = ticketPrice * billedMemberIds.length
-  const amountPerPerson = ticketPrice
-  const hasSelectedMonthlyMember = selectedMembers.some(member => member.ticketType === 'monthly')
-  const canSave = !ticketValidationError({ date, time, memberIds, billedMemberCount: billedMemberIds.length, totalAmount: totalAmountToSave, paymentMode, advancerId })
+  const grandTotal = totalAmountToSave + waterAmount
+  const canSave = !ticketValidationError({ date, memberIds, billedMemberCount: billedMemberIds.length, totalAmount: totalAmountToSave, paymentMode, advancerId })
 
   useEffect(() => {
     if (paymentMode !== 'advancer') return
@@ -321,7 +329,7 @@ function AddTicketSheet({ data, onClose, onSave }) {
 
   async function submit(e) {
     e.preventDefault()
-    const validationError = ticketValidationError({ date, time, memberIds, billedMemberCount: billedMemberIds.length, totalAmount: totalAmountToSave, paymentMode, advancerId })
+    const validationError = ticketValidationError({ date, memberIds, billedMemberCount: billedMemberIds.length, totalAmount: totalAmountToSave, paymentMode, advancerId })
     if (validationError) {
       setError(validationError)
       return
@@ -384,16 +392,6 @@ function AddTicketSheet({ data, onClose, onSave }) {
           placeholder="DD/MM/YYYY"
           inputMode="numeric"
         />
-        <Input
-          label="Giờ"
-          value={time}
-          onChange={e => {
-            setTime(e.target.value)
-            if (error) setError('')
-          }}
-          placeholder="HH:mm"
-          inputMode="numeric"
-        />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '14px 0 8px' }}>
           <div style={{ ...type.label, color: colors.textSecondary }}>Người tham gia</div>
@@ -415,10 +413,9 @@ function AddTicketSheet({ data, onClose, onSave }) {
                   alignItems: 'center',
                   gap: 6,
                   borderRadius: 100,
-                  border: `1px solid ${monthlyTicket ? 'rgba(148,163,184,0.26)' : active ? 'rgba(52,211,153,0.4)' : colors.borderSubtle}`,
-                  background: monthlyTicket ? 'rgba(148,163,184,0.08)' : active ? 'rgba(52,211,153,0.14)' : colors.inputBg,
-                  color: monthlyTicket ? colors.textMuted : active ? '#a7f3d0' : colors.textSecondary,
-                  opacity: monthlyTicket ? 0.72 : 1,
+                  border: `1px solid ${active && monthlyTicket ? 'rgba(99,102,241,0.42)' : active ? 'rgba(52,211,153,0.4)' : colors.borderSubtle}`,
+                  background: active && monthlyTicket ? 'rgba(99,102,241,0.16)' : active ? 'rgba(52,211,153,0.14)' : colors.inputBg,
+                  color: active && monthlyTicket ? '#c7d2fe' : active ? '#a7f3d0' : colors.textSecondary,
                   padding: '6px 10px 6px 6px',
                   fontFamily: 'inherit',
                   cursor: 'pointer',
@@ -443,14 +440,32 @@ function AddTicketSheet({ data, onClose, onSave }) {
           <div style={{ fontSize: 10, color: '#a7f3d0', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
             Price per person
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
-            <span style={{ fontSize: 15, color: colors.textPrimary, fontWeight: 900, ...type.mono }}>
-              {formatShortAmount(amountPerPerson)}/người{hasSelectedMonthlyMember ? ` · ${billedMemberIds.length}/${memberIds.length} tính phí` : ''}
-            </span>
-            <span style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 800, ...type.mono }}>
-              Tổng {formatShortAmount(totalAmountToSave)}
-            </span>
-          </div>
+          {monthlyMemberIds.length === 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+              <span style={{ fontSize: 15, color: colors.textPrimary, fontWeight: 900, ...type.mono }}>
+                {formatShortAmount(ticketPrice)}/người
+              </span>
+              <span style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 800, ...type.mono }}>
+                Tổng {formatShortAmount(totalAmountToSave)}
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, fontSize: 12, fontWeight: 900 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span>Vé lẻ · {billedMemberIds.length} người</span>
+                <span style={{ ...type.mono }}>{formatShortAmount(perLegPersonAmount)}/người</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span>Vé tháng · {monthlyMemberIds.length} người</span>
+                <span style={{ ...type.mono }}>{formatShortAmount(perMonthlyPersonAmount)}/người (chỉ nước)</span>
+              </div>
+              <div style={{ height: 1, background: 'rgba(52,211,153,0.18)' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 950 }}>
+                <span>Tổng cộng</span>
+                <span style={{ ...type.mono }}>{formatShortAmount(grandTotal)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ ...type.label, color: colors.textSecondary, margin: '16px 0 8px' }}>Thanh toán</div>
@@ -509,9 +524,8 @@ function AddTicketSheet({ data, onClose, onSave }) {
   )
 }
 
-function ticketValidationError({ date, time, memberIds, billedMemberCount, totalAmount, paymentMode, advancerId }) {
+function ticketValidationError({ date, memberIds, billedMemberCount, totalAmount, paymentMode, advancerId }) {
   if (!String(date || '').trim()) return 'Chọn ngày chơi.'
-  if (!String(time || '').trim()) return 'Nhập giờ chơi.'
   if (!Array.isArray(memberIds) || memberIds.length === 0) return 'Chọn ít nhất một người tham gia.'
   if ((Number(totalAmount) || 0) <= 0 && Number(billedMemberCount) > 0) return 'Nhập tổng tiền vé.'
   if (paymentMode === 'advancer' && !advancerId) return 'Chọn người ứng tiền hoặc quỹ team.'

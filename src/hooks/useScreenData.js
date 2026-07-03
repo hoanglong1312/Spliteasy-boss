@@ -1807,7 +1807,7 @@ export function buildPickleballCalendarData(state, params = {}) {
     selectedSession,
     tickets: ticketRows,
     selectedTickets: ticketsByDate.get(selectedDate) || [],
-    ticketMembers: buildTicketPickerMembers(state, currentYearMonth, sessions),
+    ticketMembers: buildTicketPickerMembers(state, currentYearMonth),
     ticketPrice,
     ticketPricePerPerson: ticketPrice,
     staleReplacementCleanup: staleReplacements.length > 0 ? {
@@ -2018,7 +2018,7 @@ export function buildPickleballTicketsData(state) {
   const teamFund = tickets.filter(ticket => ticket.status === 'team_fund')
   const approvedTickets = tickets.filter(ticket => ticket.status !== 'pending_review')
   const totalAmount = approvedTickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0)
-  const members = buildTicketPickerMembers(state, currentMonth, monthSessions)
+  const members = buildTicketPickerMembers(state, currentMonth)
 
   return {
     clubName: currentGroupName(state, 'CLB Pickleball'),
@@ -2062,9 +2062,10 @@ export function buildPickleballTicketsData(state) {
   }
 }
 
-function buildTicketPickerMembers(state, yearMonth, sessions) {
+function buildTicketPickerMembers(state, yearMonth) {
   const activeMembers = currentGroupMembers(state).filter(isActiveMember)
   const isFlex = isBillingModeFlexForMonth(state, yearMonth)
+  const sessions = [0, -1, -2].flatMap(delta => getStateMonthSessions(state, shiftMonthKey(yearMonth, delta)))
   return activeMembers
     .map((member, index) => ({
       id: member.id,

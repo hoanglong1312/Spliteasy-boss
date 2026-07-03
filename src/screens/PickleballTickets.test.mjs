@@ -38,7 +38,7 @@ test('Home pending tickets banner expands with inline approve and delete actions
   assert.match(callsite, /items=\{d\.pendingTickets\?\.items \|\| \[\]\}/)
   assert.match(callsite, /count=\{d\.pendingTickets\?\.count \|\| 0\}/)
   assert.match(callsite, /totalAmount=\{d\.pendingTickets\?\.totalAmount \|\| 0\}/)
-  assert.match(callsite, /onNavigate=\{\(\) => onAction\?\.\('push', 'pickleball-calendar'\)\}/)
+  assert.match(callsite, /onNavigate=\{\(\) => \{[\s\S]*?onAction\?\.\('push', \{[\s\S]*?screen: 'pickleball-calendar'/)
   assert.match(callsite, /onAction=\{onAction\}/)
   assert.match(banner, /function PendingTicketsBanner\(\{ items = \[\], count, totalAmount, onNavigate, onAction \}\)/)
   assert.match(banner, /const \[expanded, setExpanded\] = useState\(false\)/)
@@ -57,7 +57,8 @@ test('PickleballTickets add form calculates total from selected participants and
   assert.match(screenSource, /import React, \{ useEffect, useMemo, useState \} from 'react'/)
   assert.match(screenSource, /function AddTicketSheet\(\{ data, onClose, onSave \}\) \{/)
   assert.match(screenSource, /const \[date, setDate\] = useState/)
-  assert.match(screenSource, /const \[time, setTime\] = useState/)
+  assert.doesNotMatch(screenSource, /const \[time, setTime\] = useState/)
+  assert.match(screenSource, /const time = '19:00'/)
   assert.match(screenSource, /const \[memberIds, setMemberIds\] = useState/)
   assert.match(screenSource, /const \[paymentMode, setPaymentMode\] = useState\('team_fund'\)/)
   assert.match(screenSource, /const \[error, setError\] = useState\(''\)/)
@@ -65,19 +66,45 @@ test('PickleballTickets add form calculates total from selected participants and
   assert.match(screenSource, /\{selectedMembers\.map\(member => \(/)
   assert.doesNotMatch(screenSource, /const \[totalAmount, setTotalAmount\]/)
   assert.match(screenSource, /value=\{date\}/)
-  assert.match(screenSource, /value=\{time\}/)
+  assert.doesNotMatch(screenSource, /label="Giờ"/)
   assert.match(screenSource, /value=\{advancerId\}/)
   assert.doesNotMatch(screenSource, /<Input\s+label="Tổng tiền"/)
   assert.doesNotMatch(screenSource, /defaultValue=/)
   assert.match(screenSource, /const ticketPrice = Number\(data\.ticketPricePerPerson \|\| data\.ticketPrice \|\| data\.defaultTicketAmountPerPerson \|\| 50000\) \|\| 50000/)
-  assert.match(screenSource, /const totalAmountToSave = ticketPrice \* memberIds\.length/)
-  assert.match(screenSource, /const amountPerPerson = ticketPrice/)
+  assert.match(screenSource, /const totalAmountToSave = ticketPrice \* billedMemberIds\.length/)
+  assert.match(screenSource, /const monthlyMemberIds = memberIds\.filter/)
+  assert.match(screenSource, /const waterPerPerson = totalSelected > 0 \? Math\.round\(waterAmount \/ totalSelected\) : 0/)
+  assert.match(screenSource, /const perLegPersonAmount = ticketPrice \+ waterPerPerson/)
+  assert.match(screenSource, /const grandTotal = totalAmountToSave \+ waterAmount/)
   assert.match(screenSource, /\{memberIds\.length\} người đã chọn/)
   assert.match(screenSource, /Price per person/)
-  assert.match(screenSource, /Tổng \{formatShortAmount\(totalAmountToSave\)\}/)
+  assert.match(screenSource, /Vé lẻ · \{billedMemberIds\.length\} người/)
+  assert.match(screenSource, /Vé tháng · \{monthlyMemberIds\.length\} người/)
+  assert.match(screenSource, /Tổng cộng/)
   assert.match(screenSource, /function ticketValidationError\(/)
   assert.match(screenSource, /onSave\(\{\s*session_date: dateToIso\(date\),\s*session_time: time,\s*member_ids: memberIds,\s*total_amount: totalAmountToSave,\s*advancer_id: paymentMode === 'advancer' \? advancerId : null,\s*paymentMode,\s*\}\)/)
-  assert.match(screenSource, /\{formatShortAmount\(amountPerPerson\)\}\/người/)
+  assert.match(screenSource, /\{formatShortAmount\(ticketPrice\)\}\/người/)
+  assert.doesNotMatch(screenSource, /opacity: monthlyTicket/)
+})
+
+test('ticket sheets color monthly chips only when selected and keep simple fixed summary', () => {
+  const ticketSheet = screenSource.slice(
+    screenSource.indexOf('function AddTicketSheet'),
+    screenSource.indexOf('function ticketValidationError')
+  )
+  const calendarSheet = calendarSource.slice(
+    calendarSource.indexOf('function AddTicketSheet'),
+    calendarSource.indexOf('function SessionDetailPanel')
+  )
+
+  for (const sheet of [ticketSheet, calendarSheet]) {
+    assert.doesNotMatch(sheet, /label="Giờ"/)
+    assert.match(sheet, /active && monthlyTicket \? 'rgba\(99,102,241,0\.42\)'/)
+    assert.match(sheet, /active && monthlyTicket \? 'rgba\(99,102,241,0\.16\)'/)
+    assert.match(sheet, /active && monthlyTicket \? '#c7d2fe'/)
+    assert.doesNotMatch(sheet, /opacity: monthlyTicket/)
+    assert.match(sheet, /monthlyMemberIds\.length === 0/)
+  }
 })
 
 test('PickleballCalendar ticket sheet keeps member save errors visible', () => {

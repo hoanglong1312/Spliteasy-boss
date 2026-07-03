@@ -401,7 +401,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
 function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onSave }) {
   const members = data.ticketMembers || [];
   const initialPaymentMode = editingTicket?.advancerId ? 'advancer' : 'team_fund';
-  const [time, setTime] = useState(formatTimeLabel(editingTicket?.timeLabel || editingTicket?.time || '19:00'));
+  const time = formatTimeLabel(editingTicket?.timeLabel || editingTicket?.time || '19:00');
   const [memberIds, setMemberIds] = useState(editingTicket?.memberIds || []);
   const [paymentMode, setPaymentMode] = useState(initialPaymentMode);
   const [advancerId, setAdvancerId] = useState(editingTicket?.advancerId || '');
@@ -415,8 +415,17 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
     const member = members.find(row => String(row.id) === String(id));
     return member?.ticketType !== 'monthly';
   });
+  const monthlyMemberIds = memberIds.filter(id => {
+    const member = members.find(row => String(row.id) === String(id));
+    return member?.ticketType === 'monthly';
+  });
+  const totalSelected = memberIds.length;
+  const waterAmount = parseAmount(waterInput) || 0;
+  const waterPerPerson = totalSelected > 0 ? Math.round(waterAmount / totalSelected) : 0;
+  const perLegPersonAmount = ticketPrice + waterPerPerson;
+  const perMonthlyPersonAmount = waterPerPerson;
   const totalAmount = ticketPrice * billedMemberIds.length;
-  const hasSelectedMonthlyMember = selectedMembers.some(member => member.ticketType === 'monthly');
+  const grandTotal = totalAmount + waterAmount;
 
   useEffect(() => {
     if (paymentMode !== 'advancer') return;
@@ -435,7 +444,6 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
   const submit = async (event) => {
     event.preventDefault();
     if (!selectedDate) return setError('Chọn ngày chơi.');
-    if (!String(time || '').trim()) return setError('Nhập giờ chơi.');
     if (memberIds.length === 0) return setError('Chọn ít nhất một người.');
     if (paymentMode === 'advancer' && !advancerId) return setError('Chọn người ứng tiền.');
     try {
@@ -490,17 +498,6 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
           }}>×</button>
         </div>
 
-        <Input
-          label="Giờ"
-          value={time}
-          onChange={event => {
-            setTime(event.target.value);
-            setError('');
-          }}
-          placeholder="19:00"
-          inputMode="numeric"
-        />
-
         <div style={{ marginTop: 14, fontSize: 10, color: colors.textSecondary, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
           Người tham gia · {memberIds.length} người
         </div>
@@ -515,10 +512,9 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
                 onClick={() => toggleMember(member.id)}
                 style={{
                   borderRadius: 100,
-                  border: `1px solid ${monthlyTicket ? 'rgba(148,163,184,0.26)' : active ? 'rgba(251,191,36,0.38)' : colors.borderSubtle}`,
-                  background: monthlyTicket ? 'rgba(148,163,184,0.08)' : active ? 'rgba(251,191,36,0.12)' : colors.inputBg,
-                  color: monthlyTicket ? colors.textMuted : active ? '#fde68a' : colors.textSecondary,
-                  opacity: monthlyTicket ? 0.72 : 1,
+                  border: `1px solid ${active && monthlyTicket ? 'rgba(99,102,241,0.42)' : active ? 'rgba(251,191,36,0.38)' : colors.borderSubtle}`,
+                  background: active && monthlyTicket ? 'rgba(99,102,241,0.16)' : active ? 'rgba(251,191,36,0.12)' : colors.inputBg,
+                  color: active && monthlyTicket ? '#c7d2fe' : active ? '#fde68a' : colors.textSecondary,
                   padding: '7px 10px',
                   fontFamily: 'inherit',
                   fontSize: 11,
@@ -533,10 +529,28 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
         </div>
 
         <div style={{ marginTop: 14, padding: 11, borderRadius: 12, background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(251,191,36,0.22)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 900 }}>
-            <span>{formatVNDShort(ticketPrice)}/người{hasSelectedMonthlyMember ? ` · ${billedMemberIds.length}/${memberIds.length} tính phí` : ''}</span>
-            <span style={{ ...type.mono }}>Tổng {formatVNDShort(totalAmount)}</span>
-          </div>
+          {monthlyMemberIds.length === 0 ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 900 }}>
+              <span>{formatVNDShort(ticketPrice)}/người</span>
+              <span style={{ ...type.mono }}>Tổng {formatVNDShort(totalAmount)}</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 900 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span>Vé lẻ · {billedMemberIds.length} người</span>
+                <span style={{ ...type.mono }}>{formatVNDShort(perLegPersonAmount)}/người</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                <span>Vé tháng · {monthlyMemberIds.length} người</span>
+                <span style={{ ...type.mono }}>{formatVNDShort(perMonthlyPersonAmount)}/người (chỉ nước)</span>
+              </div>
+              <div style={{ height: 1, background: 'rgba(251,191,36,0.18)' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 950 }}>
+                <span>Tổng cộng</span>
+                <span style={{ ...type.mono }}>{formatVNDShort(grandTotal)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 12 }}>
