@@ -14,7 +14,6 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const d = data || DEMO;
   const [search, setSearch] = useState('');
   const [expandedFixed, setExpandedFixed] = useState(false);
-  const [expandedCasual, setExpandedCasual] = useState(false);
   const [expandedMemberId, setExpandedMemberId] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [editName, setEditName] = useState('');
@@ -48,8 +47,6 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     return normalizeSearch(`${candidate.name} ${candidate.bankName} ${candidate.bankAccount}`).includes(normalizedQuery);
   });
   const query = search.trim().toLowerCase();
-  const filteredFixed = useMemo(() => filterMembers(fixedMembers, query), [fixedMembers, query]);
-  const filteredCasual = useMemo(() => filterMembers(casualMembers, query), [casualMembers, query]);
   const filteredMembers = useMemo(() => filterMembers([...fixedMembers, ...casualMembers].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi')), query), [fixedMembers, casualMembers, query]);
 
   function openEdit(member) {
@@ -238,60 +235,22 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           style={{ marginBottom: 14 }}
         />
 
-        {isFlexBilling ? (
-          <MemberSection
-            title={`Thành viên · ${filteredMembers.length} người`}
-            members={filteredMembers}
-            expanded={expandedFixed}
-            onExpand={() => setExpandedFixed(true)}
-            isTreasurer={isTreasurer}
-            expandedMemberId={expandedMemberId}
-            onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
-            onChangeType={changeType}
-            isFlexBilling={isFlexBilling}
-            monthlyTicketIds={monthlyTicketIds}
-            perSessionTicketIds={perSessionTicketIds}
-            onSetTicketType={setMemberTicketType}
-            onEdit={openEdit}
-            onDelete={deleteMember}
-          />
-        ) : (
-          <>
-            <MemberSection
-              title={`Cố định · ${filteredFixed.length} người`}
-              members={filteredFixed}
-              expanded={expandedFixed}
-              onExpand={() => setExpandedFixed(true)}
-              isTreasurer={isTreasurer}
-              expandedMemberId={expandedMemberId}
-              onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
-              onChangeType={changeType}
-              isFlexBilling={isFlexBilling}
-              monthlyTicketIds={monthlyTicketIds}
-              perSessionTicketIds={perSessionTicketIds}
-              onSetTicketType={setMemberTicketType}
-              onEdit={openEdit}
-              onDelete={deleteMember}
-            />
-
-            <MemberSection
-              title={`Vãng lai · ${filteredCasual.length} người`}
-              members={filteredCasual}
-              expanded={expandedCasual}
-              onExpand={() => setExpandedCasual(true)}
-              isTreasurer={isTreasurer}
-              expandedMemberId={expandedMemberId}
-              onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
-              onChangeType={changeType}
-              isFlexBilling={isFlexBilling}
-              monthlyTicketIds={monthlyTicketIds}
-              perSessionTicketIds={perSessionTicketIds}
-              onSetTicketType={setMemberTicketType}
-              onEdit={openEdit}
-              onDelete={deleteMember}
-            />
-          </>
-        )}
+        <MemberSection
+          title={`Thành viên · ${filteredMembers.length} người`}
+          members={filteredMembers}
+          expanded={expandedFixed}
+          onExpand={() => setExpandedFixed(true)}
+          isTreasurer={isTreasurer}
+          expandedMemberId={expandedMemberId}
+          onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
+          onChangeType={changeType}
+          isFlexBilling={isFlexBilling}
+          monthlyTicketIds={monthlyTicketIds}
+          perSessionTicketIds={perSessionTicketIds}
+          onSetTicketType={setMemberTicketType}
+          onEdit={openEdit}
+          onDelete={deleteMember}
+        />
       </Screen>
 
       {showAddMember && isTreasurer && (

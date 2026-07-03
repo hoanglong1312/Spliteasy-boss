@@ -2642,14 +2642,21 @@ export function buildPersonalWaterSessionRows(monthSessions, memberId, members =
     .filter(Boolean)
 }
 
-function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = []) {
+export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = []) {
   const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members)
   const waterSessions = monthSessions.filter(s => (
     sessionWaterAmount(s) > 0 &&
     effectiveSessionMemberIds(s, members).some(id => String(id) === String(memberId))
   )).length
+  const ticketCostCard = memberBalance.ticketType == null && !('ticketType' in memberBalance)
+    ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' }
+    : memberBalance.ticketType === 'monthly'
+    ? { icon: '🏸', label: 'Vé tháng của bạn', amount: -memberBalance.monthlyTicketFee, sub: 'Vé tháng cố định' }
+    : memberBalance.ticketType === 'per_session'
+    ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia' }
+    : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt' }
   return [
-    { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' },
+    ticketCostCard,
     { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows },
     { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: -ticketAdjustment, sub: 'Qua quỹ team', key: 'ticket' },
   ]
@@ -3566,6 +3573,7 @@ function inferScheduleWeekdaysFromMonthSessions(state, yearMonth) {
 }
 
 function hasMissingGeneratedSessions(state, yearMonth, sessions, config) {
+  if (String(yearMonth || '') < monthKey(new Date())) return false
   const scheduleWeekdays = safeArray(config?.scheduleWeekdays)
   if (scheduleWeekdays.length === 0) return false
   const expectedDates = generatedSessionDatesForMonth(yearMonth, config)

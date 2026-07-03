@@ -9,6 +9,7 @@ import {
   buildPickleballCalendarData,
   buildPickleballTicketsData,
   buildPrevMonthUnpaid,
+  buildPersonalPickleSummaryCards,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
   isBillingModeFlexForMonth,
@@ -368,6 +369,10 @@ describe('flex billing helpers', () => {
 })
 
 describe('buildPickleballCalendarData', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   test('uses session group members for explicit attendees', () => {
     const state = {
       currentUserId: 'm-current',
@@ -438,6 +443,72 @@ describe('buildPickleballCalendarData', () => {
     const data = buildPickleballCalendarData(state, { yearMonth: '2026-07' })
 
     expect(data.ticketMembers.map(member => member.ticketType)).toEqual([null, null, null])
+  })
+
+  test('does not request auto-generation for elapsed months with missing sessions', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-02'))
+    const state = makeFlexState({
+      schedule_weekdays: [1],
+      schedule_start_day: '01/06/2026',
+    })
+    state.pickle.monthlyConfigs.push({
+      group_id: 'group-1',
+      year_month: '2026-06',
+      schedule_weekdays: [1],
+      schedule_start_day: '01/06/2026',
+    })
+    state.pickle.sessions = []
+
+    const data = buildPickleballCalendarData(state, { yearMonth: '2026-06' })
+
+    expect(data.shouldAutoGenerate).toBe(false)
+    expect(data.autoGenerateRequest).toBeNull()
+  })
+})
+
+describe('buildPersonalPickleSummaryCards', () => {
+  test('uses flex monthly ticket cost instead of missing court fee', () => {
+    const result = buildPersonalPickleSummaryCards([], {
+      ticketType: 'monthly',
+      monthlyTicketFee: 700000,
+      perSessionTicketFee: 0,
+      waterFee: 0,
+    }, 0, 'member-1', [])
+
+    expect(result[0]).toMatchObject({
+      label: 'Vé tháng của bạn',
+      amount: -700000,
+      sub: 'Vé tháng cố định',
+    })
+    expect(Number.isNaN(result[0].amount)).toBe(false)
+    expect(result.map(card => card.label)).toContain('Vé lẻ qua quỹ')
+  })
+
+  test('uses flex per-session ticket cost and unassigned fallback', () => {
+    const perSession = buildPersonalPickleSummaryCards([], {
+      ticketType: 'per_session',
+      monthlyTicketFee: 0,
+      perSessionTicketFee: 240000,
+      waterFee: 0,
+    }, 0, 'member-1', [])
+    const unassigned = buildPersonalPickleSummaryCards([], {
+      ticketType: null,
+      monthlyTicketFee: 0,
+      perSessionTicketFee: 0,
+      waterFee: 0,
+    }, 0, 'member-1', [])
+
+    expect(perSession[0]).toMatchObject({
+      label: 'Vé lượt của bạn',
+      amount: -240000,
+      sub: 'Theo buổi tham gia',
+    })
+    expect(unassigned[0]).toMatchObject({
+      label: 'Chưa phân nhóm vé',
+      amount: 0,
+      sub: 'Vào Thành viên để chọn vé tháng/lượt',
+    })
   })
 })
 

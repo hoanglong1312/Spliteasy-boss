@@ -9,10 +9,11 @@ describe('Pickleball members flex billing UI', () => {
     expect(dataSource).toMatch(/billingMode: isBillingModeFlexForMonth\(state, yearMonth\) \? 'flex' : 'fixed'/)
   })
 
-  test('flex mode renders one merged member section with one expander', () => {
+  test('members screen always renders one merged member section with one expander', () => {
     expect(memberSource).toMatch(/const filteredMembers = useMemo\(\(\) => filterMembers\(\[\.\.\.fixedMembers, \.\.\.casualMembers\]\.sort/)
-    expect(memberSource).toMatch(/\{isFlexBilling \? \([\s\S]*?<MemberSection[\s\S]*?title=\{`Thành viên · \$\{filteredMembers\.length\} người`\}[\s\S]*?members=\{filteredMembers\}[\s\S]*?expanded=\{expandedFixed\}/)
-    expect(memberSource).toMatch(/\) : \([\s\S]*?<MemberSection[\s\S]*?title=\{`Cố định · \$\{filteredFixed\.length\} người`\}[\s\S]*?<MemberSection[\s\S]*?title=\{`Vãng lai · \$\{filteredCasual\.length\} người`\}/)
+    expect(memberSource).toMatch(/<MemberSection[\s\S]*?title=\{`Thành viên · \$\{filteredMembers\.length\} người`\}[\s\S]*?members=\{filteredMembers\}[\s\S]*?expanded=\{expandedFixed\}/)
+    expect(memberSource).not.toMatch(/title=\{`Cố định · \$\{filteredFixed\.length\} người`\}/)
+    expect(memberSource).not.toMatch(/title=\{`Vãng lai · \$\{filteredCasual\.length\} người`\}/)
   })
 
   test('flex mode hides fixed/casual controls while fixed mode uses a two-option member type segmented control', () => {
