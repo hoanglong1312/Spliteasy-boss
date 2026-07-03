@@ -411,7 +411,12 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
   const [error, setError] = useState('');
   const selectedMembers = members.filter(member => memberIds.some(id => String(id) === String(member.id)));
   const ticketPrice = Number(editingTicket?.amountPerPerson || data.ticketPricePerPerson || data.ticketPrice || 50000) || 50000;
-  const totalAmount = ticketPrice * memberIds.length;
+  const billedMemberIds = memberIds.filter(id => {
+    const member = members.find(row => String(row.id) === String(id));
+    return member?.ticketType !== 'monthly';
+  });
+  const totalAmount = ticketPrice * billedMemberIds.length;
+  const hasSelectedMonthlyMember = selectedMembers.some(member => member.ticketType === 'monthly');
 
   useEffect(() => {
     if (paymentMode !== 'advancer') return;
@@ -502,6 +507,7 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
           {members.map(member => {
             const active = memberIds.some(id => String(id) === String(member.id));
+            const monthlyTicket = member.ticketType === 'monthly';
             return (
               <button
                 key={member.id}
@@ -509,9 +515,10 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
                 onClick={() => toggleMember(member.id)}
                 style={{
                   borderRadius: 100,
-                  border: `1px solid ${active ? 'rgba(251,191,36,0.38)' : colors.borderSubtle}`,
-                  background: active ? 'rgba(251,191,36,0.12)' : colors.inputBg,
-                  color: active ? '#fde68a' : colors.textSecondary,
+                  border: `1px solid ${monthlyTicket ? 'rgba(148,163,184,0.26)' : active ? 'rgba(251,191,36,0.38)' : colors.borderSubtle}`,
+                  background: monthlyTicket ? 'rgba(148,163,184,0.08)' : active ? 'rgba(251,191,36,0.12)' : colors.inputBg,
+                  color: monthlyTicket ? colors.textMuted : active ? '#fde68a' : colors.textSecondary,
+                  opacity: monthlyTicket ? 0.72 : 1,
                   padding: '7px 10px',
                   fontFamily: 'inherit',
                   fontSize: 11,
@@ -527,7 +534,7 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
 
         <div style={{ marginTop: 14, padding: 11, borderRadius: 12, background: 'rgba(251,191,36,0.09)', border: '1px solid rgba(251,191,36,0.22)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 900 }}>
-            <span>{formatVNDShort(ticketPrice)}/người</span>
+            <span>{formatVNDShort(ticketPrice)}/người{hasSelectedMonthlyMember ? ` · ${billedMemberIds.length}/${memberIds.length} tính phí` : ''}</span>
             <span style={{ ...type.mono }}>Tổng {formatVNDShort(totalAmount)}</span>
           </div>
         </div>

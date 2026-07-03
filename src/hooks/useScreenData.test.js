@@ -7,6 +7,7 @@ import {
   buildHomeData,
   buildPaymentProgressRows,
   buildPickleballCalendarData,
+  buildPickleballTicketsData,
   buildPrevMonthUnpaid,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
@@ -398,6 +399,76 @@ describe('buildPickleballCalendarData', () => {
     const data = buildPickleballCalendarData(state, { yearMonth: '2026-05' })
 
     expect(data.selectedSession.attendees.map(member => member.name)).toEqual(['Anh Quân'])
+  })
+
+  test('ticket picker members include flex ticket type and sort by attendance', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    state.pickle.sessions = [
+      { date: '2026-07-02', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
+      { date: '2026-07-09', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
+      { date: '2026-07-16', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
+    ]
+
+    const data = buildPickleballCalendarData(state, { yearMonth: '2026-07' })
+
+    expect(data.ticketMembers.map(member => ({
+      id: member.id,
+      ticketType: member.ticketType,
+      sessionsAttended: member.sessionsAttended,
+    }))).toEqual([
+      { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
+      { id: 'member-1', ticketType: 'monthly', sessionsAttended: 1 },
+      { id: 'member-3', ticketType: null, sessionsAttended: 0 },
+    ])
+  })
+
+  test('ticket picker members keep fixed mode ticket types null', () => {
+    const state = makeFlexState({
+      billing_mode: 'fixed',
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+
+    const data = buildPickleballCalendarData(state, { yearMonth: '2026-07' })
+
+    expect(data.ticketMembers.map(member => member.ticketType)).toEqual([null, null, null])
+  })
+})
+
+describe('buildPickleballTicketsData', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  test('members include flex ticket type and sort by attendance for current month', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-20'))
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    state.pickle.sessions = [
+      { date: '2026-07-02', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
+      { date: '2026-07-09', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
+      { date: '2026-07-16', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
+    ]
+
+    const data = buildPickleballTicketsData(state)
+
+    expect(data.members.map(member => ({
+      id: member.id,
+      ticketType: member.ticketType,
+      sessionsAttended: member.sessionsAttended,
+    }))).toEqual([
+      { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
+      { id: 'member-1', ticketType: 'monthly', sessionsAttended: 1 },
+      { id: 'member-3', ticketType: null, sessionsAttended: 0 },
+    ])
   })
 })
 describe('buildPersonalWaterSessionRows', () => {
