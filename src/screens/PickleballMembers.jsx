@@ -50,6 +50,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const query = search.trim().toLowerCase();
   const filteredFixed = useMemo(() => filterMembers(fixedMembers, query), [fixedMembers, query]);
   const filteredCasual = useMemo(() => filterMembers(casualMembers, query), [casualMembers, query]);
+  const filteredMembers = useMemo(() => filterMembers([...fixedMembers, ...casualMembers].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi')), query), [fixedMembers, casualMembers, query]);
 
   function openEdit(member) {
     setExpandedMemberId(null);
@@ -90,6 +91,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     }
     if (duplicateMember && candidatesToAdd.length === 0) return;
     setSavingAction('addMember');
+    const memberType = isFlexBilling ? 'fixed' : newMemberType;
     try {
       for (const candidate of candidatesToAdd) {
         if (candidate.isInactive) {
@@ -100,14 +102,14 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           groupId: d.groupId,
           name: candidate.name,
           profileId: candidate?.profileId || candidate?.id || '',
-          type: newMemberType,
+          type: memberType,
           bankAccountName: candidate?.bankAccountName || '',
           bankName: candidate?.bankName || '',
           bankAccount: candidate?.bankAccount || '',
         });
       }
       if (candidatesToAdd.length === 0 && typedMemberName) {
-        await onAction?.('addPickleballMember', { groupId: d.groupId, name: typedMemberName, profileId: '', type: newMemberType });
+        await onAction?.('addPickleballMember', { groupId: d.groupId, name: typedMemberName, profileId: '', type: memberType });
       }
       setNewMemberType('fixed');
       setCandidateQuery('');
@@ -143,9 +145,9 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     ));
   }
 
-  async function changeType(member) {
+  async function changeType(member, targetType) {
     if (savingAction) return;
-    const type = member.type === 'casual' ? 'fixed' : 'casual';
+    const type = targetType || (member.type === 'casual' ? 'fixed' : 'casual');
     setSavingAction('changeType');
     try {
       await onAction?.('setMemberType', { memberId: member.id, type, groupId: d.groupId, yearMonth: d.currentYearMonth });
@@ -236,39 +238,60 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           style={{ marginBottom: 14 }}
         />
 
-        <MemberSection
-          title={`Cố định · ${filteredFixed.length} người`}
-          members={filteredFixed}
-          expanded={expandedFixed}
-          onExpand={() => setExpandedFixed(true)}
-          isTreasurer={isTreasurer}
-          expandedMemberId={expandedMemberId}
-          onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
-          onChangeType={changeType}
-          isFlexBilling={isFlexBilling}
-          monthlyTicketIds={monthlyTicketIds}
-          perSessionTicketIds={perSessionTicketIds}
-          onSetTicketType={setMemberTicketType}
-          onEdit={openEdit}
-          onDelete={deleteMember}
-        />
+        {isFlexBilling ? (
+          <MemberSection
+            title={`Thành viên · ${filteredMembers.length} người`}
+            members={filteredMembers}
+            expanded={expandedFixed}
+            onExpand={() => setExpandedFixed(true)}
+            isTreasurer={isTreasurer}
+            expandedMemberId={expandedMemberId}
+            onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
+            onChangeType={changeType}
+            isFlexBilling={isFlexBilling}
+            monthlyTicketIds={monthlyTicketIds}
+            perSessionTicketIds={perSessionTicketIds}
+            onSetTicketType={setMemberTicketType}
+            onEdit={openEdit}
+            onDelete={deleteMember}
+          />
+        ) : (
+          <>
+            <MemberSection
+              title={`Cố định · ${filteredFixed.length} người`}
+              members={filteredFixed}
+              expanded={expandedFixed}
+              onExpand={() => setExpandedFixed(true)}
+              isTreasurer={isTreasurer}
+              expandedMemberId={expandedMemberId}
+              onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
+              onChangeType={changeType}
+              isFlexBilling={isFlexBilling}
+              monthlyTicketIds={monthlyTicketIds}
+              perSessionTicketIds={perSessionTicketIds}
+              onSetTicketType={setMemberTicketType}
+              onEdit={openEdit}
+              onDelete={deleteMember}
+            />
 
-        <MemberSection
-          title={`Vãng lai · ${filteredCasual.length} người`}
-          members={filteredCasual}
-          expanded={expandedCasual}
-          onExpand={() => setExpandedCasual(true)}
-          isTreasurer={isTreasurer}
-          expandedMemberId={expandedMemberId}
-          onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
-          onChangeType={changeType}
-          isFlexBilling={isFlexBilling}
-          monthlyTicketIds={monthlyTicketIds}
-          perSessionTicketIds={perSessionTicketIds}
-          onSetTicketType={setMemberTicketType}
-          onEdit={openEdit}
-          onDelete={deleteMember}
-        />
+            <MemberSection
+              title={`Vãng lai · ${filteredCasual.length} người`}
+              members={filteredCasual}
+              expanded={expandedCasual}
+              onExpand={() => setExpandedCasual(true)}
+              isTreasurer={isTreasurer}
+              expandedMemberId={expandedMemberId}
+              onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
+              onChangeType={changeType}
+              isFlexBilling={isFlexBilling}
+              monthlyTicketIds={monthlyTicketIds}
+              perSessionTicketIds={perSessionTicketIds}
+              onSetTicketType={setMemberTicketType}
+              onEdit={openEdit}
+              onDelete={deleteMember}
+            />
+          </>
+        )}
       </Screen>
 
       {showAddMember && isTreasurer && (
@@ -309,7 +332,7 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
                 </Button>
               </div>
             )}
-            <TypeSwitch value={newMemberType} onChange={setNewMemberType} />
+            {!isFlexBilling && <TypeSwitch value={newMemberType} onChange={setNewMemberType} />}
             <Button block variant="success" style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }} type="submit" disabled={savingAction === 'addMember'}>
               {savingAction === 'addMember' && <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'pickleballLoadingSpin 0.7s linear infinite', display: 'inline-block', flexShrink: 0 }} />}
               {savingAction === 'addMember' ? 'Đang lưu…' : selectedCandidates.length > 0 ? `Thêm ${selectedCandidates.length} thành viên` : typedMemberName && !exactCandidateMatch && !duplicateMember ? `Thêm "${typedMemberName}" làm thành viên mới` : 'Thêm thành viên'}
@@ -547,9 +570,11 @@ function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onCh
               </span>
             </div>
           )}
-          <div style={{ fontSize: 10, fontWeight: 800, color: isFixed ? colors.success : colors.warning, marginTop: 5 }}>
-            {isFixed ? 'Cố định' : 'Vãng lai'}
-          </div>
+          {!isFlexBilling && (
+            <div style={{ fontSize: 10, fontWeight: 800, color: isFixed ? colors.success : colors.warning, marginTop: 5 }}>
+              {isFixed ? 'Cố định' : 'Vãng lai'}
+            </div>
+          )}
         </div>
         {isTreasurer && (isFlexBilling ? (
           <div style={{
@@ -584,21 +609,10 @@ function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onCh
             </TicketTypeButton>
           </div>
         ) : (
-          <button type="button" onClick={(e) => {
-            e.stopPropagation();
-            onChangeType(member);
-          }} style={{
-            border: `1px solid ${isFixed ? 'rgba(251,191,36,0.28)' : 'rgba(52,211,153,0.30)'}`,
-            background: isFixed ? 'rgba(251,191,36,0.10)' : 'rgba(52,211,153,0.10)',
-            color: isFixed ? '#fde68a' : '#6ee7b7',
-            borderRadius: 10,
-            padding: '7px 9px',
-            fontSize: 11,
-            fontWeight: 900,
-            fontFamily: 'inherit',
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
-          }}>{isFixed ? '→ Vãng lai' : '→ Cố định'}</button>
+          <MemberTypeSegmentedControl
+            isFixed={isFixed}
+            onSelect={(type) => onChangeType(member, type)}
+          />
         ))}
       </div>
       {isExpanded && isTreasurer && (
@@ -650,6 +664,69 @@ function TicketTypeButton({ checked, tone, onClick, children }) {
   const palette = tone === 'per_session'
     ? { border: 'rgba(251,191,36,0.28)', bg: 'rgba(251,191,36,0.10)', color: '#fde68a' }
     : { border: 'rgba(96,165,250,0.28)', bg: 'rgba(96,165,250,0.12)', color: '#bfdbfe' };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${checked ? palette.border : 'transparent'}`,
+        background: checked ? palette.bg : 'transparent',
+        color: checked ? palette.color : colors.textSecondary,
+        borderRadius: 8,
+        padding: '7px 5px',
+        fontSize: 10,
+        fontWeight: 900,
+        fontFamily: 'inherit',
+        cursor: 'pointer',
+        ...type.mono,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MemberTypeSegmentedControl({ isFixed, onSelect }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 4,
+      width: 126,
+      padding: 3,
+      border: `1px solid ${colors.borderSubtle}`,
+      borderRadius: 10,
+      background: colors.cardSurface,
+    }}>
+      <MemberTypeButton
+        checked={isFixed}
+        tone="fixed"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect('fixed');
+        }}
+      >
+        Cố định
+      </MemberTypeButton>
+      <MemberTypeButton
+        checked={!isFixed}
+        tone="casual"
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect('casual');
+        }}
+      >
+        Vãng lai
+      </MemberTypeButton>
+    </div>
+  );
+}
+
+function MemberTypeButton({ checked, tone, onClick, children }) {
+  const palette = tone === 'casual'
+    ? { border: 'rgba(251,191,36,0.28)', bg: 'rgba(251,191,36,0.10)', color: '#fde68a' }
+    : { border: 'rgba(52,211,153,0.30)', bg: 'rgba(52,211,153,0.10)', color: '#6ee7b7' };
 
   return (
     <button

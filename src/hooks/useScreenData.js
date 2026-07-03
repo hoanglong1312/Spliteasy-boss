@@ -1872,7 +1872,7 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
     currentYearMonth: yearMonth,
-    billingMode: monthlyConfig?.billingMode ?? monthlyConfig?.billing_mode ?? 'fixed',
+    billingMode: isBillingModeFlexForMonth(state, yearMonth) ? 'flex' : 'fixed',
     monthlyTicketMemberIds: safeArray(monthlyConfig?.monthlyTicketMemberIds ?? monthlyConfig?.monthly_ticket_member_ids),
     perSessionTicketMemberIds: safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids),
     stats: {
