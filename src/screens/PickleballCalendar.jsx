@@ -535,14 +535,17 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
               <span style={{ ...type.mono }}>Tổng {formatVNDShort(totalAmount)}</span>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, fontWeight: 900 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <span>Vé lẻ · {billedMemberIds.length} người</span>
-                <span style={{ ...type.mono }}>{formatVNDShort(perLegPersonAmount)}/người</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, fontWeight: 900 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <span style={{ color: '#fde68a' }}>Vé lẻ · {billedMemberIds.length} người</span>
+                <span style={{ ...type.mono, fontSize: 13, fontWeight: 900 }}>{formatVNDShort(perLegPersonAmount)}/người</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <span>Vé tháng · {monthlyMemberIds.length} người</span>
-                <span style={{ ...type.mono }}>{formatVNDShort(perMonthlyPersonAmount)}/người (chỉ nước)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <span style={{ color: '#c7d2fe' }}>Vé tháng · {monthlyMemberIds.length} người</span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <span style={{ ...type.mono, fontSize: 13, fontWeight: 900 }}>{formatVNDShort(perMonthlyPersonAmount)}/người</span>
+                  <span style={{ fontSize: 9, fontStyle: 'italic', color: colors.textMuted }}>chỉ tiền nước</span>
+                </span>
               </div>
               <div style={{ height: 1, background: 'rgba(251,191,36,0.18)' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontWeight: 950 }}>
