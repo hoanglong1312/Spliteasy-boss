@@ -7,6 +7,7 @@ const memberDetailSource = readFileSync(new URL('./MemberDetail.jsx', import.met
 const dataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../app-v2.jsx', import.meta.url), 'utf8');
 const storeSource = readFileSync(new URL('../store.jsx', import.meta.url), 'utf8');
+const settingsSource = readFileSync(new URL('./PickleballSettings.jsx', import.meta.url), 'utf8');
 
 test('Pickleball member add flow validates typed names against active and inactive group members', () => {
   assert.match(dataSource, /allMembers: allMemberRows/);
@@ -61,6 +62,30 @@ test('Pickleball member row does not nest quick action button inside another but
 test('Pickleball member type changes pass the selected month to avoid cross-month contamination', () => {
   assert.match(memberSource, /onAction\?\.\('setMemberType', \{ memberId: member\.id, type, groupId: d\.groupId, yearMonth: d\.currentYearMonth \}\)/);
   assert.match(dataSource, /currentYearMonth: monthKey\(today\)/);
+});
+
+test('Flex ticket assignment lives on member rows and saves immediately', () => {
+  assert.match(dataSource, /billingMode: monthlyConfig\?\.billingMode \?\? monthlyConfig\?\.billing_mode \?\? 'fixed'/);
+  assert.match(dataSource, /monthlyTicketMemberIds: safeArray\(monthlyConfig\?\.monthlyTicketMemberIds \?\? monthlyConfig\?\.monthly_ticket_member_ids\)/);
+  assert.match(dataSource, /perSessionTicketMemberIds: safeArray\(monthlyConfig\?\.perSessionTicketMemberIds \?\? monthlyConfig\?\.per_session_ticket_member_ids\)/);
+  assert.match(memberSource, /const isFlexBilling = d\.billingMode === 'flex'/);
+  assert.match(memberSource, /onSetTicketType=\{setMemberTicketType\}/);
+  assert.match(memberSource, /onAction\?\.\('setMemberTicketType', \{ memberId: member\.id, groupId: d\.groupId, yearMonth: d\.currentYearMonth, ticketType \}\)/);
+  assert.match(memberSource, /<TicketTypeButton[\s\S]*?Vé tháng[\s\S]*?<TicketTypeButton[\s\S]*?Vé lượt/);
+  assert.doesNotMatch(settingsSource, /<FlexMemberAssignList/);
+});
+
+test('AppV2 setMemberTicketType updates flex member arrays without resetting prices', () => {
+  const block = appSource.slice(
+    appSource.indexOf("if (type === 'setMemberTicketType')"),
+    appSource.indexOf("if (type === 'removeMemberFromGroup')")
+  );
+
+  assert.match(block, /\.select\('\*'\)[\s\S]*?\.maybeSingle\(\)/);
+  assert.match(block, /monthly_ticket_price: currentConfig\?\.monthly_ticket_price \?\? currentConfig\?\.monthlyTicketPrice \?\? 0/);
+  assert.match(block, /per_session_ticket_price: currentConfig\?\.per_session_ticket_price \?\? currentConfig\?\.perSessionTicketPrice \?\? 0/);
+  assert.match(block, /monthly_ticket_member_ids: ticketType === 'monthly' \? addUnique\(monthlyIds, memberId\) : removeValue\(monthlyIds, memberId\)/);
+  assert.match(block, /per_session_ticket_member_ids: ticketType === 'per_session' \? addUnique\(perSessionIds, memberId\) : removeValue\(perSessionIds, memberId\)/);
 });
 
 test('Pickleball member actions expand inline instead of using a quick action sheet', () => {

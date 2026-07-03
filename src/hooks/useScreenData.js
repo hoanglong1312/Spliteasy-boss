@@ -1844,6 +1844,8 @@ function calendarMonthDate(params, fallbackDate) {
 
 function buildPickleballMembersData(state, selectedYearMonth) {
   const today = dateFromYearMonth(selectedYearMonth)
+  const yearMonth = monthKey(today)
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
   const allMemberRows = currentGroupMembers(state).map(member => ({
     id: member.id,
     name: member.displayName || member.name || '',
@@ -1876,7 +1878,10 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
-    currentYearMonth: monthKey(today),
+    currentYearMonth: yearMonth,
+    billingMode: monthlyConfig?.billingMode ?? monthlyConfig?.billing_mode ?? 'fixed',
+    monthlyTicketMemberIds: safeArray(monthlyConfig?.monthlyTicketMemberIds ?? monthlyConfig?.monthly_ticket_member_ids),
+    perSessionTicketMemberIds: safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids),
     stats: {
       active: activeMembers.length,
       permanent: fixedRows.length,

@@ -63,6 +63,17 @@ function normalizeMemberName(value) {
   return String(value || '').trim().toLowerCase()
 }
 
+function addUnique(values, value) {
+  const next = safeArray(values).map(String).filter(Boolean)
+  const key = String(value || '')
+  return key && !next.includes(key) ? [...next, key] : next
+}
+
+function removeValue(values, value) {
+  const key = String(value || '')
+  return safeArray(values).map(String).filter(item => item && item !== key)
+}
+
 function memberIdentityKey(member) {
   return String(member?.profileId || member?.profile_id || normalizeMemberName(member?.displayName || member?.name) || '').trim().toLowerCase()
 }
@@ -1157,6 +1168,41 @@ export default function AppV2() {
       const { error } = await sb
         .from('pickleball_monthly_config')
         .upsert(nextConfig, { onConflict: 'group_id,year_month' })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
+    if (type === 'setMemberTicketType') {
+      const memberId = payload?.memberId
+      const targetGroupId = payload?.groupId || state.currentGroupId
+      const yearMonth = payload?.yearMonth || monthKey(new Date())
+      const ticketType = payload?.ticketType === 'per_session' ? 'per_session' : 'monthly'
+      if (!memberId || !targetGroupId || !yearMonth) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { data: currentConfig, error: configError } = await sb
+        .from('pickleball_monthly_config')
+        .select('*')
+        .eq('group_id', targetGroupId)
+        .eq('year_month', yearMonth)
+        .maybeSingle()
+      if (configError) throw configError
+      const monthlyIds = safeArray(currentConfig?.monthly_ticket_member_ids ?? currentConfig?.monthlyTicketMemberIds)
+      const perSessionIds = safeArray(currentConfig?.per_session_ticket_member_ids ?? currentConfig?.perSessionTicketMemberIds)
+      const { error } = await sb
+        .from('pickleball_monthly_config')
+        .upsert({
+          group_id: targetGroupId,
+          year_month: yearMonth,
+          billing_mode: currentConfig?.billing_mode ?? currentConfig?.billingMode ?? 'flex',
+          court_fee: currentConfig?.court_fee ?? currentConfig?.courtFee ?? 0,
+          fixed_member_ids: safeArray(currentConfig?.fixed_member_ids ?? currentConfig?.fixedMemberIds),
+          monthly_ticket_price: currentConfig?.monthly_ticket_price ?? currentConfig?.monthlyTicketPrice ?? 0,
+          per_session_ticket_price: currentConfig?.per_session_ticket_price ?? currentConfig?.perSessionTicketPrice ?? 0,
+          monthly_ticket_member_ids: ticketType === 'monthly' ? addUnique(monthlyIds, memberId) : removeValue(monthlyIds, memberId),
+          per_session_ticket_member_ids: ticketType === 'per_session' ? addUnique(perSessionIds, memberId) : removeValue(perSessionIds, memberId),
+        }, { onConflict: 'group_id,year_month' })
       if (error) throw error
       await dispatch({ type: 'REFRESH' })
       return

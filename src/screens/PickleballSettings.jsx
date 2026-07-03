@@ -62,22 +62,6 @@ export default function PickleballSettings({ data, isTreasurer = true, onAction 
     ))
   }
 
-  function toggleMonthlyMember(memberId) {
-    const id = String(memberId)
-    setMonthlyTicketMemberIds(current => (
-      current.includes(id) ? current.filter(value => value !== id) : [...current, id]
-    ))
-    setPerSessionTicketMemberIds(current => current.filter(value => value !== id))
-  }
-
-  function togglePerSessionMember(memberId) {
-    const id = String(memberId)
-    setPerSessionTicketMemberIds(current => (
-      current.includes(id) ? current.filter(value => value !== id) : [...current, id]
-    ))
-    setMonthlyTicketMemberIds(current => current.filter(value => value !== id))
-  }
-
   if (!isTreasurer) {
     return (
       <PhoneFrame>
@@ -153,13 +137,6 @@ export default function PickleballSettings({ data, isTreasurer = true, onAction 
                 inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
               />
             </Card>
-            <FlexMemberAssignList
-              members={d.members}
-              monthlyTicketMemberIds={monthlyTicketMemberIds}
-              perSessionTicketMemberIds={perSessionTicketMemberIds}
-              onMonthlyToggle={toggleMonthlyMember}
-              onPerSessionToggle={togglePerSessionMember}
-            />
           </>
         )}
 
@@ -278,117 +255,6 @@ function MemberChecklist({ title, members, selectedIds, onToggle, tone }) {
         ))}
       </Card>
     </div>
-  )
-}
-
-function FlexMemberAssignList({
-  members,
-  monthlyTicketMemberIds,
-  perSessionTicketMemberIds,
-  onMonthlyToggle,
-  onPerSessionToggle,
-}) {
-  const monthlySet = new Set(safeArray(monthlyTicketMemberIds).map(String))
-  const perSessionSet = new Set(safeArray(perSessionTicketMemberIds).map(String))
-  const memberList = safeArray(members)
-
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ ...type.label, color: colors.textSecondary, margin: '8px 0 8px' }}>Phân nhóm vé</div>
-      <Card style={{ padding: '4px 12px' }}>
-        {memberList.length === 0 && (
-          <div style={{ fontSize: 12, color: colors.textSecondary, padding: '12px 0' }}>
-            Không có thành viên
-          </div>
-        )}
-        {memberList.map((member, index) => {
-          const id = String(member.id)
-
-          return (
-            <div
-              key={member.id}
-              style={{
-                width: '100%',
-                display: 'grid',
-                gridTemplateColumns: '34px minmax(0, 1fr) auto',
-                gap: 10,
-                alignItems: 'center',
-                padding: '10px 0',
-                borderBottom: index === memberList.length - 1 ? 'none' : `1px solid ${colors.borderSubtle}`,
-              }}
-            >
-              <Avatar initial={member.initial} size={34} photoUrl={member.photoUrl} />
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                  <span style={{
-                    fontSize: 13,
-                    fontWeight: 800,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    {member.name}
-                  </span>
-                  {member.isTreasurer && <Badge tone="warn" style={{ padding: '2px 6px', fontSize: 9 }}>THỦ QUỸ</Badge>}
-                </div>
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 4,
-                width: 144,
-                padding: 3,
-                border: `1px solid ${colors.borderSubtle}`,
-                borderRadius: 10,
-                background: colors.cardSurface,
-              }}>
-                <TicketTypeButton
-                  checked={monthlySet.has(id)}
-                  tone="monthly"
-                  onClick={() => onMonthlyToggle(member.id)}
-                >
-                  Vé tháng
-                </TicketTypeButton>
-                <TicketTypeButton
-                  checked={perSessionSet.has(id)}
-                  tone="per_session"
-                  onClick={() => onPerSessionToggle(member.id)}
-                >
-                  Vé lượt
-                </TicketTypeButton>
-              </div>
-            </div>
-          )
-        })}
-      </Card>
-    </div>
-  )
-}
-
-function TicketTypeButton({ checked, tone, onClick, children }) {
-  const palette = tone === 'per_session'
-    ? { border: 'rgba(251,191,36,0.28)', bg: 'rgba(251,191,36,0.10)', color: '#fde68a' }
-    : { border: 'rgba(96,165,250,0.28)', bg: 'rgba(96,165,250,0.12)', color: '#bfdbfe' }
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        border: `1px solid ${checked ? palette.border : 'transparent'}`,
-        background: checked ? palette.bg : 'transparent',
-        color: checked ? palette.color : colors.textSecondary,
-        borderRadius: 8,
-        padding: '7px 5px',
-        fontSize: 10,
-        fontWeight: 900,
-        fontFamily: 'inherit',
-        cursor: 'pointer',
-        ...type.mono,
-      }}
-    >
-      {children}
-    </button>
   )
 }
 

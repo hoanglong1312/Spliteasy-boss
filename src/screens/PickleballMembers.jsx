@@ -33,6 +33,9 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
   const casualMembers = d.casualMembers || d.guests || [];
   const allMembers = d.allMembers || [];
   const memberCandidates = d.memberCandidates || [];
+  const isFlexBilling = d.billingMode === 'flex';
+  const monthlyTicketIds = new Set((d.monthlyTicketMemberIds || []).map(String));
+  const perSessionTicketIds = new Set((d.perSessionTicketMemberIds || []).map(String));
   const typedMemberName = candidateQuery.trim();
   const duplicateMember = findDuplicateMember(typedMemberName, allMembers);
   const duplicateMemberInactive = duplicateMember && !isActiveMember(duplicateMember);
@@ -151,6 +154,16 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     }
   }
 
+  async function setMemberTicketType(member, ticketType) {
+    if (savingAction) return;
+    setSavingAction('setMemberTicketType');
+    try {
+      await onAction?.('setMemberTicketType', { memberId: member.id, groupId: d.groupId, yearMonth: d.currentYearMonth, ticketType });
+    } finally {
+      setSavingAction('');
+    }
+  }
+
   async function changeRole(member) {
     if (savingAction) return;
     const role = member.role === 'treasurer' ? 'member' : 'treasurer';
@@ -232,6 +245,10 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           expandedMemberId={expandedMemberId}
           onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
           onChangeType={changeType}
+          isFlexBilling={isFlexBilling}
+          monthlyTicketIds={monthlyTicketIds}
+          perSessionTicketIds={perSessionTicketIds}
+          onSetTicketType={setMemberTicketType}
           onEdit={openEdit}
           onDelete={deleteMember}
         />
@@ -245,6 +262,10 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           expandedMemberId={expandedMemberId}
           onToggleExpand={(id) => setExpandedMemberId(prev => prev === id ? null : id)}
           onChangeType={changeType}
+          isFlexBilling={isFlexBilling}
+          monthlyTicketIds={monthlyTicketIds}
+          perSessionTicketIds={perSessionTicketIds}
+          onSetTicketType={setMemberTicketType}
           onEdit={openEdit}
           onDelete={deleteMember}
         />
@@ -393,7 +414,22 @@ function maskAccount(value) {
   return `${text.slice(0, 4)} •••• ${text.slice(-3)}`;
 }
 
-function MemberSection({ title, members, expanded, onExpand, isTreasurer, expandedMemberId, onToggleExpand, onChangeType, onEdit, onDelete }) {
+function MemberSection({
+  title,
+  members,
+  expanded,
+  onExpand,
+  isTreasurer,
+  expandedMemberId,
+  onToggleExpand,
+  onChangeType,
+  isFlexBilling,
+  monthlyTicketIds,
+  perSessionTicketIds,
+  onSetTicketType,
+  onEdit,
+  onDelete,
+}) {
   const visibleMembers = expanded ? members : members.slice(0, 5);
   const hiddenCount = Math.max(members.length - visibleMembers.length, 0);
 
@@ -419,6 +455,9 @@ function MemberSection({ title, members, expanded, onExpand, isTreasurer, expand
             isExpanded={expandedMemberId === member.id}
             onToggleExpand={onToggleExpand}
             onChangeType={onChangeType}
+            isFlexBilling={isFlexBilling}
+            ticketType={monthlyTicketIds?.has(String(member.id)) ? 'monthly' : perSessionTicketIds?.has(String(member.id)) ? 'per_session' : ''}
+            onSetTicketType={onSetTicketType}
             onEdit={onEdit}
             onDelete={onDelete}
           />
@@ -442,7 +481,7 @@ function MemberSection({ title, members, expanded, onExpand, isTreasurer, expand
   );
 }
 
-function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onChangeType, onEdit, onDelete }) {
+function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onChangeType, isFlexBilling, ticketType, onSetTicketType, onEdit, onDelete }) {
   const isFixed = member.memberType === 'fixed' || member.type === 'fixed';
   const isCasual = !isFixed;
   const pct = Number(member.progressPct) || 0;
@@ -512,7 +551,39 @@ function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onCh
             {isFixed ? 'Cố định' : 'Vãng lai'}
           </div>
         </div>
-        {isTreasurer && (
+        {isTreasurer && (isFlexBilling ? (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 4,
+            width: 144,
+            padding: 3,
+            border: `1px solid ${colors.borderSubtle}`,
+            borderRadius: 10,
+            background: colors.cardSurface,
+          }}>
+            <TicketTypeButton
+              checked={ticketType === 'monthly'}
+              tone="monthly"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetTicketType(member, 'monthly');
+              }}
+            >
+              Vé tháng
+            </TicketTypeButton>
+            <TicketTypeButton
+              checked={ticketType === 'per_session'}
+              tone="per_session"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSetTicketType(member, 'per_session');
+              }}
+            >
+              Vé lượt
+            </TicketTypeButton>
+          </div>
+        ) : (
           <button type="button" onClick={(e) => {
             e.stopPropagation();
             onChangeType(member);
@@ -528,7 +599,7 @@ function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onCh
             cursor: 'pointer',
             whiteSpace: 'nowrap',
           }}>{isFixed ? '→ Vãng lai' : '→ Cố định'}</button>
-        )}
+        ))}
       </div>
       {isExpanded && isTreasurer && (
         <div style={{
@@ -572,6 +643,33 @@ function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onCh
         </div>
       )}
     </div>
+  );
+}
+
+function TicketTypeButton({ checked, tone, onClick, children }) {
+  const palette = tone === 'per_session'
+    ? { border: 'rgba(251,191,36,0.28)', bg: 'rgba(251,191,36,0.10)', color: '#fde68a' }
+    : { border: 'rgba(96,165,250,0.28)', bg: 'rgba(96,165,250,0.12)', color: '#bfdbfe' };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${checked ? palette.border : 'transparent'}`,
+        background: checked ? palette.bg : 'transparent',
+        color: checked ? palette.color : colors.textSecondary,
+        borderRadius: 8,
+        padding: '7px 5px',
+        fontSize: 10,
+        fontWeight: 900,
+        fontFamily: 'inherit',
+        cursor: 'pointer',
+        ...type.mono,
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
