@@ -1,5 +1,7 @@
 # Testing Rules — SpliteasyBoss
 
+Nội dung lệnh cụ thể mà `.claude/commands/verify.md` (`/verify`) và `/ship` chạy cho project này (xem `CLAUDE.md` → Quality Gate).
+
 ## Lệnh Chạy Test
 
 ### Unit Tests (Vitest) — Codex chạy được
@@ -23,7 +25,7 @@ npx playwright test --reporter=line
 
 Với thay đổi UI, verify trên localhost trước để tránh deploy vòng.
 
-**Tool duy nhất: `cmux browser` qua Bash** (WKWebView tích hợp cmux). Hỗ trợ đủ: click, fill, screenshot, snapshot DOM, console logs (`console list`), network requests (`network requests`), JS eval.
+**Tool duy nhất: `cmux browser` qua Bash** (WKWebView tích hợp cmux). Hỗ trợ: click, fill, screenshot, snapshot DOM, console logs (`console list`), JS eval. **Không hỗ trợ** `network requests` trên WKWebView (đã test thực tế, báo `not_supported`) — cần bắt network thì dùng Playwright (`page.on('request')`).
 
 Chrome DevTools MCP đã bị xóa khỏi `.mcp.json`. Không dùng lại trừ khi cần heap snapshot hoặc Lighthouse.
 

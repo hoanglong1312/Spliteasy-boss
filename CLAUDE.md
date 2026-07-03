@@ -35,13 +35,11 @@ Bug nhỏ (1-2 file, triệu chứng rõ, không cần DB/RLS/MCP) dùng fast pa
 
 ### Quality Gate — Bắt Buộc Trước Khi Bàn Giao User
 
+Đây là nội dung cụ thể mà `/ship` (`.claude/commands/ship.md`, xem Definition of Done ở `code-project.md`) chạy cho project này — không phải bước tùy chọn thêm.
+
 **Bước 1: Static Audit (Codex tự làm)**
 Gọi Codex rà soát toàn bộ screens: prop match, `onAction` handler tồn tại, import hợp lệ, form controlled. Codex báo cáo → Claude đọc adversarial → nếu có issue → gọi Codex fix → lặp lại.
 
-**Bước 2: E2E Tests**
-Claude main chạy trực tiếp (Codex không chạy được — EPERM):
-```bash
-npx playwright test --reporter=line
-```
+**Bước 2: Test suite** — lệnh cụ thể + pass condition → `rules/testing.md` (single source, không restate ở đây).
 
-**Pass condition:** `npm run build` ✅ + static audit ✅ + Playwright ✅
+**Checklist bắt buộc:** khi task đụng `.jsx`/`.sql`/migration, `TaskCreate` ngay checklist gồm các bước Quality Gate liên quan (vd: apply migration, verify data, static audit, unit test, Playwright). Không báo "xong"/tạo commit khi `TaskList` còn task pending thuộc checklist này.

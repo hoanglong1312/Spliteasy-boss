@@ -10,6 +10,6 @@ test-results/
 screenshots/
 .vercel
 .DS_Store
-.claude/
+.claude/settings.local.json
 .codegraph/
 .superpowers/.DS_Store
