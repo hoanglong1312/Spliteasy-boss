@@ -189,7 +189,12 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
           eyebrow={`CLB PICKLEBALL · ${d.clubName}`}
           title="Thành viên"
           action={isTreasurer ? (
-            <Button type="button" variant="primary" onClick={() => setShowAddMember(true)} style={{ padding: '10px 12px', fontSize: 12, color: '#064e3b' }}>+ Thêm</Button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button type="button" variant="ghost" onClick={() => onAction?.('push', { screen: 'pickleball-settings', params: { yearMonth: d.currentYearMonth } })} style={{ padding: '10px 12px', fontSize: 12 }}>
+                Cấu hình
+              </Button>
+              <Button type="button" variant="primary" onClick={() => setShowAddMember(true)} style={{ padding: '10px 12px', fontSize: 12, color: '#064e3b' }}>+ Thêm</Button>
+            </div>
           ) : null}
         />
 

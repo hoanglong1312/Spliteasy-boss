@@ -122,6 +122,7 @@ export function useScreenData() {
       getSessionDetailData: (sessionId) => buildSessionDetailData(pickleballState, pickle, sessionId, currentUserId, members),
       getPickleballCalendarData: (params) => buildPickleballCalendarData(pickleballState, { yearMonth: selectedYearMonth, ...params }),
       getPickleballMembersData: () => buildPickleballMembersData(pickleballState, selectedYearMonth),
+      getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState, selectedYearMonth),
       getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId, selectedYearMonth),
       getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
       getPickleballTeamFundData: (params) => buildPickleballTeamFundData(pickleballState, params?.yearMonth || selectedYearMonth),
@@ -1894,6 +1895,37 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     allMembers: allMemberRows,
     memberCandidates: buildGroupMemberCandidates(currentGroup(state), state?.members, state?.profiles, { mode: 'pickleball', groups: state?.groups }),
     legacyGuests: buildGuestRows(sessions),
+  }
+}
+
+export function buildPickleballSettingsData(state, selectedYearMonth = monthKey(new Date())) {
+  const today = dateFromYearMonth(selectedYearMonth)
+  const yearMonth = monthKey(today)
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const activeMembers = dedupeMemberRowsByProfileOrName(currentGroupMembers(state).filter(isActiveMember))
+    .map(member => ({
+      id: member.id,
+      name: member.displayName || member.name || 'Thành viên',
+      initial: initials(member),
+      role: member.role || 'member',
+      isTreasurer: member.role === 'treasurer',
+      photoUrl: memberPhotoUrl(member, state?.members),
+    }))
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
+
+  return {
+    yearMonth,
+    billingMode: monthlyConfig?.billingMode ?? monthlyConfig?.billing_mode ?? 'fixed',
+    courtFee: Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? 0),
+    fixedMemberIds: safeArray(monthlyConfig?.fixedMemberIds ?? monthlyConfig?.fixed_member_ids),
+    monthlyTicketPrice: Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0),
+    perSessionTicketPrice: Number(monthlyConfig?.perSessionTicketPrice ?? monthlyConfig?.per_session_ticket_price ?? 0),
+    monthlyTicketMemberIds: safeArray(monthlyConfig?.monthlyTicketMemberIds ?? monthlyConfig?.monthly_ticket_member_ids),
+    perSessionTicketMemberIds: safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids),
+    members: activeMembers,
+    groupId: currentGroup(state)?.id,
+    monthLabel: formatMonthLabel(today),
+    clubName: currentGroupName(state, 'CLB Pickleball'),
   }
 }
 

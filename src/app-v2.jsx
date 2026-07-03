@@ -14,6 +14,7 @@ import AddExpense from './screens/AddExpense'
 import PickleballOverview from './screens/PickleballOverview'
 import PickleballCalendar from './screens/PickleballCalendar'
 import PickleballMembers from './screens/PickleballMembers'
+import PickleballSettings from './screens/PickleballSettings'
 import MemberDetail from './screens/MemberDetail'
 import PickleballTickets from './screens/PickleballTickets'
 import PickleballTeamFund from './screens/PickleballTeamFund'
@@ -153,6 +154,7 @@ export default function AppV2() {
     getSessionDetailData,
     getPickleballCalendarData,
     getPickleballMembersData,
+    getPickleballSettingsData,
     getMemberDetailData,
     getPickleballTicketsData,
     getPickleballTeamFundData,
@@ -1122,6 +1124,44 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'saveMonthlyConfig') {
+      const targetGroupId = payload?.groupId || state.currentGroupId
+      const yearMonth = payload?.yearMonth || monthKey(new Date())
+      if (!targetGroupId || !yearMonth) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const mode = payload?.mode === 'flex' ? 'flex' : 'fixed'
+      const nextConfig = mode === 'flex'
+        ? {
+          group_id: targetGroupId,
+          year_month: yearMonth,
+          billing_mode: 'flex',
+          court_fee: 0,
+          fixed_member_ids: [],
+          monthly_ticket_price: Number(payload?.monthlyTicketPrice) || 0,
+          per_session_ticket_price: Number(payload?.perSessionTicketPrice) || 0,
+          monthly_ticket_member_ids: safeArray(payload?.monthlyTicketMemberIds).filter(Boolean),
+          per_session_ticket_member_ids: safeArray(payload?.perSessionTicketMemberIds).filter(Boolean),
+        }
+        : {
+          group_id: targetGroupId,
+          year_month: yearMonth,
+          billing_mode: 'fixed',
+          court_fee: Number(payload?.courtFee) || 0,
+          fixed_member_ids: safeArray(payload?.fixedMemberIds).filter(Boolean),
+          monthly_ticket_price: 0,
+          per_session_ticket_price: 0,
+          monthly_ticket_member_ids: [],
+          per_session_ticket_member_ids: [],
+        }
+      const { error } = await sb
+        .from('pickleball_monthly_config')
+        .upsert(nextConfig, { onConflict: 'group_id,year_month' })
+      if (error) throw error
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'removeMemberFromGroup') {
       const memberId = payload?.memberId ?? payload
       const targetGroupId = payload?.groupId || state.currentGroupId
@@ -1406,6 +1446,7 @@ export default function AppV2() {
         overview: 'pickleball-overview',
         calendar: 'pickleball-calendar',
         members: 'pickleball-members',
+        settings: 'pickleball-settings',
       }
       if (payload === 'overview') {
         setStack([])
@@ -2548,6 +2589,7 @@ export default function AppV2() {
       case 'all-expenses':        return <AllExpenses data={allExpensesData} isTreasurer={isTreasurer} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
+      case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'member-detail':       return <MemberDetail data={getMemberDetailData(route.params?.memberId ?? route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-tickets':  return <PickleballTickets data={getPickleballTicketsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-team-fund': return <PickleballTeamFund data={getPickleballTeamFundData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />

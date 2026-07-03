@@ -3,6 +3,7 @@ import {
   attendanceByMemberId,
   buildMemberMonthBalance,
   buildMemberMonthBalanceFlex,
+  buildPickleballSettingsData,
   buildHomeData,
   buildPaymentProgressRows,
   buildPickleballCalendarData,
@@ -331,6 +332,37 @@ describe('flex billing helpers', () => {
       rebatePerFixed: 50000,
     })
     expect(missingFieldResult).toEqual(fixedResult)
+  })
+
+  test('buildPickleballSettingsData reads config aliases and only returns active current-group members', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      court_fee: 123000,
+      fixed_member_ids: ['member-1'],
+      monthly_ticket_price: 700000,
+      perSessionTicketPrice: 120000,
+      monthlyTicketMemberIds: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    state.members.push(
+      { id: 'member-4', group_id: 'group-1', name: 'Inactive', is_active: false },
+      { id: 'member-5', group_id: 'group-2', name: 'Other Group' },
+    )
+
+    const result = buildPickleballSettingsData(state, '2026-07')
+
+    expect(result).toMatchObject({
+      yearMonth: '2026-07',
+      billingMode: 'flex',
+      courtFee: 123000,
+      fixedMemberIds: ['member-1'],
+      monthlyTicketPrice: 700000,
+      perSessionTicketPrice: 120000,
+      monthlyTicketMemberIds: ['member-1'],
+      perSessionTicketMemberIds: ['member-2'],
+      groupId: 'group-1',
+    })
+    expect(result.members.map(member => member.id)).toEqual(['member-1', 'member-3', 'member-2'])
   })
 })
 
