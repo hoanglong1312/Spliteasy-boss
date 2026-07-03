@@ -2782,7 +2782,11 @@ function calculateMemberRank(progressPct) {
   return { icon: '🥶', label: 'Hay vắng', tone: 'danger' }
 }
 
-function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
+export function buildMemberMonthBalance(state, pickle, sessions, memberId, date) {
+  const currentYearMonth0 = monthKey(date || new Date())
+  if (isBillingModeFlexForMonth(state, currentYearMonth0)) {
+    return buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, date)
+  }
   const members = currentGroupMembers(state).filter(isActiveMember)
   const currentYearMonth = monthKey(date || new Date())
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
@@ -3581,6 +3585,67 @@ function currentMonthlyPickleConfig(state, yearMonth) {
       String(config?.groupId || config?.group_id || '') === String(groupId || '') &&
       String(config?.yearMonth || config?.year_month || '') === String(yearMonth || '')
     )) || {}
+}
+
+export function isBillingModeFlexForMonth(state, yearMonth) {
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  return String(monthlyConfig?.billingMode ?? monthlyConfig?.billing_mode ?? '') === 'flex'
+}
+
+export function memberFlexTicketType(state, memberId, yearMonth) {
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const monthlyIds = safeArray(monthlyConfig?.monthlyTicketMemberIds ?? monthlyConfig?.monthly_ticket_member_ids)
+  if (monthlyIds.some(id => String(id) === String(memberId))) return 'monthly'
+  const perSessionIds = safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids)
+  if (perSessionIds.some(id => String(id) === String(memberId))) return 'per_session'
+  return null
+}
+
+export function effectiveSessionMemberIdsFlex(session) {
+  return safeArray(
+    session?.presentMemberIds ??
+    session?.present_member_ids ??
+    session?.attendeeIds ??
+    session?.attendee_ids ??
+    []
+  ).map(String).filter(Boolean)
+}
+
+export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, date) {
+  const currentYearMonth = monthKey(date || new Date())
+  const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
+  const ticketType = memberFlexTicketType(state, memberId, currentYearMonth)
+  const monthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0)
+  const perSessionTicketPrice = Number(monthlyConfig?.perSessionTicketPrice ?? monthlyConfig?.per_session_ticket_price ?? 0)
+  const monthlyTicketFee = ticketType === 'monthly' ? monthlyTicketPrice : 0
+  const attendedSessionsCount = safeArray(sessions).reduce((count, session) => (
+    effectiveSessionMemberIdsFlex(session).some(id => String(id) === String(memberId)) ? count + 1 : count
+  ), 0)
+  const perSessionTicketFee = ticketType === 'per_session' ? perSessionTicketPrice * attendedSessionsCount : 0
+  const waterFee = safeArray(sessions).reduce((sum, session) => {
+    const presentIds = effectiveSessionMemberIdsFlex(session)
+    if (!presentIds.some(id => String(id) === String(memberId))) return sum
+    const splitCount = presentIds.length + sessionGuests(session).length
+    return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
+  }, 0)
+  const extras = memberExtrasShare(sessions, memberId, state, [], [])
+  const ticketShare = memberTeamFundTicketShare(state, memberId, date)
+  const p2pBalance = memberTicketBalance(state, memberId, date)
+  const netBalance = Math.round(p2pBalance - monthlyTicketFee - perSessionTicketFee - waterFee - extras - ticketShare)
+  const totalOwed = Math.max(-netBalance, 0)
+
+  return {
+    monthlyTicketFee,
+    perSessionTicketFee,
+    waterFee,
+    extras,
+    ticketShare,
+    p2pBalance,
+    netBalance,
+    totalOwed,
+    total: totalOwed,
+    ticketType,
+  }
 }
 
 function configuredPickleScheduleTime(state, yearMonth, fallback = '') {

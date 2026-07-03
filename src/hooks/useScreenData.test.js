@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import {
   attendanceByMemberId,
+  buildMemberMonthBalance,
+  buildMemberMonthBalanceFlex,
   buildHomeData,
   buildPaymentProgressRows,
   buildPickleballCalendarData,
   buildPrevMonthUnpaid,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
+  isBillingModeFlexForMonth,
+  memberFlexTicketType,
   memberWaterShare,
 } from './useScreenData.js'
 
@@ -155,6 +159,178 @@ describe('memberWaterShare', () => {
     ]
 
     expect(memberWaterShare(sessions, 'fixed-1', fixedMembers, casualMembers)).toBe(0)
+  })
+})
+
+function makeFlexState(monthlyConfig = {}) {
+  return {
+    currentGroupId: 'group-1',
+    currentGroup: { id: 'group-1', members: ['member-1', 'member-2', 'member-3'] },
+    members: [
+      { id: 'member-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'member-2', group_id: 'group-1', name: 'Member Two' },
+      { id: 'member-3', group_id: 'group-1', name: 'Member Three', member_type: 'casual' },
+    ],
+    pickle: {
+      monthlyConfigs: [
+        {
+          group_id: 'group-1',
+          year_month: '2026-07',
+          ...monthlyConfig,
+        },
+      ],
+      ownerPayments: [],
+      externalTickets: [],
+    },
+    _allPickle: { externalTickets: [], ownerPayments: [] },
+    tickets: [],
+  }
+}
+
+describe('flex billing helpers', () => {
+  test('isBillingModeFlexForMonth returns true only for flex config', () => {
+    expect(isBillingModeFlexForMonth(makeFlexState({ billing_mode: 'flex' }), '2026-07')).toBe(true)
+    expect(isBillingModeFlexForMonth(makeFlexState({ billingMode: 'fixed' }), '2026-07')).toBe(false)
+    expect(isBillingModeFlexForMonth(makeFlexState(), '2026-07')).toBe(false)
+  })
+
+  test('memberFlexTicketType returns monthly, per_session, or null', () => {
+    const state = makeFlexState({
+      monthlyTicketMemberIds: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+
+    expect(memberFlexTicketType(state, 'member-1', '2026-07')).toBe('monthly')
+    expect(memberFlexTicketType(state, 'member-2', '2026-07')).toBe('per_session')
+    expect(memberFlexTicketType(state, 'member-3', '2026-07')).toBeNull()
+  })
+
+  test('buildMemberMonthBalanceFlex charges monthly ticket for monthly member with no sessions', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      monthly_ticket_member_ids: ['member-1'],
+    })
+
+    const result = buildMemberMonthBalanceFlex(state, {}, [], 'member-1', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      monthlyTicketFee: 700000,
+      perSessionTicketFee: 0,
+      waterFee: 0,
+      ticketType: 'monthly',
+      netBalance: -700000,
+      totalOwed: 700000,
+      total: 700000,
+    })
+  })
+
+  test('buildMemberMonthBalanceFlex charges per-session ticket by attendance count', () => {
+    const state = makeFlexState({
+      billingMode: 'flex',
+      perSessionTicketPrice: 120000,
+      perSessionTicketMemberIds: ['member-2'],
+    })
+    const sessions = [
+      { presentMemberIds: ['member-2', 'member-1'] },
+      { present_member_ids: ['member-2'] },
+      { attendeeIds: ['member-1'] },
+    ]
+
+    const result = buildMemberMonthBalanceFlex(state, {}, sessions, 'member-2', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      monthlyTicketFee: 0,
+      perSessionTicketFee: 240000,
+      ticketType: 'per_session',
+    })
+  })
+
+  test('buildMemberMonthBalanceFlex calculates water fee from flex attendance plus guests', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    const sessions = [
+      {
+        presentMemberIds: ['member-2', 'member-1'],
+        water_amount: 90000,
+      },
+      {
+        attendee_ids: ['member-2'],
+        waterAmount: 80000,
+        guests: [{ name: 'Guest One' }],
+      },
+      {
+        present_member_ids: ['member-1'],
+        water_amount: 100000,
+      },
+    ]
+
+    const result = buildMemberMonthBalanceFlex(state, {}, sessions, 'member-2', new Date('2026-07-10'))
+
+    expect(result.waterFee).toBe(85000)
+  })
+
+  test('buildMemberMonthBalance delegates to flex mode', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 500000,
+      monthly_ticket_member_ids: ['member-1'],
+    })
+
+    const result = buildMemberMonthBalance(state, {}, [], 'member-1', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      monthlyTicketFee: 500000,
+      ticketType: 'monthly',
+      totalOwed: 500000,
+    })
+  })
+
+  test('buildMemberMonthBalance keeps fixed-mode result when billing mode is fixed or missing', () => {
+    const sessions = [
+      { attendance_records: [{ member_id: 'member-3', status: 'present' }] },
+      { attendance_records: [{ member_id: 'member-3', status: 'absent' }] },
+    ]
+    const state = makeFlexState({
+      court_fee: 100000,
+      fixed_member_ids: ['member-1'],
+    })
+    state.pickle.ownerPayments = [{
+      group_id: 'group-1',
+      year_month: '2026-07',
+      items: [{ key: 'next_court', year_month: '2026-07' }],
+    }]
+
+    const fixedResult = buildMemberMonthBalance(
+      { ...state, pickle: { ...state.pickle, monthlyConfigs: [{ ...state.pickle.monthlyConfigs[0], billing_mode: 'fixed' }] } },
+      {},
+      sessions,
+      'member-1',
+      new Date('2026-07-10'),
+    )
+    const missingFieldResult = buildMemberMonthBalance(
+      { ...state, pickle: { ...state.pickle, monthlyConfigs: [{ group_id: 'group-1', year_month: '2026-07', court_fee: 100000, fixed_member_ids: ['member-1'] }] } },
+      {},
+      sessions,
+      'member-1',
+      new Date('2026-07-10'),
+    )
+
+    expect(fixedResult).toMatchObject({
+      courtFee: 50000,
+      waterFee: 0,
+      extras: 0,
+      ticketShare: 0,
+      p2pBalance: 0,
+      netBalance: -50000,
+      totalOwed: 50000,
+      total: 50000,
+      ratePerSession: 50000,
+      rebatePerFixed: 50000,
+    })
+    expect(missingFieldResult).toEqual(fixedResult)
   })
 })
 
