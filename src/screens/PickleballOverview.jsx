@@ -178,10 +178,10 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             </div>
             {!isFlexMonthlyTicket && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
-                <ProgressDonut value={d.progress.completed} max={isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total} size={80} />
+                <ProgressDonut value={isFlexPerSessionTicket ? d.progress.attended : d.progress.completed} max={isFlexPerSessionTicket ? (d.progress.ticketDatesInMonth || 1) : d.progress.total} size={80} />
                 <div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
-                    {Math.round(d.progress.completed / (isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total) * 100)}%
+                    {Math.round((isFlexPerSessionTicket ? d.progress.attended : d.progress.completed) / (isFlexPerSessionTicket ? (d.progress.ticketDatesInMonth || 1) : d.progress.total) * 100)}%
                   </div>
                   <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, marginTop: 5, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
                     buổi<br/>hoàn thành

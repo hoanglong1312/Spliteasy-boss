@@ -16,7 +16,7 @@ const baseData = {
     autoGenerate: true,
   },
   todaySession: null,
-  progress: { attended: 2, completed: 2, total: 10 },
+  progress: { attended: 2, completed: 0, total: 10, ticketDatesInMonth: 3 },
   monthCosts: {},
   yourBalance: {
     total: -240000,
@@ -82,14 +82,14 @@ describe('PickleballOverview flex billing', () => {
     expect(markup).not.toContain('/10')
   })
 
-  test('renders per-session ticket progress against completed sessions', () => {
+  test('renders per-session ticket progress against ticket dates', () => {
     const markup = renderToStaticMarkup(React.createElement(PickleballOverview, {
       data: { ...baseData, isFlexBilling: true },
       isTreasurer: true,
     }))
 
-    expect(markup).toContain('100%')
-    expect(markup).toContain('/2')
+    expect(markup).toContain('67%')
+    expect(markup).toContain('/3')
     expect(markup).toContain('240.000')
     expect(markup).toContain('vé lẻ tháng này')
   })

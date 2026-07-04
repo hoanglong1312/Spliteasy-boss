@@ -1338,6 +1338,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
   const summary = pickleSummary(pickle || {})
   const todaySession = findNearestOpenSession(pickle, new Date())
   const monthTickets = monthTicketsForState(state, today)
+  const approvedMonthTickets = monthTickets.filter(t => ticketStatus(t) !== 'pending_review')
   const ticketWaterTotal = monthTickets.reduce((sum, t) => sum + Number(t?.waterAmount ?? t?.water_amount ?? 0), 0)
   const water = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0) + ticketWaterTotal
   const courtFee = Number(currentMonthConfig?.courtFee ?? pickle?.monthlyCourtFee ?? 0)
@@ -1346,7 +1347,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
   const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
   const isFlexBilling = isBillingModeFlexForMonth(state, currentYearMonth)
   const myAttendedCount = isFlexBilling
-    ? completedMonthSessions.filter(s => effectiveSessionMemberIdsFlex(s).some(id => String(id) === String(currentPickleballMemberId))).length
+    ? approvedMonthTickets.filter(t => ticketMemberIds(t).some(id => String(id) === String(currentPickleballMemberId))).length
     : attendanceByMemberId(completedMonthSessions, currentPickleballMemberId, members, true)
   const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId, today)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId, today)
@@ -1389,6 +1390,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
       attended: myAttendedCount,
       total: monthSessions.filter(s => !isMovedSession(s)).length || 1,
       completed: completedSessions,
+      ticketDatesInMonth: approvedMonthTickets.length,
     },
     monthCosts: {
       court: courtFee,
@@ -1408,7 +1410,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
       statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
       ticketAdjustment,
       ticketType: memberBalance.ticketType ?? null,
-      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember), isFlexBilling),
+      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember), isFlexBilling, state, today),
       breakdown,
     },
     yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId, today),
@@ -2687,8 +2689,8 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
   ]
 }
 
-export function buildPersonalWaterSessionRows(monthSessions, memberId, members = [], useFlexAttendance = false) {
-  return monthSessions
+export function buildPersonalWaterSessionRows(monthSessions, memberId, members = [], useFlexAttendance = false, state, date) {
+  const rows = monthSessions
     .filter(s => sessionWaterAmount(s) > 0)
     .map(s => {
       const attendees = useFlexAttendance ? effectiveSessionMemberIdsFlex(s) : effectiveSessionMemberIds(s, members)
@@ -2701,14 +2703,31 @@ export function buildPersonalWaterSessionRows(monthSessions, memberId, members =
       }
     })
     .filter(Boolean)
+
+  if (!state) return rows
+
+  const ticketRows = monthTicketsForState(state, date || new Date())
+    .filter(t => ticketStatus(t) !== 'pending_review' && Number(t?.waterAmount ?? t?.water_amount ?? 0) > 0)
+    .filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
+    .map(t => ({
+      label: `Vé lẻ · ${formatDayMonth(ticketDate(t)) || ''}`,
+      amount: ticketWaterSharePerPerson(t),
+    }))
+
+  return [...rows, ...ticketRows]
 }
 
-export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = [], useFlexAttendance = false) {
-  const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members, useFlexAttendance)
-  const waterSessions = monthSessions.filter(s => (
+export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = [], useFlexAttendance = false, state, date) {
+  const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members, useFlexAttendance, state, date)
+  const sessionWaterCount = monthSessions.filter(s => (
     sessionWaterAmount(s) > 0 &&
     (useFlexAttendance ? effectiveSessionMemberIdsFlex(s) : effectiveSessionMemberIds(s, members)).some(id => String(id) === String(memberId))
   )).length
+  const ticketWaterCount = state ? monthTicketsForState(state, date || new Date())
+    .filter(t => ticketStatus(t) !== 'pending_review' && Number(t?.waterAmount ?? t?.water_amount ?? 0) > 0)
+    .filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
+    .length : 0
+  const waterSessions = sessionWaterCount + ticketWaterCount
   const ticketCostCard = memberBalance.ticketType == null && !('ticketType' in memberBalance)
     ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' }
     : memberBalance.ticketType === 'monthly'
@@ -3595,6 +3614,12 @@ function ticketAmountPerPerson(ticket) {
   return memberIds.length > 0 ? Math.round(total / memberIds.length) : 0
 }
 
+function ticketWaterSharePerPerson(ticket) {
+  const memberIds = ticketMemberIds(ticket)
+  const water = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
+  return memberIds.length > 0 ? Math.round(water / memberIds.length) : 0
+}
+
 function ticketDate(ticket) {
   return ticket?.date || ticket?.sessionDate || ticket?.session_date || ticket?.createdAt || ticket?.created_at
 }
@@ -3739,16 +3764,30 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
     const splitCount = presentIds.length + sessionGuests(session).length
     return sum + (splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0)
   }, 0)
+  const monthTickets = monthTicketsForState(state, date || new Date()).filter(t => ticketStatus(t) !== 'pending_review')
+  const myTickets = monthTickets.filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
+  const ticketWaterFee = myTickets.reduce((sum, t) => sum + ticketWaterSharePerPerson(t), 0)
+  const ticketAttendedCount = myTickets.length
+  const ticketPerSessionFee = ticketType === 'per_session'
+    ? myTickets.reduce((sum, t) => {
+      const billedCount = ticketMemberIds(t).filter(id => memberFlexTicketType(state, id, currentYearMonth) === 'per_session').length
+      return sum + (billedCount > 0 ? Math.round(ticketTotalAmount(t) / billedCount) : 0)
+    }, 0)
+    : 0
+  const combinedAttendedSessionsCount = attendedSessionsCount + ticketAttendedCount
+  const combinedPerSessionTicketFee = perSessionTicketFee + ticketPerSessionFee
+  const combinedWaterFee = waterFee + ticketWaterFee
   const extras = memberExtrasShare(sessions, memberId, state, [], [])
   const ticketShare = memberTeamFundTicketShare(state, memberId, date)
   const p2pBalance = memberTicketBalance(state, memberId, date)
-  const netBalance = Math.round(p2pBalance - monthlyTicketFee - perSessionTicketFee - waterFee - extras - ticketShare)
+  const netBalance = Math.round(p2pBalance - monthlyTicketFee - combinedPerSessionTicketFee - combinedWaterFee - extras - ticketShare)
   const totalOwed = Math.max(-netBalance, 0)
 
   return {
     monthlyTicketFee,
-    perSessionTicketFee,
-    waterFee,
+    perSessionTicketFee: combinedPerSessionTicketFee,
+    waterFee: combinedWaterFee,
+    attendedSessionsCount: combinedAttendedSessionsCount,
     extras,
     ticketShare,
     p2pBalance,

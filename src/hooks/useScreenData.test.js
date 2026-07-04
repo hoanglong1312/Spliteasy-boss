@@ -192,6 +192,41 @@ function makeFlexState(monthlyConfig = {}) {
   }
 }
 
+function addJulyFlexTickets(state) {
+  state.pickle.externalTickets = [
+    {
+      id: 'ticket-1',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-01',
+      status: 'team_fund',
+      total_amount: 350000,
+      water_amount: 75000,
+      member_ids: ['member-1', 'member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    },
+    {
+      id: 'ticket-2',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-03',
+      status: 'team_fund',
+      total_amount: 250000,
+      water_amount: 0,
+      member_ids: ['member-1', 'member-2', 'member-3', 'member-4', 'member-5'],
+    },
+  ]
+  state.members = [
+    { id: 'member-1', group_id: 'group-1', name: 'Member One' },
+    { id: 'member-2', group_id: 'group-1', name: 'Member Two' },
+    { id: 'member-3', group_id: 'group-1', name: 'Member Three' },
+    { id: 'member-4', group_id: 'group-1', name: 'Member Four' },
+    { id: 'member-5', group_id: 'group-1', name: 'Member Five' },
+    { id: 'member-6', group_id: 'group-1', name: 'Member Six' },
+    { id: 'member-7', group_id: 'group-1', name: 'Member Seven' },
+  ]
+  return state
+}
+
 describe('flex billing helpers', () => {
   test('isBillingModeFlexForMonth returns true only for flex config', () => {
     expect(isBillingModeFlexForMonth(makeFlexState({ billing_mode: 'flex' }), '2026-07')).toBe(true)
@@ -275,6 +310,38 @@ describe('flex billing helpers', () => {
     const result = buildMemberMonthBalanceFlex(state, {}, sessions, 'member-2', new Date('2026-07-10'))
 
     expect(result.waterFee).toBe(85000)
+  })
+
+  test('buildMemberMonthBalanceFlex adds ticket water and attendance for monthly member', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      monthly_ticket_member_ids: ['member-1', 'member-4'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-5', 'member-6', 'member-7'],
+    }))
+
+    const result = buildMemberMonthBalanceFlex(state, {}, [], 'member-1', new Date('2026-07-10'))
+
+    expect(result.ticketType).toBe('monthly')
+    expect(result.monthlyTicketFee).toBe(700000)
+    expect(result.perSessionTicketFee).toBe(0)
+    expect(result.waterFee).toBe(10714)
+    expect(result.attendedSessionsCount).toBe(2)
+  })
+
+  test('buildMemberMonthBalanceFlex splits ticket total only across per-session members', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1', 'member-4'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-5', 'member-6', 'member-7'],
+    }))
+
+    const result = buildMemberMonthBalanceFlex(state, {}, [], 'member-2', new Date('2026-07-10'))
+
+    expect(result.ticketType).toBe('per_session')
+    expect(result.attendedSessionsCount).toBe(2)
+    expect(result.perSessionTicketFee).toBe(153333)
+    expect(result.waterFee).toBe(10714)
   })
 
   test('buildMemberMonthBalance delegates to flex mode', () => {
@@ -581,39 +648,28 @@ describe('buildPersonalPickleSummaryCards', () => {
     })
   })
 
-  test('counts flex water sessions from explicit attendance only', () => {
-    const sessions = [
-      {
-        id: '1',
-        date: '2026-07-02',
-        water_amount: 100000,
-        attendance_records: [{ member_id: 'member-2', status: 'present' }],
-      },
-      {
-        id: '2',
-        date: '2026-07-09',
-        water_amount: 120000,
-        presentMemberIds: ['member-1', 'member-2'],
-      },
-    ]
-    const members = [
-      { id: 'member-1', name: 'Member One' },
-      { id: 'member-2', name: 'Member Two' },
-    ]
+  test('counts ticket water rows for flex summary cards', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+    }))
 
-    const result = buildPersonalPickleSummaryCards(sessions, {
+    const result = buildPersonalPickleSummaryCards([], {
       ticketType: 'monthly',
       monthlyTicketFee: 700000,
-      waterFee: 60000,
-    }, 0, 'member-1', members, true)
+      waterFee: 10714,
+    }, 0, 'member-1', state.members, true, state, new Date('2026-07-10'))
 
     expect(result[1]).toMatchObject({
       label: 'Nước của bạn',
-      amount: -60000,
+      amount: -10714,
       sub: '1 buổi có nước',
     })
     expect(result[1].rows).toHaveLength(1)
-    expect(result[1].rows[0].amount).toBe(60000)
+    expect(result[1].rows[0]).toMatchObject({
+      label: 'Vé lẻ · 01/07',
+      amount: 10714,
+    })
   })
 })
 
@@ -744,45 +800,38 @@ describe('buildPersonalWaterSessionRows', () => {
     expect(buildPersonalWaterSessionRows(sessions, 'member-1', members)).toHaveLength(1)
     expect(buildPersonalWaterSessionRows(sessions, 'member-1', members, true)).toEqual([])
   })
+
+  test('appends ticket water rows when state is provided', () => {
+    const state = addJulyFlexTickets(makeFlexState({ billing_mode: 'flex' }))
+
+    const result = buildPersonalWaterSessionRows([], 'member-1', state.members, true, state, new Date('2026-07-10'))
+
+    expect(result).toEqual([
+      { label: 'Vé lẻ · 01/07', amount: 10714 },
+    ])
+  })
 })
 
 describe('buildPickleballOverviewData flex attendance', () => {
-  test('uses explicit flex attendance for personal progress and water summary', () => {
-    const state = {
-      currentUserId: 'member-1',
-      currentGroupId: 'group-1',
-      currentGroup: { id: 'group-1', name: 'Flex Club' },
-      members: [
-        { id: 'member-1', group_id: 'group-1', name: 'Member One', memberType: 'fixed', isActive: true },
-        { id: 'member-2', group_id: 'group-1', name: 'Member Two', memberType: 'fixed', isActive: true },
-      ],
-      pickle: {
-        monthlyConfigs: [{
-          group_id: 'group-1',
-          year_month: '2026-07',
-          billing_mode: 'flex',
-          monthly_ticket_price: 700000,
-          monthly_ticket_member_ids: ['member-1'],
-        }],
-        sessions: [
-          { id: 's1', group_id: 'group-1', date: '2026-07-02', status: 'completed', water_amount: 100000, presentMemberIds: ['member-1', 'member-2'] },
-          { id: 's2', group_id: 'group-1', date: '2026-07-09', status: 'completed', water_amount: 100000, attendance_records: [{ member_id: 'member-2', status: 'present' }] },
-        ],
-        externalTickets: [],
-        ownerPayments: [],
-      },
-      _allPickle: { sessions: [], externalTickets: [], ownerPayments: [] },
-      tickets: [],
-    }
+  test('uses flex tickets for personal progress and water summary', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      monthly_ticket_member_ids: ['member-1', 'member-4'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-5', 'member-6', 'member-7'],
+    }))
+    state.currentUserId = 'member-1'
+    state.currentGroup.name = 'Flex Club'
 
     const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'member-1', state.members, '2026-07')
 
     expect(data.isFlexBilling).toBe(true)
-    expect(data.progress.attended).toBe(1)
+    expect(data.progress.attended).toBe(2)
+    expect(data.progress.ticketDatesInMonth).toBe(2)
     expect(data.yourBalance.ticketType).toBe('monthly')
     expect(data.yourBalance.summaryCards[1]).toMatchObject({
       label: 'Nước của bạn',
-      amount: -50000,
+      amount: -10714,
       sub: '1 buổi có nước',
     })
   })
