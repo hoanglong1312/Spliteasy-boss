@@ -2389,6 +2389,52 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'requestSettlementCheckpoint') {
+      try {
+        await dispatch({
+          type: 'REQUEST_SETTLEMENT_CHECKPOINT',
+          ...payload,
+        })
+        await dispatch({ type: 'REFRESH' })
+        dispatch({ type: 'SHOW_TOAST', message: 'Đã gửi yêu cầu thanh toán, chờ thủ quỹ xác nhận.' })
+      } catch (error) {
+        console.error('[app] requestSettlementCheckpoint:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa gửi được yêu cầu thanh toán.' })
+        throw error
+      }
+      return
+    }
+
+    if (type === 'confirmSettlementCheckpoint') {
+      try {
+        await dispatch({
+          type: 'CONFIRM_SETTLEMENT_CHECKPOINT',
+          checkpointId: payload?.checkpointId,
+        })
+        dispatch({ type: 'SHOW_TOAST', message: 'Đã xác nhận thanh toán.' })
+      } catch (error) {
+        console.error('[app] confirmSettlementCheckpoint:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa xác nhận được thanh toán.' })
+        throw error
+      }
+      return
+    }
+
+    if (type === 'rejectSettlementCheckpoint') {
+      try {
+        await dispatch({
+          type: 'REJECT_SETTLEMENT_CHECKPOINT',
+          checkpointId: payload?.checkpointId,
+        })
+        dispatch({ type: 'SHOW_TOAST', message: 'Đã từ chối yêu cầu thanh toán.' })
+      } catch (error) {
+        console.error('[app] rejectSettlementCheckpoint:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa từ chối được yêu cầu thanh toán.' })
+        throw error
+      }
+      return
+    }
+
     if (type === 'confirmPaymentNotice' || type === 'rejectPaymentNotice') {
       await dispatch({
         type: 'REVIEW_PAYMENT_NOTIFICATION',

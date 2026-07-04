@@ -565,6 +565,7 @@ function buildEmptyState() {
     expenses: [],
     joinRequests: [],
     settlementPeriods: [],
+    settlementCheckpoints: [],
     pickle: {
       sessions: [],
       upcoming: [],
@@ -602,7 +603,7 @@ function memberHasPin(member, profile = null) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, prR, gR, mtR, eR, pR, sR, spR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, jR, msR] = await Promise.all([
+  const [mR, prR, gR, mtR, eR, pR, sR, spR, scR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, jR, msR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('profiles').select('*'),
     sb.from('groups').select('*'),
@@ -611,6 +612,7 @@ async function fetchGroupData(token) {
     sb.from('expense_participants').select('*'),
     sb.from('settlements').select('*').order('settlement_date', { ascending: false }),
     sb.from('settlement_periods').select('*').order('period_end', { ascending: false }),
+    sb.from('settlement_checkpoints').select('*'),
     sb.from('period_payments').select('*'),
     sb.from('pickle_configs').select('*'),
     sb.from('pickleball_monthly_config').select('*'),
@@ -631,6 +633,7 @@ async function fetchGroupData(token) {
   if (gR.error) throw gR.error
   if (mtR.error) console.warn('[store] member_tokens query failed:', mtR.error)
   if (spR.error) console.warn('[store] settlement_periods query failed:', spR.error)
+  if (scR.error) console.warn('[store] settlement_checkpoints query failed:', scR.error)
   if (ppR.error) console.warn('[store] period_payments query failed:', ppR.error)
   if (pcR.error) console.warn('[store] pickle_configs query failed:', pcR.error)
   if (pmcR.error) console.warn('[store] pickleball_monthly_config query failed:', pmcR.error)
@@ -652,6 +655,7 @@ async function fetchGroupData(token) {
     participants:    pR.data || [],
     settlements:     sR.data || [],
     settlementPeriods: spR.data || [],
+    settlementCheckpoints: scR.data || [],
     periodPayments:    ppR.data || [],
     pickleConfigs:   pcR.data || [],
     pickleballMonthlyConfigs: pmcR.data || [],
@@ -921,6 +925,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     participants,
     settlements,
     settlementPeriods,
+    settlementCheckpoints = [],
     periodPayments,
     pickleConfigs,
     pickleballMonthlyConfigs = [],
@@ -1018,6 +1023,27 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     createdAt: p.created_at,
     created_at: p.created_at,
     payments: normalPeriodPayments.filter(pay => pay.periodId === p.id),
+  }))
+  const normalSettlementCheckpoints = safeArray(settlementCheckpoints).map(p => ({
+    id: p.id,
+    groupId: p.group_id,
+    group_id: p.group_id,
+    memberId: p.member_id,
+    member_id: p.member_id,
+    periodStart: p.period_start,
+    period_start: p.period_start,
+    periodEnd: p.period_end,
+    period_end: p.period_end,
+    amount: Number(p.amount) || 0,
+    status: p.status || 'pending',
+    createdByMemberId: p.created_by_member_id,
+    created_by_member_id: p.created_by_member_id,
+    confirmedByMemberId: p.confirmed_by_member_id,
+    confirmed_by_member_id: p.confirmed_by_member_id,
+    confirmedAt: p.confirmed_at,
+    confirmed_at: p.confirmed_at,
+    createdAt: p.created_at,
+    created_at: p.created_at,
   }))
   const normalNotifications = safeArray(notifications).map(notification => ({
     id: notification.id,
@@ -1269,6 +1295,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     expenses: normalExpenses.filter(e => e.groupId === group.id),
     settlements: normalSettlements.filter(s => s.groupId === group.id),
     settlementPeriods: normalSettlementPeriods.filter(p => p.groupId === group.id),
+    settlementCheckpoints: normalSettlementCheckpoints.filter(p => p.groupId === group.id),
   }))
   const normalPickleConfigs = safeArray(pickleConfigs ?? (pickleConfig ? [pickleConfig] : [])).map(config => ({
     ...config,
@@ -1373,6 +1400,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     joinRequests: normalJoinRequests,
     monthSettlements: safeArray(monthSettlements),
     settlementPeriods: normalSettlementPeriods,
+    settlementCheckpoints: normalSettlementCheckpoints,
     pickle: null,
     _allPickle: {
       sessions: [
@@ -2018,6 +2046,49 @@ export function AppProvider({ children }) {
           throw error
         }
         await dispatch({ type: 'REFRESH' })
+        return data
+      }
+
+      case 'REQUEST_SETTLEMENT_CHECKPOINT': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('request_settlement_checkpoint', {
+          p_group_id: action.groupId || state.currentGroupId,
+          p_member_id: action.memberId,
+          p_amount: Number(action.amount) || 0,
+        })
+        if (error) {
+          console.error('[store] REQUEST_SETTLEMENT_CHECKPOINT:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
+      case 'CONFIRM_SETTLEMENT_CHECKPOINT': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('confirm_settlement_checkpoint', {
+          p_checkpoint_id: action.checkpointId,
+          p_treasurer_member_id: String(state.currentUserId),
+        })
+        if (error) {
+          console.error('[store] CONFIRM_SETTLEMENT_CHECKPOINT:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
+      case 'REJECT_SETTLEMENT_CHECKPOINT': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('reject_settlement_checkpoint', {
+          p_checkpoint_id: action.checkpointId,
+          p_treasurer_member_id: String(state.currentUserId),
+        })
+        if (error) {
+          console.error('[store] REJECT_SETTLEMENT_CHECKPOINT:', error)
+          throw error
+        }
+        await refresh()
         return data
       }
 

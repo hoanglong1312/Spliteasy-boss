@@ -89,6 +89,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           balanceLabel={heroBalanceLabel}
           owedTo={d.owedTo}
           paymentStatus={d.paymentSummary?.paymentStatus}
+          pendingSettlementCheckpoint={d.pendingSettlementCheckpoint}
           isCarryForwardSettled={isCarryForwardSettled}
           onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
@@ -177,7 +178,10 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           yearMonth: d.yearMonth || '',
           currentProfileId: d.currentProfileId || '',
           currentGroupId: d.currentGroupId || '',
+          currentUserId: d.currentUserId || '',
           monthSettlements: d.monthSettlements || [],
+          pendingSettlementCheckpoint: d.pendingSettlementCheckpoint || null,
+          pendingCheckpointsForTreasurer: d.pendingCheckpointsForTreasurer || [],
           currentMonthResidualByMember: d.currentMonthResidualByMember || {},
         }}
         paymentRecords={d.paymentRecords || []}
@@ -187,7 +191,11 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         setSavingAction={setSavingAction}
         onAction={onAction}
         onViewPaymentRecord={setPaymentRecordDetail}
-        onConfirmPayment={(payload) => onAction?.('confirmPaymentSent', payload)}
+        onConfirmPayment={(payload) => onAction?.('requestSettlementCheckpoint', {
+          ...payload,
+          groupId: d.currentGroupId || '',
+          memberId: d.currentUserId || '',
+        })}
         onConfirmRefund={(row) => {
           const key = String(row.profileId || row.name || 'member');
           setConfirmedRefunds(prev => new Set([...prev, key]));
@@ -513,7 +521,7 @@ function approvalButton(background, color) {
   };
 }
 
-export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', isCarryForwardSettled = false, onOpenPayment, onAction }) {
+export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, isCarryForwardSettled = false, onOpenPayment, onAction }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
@@ -523,8 +531,8 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
   const isZeroTotal = !isNegativeTotal && !isPositiveTotal;
   const normalizedPaymentStatus = String(paymentStatus || '').toLowerCase();
   const paidConfirmed = normalizedPaymentStatus === 'confirmed';
-  const paymentPending = normalizedPaymentStatus === 'pending';
-  const paymentChipLabel = isCarryForwardSettled ? '↪ Đã gộp' : paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? '⏳ Chờ xác nhận' : isZeroTotal ? '0' : '💳 Thanh toán';
+  const paymentPending = Boolean(pendingSettlementCheckpoint) || normalizedPaymentStatus === 'pending';
+  const paymentChipLabel = isCarryForwardSettled ? '↪ Đã gộp' : paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? (pendingSettlementCheckpoint ? '⏳ Chờ thủ quỹ duyệt' : '⏳ Chờ xác nhận') : isZeroTotal ? '0' : '💳 Thanh toán';
   const paymentChipBg = isCarryForwardSettled ? 'rgba(99,102,241,0.16)' : paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isZeroTotal ? 'rgba(148,163,184,0.12)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
   const paymentChipBorder = isCarryForwardSettled ? 'rgba(99,102,241,0.34)' : paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isZeroTotal ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
   const paymentChipColor = isCarryForwardSettled ? '#a5b4fc' : paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isZeroTotal ? colors.textSecondary : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
@@ -768,6 +776,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             paymentRecords={paymentRecords}
             pendingRecords={paymentRecords}
             refundRows={refundRows}
+            pendingCheckpointsForTreasurer={data?.pendingCheckpointsForTreasurer || []}
             confirmedRefunds={confirmedRefunds}
             onAction={onAction}
             onViewPaymentRecord={onViewPaymentRecord}
@@ -940,7 +949,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                     textDecoration: 'none',
                   }}
                 >Lưu QR</a>
-                <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed} style={{
+                <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || Boolean(data?.pendingSettlementCheckpoint)} style={{
                   minHeight: 42,
                   borderRadius: 12,
                   background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
@@ -949,9 +958,9 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                   fontSize: 12,
                   fontWeight: 900,
                   fontFamily: 'inherit',
-                  cursor: savingAction === 'confirmPayment' || paymentConfirmed ? 'default' : 'pointer',
+                  cursor: savingAction === 'confirmPayment' || paymentConfirmed || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
                   opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
-                }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
+                }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ thủ quỹ duyệt' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
               </div>
             </div>
           ) : (
@@ -995,7 +1004,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   );
 }
 
-function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, currentMonthResidualByMember, onDeferMonthBalance, onUndoDeferMonthBalance }) {
+function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, currentMonthResidualByMember, onDeferMonthBalance, onUndoDeferMonthBalance }) {
   const [unpaidExpanded, setUnpaidExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
@@ -1027,6 +1036,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const safeSettlements = safeArray(monthSettlements);
   const safeCurrentResidual = currentMonthResidualByMember || {};
   const pending = safeArray(pendingRecords);
+  const pendingCheckpoints = safeArray(pendingCheckpointsForTreasurer);
   const refunds = safeArray(refundRows);
   const confirmedRecords = pending.filter(record => String(record.status || '').toLowerCase() === 'confirmed');
   const pendingRowsRaw = rows.filter(row => String(row.status || '').toLowerCase() === 'pending');
@@ -1102,6 +1112,34 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         onChange={(event) => setSearchQuery(event.target.value)}
         placeholder="Tìm thành viên trong danh sách"
       />
+
+      {pendingCheckpoints.length > 0 && (
+        <DashboardSection
+          title={`Checkpoint chờ duyệt · ${pendingCheckpoints.length}`}
+          subtitle="Member đã bấm xác nhận thanh toán"
+          amount={pendingCheckpoints.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)}
+          icon="⏳"
+          color="#fcd34d"
+          expanded={pendingExpanded}
+          onToggle={() => setPendingExpanded(value => !value)}
+          listScroll
+        >
+          {pendingCheckpoints.map(row => (
+            <PaymentDashboardRow
+              key={row.id}
+              row={{
+                ...row,
+                name: row.memberName || row.name,
+                sourceSummary: row.periodEnd ? `Đến ${row.periodEnd}` : 'Chờ xác nhận',
+              }}
+              tone="pending"
+            >
+              <button type="button" onClick={() => withLoading(() => onAction?.('confirmSettlementCheckpoint', { checkpointId: row.id }))} style={miniDashButton('#22c55e', '#052e16')}>Duyệt</button>
+              <button type="button" onClick={() => withLoading(() => onAction?.('rejectSettlementCheckpoint', { checkpointId: row.id }))} style={miniDashButton(colors.danger, '#fff')}>Từ chối</button>
+            </PaymentDashboardRow>
+          ))}
+        </DashboardSection>
+      )}
 
       {pendingRecordsRaw.length > 0 && (
         <DashboardSection

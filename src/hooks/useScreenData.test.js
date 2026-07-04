@@ -947,6 +947,89 @@ describe('buildPaymentProgressRows', () => {
 })
 
 describe('buildHomeData', () => {
+  test('uses last confirmed checkpoint as payment balance start', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'payer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Payer One' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'payer-1'],
+      expenses: [
+        {
+          id: 'old-expense',
+          amount: 100000,
+          expense_date: '2026-06-20',
+          paid_by_member_id: 'payer-1',
+          participants: ['member-1', 'payer-1'],
+        },
+        {
+          id: 'new-expense',
+          amount: 80000,
+          expense_date: '2026-07-02',
+          paid_by_member_id: 'payer-1',
+          participants: ['member-1', 'payer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-1',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        period_end: '2026-07-01T00:00:00.000Z',
+        confirmed_at: '2026-07-01T00:05:00.000Z',
+        status: 'confirmed',
+      }],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-08')
+
+    expect(result.totalBalance).toBe(-40000)
+    expect(result.paymentSummary.netBalance).toBe(-40000)
+    expect(result.prevMonthUnpaid).toMatchObject({ label: 'Còn nợ từ 01/07/2026' })
+  })
+
+  test('exposes pending settlement checkpoint state for member and treasurer', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{ id: 'group-1', name: 'Group', members: ['member-1', 'treasurer-1'], expenses: [] }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-1',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        amount: 40000,
+        status: 'pending',
+        period_start: '2026-07-01T00:00:00.000Z',
+        period_end: '2026-07-02T00:00:00.000Z',
+        created_at: '2026-07-02T00:00:00.000Z',
+      }],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.pendingSettlementCheckpoint).toMatchObject({ id: 'checkpoint-1', amount: 40000, status: 'pending' })
+    expect(result.pendingCheckpointsForTreasurer).toEqual([
+      expect.objectContaining({ id: 'checkpoint-1', memberName: 'Member One', amount: 40000 }),
+    ])
+  })
+
   test('returns current month residual for confirmed members who still owe after payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
