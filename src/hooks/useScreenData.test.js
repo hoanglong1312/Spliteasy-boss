@@ -3,6 +3,7 @@ import {
   attendanceByMemberId,
   buildMemberMonthBalance,
   buildMemberMonthBalanceFlex,
+  buildPickleballTeamFundData,
   buildPickleballSettingsData,
   buildHomeData,
   buildPaymentProgressRows,
@@ -365,6 +366,74 @@ describe('flex billing helpers', () => {
       groupId: 'group-1',
     })
     expect(result.members.map(member => member.id)).toEqual(['member-1', 'member-3', 'member-2'])
+  })
+
+  test('buildPickleballTeamFundData uses flex tickets for owner payment draft', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      court_fee: 9_999_999,
+      ticket_price: 123_456,
+      monthly_ticket_price: 700_000,
+      per_session_ticket_price: 120_000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    state.pickle.sessions = [
+      {
+        id: 's1',
+        group_id: 'group-1',
+        date: '2026-07-05',
+        present_member_ids: ['member-1', 'member-2'],
+        water_amount: 60_000,
+      },
+      {
+        id: 's2',
+        group_id: 'group-1',
+        date: '2026-07-12',
+        presentMemberIds: ['member-2'],
+      },
+      {
+        id: 's3',
+        group_id: 'group-1',
+        date: '2026-07-19',
+        present_member_ids: ['member-1'],
+      },
+    ]
+    state.pickle.sessionItems = [
+      { id: 'extra-1', session_id: 's1', name: 'Bóng', amount: 80_000 },
+    ]
+    state.pickle.ownerPayments = [
+      {
+        group_id: 'group-1',
+        year_month: '2026-07',
+        items: [{ key: 'flex_per_session', year_month: '2026-07' }],
+      },
+    ]
+
+    const data = buildPickleballTeamFundData(state, '2026-07')
+
+    expect(data).toMatchObject({
+      isFlexBilling: true,
+      flexMonthlyTicketPrice: 700_000,
+      flexPerSessionTicketPrice: 120_000,
+      flexMonthlyMemberCount: 1,
+      flexPerSessionMemberCount: 1,
+      flexMonthlyRevenue: 700_000,
+      flexPerSessionRevenue: 240_000,
+      flexTotalDue: 940_000,
+    })
+    expect(data.paymentDraft.items.map(item => [item.key, item.label, item.amount, item.paid])).toEqual([
+      ['water', 'Tiền nước', 60_000, false],
+      ['extras', 'Phát sinh', 80_000, false],
+      ['flex_monthly', 'Vé tháng thu về', 700_000, false],
+      ['flex_per_session', 'Vé lẻ thu về', 240_000, true],
+    ])
+    expect(data.costRows.map(row => [row.key, row.label, row.amount, row.paidToOwner])).toEqual([
+      ['water', 'Tiền nước', 60_000, false],
+      ['extras', 'Phát sinh', 80_000, false],
+      ['flex_monthly', 'Vé tháng thu về', 700_000, false],
+      ['flex_per_session', 'Vé lẻ thu về', 240_000, true],
+    ])
   })
 })
 

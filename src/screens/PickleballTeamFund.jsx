@@ -188,65 +188,83 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>
             Cấu hình tiền tháng
           </div>
-          <Input
-            label="Tiền sân tháng"
-            suffix="đ"
-            value={formatInputAmount(courtFee)}
-            onChange={event => {
-              setCourtFee(parseAmount(event.target.value));
-              setSaveState('');
-            }}
-            inputMode="numeric"
-            inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
-          />
-          <Input
-            label="Giá vé lẻ/người"
-            suffix="đ"
-            value={formatInputAmount(ticketPrice)}
-            onChange={event => {
-              setTicketPrice(parseAmount(event.target.value));
-              setSaveState('');
-            }}
-            inputMode="numeric"
-            inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-            <MiniStat label="Tiền sân/buổi" value={perSession} tone="info" />
-            <MiniStat label="Tiền sân/người" value={perMember} tone="info" />
-          </div>
+          {d.isFlexBilling ? (
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 12, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.22)' }}>
+              <div style={{ fontSize: 13, fontWeight: 900, color: '#bfdbfe', ...type.mono }}>
+                Vé tháng: {formatVND(d.flexMonthlyTicketPrice || 0)}/người · {d.flexMonthlyMemberCount || 0} người
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 900, color: '#bfdbfe', marginTop: 8, ...type.mono }}>
+                Vé lẻ: {formatVND(d.flexPerSessionTicketPrice || 0)}/lượt · {d.flexPerSessionMemberCount || 0} người xé lẻ
+              </div>
+              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 9 }}>
+                Chỉnh giá vé ở màn Cấu hình pickleball
+              </div>
+            </div>
+          ) : (
+            <>
+              <Input
+                label="Tiền sân tháng"
+                suffix="đ"
+                value={formatInputAmount(courtFee)}
+                onChange={event => {
+                  setCourtFee(parseAmount(event.target.value));
+                  setSaveState('');
+                }}
+                inputMode="numeric"
+                inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
+              />
+              <Input
+                label="Giá vé lẻ/người"
+                suffix="đ"
+                value={formatInputAmount(ticketPrice)}
+                onChange={event => {
+                  setTicketPrice(parseAmount(event.target.value));
+                  setSaveState('');
+                }}
+                inputMode="numeric"
+                inputStyle={{ fontWeight: 900, fontSize: 18, ...type.mono }}
+              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+                <MiniStat label="Tiền sân/buổi" value={perSession} tone="info" />
+                <MiniStat label="Tiền sân/người" value={perMember} tone="info" />
+              </div>
+            </>
+          )}
           {saveState && (
             <div style={{ marginTop: 9, color: saveState === 'saved' ? '#86efac' : colors.danger, fontSize: 11, fontWeight: 800 }}>
               {saveState === 'saved' ? 'Đã lưu cấu hình quỹ tháng.' : 'Chưa lưu được. Cần chạy supabase db push nếu remote chưa có cột STK chủ sân.'}
             </div>
           )}
-          <Button
-            block
-            variant="success"
-            style={{ marginTop: 12, padding: 12 }}
-            onClick={async () => {
-              if (savingAction) return;
-              setSavingAction('saveTeamFundConfig');
-              setSaveState('');
-              try {
-                await onAction?.('saveTeamFundConfig', {
-                  currentYearMonth: d.currentYearMonth,
-                  courtFee,
-                  ticketPrice,
-                  venueOwnerName,
-                  venueBankName,
-                  venueBankAccount,
-                });
-                setSaveState('saved');
-              } catch {
-                setSaveState('error');
-              } finally {
-                setSavingAction('');
-              }
-            }}
-            disabled={savingAction === 'saveTeamFundConfig'}
-          >
-            {savingAction === 'saveTeamFundConfig' ? 'Đang lưu…' : 'Lưu cấu hình quỹ'}
-          </Button>
+          {!d.isFlexBilling && (
+            <Button
+              block
+              variant="success"
+              style={{ marginTop: 12, padding: 12 }}
+              onClick={async () => {
+                if (savingAction) return;
+                setSavingAction('saveTeamFundConfig');
+                setSaveState('');
+                try {
+                  await onAction?.('saveTeamFundConfig', {
+                    currentYearMonth: d.currentYearMonth,
+                    courtFee,
+                    ticketPrice,
+                    venueOwnerName,
+                    venueBankName,
+                    venueBankAccount,
+                  });
+                  setSaveState('saved');
+                } catch {
+                  setSaveState('error');
+                } finally {
+                  setSavingAction('');
+                }
+              }}
+              disabled={savingAction === 'saveTeamFundConfig'}
+            >
+              {savingAction === 'saveTeamFundConfig' ? 'Đang lưu…' : 'Lưu cấu hình quỹ'}
+            </Button>
+          )}
         </Card>
 
         <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px', borderColor: 'rgba(96,165,250,0.24)' }}>
@@ -530,6 +548,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
           )}
         </Card>
 
+        {!d.isFlexBilling && (
         <Card accent="pickleball" style={{ marginTop: 10, padding: '14px 12px', borderColor: 'rgba(251,191,36,0.24)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
             <div>
@@ -639,6 +658,7 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             </div>
           )}
         </Card>
+        )}
 
         <Card accent="finance" style={{ marginTop: 10, padding: '14px 12px' }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>

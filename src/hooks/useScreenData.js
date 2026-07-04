@@ -1419,7 +1419,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   }
 }
 
-function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Date())) {
+export function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Date())) {
   const today = dateFromYearMonth(selectedYearMonth)
   const currentYearMonth = monthKey(today)
   const nextYearMonth = shiftMonthKey(currentYearMonth, 1)
@@ -1431,6 +1431,19 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
   const teamFundDirectTotal = ticketFund.teamFundTotal || 0
   const ticketRows = buildTeamFundTicketRows(state, today)
   const ticketParticipantRows = buildTeamFundTicketParticipantRows(state, today)
+  const isFlexBilling = isBillingModeFlexForMonth(state, currentYearMonth)
+  const flexMonthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0)
+  const flexPerSessionTicketPrice = Number(monthlyConfig?.perSessionTicketPrice ?? monthlyConfig?.per_session_ticket_price ?? 0)
+  const flexMembers = currentGroupMembers(state).filter(isActiveMember)
+  const flexMonthlyMembers = flexMembers.filter(member => memberFlexTicketType(state, member.id, currentYearMonth) === 'monthly')
+  const flexPerSessionMembers = flexMembers.filter(member => memberFlexTicketType(state, member.id, currentYearMonth) === 'per_session')
+  const flexMonthlyRevenue = flexMonthlyMembers.length * flexMonthlyTicketPrice
+  const flexPerSessionRevenue = monthSessions.reduce((sum, session) => {
+    const presentIds = new Set(effectiveSessionMemberIdsFlex(session).map(String))
+    const attendeeCount = flexPerSessionMembers.filter(member => presentIds.has(String(member.id))).length
+    return sum + attendeeCount * flexPerSessionTicketPrice
+  }, 0)
+  const flexTotalDue = flexMonthlyRevenue + flexPerSessionRevenue
   const currentFixedMembers = currentGroupMembers(state)
     .filter(member => isActiveMember(member) && isFixedForMonth(state, member, currentYearMonth))
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
@@ -1448,18 +1461,88 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
   const paymentDraftItems = [
     { key: 'water', label: 'Tiền nước', yearMonth: currentYearMonth, amount: waterTotal },
     { key: 'extras', label: 'Phát sinh', yearMonth: currentYearMonth, amount: extrasTotal },
-    { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: teamFundDirectTotal },
-    { key: 'next_court', label: 'Tiền sân tháng này', yearMonth: currentYearMonth, amount: courtFeeTotal },
+    ...(isFlexBilling
+      ? [
+        { key: 'flex_monthly', label: 'Vé tháng thu về', yearMonth: currentYearMonth, amount: flexMonthlyRevenue },
+        { key: 'flex_per_session', label: 'Vé lẻ thu về', yearMonth: currentYearMonth, amount: flexPerSessionRevenue },
+      ]
+      : [
+        { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: teamFundDirectTotal },
+        { key: 'next_court', label: 'Tiền sân tháng này', yearMonth: currentYearMonth, amount: courtFeeTotal },
+      ]),
   ].map(item => ({
     ...item,
     paid: ownerPaymentCoversItem(ownerPayments, item.key, item.yearMonth),
   }))
+  const costRows = isFlexBilling ? [
+    {
+      key: 'water',
+      label: 'Tiền nước',
+      amount: waterTotal,
+      paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)) ||
+        ownerPaymentCoversItem(ownerPayments, 'water', currentYearMonth),
+    },
+    {
+      key: 'extras',
+      label: 'Phát sinh',
+      amount: extrasTotal,
+      paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)) ||
+        ownerPaymentCoversItem(ownerPayments, 'extras', currentYearMonth),
+    },
+    {
+      key: 'flex_monthly',
+      label: 'Vé tháng thu về',
+      amount: flexMonthlyRevenue,
+      paidToOwner: ownerPaymentCoversItem(ownerPayments, 'flex_monthly', currentYearMonth),
+    },
+    {
+      key: 'flex_per_session',
+      label: 'Vé lẻ thu về',
+      amount: flexPerSessionRevenue,
+      paidToOwner: ownerPaymentCoversItem(ownerPayments, 'flex_per_session', currentYearMonth),
+    },
+  ] : [
+    {
+      key: 'court',
+      label: 'Tiền sân',
+      amount: courtFeeTotal,
+      paidToOwner: isPaidToOwner(monthlyConfig) || ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth),
+    },
+    {
+      key: 'water',
+      label: 'Tiền nước',
+      amount: waterTotal,
+      paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)) ||
+        ownerPaymentCoversItem(ownerPayments, 'water', currentYearMonth),
+    },
+    {
+      key: 'extras',
+      label: 'Phát sinh',
+      amount: extrasTotal,
+      paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)) ||
+        ownerPaymentCoversItem(ownerPayments, 'extras', currentYearMonth),
+    },
+    {
+      key: 'tickets',
+      label: 'Vé lẻ team',
+      amount: teamFundDirectTotal,
+      paidToOwner: ownerPaymentCoversItem(ownerPayments, 'tickets', currentYearMonth),
+    },
+  ]
 
   return {
     groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
     currentYearMonth,
+    isFlexBilling,
+    flexMonthlyTicketPrice,
+    flexPerSessionTicketPrice,
+    flexMonthlyMemberCount: flexMonthlyMembers.length,
+    flexPerSessionMemberCount: flexPerSessionMembers.length,
+    flexMonthlyRevenue,
+    flexPerSessionRevenue,
+    flexTotalDue,
     courtFeeTotal,
     ticketPrice,
     sessionsCount: monthSessions.length,
@@ -1487,34 +1570,7 @@ function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(new Dat
       items: safeArray(payment.items),
       note: payment.note || '',
     })),
-    costRows: [
-      {
-        key: 'court',
-        label: 'Tiền sân',
-        amount: courtFeeTotal,
-        paidToOwner: isPaidToOwner(monthlyConfig) || ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth),
-      },
-      {
-        key: 'water',
-        label: 'Tiền nước',
-        amount: waterTotal,
-        paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)) ||
-          ownerPaymentCoversItem(ownerPayments, 'water', currentYearMonth),
-      },
-      {
-        key: 'extras',
-        label: 'Phát sinh',
-        amount: extrasTotal,
-        paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)) ||
-          ownerPaymentCoversItem(ownerPayments, 'extras', currentYearMonth),
-      },
-      {
-        key: 'tickets',
-        label: 'Vé lẻ team',
-        amount: teamFundDirectTotal,
-        paidToOwner: ownerPaymentCoversItem(ownerPayments, 'tickets', currentYearMonth),
-      },
-    ],
+    costRows,
   }
 }
 
