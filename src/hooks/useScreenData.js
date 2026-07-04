@@ -332,17 +332,40 @@ function pickleStateAfter(state, startDate) {
   }
 }
 
+function sourceMonthLabel(month) {
+  const date = dateFromYearMonth(month)
+  return `Tháng ${date.getMonth() + 1}`
+}
+
+function sourceMonthBreakdown(rows) {
+  const byMonth = new Map()
+  safeArray(rows).forEach(row => {
+    const month = row.month || monthKey(row.date || row.expense_date)
+    if (!month) return
+    byMonth.set(month, (byMonth.get(month) || 0) + (Number(row.amount) || 0))
+  })
+  return [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, amount]) => ({ month, label: sourceMonthLabel(month), amount }))
+    .filter(row => row.amount !== 0)
+}
+
 function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members) {
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
     membersForGroup(group, members).map(member => {
       const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, member.id)
       const checkpointGroup = groupWithExpensesAfter(group, checkpoint?.periodEnd || null)
+      const monthBreakdown = sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
+        month: monthKey(expense.date || expense.expense_date),
+        amount: groupNet({ ...checkpointGroup, expenses: [expense] }, member.id),
+      })))
       return {
         sourceId: group.id,
         sourceType: 'group',
         sourceLabel: group.name || 'Nhóm',
         memberId: member.id,
         amount: groupNet(checkpointGroup, member.id),
+        monthBreakdown,
       }
     })
   ))
@@ -4203,12 +4226,30 @@ function currentProfileSourceBreakdown(sourceBalances, currentUserId, members) {
         profileId,
         memberId: row.memberId || row.member_id || currentUserId,
         amount: 0,
+        monthAmounts: new Map(),
       }
       existing.amount += Number(row.amount) || 0
+      safeArray(row.monthBreakdown).forEach(item => {
+        const month = item.month || monthKey(item.date)
+        if (!month) return
+        existing.monthAmounts.set(month, (existing.monthAmounts.get(month) || 0) + (Number(item.amount) || 0))
+      })
+      if (!safeArray(row.monthBreakdown).length && row.month) {
+        existing.monthAmounts.set(row.month, (existing.monthAmounts.get(row.month) || 0) + (Number(row.amount) || 0))
+      }
       bySource.set(key, existing)
     })
 
-  return [...bySource.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.sourceLabel.localeCompare(b.sourceLabel, 'vi'))
+  return [...bySource.values()]
+    .map(row => {
+      const monthBreakdown = [...row.monthAmounts.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, amount]) => ({ month, label: sourceMonthLabel(month), amount }))
+        .filter(item => item.amount !== 0)
+      const { monthAmounts, ...rest } = row
+      return { ...rest, monthBreakdown }
+    })
+    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.sourceLabel.localeCompare(b.sourceLabel, 'vi'))
 }
 
 function aggregateBalancesByProfile(sourceBalances, members) {

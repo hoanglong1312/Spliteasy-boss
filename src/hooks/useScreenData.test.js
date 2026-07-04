@@ -1065,6 +1065,53 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('adds source month breakdown without changing total amount', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'payer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Payer One' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'payer-1'],
+      expenses: [
+        {
+          id: 'may-expense',
+          amount: 100000,
+          expense_date: '2026-05-20',
+          paid_by_member_id: 'payer-1',
+          participants: ['member-1', 'payer-1'],
+        },
+        {
+          id: 'june-expense',
+          amount: 60000,
+          expense_date: '2026-06-20',
+          paid_by_member_id: 'payer-1',
+          participants: ['member-1', 'payer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const source = result.sourceBreakdown.find(row => row.sourceId === 'group-1')
+
+    expect(source.amount).toBe(-80000)
+    expect(source.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -50000 },
+      { month: '2026-06', label: 'Tháng 6', amount: -30000 },
+    ])
+    expect(source.monthBreakdown.reduce((sum, row) => sum + row.amount, 0)).toBe(source.amount)
+  })
+
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

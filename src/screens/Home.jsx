@@ -634,6 +634,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
         const amount = Number(source.amount) || 0;
         const isPickleball = source.sourceType === 'pickleball';
         const isNegative = amount < 0;
+        const monthBreakdown = safeArray(source.monthBreakdown).filter(row => Number(row.amount) !== 0);
         const openSource = () => {
           if (isPickleball) {
             onAction?.('tab', 'pickleball');
@@ -642,55 +643,82 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
           onAction?.('open', source.sourceId);
         };
         return (
-          <button
+          <div
             key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`}
-            type="button"
-            aria-label={`Mở ${source.sourceLabel}`}
-            onClick={openSource}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              padding: '11px 10px',
-              marginTop: 8,
-              background: isPickleball ? 'rgba(52,211,153,0.10)' : 'transparent',
-              border: isPickleball ? '1px solid rgba(52,211,153,0.26)' : '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 12,
-              boxShadow: isPickleball ? '0 10px 24px rgba(16,185,129,0.10)' : 'none',
-              color: 'inherit',
-              cursor: 'pointer',
-              fontFamily: 'inherit',
-              textAlign: 'left',
-            }}>
-            <div style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              background: isPickleball ? 'rgba(52,211,153,0.18)' : 'rgba(99,102,241,0.12)',
-              border: isPickleball ? '1px solid rgba(52,211,153,0.34)' : '1px solid transparent',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 16,
-              flexShrink: 0,
-            }}>{isPickleball ? '🏸' : '👥'}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {source.sourceLabel}
+            style={{ marginTop: 8 }}
+          >
+            <button
+              type="button"
+              aria-label={`Mở ${source.sourceLabel}`}
+              onClick={openSource}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '11px 10px',
+                background: isPickleball ? 'rgba(52,211,153,0.10)' : 'transparent',
+                border: isPickleball ? '1px solid rgba(52,211,153,0.26)' : '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 12,
+                boxShadow: isPickleball ? '0 10px 24px rgba(16,185,129,0.10)' : 'none',
+                color: 'inherit',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
+              }}>
+              <div style={{
+                width: 34,
+                height: 34,
+                borderRadius: 10,
+                background: isPickleball ? 'rgba(52,211,153,0.18)' : 'rgba(99,102,241,0.12)',
+                border: isPickleball ? '1px solid rgba(52,211,153,0.34)' : '1px solid transparent',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16,
+                flexShrink: 0,
+              }}>{isPickleball ? '🏸' : '👥'}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {source.sourceLabel}
+                </div>
+                <div style={{ fontSize: 11, color: isPickleball ? '#6ee7b7' : colors.textSecondary, marginTop: 2 }}>
+                  {isPickleball ? 'Pickleball' : 'Chi tiêu nhóm'}
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: isPickleball ? '#6ee7b7' : colors.textSecondary, marginTop: 2 }}>
-                {isPickleball ? 'Pickleball' : 'Chi tiêu nhóm'}
+              <div style={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: isNegative ? colors.danger : colors.success,
+                ...type.mono,
+              }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
+              <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
+            </button>
+            {monthBreakdown.length > 1 && (
+              <div style={{
+                display: 'grid',
+                gap: 4,
+                padding: '7px 12px 2px 56px',
+              }}>
+                {monthBreakdown.map(row => {
+                  const monthAmount = Number(row.amount) || 0;
+                  return (
+                    <div key={row.month || row.label} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      fontSize: 11,
+                      color: colors.textSecondary,
+                      lineHeight: 1.25,
+                    }}>
+                      <span>{row.label || row.month}</span>
+                      <span style={{ color: monthAmount < 0 ? colors.danger : colors.success, ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            <div style={{
-              fontSize: 13,
-              fontWeight: 800,
-              color: isNegative ? colors.danger : colors.success,
-              ...type.mono,
-            }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
-            <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
-          </button>
+            )}
+          </div>
         );
       })}
     </Card>
