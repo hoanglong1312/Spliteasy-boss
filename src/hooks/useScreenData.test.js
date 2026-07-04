@@ -1112,6 +1112,51 @@ describe('buildHomeData', () => {
     expect(source.monthBreakdown.reduce((sum, row) => sum + row.amount, 0)).toBe(source.amount)
   })
 
+  test('keeps member balance point-in-time while treasurer progress stops at viewed month end', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'june-expense',
+          amount: 100000,
+          expense_date: '2026-06-20',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'july-expense',
+          amount: 60000,
+          expense_date: '2026-07-02',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const source = result.sourceBreakdown.find(row => row.sourceId === 'group-1')
+    const progressRow = result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
+
+    expect(result.totalBalance).toBe(-80000)
+    expect(source.amount).toBe(-80000)
+    expect(progressRow).toMatchObject({ amount: 50000, status: 'unpaid' })
+  })
+
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

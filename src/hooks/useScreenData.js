@@ -283,20 +283,37 @@ function pendingSettlementCheckpointsForTreasurer(state, members = []) {
     .sort((a, b) => parseDateValue(a.createdAt) - parseDateValue(b.createdAt))
 }
 
-function groupWithExpensesAfter(group, startDate) {
+function groupWithExpensesAfter(group, startDate, endDate = null) {
   const startMs = parseDateValue(startDate)
+  const endMs = parseDateValue(endDate)
   return safeGroup({
     ...group,
-    expenses: safeArray(group?.expenses).filter(expense => !startMs || parseDateValue(expense.date || expense.expense_date) > startMs),
+    expenses: safeArray(group?.expenses).filter(expense => {
+      const time = parseDateValue(expense.date || expense.expense_date)
+      if (!time) return false
+      return (!startMs || time > startMs) && (!endMs || time <= endMs)
+    }),
   })
 }
 
-function settlementRelevantMonthDates(state, startDate) {
+function groupWithExpensesUpTo(group, endDate) {
+  const endMs = parseDateValue(endDate)
+  return safeGroup({
+    ...group,
+    expenses: safeArray(group?.expenses).filter(expense => {
+      const time = parseDateValue(expense.date || expense.expense_date)
+      return time && (!endMs || time <= endMs)
+    }),
+  })
+}
+
+function settlementRelevantMonthDates(state, startDate, endDate = null) {
   const months = new Set()
   const startMs = parseDateValue(startDate)
+  const endMs = parseDateValue(endDate)
   const add = value => {
     const time = parseDateValue(value)
-    if (time && (!startMs || time > startMs)) months.add(monthKey(value))
+    if (time && (!startMs || time > startMs) && (!endMs || time <= endMs)) months.add(monthKey(value))
   }
   getAllSessions(state).forEach(session => add(sessionDate(session)))
   uniqueTickets([
@@ -304,16 +321,20 @@ function settlementRelevantMonthDates(state, startDate) {
     ...safeArray(state?._allPickle?.externalTickets),
     ...safeArray(state?.tickets),
   ]).forEach(ticket => add(ticketDate(ticket)))
-  months.add(monthKey(new Date()))
+  add(new Date())
   return [...months].filter(Boolean).sort().map(dateFromYearMonth)
 }
 
-function pickleStateAfter(state, startDate) {
+function pickleStateAfter(state, startDate, endDate = null) {
   const startMs = parseDateValue(startDate)
-  if (!startMs) return state
-  const after = value => parseDateValue(value) > startMs
-  const filterTickets = tickets => safeArray(tickets).filter(ticket => after(ticketDate(ticket)))
-  const filterSessions = sessions => safeArray(sessions).filter(session => after(sessionDate(session)))
+  const endMs = parseDateValue(endDate)
+  if (!startMs && !endMs) return state
+  const inRange = value => {
+    const time = parseDateValue(value)
+    return time && (!startMs || time > startMs) && (!endMs || time <= endMs)
+  }
+  const filterTickets = tickets => safeArray(tickets).filter(ticket => inRange(ticketDate(ticket)))
+  const filterSessions = sessions => safeArray(sessions).filter(session => inRange(sessionDate(session)))
   return {
     ...state,
     sessions: filterSessions(state?.sessions),
@@ -350,11 +371,11 @@ function sourceMonthBreakdown(rows) {
     .filter(row => row.amount !== 0)
 }
 
-function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members) {
+function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members, endDate = null) {
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
     membersForGroup(group, members).map(member => {
       const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, member.id)
-      const checkpointGroup = groupWithExpensesAfter(group, checkpoint?.periodEnd || null)
+      const checkpointGroup = groupWithExpensesAfter(group, checkpoint?.periodEnd || null, endDate)
       const monthBreakdown = sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
         month: monthKey(expense.date || expense.expense_date),
         amount: groupNet({ ...checkpointGroup, expenses: [expense] }, member.id),
@@ -375,8 +396,8 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
     .flatMap(member => {
       const checkpoint = latestConfirmedSettlementCheckpoint(pickleballState, pickleGroupId, member.id)
       const startDate = checkpoint?.periodEnd || null
-      const pickleState = pickleStateAfter(pickleballState, startDate)
-      return settlementRelevantMonthDates(pickleState, startDate).map(monthDate => {
+      const pickleState = pickleStateAfter(pickleballState, startDate, endDate)
+      return settlementRelevantMonthDates(pickleState, startDate, endDate).map(monthDate => {
         const monthSessions = getStateMonthSessions(pickleState, monthDate)
         return {
         sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
@@ -403,8 +424,14 @@ function settlementCarryForwardNotice(checkpoint, selectedYearMonth, balance) {
   }
 }
 
+function endOfYearMonth(yearMonth) {
+  const date = dateFromYearMonth(yearMonth)
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
+}
+
 export function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state, selectedYearMonth = monthKey(new Date())) {
   const today = dateFromYearMonth(selectedYearMonth)
+  const endOfSelectedMonth = endOfYearMonth(selectedYearMonth)
   const safeGroups = safeArray(groups).map(safeGroup)
   const expenseGroups = safeGroups
     .filter(group => groupKind(group) !== 'pickleball')
@@ -425,6 +452,16 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
   const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
+  const treasurerExpenseGroups = safeGroups
+    .filter(group => groupKind(group) !== 'pickleball')
+    .map(group => groupWithExpensesUpTo(group, endOfSelectedMonth))
+  const treasurerSourceBalances = buildSettlementSourceBalances(state, treasurerExpenseGroups, pickleballState, pickle, members, endOfSelectedMonth)
+  const treasurerProfileBreakdown = adjustedProfileBreakdownForPayments(
+    state,
+    aggregateBalancesByProfile(treasurerSourceBalances, members),
+    members,
+    today,
+  )
   const prevYearMonth = shiftMonthKey(selectedYearMonth, -1)
   const prevDate = dateFromYearMonth(prevYearMonth)
   const prevExpenseGroups = safeGroups
@@ -455,7 +492,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     }
   })
   const stateWithPrevMonthResidual = { ...state, prevMonthResidualByMember }
-  const paymentSummary = buildHomePaymentSummary(stateWithPrevMonthResidual, rawSourceBreakdown, profileBreakdown, members, me, today)
+  const paymentSummary = buildHomePaymentSummary(stateWithPrevMonthResidual, rawSourceBreakdown, profileBreakdown, members, me, today, treasurerProfileBreakdown)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
   const confirmedCheckpoint = sourceBreakdown
@@ -548,7 +585,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   }
 }
 
-function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate) {
+function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate, progressProfileBreakdown = profileBreakdown) {
   const monthLabel = formatMonthLabel(monthDate)
   const coverage = paymentCoverageForMember(state, me, monthLabel, sourceBreakdown)
   const adjustedSources = applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources)
@@ -567,7 +604,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     paymentStatusLabel: netBalance < 0 && coverage.confirmedAmount > 0 ? 'Cần nộp thêm' : paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     memberBank: bankData(me, true),
-    paymentProgress: buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, safeArray(state?.monthSettlements), monthKey(monthDate)),
+    paymentProgress: buildPaymentProgressRows(progressProfileBreakdown, members, state, monthLabel, safeArray(state?.monthSettlements), monthKey(monthDate)),
     payForRows: safeArray(profileBreakdown)
       .filter(row => Number(row.amount) < 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),

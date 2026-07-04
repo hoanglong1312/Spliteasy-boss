@@ -2092,39 +2092,6 @@ export function AppProvider({ children }) {
         return data
       }
 
-      case 'DEFER_MONTH_BALANCE': {
-        if (!sb || !state.currentUserId) return null
-        const { data: rpcData, error } = await sb.rpc('defer_member_month_balance', {
-          p_member_id: action.memberId,
-          p_group_id: action.groupId || state.currentGroupId,
-          p_month: action.month,
-          p_amount: Number(action.amount),
-          p_next_month_date: action.nextMonthDate,
-          p_member_name: action.memberName || '',
-          p_treasurer_member_id: String(state.currentUserId),
-        })
-        if (error) {
-          console.error('[store] DEFER_MONTH_BALANCE:', error)
-          throw error
-        }
-        await refresh()
-        return rpcData
-      }
-
-      case 'UNDO_DEFER_MONTH_BALANCE': {
-        if (!sb || !state.currentUserId) return null
-        const { error } = await sb.rpc('undo_defer_member_month_balance', {
-          p_settlement_id: action.settlementId,
-          p_treasurer_member_id: String(state.currentUserId),
-        })
-        if (error) {
-          console.error('[store] UNDO_DEFER_MONTH_BALANCE:', error)
-          throw error
-        }
-        await refresh()
-        return null
-      }
-
       case 'DELETE_PAYMENT_NOTIFICATION': {
         if (!sb || !state.currentUserId) return null
         const notificationId = action.notificationId || action.id

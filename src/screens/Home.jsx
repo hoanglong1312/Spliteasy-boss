@@ -53,11 +53,6 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const heroBalanceLabel = isTreasurer
     ? (outstandingAmount > 0 ? 'Còn cần thu' : 'Đã thu đủ')
     : balanceLabel;
-  const isCarryForwardSettled = Boolean(
-    (d.monthSettlements || []).find(
-      s => String(s.member_id) === String(d.currentUserId) && String(s.month) === String(d.yearMonth)
-    )
-  );
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
   const pendingPayments = d.pendingPayments || [];
@@ -90,7 +85,6 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           owedTo={d.owedTo}
           paymentStatus={d.paymentSummary?.paymentStatus}
           pendingSettlementCheckpoint={d.pendingSettlementCheckpoint}
-          isCarryForwardSettled={isCarryForwardSettled}
           onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
         />
@@ -179,11 +173,9 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           currentProfileId: d.currentProfileId || '',
           currentGroupId: d.currentGroupId || '',
           currentUserId: d.currentUserId || '',
-          monthSettlements: d.monthSettlements || [],
           pendingSettlementCheckpoint: d.pendingSettlementCheckpoint || null,
           pendingSettlementCheckpoints: d.pendingSettlementCheckpoints || [],
           pendingCheckpointsForTreasurer: d.pendingCheckpointsForTreasurer || [],
-          currentMonthResidualByMember: d.currentMonthResidualByMember || {},
         }}
         paymentRecords={d.paymentRecords || []}
         isTreasurer={isTreasurer}
@@ -521,7 +513,7 @@ function approvalButton(background, color) {
   };
 }
 
-export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, isCarryForwardSettled = false, onOpenPayment, onAction }) {
+export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, onOpenPayment, onAction }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
@@ -532,13 +524,13 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
   const normalizedPaymentStatus = String(paymentStatus || '').toLowerCase();
   const paidConfirmed = normalizedPaymentStatus === 'confirmed';
   const paymentPending = Boolean(pendingSettlementCheckpoint) || normalizedPaymentStatus === 'pending';
-  const paymentChipLabel = isCarryForwardSettled ? '↪ Đã gộp' : paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? (pendingSettlementCheckpoint ? '⏳ Chờ thủ quỹ duyệt' : '⏳ Chờ xác nhận') : isZeroTotal ? '0' : '💳 Thanh toán';
-  const paymentChipBg = isCarryForwardSettled ? 'rgba(99,102,241,0.16)' : paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isZeroTotal ? 'rgba(148,163,184,0.12)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
-  const paymentChipBorder = isCarryForwardSettled ? 'rgba(99,102,241,0.34)' : paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isZeroTotal ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
-  const paymentChipColor = isCarryForwardSettled ? '#a5b4fc' : paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isZeroTotal ? colors.textSecondary : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
-  const paymentDisabled = isCarryForwardSettled || isZeroTotal || paidConfirmed || paymentPending;
-  const displayBalanceLabel = isCarryForwardSettled ? 'Đã gộp sang tháng sau' : paidConfirmed ? 'Đã thanh toán' : isZeroTotal ? 'Số dư tháng này' : balanceLabel;
-  const displayTotalBalance = isCarryForwardSettled ? 0 : totalBalance;
+  const paymentChipLabel = paidConfirmed ? '✅ Đã thanh toán' : paymentPending ? (pendingSettlementCheckpoint ? '⏳ Chờ thủ quỹ duyệt' : '⏳ Chờ xác nhận') : isZeroTotal ? '0' : '💳 Thanh toán';
+  const paymentChipBg = paidConfirmed ? 'rgba(52,211,153,0.16)' : paymentPending ? 'rgba(245,158,11,0.16)' : isZeroTotal ? 'rgba(148,163,184,0.12)' : isNegativeTotal ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)';
+  const paymentChipBorder = paidConfirmed ? 'rgba(52,211,153,0.34)' : paymentPending ? 'rgba(245,158,11,0.34)' : isZeroTotal ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.32)' : 'rgba(52,211,153,0.32)';
+  const paymentChipColor = paidConfirmed ? '#6ee7b7' : paymentPending ? '#fcd34d' : isZeroTotal ? colors.textSecondary : isNegativeTotal ? '#fca5a5' : '#6ee7b7';
+  const paymentDisabled = isZeroTotal || paidConfirmed || paymentPending;
+  const displayBalanceLabel = paidConfirmed ? 'Đã thanh toán' : isZeroTotal ? 'Số dư tháng này' : balanceLabel;
+  const displayTotalBalance = totalBalance;
   const ctaBg = paymentDisabled ? 'rgba(148,163,184,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.20)' : 'rgba(52,211,153,0.18)';
   const ctaBorder = paymentDisabled ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.40)' : 'rgba(52,211,153,0.38)';
   const ctaColor = paymentDisabled ? colors.textSecondary : isNegativeTotal ? '#fecaca' : '#86efac';
@@ -573,7 +565,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
           marginTop: 8,
           fontSize: 12,
           fontWeight: 850,
-          color: isCarryForwardSettled ? '#a5b4fc' : isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
+          color: isNegativeTotal ? '#fca5a5' : isPositiveTotal ? '#6ee7b7' : colors.textSecondary,
         }}>
           {displayBalanceLabel}
         </div>
@@ -809,10 +801,6 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             onAction={onAction}
             onViewPaymentRecord={onViewPaymentRecord}
             onConfirmRefund={onConfirmRefund}
-            monthSettlements={data?.monthSettlements || []}
-            currentMonthResidualByMember={data?.currentMonthResidualByMember || {}}
-            onDeferMonthBalance={(payload) => onAction?.('deferMonthBalance', payload)}
-            onUndoDeferMonthBalance={(payload) => onAction?.('undoDeferMonthBalance', payload)}
           />
         </>
       )}
@@ -1032,11 +1020,10 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   );
 }
 
-function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, currentMonthResidualByMember, onDeferMonthBalance, onUndoDeferMonthBalance }) {
+function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
   const [unpaidExpanded, setUnpaidExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [confirmedExpanded, setConfirmedExpanded] = useState(false);
-  const [chotSoExpanded, setChotSoExpanded] = useState(false);
   const [refundExpanded, setRefundExpanded] = useState(false);
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1049,20 +1036,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
   const [qrSheetIndex, setQrSheetIndex] = useState(0);
   const rows = safeArray(progressRows);
-  const currentYM = data?.yearMonth || '';
-  const nextMonthNum = currentYM ? (() => {
-    const month = Number(currentYM.split('-')[1]);
-    return month === 12 ? 1 : month + 1;
-  })() : '';
-  const nextMonthLabel = nextMonthNum ? `T${nextMonthNum}` : '';
-  const nextMonthFirstDay = currentYM ? (() => {
-    const [year, month] = currentYM.split('-').map(Number);
-    const nextMonth = month === 12 ? 1 : month + 1;
-    const nextYear = month === 12 ? year + 1 : year;
-    return `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`;
-  })() : '';
-  const safeSettlements = safeArray(monthSettlements);
-  const safeCurrentResidual = currentMonthResidualByMember || {};
   const pending = safeArray(pendingRecords);
   const pendingCheckpoints = safeArray(pendingCheckpointsForTreasurer);
   const refunds = safeArray(refundRows);
@@ -1222,71 +1195,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           )}
         </DashboardSection>
       )}
-
-      {(() => {
-        const chotSoRows = confirmedRecords.filter(record => {
-          const memberIds = safeArray(record.memberIds || [record.memberId]).map(String);
-          const residual = memberIds.reduce((max, memberId) => Math.max(max, Number(safeCurrentResidual[memberId]) || 0), 0);
-          return residual > 0;
-        });
-        if (chotSoRows.length === 0) return null;
-        return (
-          <DashboardSection
-            title={`Chốt sổ · ${chotSoRows.length} thành viên`}
-            subtitle={`Đã nhận nhưng còn dư · chuyển sang ${nextMonthLabel}`}
-            amount={chotSoRows.reduce((sum, record) => {
-              const memberIds = safeArray(record.memberIds || [record.memberId]).map(String);
-              return sum + memberIds.reduce((max, memberId) => Math.max(max, Number(safeCurrentResidual[memberId]) || 0), 0);
-            }, 0)}
-            icon="⟳"
-            color="#f59e0b"
-            expanded={chotSoExpanded}
-            onToggle={() => setChotSoExpanded(v => !v)}
-          >
-            {chotSoRows.map(record => {
-              const memberIds = safeArray(record.memberIds || [record.memberId]).map(String);
-              const residual = memberIds.reduce((max, memberId) => Math.max(max, Number(safeCurrentResidual[memberId]) || 0), 0);
-              const settlement = currentYM ? safeSettlements.find(s =>
-                memberIds.includes(String(s.member_id)) && String(s.month) === currentYM
-              ) : null;
-              const isSettled = Boolean(settlement);
-              return (
-                <PaymentDashboardRow key={`chot-so-${record.notificationId || record.id}`} row={{ ...record, amount: residual }} tone="confirmed">
-                  {!isSettled && (
-                    <button
-                      type="button"
-                      onClick={() => withLoading(() => onDeferMonthBalance?.({
-                        memberId: memberIds[0] || record.memberId,
-                        profileId: record.profileId,
-                        month: currentYM,
-                        amount: residual,
-                        nextMonthDate: nextMonthFirstDay,
-                        memberName: record.name || record.memberName || '',
-                        groupId: data?.currentGroupId || '',
-                      }))}
-                      style={miniDashButton('#f59e0b', '#1c1917')}
-                    >
-                      Gộp → {nextMonthLabel}
-                    </button>
-                  )}
-                  {isSettled && (
-                    <>
-                      <span style={{ fontSize: 10, background: 'rgba(34,197,94,0.18)', color: '#4ade80', borderRadius: 6, padding: '3px 8px', fontWeight: 700 }}>✓ Gộp {nextMonthLabel}</span>
-                      <button
-                        type="button"
-                        onClick={() => withLoading(() => onUndoDeferMonthBalance?.({ settlementId: settlement.id }))}
-                        style={miniDashButton(colors.danger, '#fff')}
-                      >
-                        Hủy gộp
-                      </button>
-                    </>
-                  )}
-                </PaymentDashboardRow>
-              );
-            })}
-          </DashboardSection>
-        );
-      })()}
 
       <div style={{ position: 'relative' }}>
         <DashboardSection

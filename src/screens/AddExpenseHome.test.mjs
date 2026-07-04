@@ -623,10 +623,10 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(appSource, /coveredMembers/);
   assert.match(screenDataSource, /memberId: member\?\.id/);
   assert.match(homeSource, /<SourceBreakdown[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*balanceLabel=\{balanceLabel\}[\s\S]*owedTo=\{d\.owedTo\}[\s\S]*paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/);
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\)/);
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, onOpenPayment, onAction \}\)/);
   assert.doesNotMatch(homeSource, /if \(!safeArray\(sources\)\.length\) return null/);
   assert.match(homeSource, /const sourceRows = safeArray\(sources\)/);
-  assert.match(homeSource, /const paymentChipLabel = paidConfirmed \? '✅ Đã thanh toán' : paymentPending \? '⏳ Chờ xác nhận' : isZeroTotal \? '0'/);
+  assert.match(homeSource, /const paymentChipLabel = paidConfirmed \? '✅ Đã thanh toán' : paymentPending \? \(pendingSettlementCheckpoint \? '⏳ Chờ thủ quỹ duyệt' : '⏳ Chờ xác nhận'\) : isZeroTotal \? '0'/);
   assert.match(homeSource, /const paymentDisabled = isZeroTotal \|\| paidConfirmed \|\| paymentPending/);
   assert.match(homeSource, /const displayBalanceLabel = paidConfirmed \? 'Đã thanh toán' : isZeroTotal \? 'Số dư tháng này' : balanceLabel/);
   assert.match(homeSource, /Tổng hợp tất cả nguồn tiền tháng này/);
@@ -645,23 +645,22 @@ test('Home hero review chip is an explicit settle-all action', () => {
 });
 
 test('Home payment sheet gives treasurers a payment progress dashboard', () => {
-  assert.match(screenDataSource, /paymentProgress: buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel, safeArray\(state\?\.monthSettlements\), monthKey\(monthDate\)\)/);
+  assert.match(screenDataSource, /paymentProgress: buildPaymentProgressRows\(progressProfileBreakdown, members, state, monthLabel, safeArray\(state\?\.monthSettlements\), monthKey\(monthDate\)\)/);
+  assert.match(screenDataSource, /treasurerProfileBreakdown/);
   assert.match(screenDataSource, /function buildPaymentProgressRows\(profileBreakdown, members, state, monthLabel, settlements = \[\], selectedYearMonth = ''\)/);
   assert.match(screenDataSource, /value === 'confirmed'/);
   assert.match(screenDataSource, /value === 'pending'/);
   assert.match(screenDataSource, /status: Number\(row\.pendingAmount\) > 0 \? 'pending' : 'unpaid'/);
-  assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{data\?\.paymentProgress \|\| \[\]\}[\s\S]*monthSettlements=\{data\?\.monthSettlements \|\| \[\]\}/);
-  assert.match(homeSource, /prevMonthUnpaidByMember=\{data\?\.prevMonthUnpaidByMember \|\| \{\}\}/);
-  assert.match(homeSource, /onDeferMonthBalance=\{\(payload\) => onAction\?\.\('deferMonthBalance', payload\)\}/);
-  assert.match(homeSource, /onUndoDeferMonthBalance=\{\(payload\) => onAction\?\.\('undoDeferMonthBalance', payload\)\}/);
-  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, monthSettlements, prevMonthUnpaidByMember, onDeferMonthBalance, onUndoDeferMonthBalance \}\)/);
-  assert.match(homeSource, /const currentYM = data\?\.yearMonth \|\| ''/);
-  assert.match(homeSource, /Gộp → \{nextMonthLabel\}/);
-  assert.match(homeSource, /Hủy gộp/);
-  assert.match(appSource, /type === 'deferMonthBalance'/);
-  assert.match(appSource, /type: 'DEFER_MONTH_BALANCE'/);
-  assert.match(appSource, /type === 'undoDeferMonthBalance'/);
-  assert.match(appSource, /type: 'UNDO_DEFER_MONTH_BALANCE'/);
+  assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{\(data\?\.paymentProgress \|\| \[\]\)\.filter/);
+  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund \}\)/);
+  assert.doesNotMatch(homeSource, /onDeferMonthBalance/);
+  assert.doesNotMatch(homeSource, /onUndoDeferMonthBalance/);
+  assert.doesNotMatch(homeSource, /Gộp →/);
+  assert.doesNotMatch(homeSource, /Hủy gộp/);
+  assert.doesNotMatch(appSource, /type === 'deferMonthBalance'/);
+  assert.doesNotMatch(appSource, /type: 'DEFER_MONTH_BALANCE'/);
+  assert.doesNotMatch(appSource, /type === 'undoDeferMonthBalance'/);
+  assert.doesNotMatch(appSource, /type: 'UNDO_DEFER_MONTH_BALANCE'/);
   assert.match(homeSource, /Tiến độ thu/);
   assert.match(homeSource, /Đã nhận/);
   assert.match(homeSource, /Chờ duyệt/);
@@ -675,7 +674,8 @@ test('Home payment sheet gives treasurers a payment progress dashboard', () => {
   assert.match(homeSource, /function MemberShareLinkSheet\(\{ member, monthLabel, onAction, onClose \}\)/);
   assert.match(homeSource, /onAction\?\.\('createMemberBillShare', \{ groupId: member\.groupId, memberId: member\.memberId, copy: false \}\)/);
   assert.match(homeSource, /gridTemplateColumns: 'minmax\(0,1fr\) minmax\(0,1fr\) minmax\(0,1fr\)'/);
-  assert.match(homeSource, /maxHeight: 320, overflowY: 'auto'/);
+  assert.match(homeSource, /title=\{`Còn chưa thanh toán · \$\{unpaidRows\.length\}[\s\S]*listScroll/);
+  assert.match(homeSource, /maxHeight: 340, overflowY: 'auto'/);
 });
 
 test('GroupDetail no longer shows treasurer pending approval alert outside activity', () => {
