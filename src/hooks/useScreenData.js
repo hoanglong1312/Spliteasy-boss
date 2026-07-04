@@ -1320,7 +1320,7 @@ function buildGroupPaymentTarget(group, members) {
   }
 }
 
-function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members, selectedYearMonth) {
+export function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, members, selectedYearMonth) {
   const today = dateFromYearMonth(selectedYearMonth)
   const currentYearMonth = monthKey(today)
   const group = currentGroup(state)
@@ -1344,7 +1344,10 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
   const currentFixedMembers = currentGroupMembers(state).filter(member => isActiveMember(member) && isFixedForMonth(state, member, currentYearMonth))
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
   const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
-  const myAttendedCount = attendanceByMemberId(completedMonthSessions, currentPickleballMemberId, members, true)
+  const isFlexBilling = isBillingModeFlexForMonth(state, currentYearMonth)
+  const myAttendedCount = isFlexBilling
+    ? completedMonthSessions.filter(s => effectiveSessionMemberIdsFlex(s).some(id => String(id) === String(currentPickleballMemberId))).length
+    : attendanceByMemberId(completedMonthSessions, currentPickleballMemberId, members, true)
   const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId, today)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId, today)
   const ticketAmount = p2pTicketBalance - teamFundTicketShare
@@ -1372,6 +1375,7 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
     clubName: state?.currentGroup?.name || 'CLB Pickleball',
     monthLabel: formatMonthLabel(today),
     currentYearMonth,
+    isFlexBilling,
     scheduleConfig: {
       clubName: pickleConfig?.clubName || pickleConfig?.club_name || group?.name || '',
       weekdays: scheduleWeekdays,
@@ -1403,7 +1407,8 @@ function buildPickleballOverviewData(state, pickle, _allPickle, currentUserId, m
       color: currentMember?.color,
       statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
       ticketAdjustment,
-      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember)),
+      ticketType: memberBalance.ticketType ?? null,
+      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember), isFlexBilling),
       breakdown,
     },
     yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId, today),
@@ -2682,11 +2687,11 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
   ]
 }
 
-export function buildPersonalWaterSessionRows(monthSessions, memberId, members = []) {
+export function buildPersonalWaterSessionRows(monthSessions, memberId, members = [], useFlexAttendance = false) {
   return monthSessions
     .filter(s => sessionWaterAmount(s) > 0)
     .map(s => {
-      const attendees = effectiveSessionMemberIds(s, members)
+      const attendees = useFlexAttendance ? effectiveSessionMemberIdsFlex(s) : effectiveSessionMemberIds(s, members)
       const memberPresent = attendees.some(id => String(id) === String(memberId))
       if (!memberPresent) return null
       const share = Math.round(sessionWaterAmount(s) / attendees.length)
@@ -2698,11 +2703,11 @@ export function buildPersonalWaterSessionRows(monthSessions, memberId, members =
     .filter(Boolean)
 }
 
-export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = []) {
-  const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members)
+export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = [], useFlexAttendance = false) {
+  const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members, useFlexAttendance)
   const waterSessions = monthSessions.filter(s => (
     sessionWaterAmount(s) > 0 &&
-    effectiveSessionMemberIds(s, members).some(id => String(id) === String(memberId))
+    (useFlexAttendance ? effectiveSessionMemberIdsFlex(s) : effectiveSessionMemberIds(s, members)).some(id => String(id) === String(memberId))
   )).length
   const ticketCostCard = memberBalance.ticketType == null && !('ticketType' in memberBalance)
     ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' }

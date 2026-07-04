@@ -72,6 +72,9 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
   }, [data]);
 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
+  const isFlexMonthlyTicket = d.isFlexBilling && d.yourBalance?.ticketType === 'monthly';
+  const isFlexPerSessionTicket = d.isFlexBilling && d.yourBalance?.ticketType === 'per_session';
+  const perSessionTicketAmount = Math.abs(personalSummaryCards[0]?.amount || 0);
   const timeInputStyle = {
     width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 10, padding: '10px 8px', color: '#f1f5f9', fontSize: 13, fontWeight: 600,
@@ -173,17 +176,19 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
               Tiến độ tháng
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
-              <ProgressDonut value={d.progress.completed} max={d.progress.total} size={80} />
-              <div>
-                <div style={{ fontSize: 28, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
-                  {Math.round(d.progress.completed / d.progress.total * 100)}%
-                </div>
-                <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, marginTop: 5, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-                  buổi<br/>hoàn thành
+            {!isFlexMonthlyTicket && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
+                <ProgressDonut value={d.progress.completed} max={isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total} size={80} />
+                <div>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
+                    {Math.round(d.progress.completed / (isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total) * 100)}%
+                  </div>
+                  <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, marginTop: 5, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                    buổi<br/>hoàn thành
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
               background: 'rgba(52,211,153,0.13)',
@@ -196,6 +201,16 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               <span style={{ fontSize: 26, fontWeight: 900, color: '#34d399', ...type.mono, lineHeight: 1, letterSpacing: '-0.5px' }}>{d.progress.attended}</span>
               <span style={{ fontSize: 11, fontWeight: 600, color: '#6ee7b7' }}>buổi</span>
             </div>
+            {isFlexMonthlyTicket && (
+              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 6, textAlign: 'center' }}>
+                Vé tháng — không tính theo buổi
+              </div>
+            )}
+            {isFlexPerSessionTicket && (
+              <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 6, textAlign: 'center' }}>
+                ≈ {formatVND(perSessionTicketAmount)} vé lẻ tháng này
+              </div>
+            )}
             {d.todaySession && (
               <div style={{
                 marginTop: 10,
@@ -243,66 +258,68 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </div>
         </div>
 
-        <Card accent="pickleball" style={{ marginTop: 10, padding: '13px 12px', borderColor: 'rgba(251,191,36,0.20)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#fbbf24', textTransform: 'uppercase' }}>
-                Vé lẻ trong tháng
+        {!d.isFlexBilling && (
+          <Card accent="pickleball" style={{ marginTop: 10, padding: '13px 12px', borderColor: 'rgba(251,191,36,0.20)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '1px', color: '#fbbf24', textTransform: 'uppercase' }}>
+                  Vé lẻ trong tháng
+                </div>
+                <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
+                  Vé lẻ của bạn trong tháng
+                </div>
               </div>
-              <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 3 }}>
-                Vé lẻ của bạn trong tháng
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <button type="button" onClick={() => onAction?.('push', 'pickleball-calendar')} style={{
-                border: 'none',
-                background: 'rgba(251,191,36,0.12)',
-                color: '#fde68a',
-                borderRadius: 999,
-                padding: '8px 10px',
-                fontSize: 11,
-                fontWeight: 900,
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-              }}>
-                Mở lịch
-              </button>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
-            <TicketFundStat label="Buổi thêm" value={yourTickets.summary.sessionCount} tone="warn" raw />
-            <TicketFundStat label="Phần của bạn" value={yourTickets.summary.displayAdjustment ?? -yourTickets.summary.totalAdjustment} tone={(yourTickets.summary.displayAdjustment ?? -yourTickets.summary.totalAdjustment) > 0 ? 'success' : 'warn'} />
-          </div>
-
-          {yourTickets.rows.length > 0 && (
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {yourTickets.rows.map(row => (
-                <div key={row.id || `${row.dateLabel}-${row.sourceLabel}`} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 9,
-                  padding: '8px 0',
-                  borderTop: `1px solid ${colors.borderSubtle}`,
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <button type="button" onClick={() => onAction?.('push', 'pickleball-calendar')} style={{
+                  border: 'none',
+                  background: 'rgba(251,191,36,0.12)',
+                  color: '#fde68a',
+                  borderRadius: 999,
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  fontWeight: 900,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
                 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 900 }}>{row.dateLabel || 'Vé lẻ'}</div>
-                    <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
-                      {row.sourceLabel} · {row.roleLabel}
+                  Mở lịch
+                </button>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
+              <TicketFundStat label="Buổi thêm" value={yourTickets.summary.sessionCount} tone="warn" raw />
+              <TicketFundStat label="Phần của bạn" value={yourTickets.summary.displayAdjustment ?? -yourTickets.summary.totalAdjustment} tone={(yourTickets.summary.displayAdjustment ?? -yourTickets.summary.totalAdjustment) > 0 ? 'success' : 'warn'} />
+            </div>
+
+            {yourTickets.rows.length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {yourTickets.rows.map(row => (
+                  <div key={row.id || `${row.dateLabel}-${row.sourceLabel}`} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 9,
+                    padding: '8px 0',
+                    borderTop: `1px solid ${colors.borderSubtle}`,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 900 }}>{row.dateLabel || 'Vé lẻ'}</div>
+                      <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>
+                        {row.sourceLabel} · {row.roleLabel}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: row.displayAmount > 0 ? '#6ee7b7' : '#fca5a5',
+                      ...type.mono,
+                    }}>
+                      {formatSignedTicketAmount(row.displayAmount ?? -row.personalAmount)}
                     </div>
                   </div>
-                  <div style={{
-                    fontSize: 12,
-                    fontWeight: 900,
-                    color: row.displayAmount > 0 ? '#6ee7b7' : '#fca5a5',
-                    ...type.mono,
-                  }}>
-                    {formatSignedTicketAmount(row.displayAmount ?? -row.personalAmount)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
 
         {isTreasurer && (
           <Card accent="finance" style={{ marginTop: 10, padding: '13px 12px', borderColor: 'rgba(96,165,250,0.22)' }}>
@@ -337,7 +354,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </Card>
         )}
 
-        {isTreasurer && (
+        {isTreasurer && !d.isFlexBilling && (
           <Button
             block
             variant="ghost"
@@ -356,7 +373,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           </Button>
         )}
 
-        {isTreasurer && (
+        {isTreasurer && !d.isFlexBilling && (
           <div style={{ marginTop: 16, borderRadius: 14, border: '1px solid rgba(99,102,241,0.22)', overflow: 'hidden' }}>
             <button
               type="button"

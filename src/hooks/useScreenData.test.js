@@ -3,6 +3,7 @@ import {
   attendanceByMemberId,
   buildMemberMonthBalance,
   buildMemberMonthBalanceFlex,
+  buildPickleballOverviewData,
   buildPickleballTeamFundData,
   buildPickleballSettingsData,
   buildHomeData,
@@ -579,6 +580,41 @@ describe('buildPersonalPickleSummaryCards', () => {
       sub: 'Vào Thành viên để chọn vé tháng/lượt',
     })
   })
+
+  test('counts flex water sessions from explicit attendance only', () => {
+    const sessions = [
+      {
+        id: '1',
+        date: '2026-07-02',
+        water_amount: 100000,
+        attendance_records: [{ member_id: 'member-2', status: 'present' }],
+      },
+      {
+        id: '2',
+        date: '2026-07-09',
+        water_amount: 120000,
+        presentMemberIds: ['member-1', 'member-2'],
+      },
+    ]
+    const members = [
+      { id: 'member-1', name: 'Member One' },
+      { id: 'member-2', name: 'Member Two' },
+    ]
+
+    const result = buildPersonalPickleSummaryCards(sessions, {
+      ticketType: 'monthly',
+      monthlyTicketFee: 700000,
+      waterFee: 60000,
+    }, 0, 'member-1', members, true)
+
+    expect(result[1]).toMatchObject({
+      label: 'Nước của bạn',
+      amount: -60000,
+      sub: '1 buổi có nước',
+    })
+    expect(result[1].rows).toHaveLength(1)
+    expect(result[1].rows[0].amount).toBe(60000)
+  })
 })
 
 describe('buildPickleballTicketsData', () => {
@@ -687,6 +723,68 @@ describe('buildPersonalWaterSessionRows', () => {
     
     const result = buildPersonalWaterSessionRows(sessions, 'member-1', members)
     expect(result.length).toBe(1)
+  })
+
+  test('uses flex attendance without fixed-member fallback when requested', () => {
+    const sessions = [
+      {
+        id: '1',
+        date: '2026-07-02',
+        water_amount: 100000,
+        attendance_records: [
+          { member_id: 'member-2', status: 'present' },
+        ],
+      },
+    ]
+    const members = [
+      { id: 'member-1', name: 'Member One' },
+      { id: 'member-2', name: 'Member Two' },
+    ]
+
+    expect(buildPersonalWaterSessionRows(sessions, 'member-1', members)).toHaveLength(1)
+    expect(buildPersonalWaterSessionRows(sessions, 'member-1', members, true)).toEqual([])
+  })
+})
+
+describe('buildPickleballOverviewData flex attendance', () => {
+  test('uses explicit flex attendance for personal progress and water summary', () => {
+    const state = {
+      currentUserId: 'member-1',
+      currentGroupId: 'group-1',
+      currentGroup: { id: 'group-1', name: 'Flex Club' },
+      members: [
+        { id: 'member-1', group_id: 'group-1', name: 'Member One', memberType: 'fixed', isActive: true },
+        { id: 'member-2', group_id: 'group-1', name: 'Member Two', memberType: 'fixed', isActive: true },
+      ],
+      pickle: {
+        monthlyConfigs: [{
+          group_id: 'group-1',
+          year_month: '2026-07',
+          billing_mode: 'flex',
+          monthly_ticket_price: 700000,
+          monthly_ticket_member_ids: ['member-1'],
+        }],
+        sessions: [
+          { id: 's1', group_id: 'group-1', date: '2026-07-02', status: 'completed', water_amount: 100000, presentMemberIds: ['member-1', 'member-2'] },
+          { id: 's2', group_id: 'group-1', date: '2026-07-09', status: 'completed', water_amount: 100000, attendance_records: [{ member_id: 'member-2', status: 'present' }] },
+        ],
+        externalTickets: [],
+        ownerPayments: [],
+      },
+      _allPickle: { sessions: [], externalTickets: [], ownerPayments: [] },
+      tickets: [],
+    }
+
+    const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'member-1', state.members, '2026-07')
+
+    expect(data.isFlexBilling).toBe(true)
+    expect(data.progress.attended).toBe(1)
+    expect(data.yourBalance.ticketType).toBe('monthly')
+    expect(data.yourBalance.summaryCards[1]).toMatchObject({
+      label: 'Nước của bạn',
+      amount: -50000,
+      sub: '1 buổi có nước',
+    })
   })
 })
 
