@@ -74,6 +74,7 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
   const liveSessionsCount = computeSessionsCount(weekdays, d.currentYearMonth);
   const isFlexMonthlyTicket = d.isFlexBilling && d.yourBalance?.ticketType === 'monthly';
   const isFlexPerSessionTicket = d.isFlexBilling && d.yourBalance?.ticketType === 'per_session';
+  const visibleSummaryCards = d.isFlexBilling ? personalSummaryCards.filter(card => card.key !== 'ticket') : personalSummaryCards;
   const perSessionTicketAmount = Math.abs(personalSummaryCards[0]?.amount || 0);
   const timeInputStyle = {
     width: '100%', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
@@ -240,8 +241,8 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             )}
           </Card>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {personalSummaryCards.map(card => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: '100%' }}>
+            {visibleSummaryCards.map(card => {
               const isExpandable = card.rows || card.key === 'ticket';
               return (
                 <div key={card.label}
