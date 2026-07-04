@@ -997,6 +997,74 @@ describe('buildHomeData', () => {
     expect(result.prevMonthUnpaid).toMatchObject({ label: 'Còn nợ từ 01/07/2026' })
   })
 
+  test('uses checkpoint cutoff per group member for same profile', () => {
+    const members = [
+      { id: 'member-food', profile_id: 'profile-1', group_id: 'food-group', name: 'Lê Tuấn' },
+      { id: 'payer-food', profile_id: 'profile-2', group_id: 'food-group', name: 'Payer Food' },
+      { id: 'member-trip', profile_id: 'profile-1', group_id: 'trip-group', name: 'Lê Tuấn' },
+      { id: 'payer-trip', profile_id: 'profile-3', group_id: 'trip-group', name: 'Payer Trip' },
+    ]
+    const groups = [
+      {
+        id: 'food-group',
+        name: 'Food',
+        members: ['member-food', 'payer-food'],
+        expenses: [
+          {
+            id: 'food-old',
+            amount: 100000,
+            expense_date: '2026-06-20',
+            paid_by_member_id: 'payer-food',
+            participants: ['member-food', 'payer-food'],
+          },
+          {
+            id: 'food-new',
+            amount: 80000,
+            expense_date: '2026-07-02',
+            paid_by_member_id: 'payer-food',
+            participants: ['member-food', 'payer-food'],
+          },
+        ],
+      },
+      {
+        id: 'trip-group',
+        name: 'Trip',
+        members: ['member-trip', 'payer-trip'],
+        expenses: [{
+          id: 'trip-old',
+          amount: 60000,
+          expense_date: '2026-06-25',
+          paid_by_member_id: 'payer-trip',
+          participants: ['member-trip', 'payer-trip'],
+        }],
+      },
+    ]
+    const state = {
+      currentUserId: 'member-food',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'food-group',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-food',
+        group_id: 'food-group',
+        member_id: 'member-food',
+        period_end: '2026-07-01T00:00:00.000Z',
+        confirmed_at: '2026-07-01T00:05:00.000Z',
+        status: 'confirmed',
+      }],
+    }
+
+    const result = buildHomeData(state, 'member-food', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-08')
+
+    expect(result.totalBalance).toBe(-70000)
+    expect(result.sourceBreakdown).toEqual([
+      expect.objectContaining({ sourceId: 'food-group', memberId: 'member-food', amount: -40000 }),
+      expect.objectContaining({ sourceId: 'trip-group', memberId: 'member-trip', amount: -30000 }),
+    ])
+  })
+
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
@@ -1025,6 +1093,9 @@ describe('buildHomeData', () => {
     const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
 
     expect(result.pendingSettlementCheckpoint).toMatchObject({ id: 'checkpoint-1', amount: 40000, status: 'pending' })
+    expect(result.pendingSettlementCheckpoints).toEqual([
+      expect.objectContaining({ id: 'checkpoint-1', amount: 40000, status: 'pending' }),
+    ])
     expect(result.pendingCheckpointsForTreasurer).toEqual([
       expect.objectContaining({ id: 'checkpoint-1', memberName: 'Member One', amount: 40000 }),
     ])

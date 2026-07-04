@@ -181,6 +181,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           currentUserId: d.currentUserId || '',
           monthSettlements: d.monthSettlements || [],
           pendingSettlementCheckpoint: d.pendingSettlementCheckpoint || null,
+          pendingSettlementCheckpoints: d.pendingSettlementCheckpoints || [],
           pendingCheckpointsForTreasurer: d.pendingCheckpointsForTreasurer || [],
           currentMonthResidualByMember: d.currentMonthResidualByMember || {},
         }}
@@ -193,8 +194,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         onViewPaymentRecord={setPaymentRecordDetail}
         onConfirmPayment={(payload) => onAction?.('requestSettlementCheckpoint', {
           ...payload,
-          groupId: d.currentGroupId || '',
-          memberId: d.currentUserId || '',
+          groups: buildSettlementCheckpointGroups(payload?.coveredSources),
         })}
         onConfirmRefund={(row) => {
           const key = String(row.profileId || row.name || 'member');
@@ -1829,6 +1829,27 @@ function resolveVietQrBank(bank = {}) {
 }
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function buildSettlementCheckpointGroups(coveredSources) {
+  const byMemberGroup = new Map();
+  safeArray(coveredSources)
+    .filter(source => Number(source.amount) < 0)
+    .forEach(source => {
+      const groupId = source.sourceId || source.source_id || '';
+      const memberId = source.memberId || source.member_id || '';
+      if (!groupId || !memberId) return;
+      const key = `${groupId}:${memberId}`;
+      const current = byMemberGroup.get(key) || {
+        groupId,
+        memberId,
+        amount: 0,
+        groupName: source.sourceLabel || source.source_label || '',
+      };
+      current.amount += Math.abs(Number(source.amount) || 0);
+      byMemberGroup.set(key, current);
+    });
+  return [...byMemberGroup.values()].filter(row => row.amount > 0);
 }
 
 function normalizeSearch(value) {

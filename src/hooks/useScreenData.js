@@ -251,8 +251,7 @@ function normalizeSettlementCheckpoint(row, members = []) {
   }
 }
 
-function latestConfirmedSettlementCheckpoint(state, memberId) {
-  const groupId = settlementCheckpointGroupId(state)
+function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
   return safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, state?.members))
     .filter(row => String(row.groupId || '') === String(groupId || ''))
@@ -261,15 +260,18 @@ function latestConfirmedSettlementCheckpoint(state, memberId) {
     .sort((a, b) => parseDateValue(b.confirmedAt || b.periodEnd) - parseDateValue(a.confirmedAt || a.periodEnd))[0] || null
 }
 
-function pendingSettlementCheckpointForMember(state, memberId, members = []) {
-  const groupId = settlementCheckpointGroupId(state)
+function pendingSettlementCheckpointsForProfile(state, memberId, members = [], groups = []) {
+  const profileId = profileIdForMember(memberId, members)
+  const memberIds = new Set(memberIdsForProfile(profileId, members).map(String))
   return safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, members))
-    .find(row => (
-      String(row.groupId || '') === String(groupId || '') &&
-      String(row.memberId || '') === String(memberId || '') &&
-      String(row.status || '').toLowerCase() === 'pending'
-    )) || null
+    .filter(row => memberIds.has(String(row.memberId || '')))
+    .filter(row => String(row.status || '').toLowerCase() === 'pending')
+    .map(row => ({
+      ...row,
+      groupName: safeArray(groups).find(group => String(group.id) === String(row.groupId))?.name || row.groupId || 'Nhóm',
+    }))
+    .sort((a, b) => parseDateValue(a.createdAt) - parseDateValue(b.createdAt))
 }
 
 function pendingSettlementCheckpointsForTreasurer(state, members = []) {
@@ -330,30 +332,39 @@ function pickleStateAfter(state, startDate) {
   }
 }
 
-function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members, startDate) {
+function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members) {
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
-    membersForGroup(group, members).map(member => ({
-      sourceId: group.id,
-      sourceType: 'group',
-      sourceLabel: group.name || 'Nhóm',
-      memberId: member.id,
-      amount: groupNet(group, member.id),
-    }))
+    membersForGroup(group, members).map(member => {
+      const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, member.id)
+      const checkpointGroup = groupWithExpensesAfter(group, checkpoint?.periodEnd || null)
+      return {
+        sourceId: group.id,
+        sourceType: 'group',
+        sourceLabel: group.name || 'Nhóm',
+        memberId: member.id,
+        amount: groupNet(checkpointGroup, member.id),
+      }
+    })
   ))
-  const pickleState = pickleStateAfter(pickleballState, startDate)
-  const pickleRows = settlementRelevantMonthDates(pickleState, startDate).flatMap(monthDate => {
-    const monthSessions = getStateMonthSessions(pickleState, monthDate)
-    return currentGroupMembers(pickleState)
-      .filter(isActiveMember)
-      .map(member => ({
+  const pickleGroupId = pickleballState?.currentGroupId || pickleballState?.currentGroup?.id
+  const pickleRows = currentGroupMembers(pickleballState)
+    .filter(isActiveMember)
+    .flatMap(member => {
+      const checkpoint = latestConfirmedSettlementCheckpoint(pickleballState, pickleGroupId, member.id)
+      const startDate = checkpoint?.periodEnd || null
+      const pickleState = pickleStateAfter(pickleballState, startDate)
+      return settlementRelevantMonthDates(pickleState, startDate).map(monthDate => {
+        const monthSessions = getStateMonthSessions(pickleState, monthDate)
+        return {
         sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
         sourceType: 'pickleball',
         sourceLabel: pickleState?.currentGroup?.name || 'Pickleball',
         memberId: member.id,
         amount: buildMemberMonthBalance(pickleState, pickle, monthSessions, member.id, monthDate).netBalance || 0,
         month: monthKey(monthDate),
-      }))
-  })
+        }
+      })
+    })
   return [...expenseRows, ...pickleRows].filter(row => row.memberId && row.amount !== 0)
 }
 
@@ -375,16 +386,14 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const expenseGroups = safeGroups
     .filter(group => groupKind(group) !== 'pickleball')
     .map(group => groupWithMonthExpenses(group, today))
-  const confirmedCheckpoint = latestConfirmedSettlementCheckpoint(state, currentUserId)
-  const checkpointStart = confirmedCheckpoint?.periodEnd || null
   const settlementExpenseGroups = safeGroups
     .filter(group => groupKind(group) !== 'pickleball')
-    .map(group => groupWithExpensesAfter(group, checkpointStart))
+    .map(safeGroup)
   const monthSessions = getStateMonthSessions(pickleballState, today)
   const summary = pickleSummary(pickle || {})
   const session = findNearestOpenSession(pickle, today)
   const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, state?.currentUserName)
-  const settlementSourceBalances = buildSettlementSourceBalances(state, settlementExpenseGroups, pickleballState, pickle, members, checkpointStart)
+  const settlementSourceBalances = buildSettlementSourceBalances(state, settlementExpenseGroups, pickleballState, pickle, members)
   const pickleballBalance = settlementSourceBalances
     .filter(source => source.sourceType === 'pickleball' && String(source.memberId) === String(pickleballMemberId))
     .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
@@ -426,9 +435,19 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const paymentSummary = buildHomePaymentSummary(stateWithPrevMonthResidual, rawSourceBreakdown, profileBreakdown, members, me, today)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
+  const confirmedCheckpoint = sourceBreakdown
+    .filter(source => Number(source.amount) < 0)
+    .map(source => latestConfirmedSettlementCheckpoint(
+      source.sourceType === 'pickleball' ? pickleballState : state,
+      source.sourceId,
+      source.memberId,
+    ))
+    .filter(Boolean)
+    .sort((a, b) => parseDateValue(a.periodEnd) - parseDateValue(b.periodEnd))[0] || null
   const checkpointNotice = settlementCarryForwardNotice(confirmedCheckpoint, selectedYearMonth, paymentSummary.netBalance)
   const prevMonthUnpaid = checkpointNotice || buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth)
-  const pendingSettlementCheckpoint = pendingSettlementCheckpointForMember(state, currentUserId, members)
+  const pendingSettlementCheckpoints = pendingSettlementCheckpointsForProfile(state, currentUserId, members, safeGroups)
+  const pendingSettlementCheckpoint = pendingSettlementCheckpoints[0] || null
   const pendingCheckpointsForTreasurer = pendingSettlementCheckpointsForTreasurer(state, members)
   const allTickets = [
     ...safeArray(pickleballState?._allPickle?.externalTickets),
@@ -497,6 +516,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     paymentSummary,
     prevMonthUnpaid,
     pendingSettlementCheckpoint,
+    pendingSettlementCheckpoints,
     pendingCheckpointsForTreasurer,
     prevMonthResidualByMember,
     currentMonthResidualByMember,
