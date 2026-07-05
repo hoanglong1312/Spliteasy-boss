@@ -1176,9 +1176,27 @@ describe('buildHomeData', () => {
     expect(june.cappedTotalBalance).toBe(-50000)
     expect(june.totalBalance).toBe(-80000)
     expect(june.paymentSummary.netBalance).toBe(-80000)
+    expect(june.cappedSourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -50000 }],
+    })
+    expect(june.sourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({
+      amount: -80000,
+      monthBreakdown: [
+        { month: '2026-06', label: 'Tháng 6', amount: -50000 },
+        { month: '2026-07', label: 'Tháng 7', amount: -30000 },
+      ],
+    })
     expect(july.cappedTotalBalance).toBe(-80000)
     expect(july.totalBalance).toBe(-80000)
     expect(july.paymentSummary.netBalance).toBe(-80000)
+    expect(july.cappedSourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({
+      amount: -80000,
+      monthBreakdown: [
+        { month: '2026-06', label: 'Tháng 6', amount: -50000 },
+        { month: '2026-07', label: 'Tháng 7', amount: -30000 },
+      ],
+    })
     expect(june.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 50000, status: 'unpaid' })
   })
 

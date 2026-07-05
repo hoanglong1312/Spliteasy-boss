@@ -54,6 +54,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const heroBalanceLabel = isTreasurer
     ? (outstandingAmount > 0 ? 'Còn cần thu' : 'Đã thu đủ')
     : balanceLabel;
+  const heroSourceBreakdown = isTreasurer ? (d.sourceBreakdown || []) : (d.cappedSourceBreakdown || d.sourceBreakdown || []);
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
   const pendingPayments = d.pendingPayments || [];
@@ -80,7 +81,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
         <SourceBreakdown
-          sources={d.sourceBreakdown || []}
+          sources={heroSourceBreakdown}
           totalBalance={heroBalance}
           balanceLabel={heroBalanceLabel}
           owedTo={d.owedTo}

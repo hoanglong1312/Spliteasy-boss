@@ -476,6 +476,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     .filter(group => groupKind(group) !== 'pickleball')
     .map(group => groupWithExpensesUpTo(group, endOfSelectedMonth))
   const treasurerSourceBalances = buildSettlementSourceBalances(state, treasurerExpenseGroups, pickleballState, pickle, members, endOfSelectedMonth)
+  const cappedSourceBreakdown = currentProfileSourceBreakdown(treasurerSourceBalances, currentUserId, members)
   const treasurerProfileBreakdown = adjustedProfileBreakdownForPayments(
     state,
     aggregateBalancesByProfile(treasurerSourceBalances, members),
@@ -597,6 +598,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     pendingPayments: buildPendingPaymentConfirmations(state),
     paymentRecords: buildPaymentManagementRecords(state, me, today),
     sourceBreakdown,
+    cappedSourceBreakdown,
     profileBreakdown,
     paymentSummary,
     prevMonthUnpaid,
