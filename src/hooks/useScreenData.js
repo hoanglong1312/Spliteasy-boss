@@ -859,7 +859,8 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       if (memberId && scope.memberIds?.has(String(memberId))) return true
       if (profileId && sourceProfileIds.size > 0) return sourceProfileIds.has(profileId)
       if (memberId && sourceMemberIds.size > 0) return sourceMemberIds.has(memberId)
-      return !profileId && !memberId && (scope.isActor === true || scope.isRecipient === true)
+      if (scope.isRecipient) return true
+      return !profileId && !memberId && scope.isActor === true
     })
     .map(source => ({
       sourceId: source.sourceId || source.source_id,
@@ -873,8 +874,19 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
     .filter(source => source.amount !== 0)
   if (explicit.length > 0) return explicit
 
-  let remaining = coveredMemberAmountForScope(metadata, scope) || (scope.isActor ? Math.abs(Number(metadata?.amount) || 0) : 0)
+  let remaining = coveredMemberAmountForScope(metadata, scope) || ((scope.isActor || scope.isRecipient) ? Math.abs(Number(metadata?.amount) || 0) : 0)
   if (remaining <= 0) return []
+  if (scope.isRecipient) {
+    return safeArray(sourceBreakdown)
+      .filter(source => Number(source.amount) > 0)
+      .map(source => {
+        if (remaining <= 0) return null
+        const covered = Math.min(Number(source.amount), remaining)
+        remaining -= covered
+        return { ...source, amount: covered }
+      })
+      .filter(Boolean)
+  }
   return safeArray(sourceBreakdown)
     .filter(source => Number(source.amount) < 0)
     .map(source => {
