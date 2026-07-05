@@ -713,7 +713,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                         {isPast && (
                           <button
                             type="button"
-                            onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); }}
+                            onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); openSource(); }}
                             style={{
                               padding: 0,
                               border: 'none',
