@@ -252,12 +252,32 @@ function normalizeSettlementCheckpoint(row, members = []) {
 }
 
 function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
-  return safeArray(state?.settlementCheckpoints)
+  const checkpoint = safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, state?.members))
     .filter(row => String(row.groupId || '') === String(groupId || ''))
     .filter(row => String(row.memberId || '') === String(memberId || ''))
     .filter(row => String(row.status || '').toLowerCase() === 'confirmed')
     .sort((a, b) => parseDateValue(b.confirmedAt || b.periodEnd) - parseDateValue(a.confirmedAt || a.periodEnd))[0] || null
+  const notice = safeArray(state?.notifications)
+    .filter(row => String(row?.type || '') === 'payment_submitted')
+    .filter(row => String(row?.groupId || row?.group_id || '') === String(groupId || ''))
+    .filter(row => String(row?.actorMemberId || row?.actor_member_id || '') === String(memberId || ''))
+    .filter(row => String((row?.metadata || {}).status || '').toLowerCase() === 'confirmed')
+    .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))[0] || null
+  const noticeDate = notice?.createdAt || notice?.created_at || null
+  if (!noticeDate) return checkpoint
+  if (parseDateValue(checkpoint?.confirmedAt || checkpoint?.periodEnd) >= parseDateValue(noticeDate)) return checkpoint
+  return {
+    groupId,
+    group_id: groupId,
+    memberId,
+    member_id: memberId,
+    periodEnd: noticeDate,
+    period_end: noticeDate,
+    confirmedAt: noticeDate,
+    confirmed_at: noticeDate,
+    status: 'confirmed',
+  }
 }
 
 function pendingSettlementCheckpointsForProfile(state, memberId, members = [], groups = []) {

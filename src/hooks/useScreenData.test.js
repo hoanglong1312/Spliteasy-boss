@@ -1157,6 +1157,58 @@ describe('buildHomeData', () => {
     expect(progressRow).toMatchObject({ amount: 50000, status: 'unpaid' })
   })
 
+  test('uses confirmed payment notification as settlement cutoff across later months', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'june-expense',
+          amount: 100000,
+          expense_date: '2026-06-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'july-expense',
+          amount: 60000,
+          expense_date: '2026-07-02T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-confirmed-june',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 6 · 2026', amount: 50000 },
+        created_at: '2026-06-30T12:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const source = result.sourceBreakdown.find(row => row.sourceId === 'group-1')
+    const progressRow = result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
+
+    expect(result.totalBalance).toBe(-30000)
+    expect(source).toMatchObject({ amount: -30000 })
+    expect(progressRow).toMatchObject({ amount: 30000, status: 'unpaid' })
+  })
+
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
