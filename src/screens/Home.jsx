@@ -694,18 +694,19 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                   const isPast = row.month && viewedMonthKey && row.month < viewedMonthKey;
                   return (
                     <div key={row.month || row.label} style={{
-                      border: isPast ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 8,
-                      padding: '4px 6px',
-                      background: isPast ? 'rgba(251,191,36,0.06)' : 'rgba(255,255,255,0.025)',
+                      ...(isPast ? {
+                        border: '1px solid rgba(251,191,36,0.45)',
+                        borderRadius: 8,
+                        padding: '4px 6px',
+                        background: 'rgba(251,191,36,0.06)',
+                      } : {}),
                       fontSize: 11,
                       color: colors.textSecondary,
                       lineHeight: 1.25,
                     }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'baseline', columnGap: 6 }}>
-                        <span aria-hidden="true" style={{ color: colors.textMuted, fontSize: 10, lineHeight: 1 }}>•</span>
-                        <span style={{ minWidth: 0 }}>{row.label || row.month}</span>
-                        <span style={{ color: monthAmount < 0 ? colors.danger : colors.success, textAlign: 'right', whiteSpace: 'nowrap', ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                        <span>{row.label || row.month}</span>
+                        <span style={{ color: monthAmount < 0 ? colors.danger : colors.success, whiteSpace: 'nowrap', ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
                       </div>
                       {isPast && (
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 10, marginTop: 3 }}>
