@@ -706,8 +706,9 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                       lineHeight: 1.25,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: colors.textMuted, fontSize: 9 }}>›</span>
                         <span>{row.label || row.month}</span>
-                        {isPast && <span style={{ fontSize: 9, color: '#fbbf24', fontWeight: 800, whiteSpace: 'nowrap' }}>⚠️ chưa trả</span>}
+                        {isPast && <span style={{ fontSize: 9, color: '#fbbf24', fontWeight: 800, whiteSpace: 'nowrap' }}>⚠️ chưa quyết toán</span>}
                         <span style={{ flex: 1, textAlign: 'right', color: monthAmount < 0 ? colors.danger : colors.success, whiteSpace: 'nowrap', ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
                         {isPast && (
                           <button
