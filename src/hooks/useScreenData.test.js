@@ -1209,6 +1209,61 @@ describe('buildHomeData', () => {
     expect(progressRow).toMatchObject({ amount: 30000, status: 'unpaid' })
   })
 
+  test('keeps treasurer outstanding stable across month views after confirmed payment notice', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'settled-july-expense',
+          amount: 100000,
+          expense_date: '2026-07-02T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'remaining-july-expense',
+          amount: 40000,
+          expense_date: '2026-07-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentUserName: 'Treasurer One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-confirmed-july',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 7 · 2026', amount: 50000 },
+        created_at: '2026-07-10T12:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const july = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const august = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-08')
+    const outstanding = rows => rows
+      .filter(row => ['pending', 'unpaid'].includes(String(row.status).toLowerCase()))
+      .reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+
+    expect(outstanding(july.paymentSummary.paymentProgress)).toBe(20000)
+    expect(outstanding(august.paymentSummary.paymentProgress)).toBe(20000)
+    expect(july.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 20000, status: 'unpaid' })
+    expect(august.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 20000, status: 'unpaid' })
+  })
+
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

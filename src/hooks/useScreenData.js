@@ -640,6 +640,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
 
 export function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, settlements = [], selectedYearMonth = '') {
   const rowsByProfile = new Map()
+  const rawDebtProfiles = new Set()
   const putRow = (row) => {
     const profileId = String(row.profileId || row.profile_id || row.memberId || row.member_id || row.name || '')
     if (!profileId) return
@@ -670,12 +671,30 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
 
   safeArray(profileBreakdown)
     .filter(row => Number(row.amount) < 0)
-    .forEach(row => putRow({
-      ...row,
-      amount: Math.abs(Number(row.amount) || 0),
-      status: Number(row.pendingAmount) > 0 ? 'pending' : 'unpaid',
-      sourceSummary: safeArray(row.sources).length ? `${safeArray(row.sources).length} nguồn tiền` : 'Nguồn tiền',
-    }))
+    .forEach(row => {
+      putRow({
+        ...row,
+        amount: Math.abs(Number(row.amount) || 0),
+        status: Number(row.pendingAmount) > 0 ? 'pending' : 'unpaid',
+        sourceSummary: safeArray(row.sources).length ? `${safeArray(row.sources).length} nguồn tiền` : 'Nguồn tiền',
+      })
+      const profileId = String(row.profileId || row.profile_id || row.memberId || row.member_id || row.name || '')
+      if (profileId) rawDebtProfiles.add(profileId)
+    })
+
+  const shouldSkipPaymentNotice = (notification, metadata, status) => {
+    if (status === 'confirmed') {
+      const noticeMonth = monthKey(notification?.createdAt || notification?.created_at)
+      return Boolean(selectedYearMonth && noticeMonth && noticeMonth > selectedYearMonth)
+    }
+    return Boolean(monthLabel && metadata.monthLabel && String(metadata.monthLabel) !== String(monthLabel))
+  }
+
+  const putNoticeRow = (row, status) => {
+    const profileId = String(row.profileId || row.profile_id || row.memberId || row.member_id || row.name || '')
+    if (status === 'confirmed' && rawDebtProfiles.has(profileId)) return
+    putRow(row)
+  }
 
   safeArray(state?.notifications)
     .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
@@ -683,12 +702,12 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       const metadata = notification?.metadata || {}
       const status = String(metadata.status || 'pending').toLowerCase()
       if (status === 'deleted' || status === 'rejected') return
-      if (monthLabel && metadata.monthLabel && String(metadata.monthLabel) !== String(monthLabel)) return
+      if (shouldSkipPaymentNotice(notification, metadata, status)) return
       const actorMemberId = notification.actorMemberId || notification.actor_member_id || ''
       const actorProfileId = profileIdForMember(actorMemberId, members)
       const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
       if (coveredMembers.length > 0) {
-        coveredMembers.forEach(member => putRow({
+        coveredMembers.forEach(member => putNoticeRow({
           profileId: member.profileId || member.profile_id || profileIdForMember(member.memberId || member.member_id, members),
           memberId: member.memberId || member.member_id,
           memberIds: member.memberIds || member.member_ids,
@@ -696,17 +715,17 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
           amount: member.amount || metadata.amount,
           status,
           sourceSummary: 'Đã báo thanh toán',
-        }))
+        }, status))
         return
       }
-      putRow({
+      putNoticeRow({
         profileId: actorProfileId,
         memberId: actorMemberId,
         name: metadata.memberName || notification.actorName || notification.actor_name,
         amount: metadata.amount,
         status,
         sourceSummary: 'Đã báo thanh toán',
-      })
+      }, status)
     })
 
   const prevMonth = selectedYearMonth ? shiftMonthKey(selectedYearMonth, -1) : ''
@@ -765,6 +784,7 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   notices.forEach(notification => {
     const metadata = notification?.metadata || {}
     const status = String(metadata.status || 'pending').toLowerCase()
+    if (isConfirmedPaymentSubmittedNotice(notification, status)) return
     const amount = Math.abs(Number(metadata.amount) || 0)
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
     const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)) }
@@ -779,6 +799,11 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   })
 
   return { confirmedSources, confirmedAmount, pendingAmount }
+}
+
+function isConfirmedPaymentSubmittedNotice(notification, status = '') {
+  return String(notification?.type || '').toLowerCase() === 'payment_submitted' &&
+    String(status || (notification?.metadata || {}).status || '').toLowerCase() === 'confirmed'
 }
 
 function paymentScopeForMember(state, member) {
