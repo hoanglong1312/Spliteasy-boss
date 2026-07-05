@@ -689,28 +689,25 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                 gap: 4,
                 padding: '7px 12px 2px 56px',
               }}>
+                <div style={{ fontSize: 9, color: colors.textMuted, paddingBottom: 2, letterSpacing: '0.05em' }}>theo tháng</div>
                 {monthBreakdown.map(row => {
                   const monthAmount = Number(row.amount) || 0;
                   const isPast = row.month && viewedMonthKey && row.month < viewedMonthKey;
                   return (
                     <div key={row.month || row.label} style={{
-                      ...(isPast ? {
-                        border: '1px solid rgba(251,191,36,0.45)',
-                        borderRadius: 8,
-                        padding: '4px 6px',
-                        background: 'rgba(251,191,36,0.06)',
-                      } : {}),
+                      border: isPast ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 8,
+                      padding: '4px 6px',
+                      background: isPast ? 'rgba(251,191,36,0.06)' : 'transparent',
                       fontSize: 11,
                       color: colors.textSecondary,
                       lineHeight: 1.25,
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span>{row.label || row.month}</span>
-                        <span style={{ color: monthAmount < 0 ? colors.danger : colors.success, whiteSpace: 'nowrap', ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
-                      </div>
-                      {isPast && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', alignItems: 'center', gap: 10, marginTop: 3 }}>
-                          <span style={{ fontSize: 10, color: '#fbbf24', fontWeight: 800 }}>⚠️ chưa trả</span>
+                        {isPast && <span style={{ fontSize: 9, color: '#fbbf24', fontWeight: 800, whiteSpace: 'nowrap' }}>⚠️ chưa trả</span>}
+                        <span style={{ flex: 1, textAlign: 'right', color: monthAmount < 0 ? colors.danger : colors.success, whiteSpace: 'nowrap', ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
+                        {isPast && (
                           <button
                             type="button"
                             onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); }}
@@ -723,12 +720,13 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                               fontWeight: 800,
                               fontFamily: 'inherit',
                               cursor: 'pointer',
+                              whiteSpace: 'nowrap',
                             }}
                           >
                             Xem →
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })}
