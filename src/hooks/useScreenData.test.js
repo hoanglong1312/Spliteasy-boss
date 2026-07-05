@@ -1335,6 +1335,40 @@ describe('buildHomeData', () => {
     expect(progressRow.amount).not.toBe(994590)
   })
 
+  test('labels confirmed payment records with group name and month', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [],
+    }]
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentUserName: 'Hoàng Long',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-confirmed-may',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 5 · 2026', amount: 894590 },
+        created_at: '2026-07-05T05:11:13.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-05')
+
+    expect(result.paymentRecords[0].sourceSummary).toBe('Lấy vk để trưởng thành · Tháng 5 · 2026')
+    expect(result.paymentRecords[0].sourceSummary).not.toBe('Chưa rõ nguồn')
+  })
+
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

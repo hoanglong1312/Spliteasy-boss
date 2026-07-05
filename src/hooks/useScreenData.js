@@ -1070,6 +1070,8 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
       const memberName = metadata.memberName || notification.actorName || notification.actor_name || 'Thành viên'
       const actorMemberId = notification.actorMemberId || notification.actor_member_id || ''
       const actorProfileId = profileIdForMember(actorMemberId, state?.members)
+      const groupId = notification.groupId || notification.group_id || ''
+      const groupName = safeArray(state?.groups).find(group => String(group?.id || '') === String(groupId))?.name || ''
       const coveredSources = safeArray(metadata.coveredSources || metadata.covered_sources).map(source => ({
         ...source,
         profileId: source.profileId || source.profile_id || actorProfileId || '',
@@ -1090,7 +1092,7 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
         monthLabel: metadata.monthLabel || monthLabel,
         transferDescription: metadata.transferDescription || metadata.transfer_description || '',
         coveredSources,
-        sourceSummary: coveredSources.length ? `${coveredSources.length} nguồn tiền` : 'Chưa rõ nguồn',
+        sourceSummary: groupName ? `${groupName} · ${metadata.monthLabel || monthLabel}` : (coveredSources.length ? `${coveredSources.length} nguồn tiền` : 'Chưa rõ nguồn'),
       }
     })
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
