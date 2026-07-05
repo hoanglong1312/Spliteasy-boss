@@ -772,10 +772,10 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   notices.forEach(notification => {
     const metadata = notification?.metadata || {}
     const status = String(metadata.status || 'pending').toLowerCase()
-    if (isConfirmedPaymentSubmittedNotice(notification, status)) return
     const amount = Math.abs(Number(metadata.amount) || 0)
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
     const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)) }
+    if (noticeScope.isActor && isConfirmedPaymentSubmittedNotice(notification, status)) return
     const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
     const scopedAmount = coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
     if (status === 'confirmed') {
@@ -829,6 +829,13 @@ function paymentNoticesForMember(state, member, monthLabel) {
 function paymentNoticeCoversMember(notification, memberIds, profileId) {
   if (memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || ''))) return true
   const metadata = notification?.metadata || {}
+  const notificationMemberId = notification?.memberId || notification?.member_id || ''
+  if (
+    notificationMemberId &&
+    memberIds.has(String(notificationMemberId)) &&
+    String(notification?.type || '').toLowerCase() === 'payment_submitted' &&
+    String(metadata.status || '').toLowerCase() === 'confirmed'
+  ) return true
   const profileKey = String(profileId || '')
   return safeArray(metadata.coveredMembers || metadata.covered_members).some(row => (
     (profileKey && String(row?.profileId || row?.profile_id || '') === profileKey) ||
@@ -897,11 +904,16 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
   return safeArray(sourceBreakdown)
     .map(source => {
       const amount = Number(source.amount) || 0
-      if (amount >= 0) return source
       const paid = coveredBySource.get(sourceKey(source)) || 0
+      if (amount >= 0) {
+        if (!paid) return source
+        const newAmount = amount - paid
+        return newAmount <= 0 ? null : { ...source, amount: newAmount, paidAmount: Math.min(amount, paid) }
+      }
       const remaining = amount + paid
       return { ...source, amount: remaining, paidAmount: Math.min(Math.abs(amount), paid) }
     })
+    .filter(Boolean)
     .filter(source => Number(source.amount) !== 0)
 }
 
