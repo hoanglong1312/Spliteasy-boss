@@ -263,6 +263,11 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
     .filter(row => String(row?.groupId || row?.group_id || '') === String(groupId || ''))
     .filter(row => String(row?.actorMemberId || row?.actor_member_id || '') === String(memberId || ''))
     .filter(row => String((row?.metadata || {}).status || '').toLowerCase() === 'confirmed')
+    .filter(row => {
+      const metadata = row?.metadata || {}
+      return !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
+        !safeArray(metadata.coveredMembers || metadata.covered_members).length
+    })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))[0] || null
   const noticeDate = notice?.createdAt || notice?.created_at || null
   if (!noticeDate) return checkpoint
@@ -378,6 +383,12 @@ function sourceMonthLabel(month) {
   return `Tháng ${date.getMonth() + 1}`
 }
 
+function monthKeyFromPaymentLabel(label) {
+  const match = String(label || '').match(/Tháng\s+(\d{1,2})\D+(\d{4})/i)
+  if (!match) return ''
+  return `${match[2]}-${String(match[1]).padStart(2, '0')}`
+}
+
 function sourceMonthBreakdown(rows) {
   const byMonth = new Map()
   safeArray(rows).forEach(row => {
@@ -414,7 +425,13 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
   const pickleRows = currentGroupMembers(pickleballState)
     .filter(isActiveMember)
     .flatMap(member => {
-      const checkpoint = latestConfirmedSettlementCheckpoint(pickleballState, pickleGroupId, member.id)
+      const checkpointState = {
+        ...pickleballState,
+        members: safeArray(pickleballState?.members).length ? pickleballState.members : state?.members,
+        notifications: safeArray(pickleballState?.notifications).length ? pickleballState.notifications : state?.notifications,
+        settlementCheckpoints: safeArray(pickleballState?.settlementCheckpoints).length ? pickleballState.settlementCheckpoints : state?.settlementCheckpoints,
+      }
+      const checkpoint = latestConfirmedSettlementCheckpoint(checkpointState, pickleGroupId, member.id)
       const startDate = checkpoint?.periodEnd || null
       const pickleState = pickleStateAfter(pickleballState, startDate, endDate)
       return settlementRelevantMonthDates(pickleState, startDate, endDate).map(monthDate => {
@@ -442,6 +459,18 @@ function settlementCarryForwardNotice(checkpoint, selectedYearMonth, balance) {
     label: `Còn nợ từ ${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`,
     balance,
   }
+}
+
+function capSourceBreakdownByMonth(sourceBreakdown, selectedYearMonth) {
+  return safeArray(sourceBreakdown)
+    .map(source => {
+      const monthBreakdown = safeArray(source.monthBreakdown)
+      if (!monthBreakdown.length) return source
+      const cappedMonths = monthBreakdown.filter(row => !row.month || String(row.month) <= String(selectedYearMonth))
+      const amount = cappedMonths.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+      return amount === 0 ? null : { ...source, amount, monthBreakdown: cappedMonths }
+    })
+    .filter(Boolean)
 }
 
 function endOfYearMonth(yearMonth) {
@@ -476,7 +505,6 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     .filter(group => groupKind(group) !== 'pickleball')
     .map(group => groupWithExpensesUpTo(group, endOfSelectedMonth))
   const treasurerSourceBalances = buildSettlementSourceBalances(state, treasurerExpenseGroups, pickleballState, pickle, members, endOfSelectedMonth)
-  const cappedSourceBreakdown = currentProfileSourceBreakdown(treasurerSourceBalances, currentUserId, members)
   const treasurerProfileBreakdown = adjustedProfileBreakdownForPayments(
     state,
     aggregateBalancesByProfile(treasurerSourceBalances, members),
@@ -520,6 +548,8 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const paymentSummary = buildHomePaymentSummary(stateWithPrevMonthResidual, rawSourceBreakdown, profileBreakdown, members, me, today, treasurerProfileBreakdown)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
+  const cappedSourceBreakdown = capSourceBreakdownByMonth(sourceBreakdown, selectedYearMonth)
+  const displayCappedTotalBalance = cappedSourceBreakdown.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const confirmedCheckpoint = sourceBreakdown
     .filter(source => Number(source.amount) < 0)
     .map(source => latestConfirmedSettlementCheckpoint(
@@ -576,7 +606,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     monthLabel: formatMonthLabel(today),
     currentGroupId: state?.currentGroupId || state?.currentGroup?.id || '',
     totalBalance,
-    cappedTotalBalance,
+    cappedTotalBalance: displayCappedTotalBalance || cappedTotalBalance,
     owedTo: sourceBreakdown.filter(source => Number(source.amount) < 0).length,
     pickleball: {
       sessionsAttended: monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length,
@@ -668,6 +698,8 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
         name: row.name || row.memberName || row.member_name || findProfileMember(profileId, members)?.displayName || findProfileMember(profileId, members)?.name || 'Thành viên',
         amount,
         status: nextStatus,
+        sources: safeArray(row.sources),
+        coveredSources: safeArray(row.coveredSources || row.covered_sources || row.sources),
         sourceSummary: row.sourceSummary || row.source_summary || `${safeArray(row.sources).length || 1} nguồn tiền`,
         prevMonthResidual: 0,
         prevMonthSettled: false,
@@ -776,7 +808,12 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
     const recipientMemberId = notification?.memberId || notification?.member_id || ''
     const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)), isRecipient: !!recipientMemberId && scope.memberIds.has(String(recipientMemberId)) }
-    if (noticeScope.isActor && isConfirmedPaymentSubmittedNotice(notification, status)) return
+    if (
+      noticeScope.isActor &&
+      isConfirmedPaymentSubmittedNotice(notification, status) &&
+      !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
+      !safeArray(metadata.coveredMembers || metadata.covered_members).length
+    ) return
     const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
     const scopedAmount = coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
     if (status === 'confirmed') {
@@ -822,6 +859,8 @@ function paymentNoticesForMember(state, member, monthLabel) {
     .filter(notification => paymentNoticeCoversMember(notification, memberIds, profileId))
     .filter(notification => {
       const metadata = notification?.metadata || {}
+      const status = String(metadata.status || 'pending').toLowerCase()
+      if (status === 'confirmed') return true
       return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
     })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
@@ -870,20 +909,25 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       memberId: source.memberId || source.member_id || '',
       memberName: source.memberName || source.member_name || '',
       amount: Number(source.amount) || 0,
+      month: source.month || source.yearMonth || source.year_month || '',
+      monthBreakdown: safeArray(source.monthBreakdown || source.month_breakdown),
     }))
     .filter(source => source.amount !== 0)
   if (explicit.length > 0) return explicit
 
   let remaining = coveredMemberAmountForScope(metadata, scope) || ((scope.isActor || scope.isRecipient) ? Math.abs(Number(metadata?.amount) || 0) : 0)
   if (remaining <= 0) return []
+  const coveredMonth = monthKeyFromPaymentLabel(metadata?.monthLabel || metadata?.month_label)
   if (scope.isRecipient) {
-    return safeArray(sourceBreakdown)
-      .filter(source => Number(source.amount) > 0)
+    const debtSources = safeArray(sourceBreakdown).filter(source => Number(source.amount) < 0)
+    const rows = debtSources.length ? debtSources : safeArray(sourceBreakdown).filter(source => Number(source.amount) > 0)
+    return rows
       .map(source => {
         if (remaining <= 0) return null
-        const covered = Math.min(Number(source.amount), remaining)
+        const amount = Number(source.amount) || 0
+        const covered = Math.min(Math.abs(amount), remaining)
         remaining -= covered
-        return { ...source, amount: covered }
+        return { ...source, amount: amount < 0 ? -covered : covered, month: coveredMonth || source.month || '' }
       })
       .filter(Boolean)
   }
@@ -893,7 +937,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       if (remaining <= 0) return null
       const covered = Math.min(Math.abs(Number(source.amount) || 0), remaining)
       remaining -= covered
-      return { ...source, amount: -covered }
+      return { ...source, amount: -covered, month: coveredMonth || source.month || '' }
     })
     .filter(Boolean)
 }
@@ -910,24 +954,71 @@ function coveredMemberAmountForScope(metadata, scope = {}) {
 
 function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
   const coveredBySource = new Map()
+  const coveredMonthsBySource = new Map()
   safeArray(confirmedSources).forEach(source => {
     const key = sourceKey(source)
-    coveredBySource.set(key, (coveredBySource.get(key) || 0) + Math.abs(Number(source.amount) || 0))
+    const amount = Math.abs(Number(source.amount) || 0)
+    coveredBySource.set(key, (coveredBySource.get(key) || 0) + amount)
+    const sourceMonth = source.month || source.yearMonth || source.year_month
+    const months = safeArray(source.monthBreakdown || source.month_breakdown)
+    if (sourceMonth) {
+      const monthMap = coveredMonthsBySource.get(key) || new Map()
+      monthMap.set(sourceMonth, (monthMap.get(sourceMonth) || 0) + amount)
+      coveredMonthsBySource.set(key, monthMap)
+    } else if (months.length) {
+      months.forEach(item => {
+        const month = item.month || monthKey(item.date)
+        if (!month) return
+        const monthMap = coveredMonthsBySource.get(key) || new Map()
+        monthMap.set(month, (monthMap.get(month) || 0) + Math.abs(Number(item.amount) || 0))
+        coveredMonthsBySource.set(key, monthMap)
+      })
+    }
   })
   return safeArray(sourceBreakdown)
     .map(source => {
       const amount = Number(source.amount) || 0
-      const paid = coveredBySource.get(sourceKey(source)) || 0
+      const key = sourceKey(source)
+      const paid = Math.min(Math.abs(amount), coveredBySource.get(key) || 0)
+      coveredBySource.set(key, Math.max((coveredBySource.get(key) || 0) - paid, 0))
+      const monthBreakdown = applyConfirmedPaymentCoverageToMonths(source.monthBreakdown, paid, amount, coveredMonthsBySource.get(key))
+      const remainingFromMonths = safeArray(monthBreakdown).length
+        ? monthBreakdown.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+        : null
       if (amount >= 0) {
         if (!paid) return source
-        const newAmount = amount - paid
-        return newAmount <= 0 ? null : { ...source, amount: newAmount, paidAmount: Math.min(amount, paid) }
+        const newAmount = remainingFromMonths ?? amount - paid
+        return newAmount <= 0 ? null : { ...source, amount: newAmount, monthBreakdown, paidAmount: paid }
       }
-      const remaining = amount + paid
-      return { ...source, amount: remaining, paidAmount: Math.min(Math.abs(amount), paid) }
+      const remaining = remainingFromMonths ?? amount + paid
+      return { ...source, amount: remaining, monthBreakdown, paidAmount: paid }
     })
     .filter(Boolean)
     .filter(source => Number(source.amount) !== 0)
+}
+
+function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmount, coveredMonths = new Map()) {
+  let remainingPaid = Math.abs(Number(paid) || 0)
+  if (!remainingPaid || !safeArray(monthBreakdown).length) return monthBreakdown
+  const sign = Number(sourceAmount) >= 0 ? 1 : -1
+  return safeArray(monthBreakdown)
+    .map(item => {
+      const amount = Number(item.amount) || 0
+      const monthPaid = Math.min(Math.abs(amount), coveredMonths.get(item.month) || 0)
+      if (monthPaid > 0) {
+        remainingPaid = Math.max(remainingPaid - monthPaid, 0)
+        return { ...item, amount: amount - sign * Math.abs(amount) }
+      }
+      if (remainingPaid <= 0 || Math.sign(amount) !== sign) return item
+      if (remainingPaid >= Math.abs(amount) * 0.9) {
+        remainingPaid = Math.max(remainingPaid - Math.abs(amount), 0)
+        return { ...item, amount: 0 }
+      }
+      const covered = Math.min(Math.abs(amount), remainingPaid)
+      remainingPaid -= covered
+      return { ...item, amount: amount - sign * covered }
+    })
+    .filter(item => Number(item.amount) !== 0)
 }
 
 function sourceKey(source) {
@@ -4399,6 +4490,8 @@ function aggregateBalancesByProfile(sourceBalances, members) {
       memberId: row.memberId || row.member_id || '',
       memberName: item.name,
       amount,
+      month: row.month || '',
+      monthBreakdown: safeArray(row.monthBreakdown || row.month_breakdown),
     })
   })
   return [...byProfile.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.name.localeCompare(b.name, 'vi'))
