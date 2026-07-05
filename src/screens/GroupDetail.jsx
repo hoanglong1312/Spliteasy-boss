@@ -21,6 +21,10 @@ const GROUP_TYPES = [
   { key: 'other', label: 'Khác', emoji: '🎯', hint: 'Nhóm linh hoạt', descriptionPlaceholder: 'Ví dụ: Nhóm chi tiêu linh hoạt' },
 ];
 
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const d = data || DEMO;
   const groupTypeOptions = d.groupTypeOptions || GROUP_TYPES;
@@ -182,8 +186,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 18 }}>
             <Button variant="primary" style={{ padding: '7px 6px', fontSize: 11, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost" style={{ padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán</Button>
+            <Button variant="ghost" style={{ padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán hết nợ</Button>
             <Button variant="ghost" style={{ gridColumn: '1 / -1', padding: '7px 6px', fontSize: 11 }} onClick={() => setExportMenuOpen(true)}>📤 Xuất Excel</Button>
+          </div>
+          <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 7, lineHeight: 1.35 }}>
+            Thanh toán cho tất cả các tháng còn nợ đến hiện tại.
           </div>
         </ModuleHero>
 
@@ -706,6 +713,9 @@ function MemberRow({ member, isTreasurer, onOpen, onMore }) {
           }}>⋯</button>
         )}
       </div>
+      {safeArray(member.monthBreakdown).length > 0 && (
+        <MonthBreakdown rows={member.monthBreakdown} />
+      )}
     </Card>
   );
 }
@@ -777,6 +787,11 @@ function MemberDetailContent({ member, isTreasurer, onAction, onClose, onEdit, o
         <div style={{ height: 1, background: colors.borderSubtle, margin: '12px 0' }} />
         <BalanceBreakdownRow label="Cần trả" amount={summary.owes} tone={colors.danger} />
         <BalanceBreakdownRow label="Đã ứng" amount={summary.advanced} tone="#6ee7b7" />
+        {safeArray(member.monthBreakdown).length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <MonthBreakdown rows={member.monthBreakdown} />
+          </div>
+        )}
       </Card>
 
       {isTreasurer && (
@@ -837,6 +852,24 @@ function MemberDetailContent({ member, isTreasurer, onAction, onClose, onEdit, o
         </BottomSheet>
       )}
 
+    </div>
+  );
+}
+
+function MonthBreakdown({ rows }) {
+  return (
+    <div style={{ display: 'grid', gap: 4, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.borderSubtle}` }}>
+      {safeArray(rows).map(row => {
+        const amount = Number(row.amount) || 0;
+        const tone = amount < 0 ? colors.danger : amount > 0 ? '#6ee7b7' : colors.textSecondary;
+        const label = amount === 0 ? '0 đ' : `${amount > 0 ? '+' : '-'}${formatVND(Math.abs(amount))}`;
+        return (
+          <div key={row.month || row.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, color: colors.textSecondary }}>
+            <span>{row.label || row.month}</span>
+            <span style={{ color: tone, fontWeight: 850, ...type.mono }}>{label}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

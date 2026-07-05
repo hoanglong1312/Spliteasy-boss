@@ -57,7 +57,9 @@ test('AddExpense uses scroll date picker and supports receipt image previews', (
 test('GroupDetail menu, balances, and members tabs render real group data', () => {
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /onAction\?\.\('settleAll'\)/);
-  assert.match(groupDetailSource, />💳 Thanh toán<\/Button>/);
+  assert.match(groupDetailSource, />💳 Thanh toán hết nợ<\/Button>/);
+  assert.match(groupDetailSource, /Thanh toán cho tất cả các tháng còn nợ đến hiện tại\./);
+  assert.match(groupDetailSource, /function MonthBreakdown\(\{ rows \}\)/);
   assert.doesNotMatch(groupDetailSource, /⚡ Tất toán/);
   assert.doesNotMatch(groupDetailSource, /Gửi bill tháng/);
   assert.doesNotMatch(groupDetailSource, /Chốt sổ tháng/);

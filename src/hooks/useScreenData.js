@@ -1302,9 +1302,10 @@ function stableHash(value) {
   return hash >>> 0
 }
 
-function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = [], appState = {}) {
+export function buildGroupDetailData(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = [], appState = {}) {
   const g = safeGroup(group)
   const monthDate = dateFromYearMonth(selectedYearMonth)
+  const endOfSelectedMonth = endOfYearMonth(selectedYearMonth)
   const monthlyGroup = groupWithMonthExpenses(g, monthDate)
   const groupMembers = membersForGroup(g, members)
   const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(g, currentUserId, members, currentUserName)))
@@ -1312,10 +1313,12 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
   const isGroupCreator = isMemberGroupCreator(g, currentGroupMember) || isMemberGroupCreator(g, currentMember)
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
   const isGroupTreasurer = Boolean(isGroupCreator || isManagerRole(currentGroupMember?.role) || (Boolean(currentGroupMember) && isSoloExpenseGroup))
-  const balanceMap = groupBalanceForMember(monthlyGroup, currentUserId, members, currentUserName)
-  const balance = adjustedGroupNetForMember(monthlyGroup, currentGroupMember?.id || currentUserId, groupMembers, appState, monthDate)
+  const currentBalanceGroup = groupDetailSettlementGroup(g, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
+  const balanceMap = groupBalanceForMember(currentBalanceGroup, currentGroupMember?.id || currentUserId, members, currentUserName)
+  const currentBalance = groupDetailSettlementBalance(g, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
+  const balance = currentBalance.amount
   const memberBalanceMap = Object.fromEntries(
-    groupMembers.map(member => [member.id, adjustedGroupNetForMember(monthlyGroup, member.id, groupMembers, appState, monthDate)])
+    groupMembers.map(member => [member.id, groupDetailSettlementBalance(g, member.id, appState, endOfSelectedMonth)])
   )
   const paymentTarget = buildGroupPaymentTarget(g, groupMembers)
   const activities = safeArray(monthlyGroup.expenses)
@@ -1380,7 +1383,8 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         bankAccount: member.bankAccount || member.bank_account || '',
         bankAccountName: member.bankAccountName || member.bank_account_name || '',
         joinDate: fullExpenseDate(member.createdAt || member.created_at),
-        balance: memberBalanceMap[member.id] || 0,
+        balance: memberBalanceMap[member.id]?.amount || 0,
+        monthBreakdown: memberBalanceMap[member.id]?.monthBreakdown || [],
         isCurrentUser: String(member.id) === String(currentGroupMember?.id || ''),
         memberTransactions,
         memberTransactionSummary: summarizeMemberTransactions(memberTransactions),
@@ -1396,10 +1400,27 @@ function buildGroupDetailData(group, currentUserId, members, currentUserName, se
         photoUrl: memberPhotoUrl(member, members),
         role: member.role,
         isGroupCreator: isMemberGroupCreator(g, member),
-        amount: memberBalanceMap[member.id] || 0,
+        amount: memberBalanceMap[member.id]?.amount || 0,
+        monthBreakdown: memberBalanceMap[member.id]?.monthBreakdown || [],
       }))
       .filter(row => row.amount !== 0)
       .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.name.localeCompare(b.name, 'vi')),
+  }
+}
+
+function groupDetailSettlementGroup(group, memberId, state, endDate) {
+  const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, memberId)
+  return groupWithExpensesAfter(group, checkpoint?.periodEnd || null, endDate)
+}
+
+function groupDetailSettlementBalance(group, memberId, state, endDate) {
+  const checkpointGroup = groupDetailSettlementGroup(group, memberId, state, endDate)
+  return {
+    amount: groupNet(checkpointGroup, memberId),
+    monthBreakdown: sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
+      month: monthKey(expense.date || expense.expense_date),
+      amount: groupNet({ ...checkpointGroup, expenses: [expense] }, memberId),
+    }))),
   }
 }
 

@@ -7,6 +7,7 @@ import {
   buildPickleballTeamFundData,
   buildPickleballSettingsData,
   buildHomeData,
+  buildGroupDetailData,
   buildPaymentProgressRows,
   buildPickleballCalendarData,
   buildPickleballTicketsData,
@@ -1447,5 +1448,112 @@ describe('buildHomeData', () => {
 
     expect(result.currentMonthResidualByMember).toEqual({ 'member-1': 20000 })
     expect(result.prevMonthUnpaidByMember).toBeUndefined()
+  })
+})
+
+describe('buildGroupDetailData', () => {
+  test('uses checkpoint cutoff through viewed month for member balances', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const group = {
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'april-settled',
+          amount: 100000,
+          expense_date: '2026-04-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'june-open',
+          amount: 200000,
+          expense_date: '2026-06-10T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups: [group],
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-1',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        status: 'confirmed',
+        period_end: '2026-05-01T00:00:00.000Z',
+        confirmed_at: '2026-05-01T00:05:00.000Z',
+      }],
+    }
+
+    const may = buildGroupDetailData(group, 'member-1', members, 'Member One', '2026-05', [], state)
+    const june = buildGroupDetailData(group, 'member-1', members, 'Member One', '2026-06', [], state)
+
+    expect(may.balance).toBe(0)
+    expect(may.members.find(member => member.id === 'member-1')).toMatchObject({
+      balance: 0,
+      monthBreakdown: [],
+    })
+    expect(june.balance).toBe(-100000)
+    expect(june.members.find(member => member.id === 'member-1')).toMatchObject({
+      balance: -100000,
+      monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -100000 }],
+    })
+  })
+
+  test('accumulates prior unconfirmed months and exposes month breakdown', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const group = {
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'may-open',
+          amount: 100000,
+          expense_date: '2026-05-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'june-open',
+          amount: 60000,
+          expense_date: '2026-06-10T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups: [group],
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildGroupDetailData(group, 'member-1', members, 'Member One', '2026-06', [], state)
+    const member = result.members.find(row => row.id === 'member-1')
+
+    expect(result.balance).toBe(-80000)
+    expect(member.balance).toBe(-80000)
+    expect(member.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -50000 },
+      { month: '2026-06', label: 'Tháng 6', amount: -30000 },
+    ])
   })
 })
