@@ -774,7 +774,8 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const status = String(metadata.status || 'pending').toLowerCase()
     const amount = Math.abs(Number(metadata.amount) || 0)
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
-    const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)) }
+    const recipientMemberId = notification?.memberId || notification?.member_id || ''
+    const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)), isRecipient: !!recipientMemberId && scope.memberIds.has(String(recipientMemberId)) }
     if (noticeScope.isActor && isConfirmedPaymentSubmittedNotice(notification, status)) return
     const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
     const scopedAmount = coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
@@ -858,7 +859,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       if (memberId && scope.memberIds?.has(String(memberId))) return true
       if (profileId && sourceProfileIds.size > 0) return sourceProfileIds.has(profileId)
       if (memberId && sourceMemberIds.size > 0) return sourceMemberIds.has(memberId)
-      return !profileId && !memberId && scope.isActor === true
+      return !profileId && !memberId && (scope.isActor === true || scope.isRecipient === true)
     })
     .map(source => ({
       sourceId: source.sourceId || source.source_id,
