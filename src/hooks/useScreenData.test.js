@@ -944,6 +944,27 @@ describe('buildPaymentProgressRows', () => {
       settlementExpenseId: null,
     })
   })
+
+  test('ignores confirmed payment_submitted notices because checkpoint cutoff owns confirmed debt', () => {
+    const rows = buildPaymentProgressRows(
+      [],
+      [{ id: 'member-1', profile_id: 'profile-1', name: 'Lê Tuấn' }],
+      {
+        notifications: [{
+          id: 'notice-1',
+          type: 'payment_submitted',
+          actor_member_id: 'member-1',
+          metadata: { status: 'confirmed', amount: 894590, monthLabel: 'Tháng 5 · 2026' },
+          created_at: '2026-07-05T05:11:13.000Z',
+        }],
+      },
+      'Tháng 7 · 2026',
+      [],
+      '2026-07',
+    )
+
+    expect(rows).toEqual([])
+  })
 })
 
 describe('buildHomeData', () => {
@@ -1262,6 +1283,56 @@ describe('buildHomeData', () => {
     expect(outstanding(august.paymentSummary.paymentProgress)).toBe(20000)
     expect(july.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 20000, status: 'unpaid' })
     expect(august.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 20000, status: 'unpaid' })
+  })
+
+  test('shows only post-confirmation debt after confirmed payment notice', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'confirmed-may-expense',
+          amount: 1789180,
+          expense_date: '2026-05-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'post-confirm-expense',
+          amount: 200000,
+          expense_date: '2026-07-05T06:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentUserName: 'Treasurer One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-confirmed-may',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 5 · 2026', amount: 894590 },
+        created_at: '2026-07-05T05:11:13.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const progressRow = result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
+
+    expect(progressRow).toMatchObject({ amount: 100000, status: 'unpaid' })
+    expect(progressRow.amount).not.toBe(994590)
   })
 
   test('exposes pending settlement checkpoint state for member and treasurer', () => {
