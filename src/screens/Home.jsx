@@ -689,7 +689,9 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                 gap: 4,
                 padding: '7px 12px 2px 56px',
               }}>
-                <div style={{ fontSize: 9, color: colors.textMuted, paddingBottom: 2, letterSpacing: '0.05em' }}>theo tháng</div>
+                <div style={{ fontSize: 9, color: colors.textMuted, paddingBottom: 2, letterSpacing: '0.05em' }}>
+                  theo tháng
+                </div>
                 {monthBreakdown.map(row => {
                   const monthAmount = Number(row.amount) || 0;
                   const isPast = row.month && viewedMonthKey && row.month < viewedMonthKey;
