@@ -482,6 +482,10 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     members,
     today,
   )
+  const currentProfileId = me?.profileId || me?.profile_id || profileIdForMember(currentUserId, members)
+  const cappedTotalBalance = Number(safeArray(treasurerProfileBreakdown).find(row => (
+    String(row.profileId || row.profile_id || '') === String(currentProfileId || '')
+  ))?.amount) || 0
   const prevYearMonth = shiftMonthKey(selectedYearMonth, -1)
   const prevDate = dateFromYearMonth(prevYearMonth)
   const prevExpenseGroups = safeGroups
@@ -571,6 +575,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     monthLabel: formatMonthLabel(today),
     currentGroupId: state?.currentGroupId || state?.currentGroup?.id || '',
     totalBalance,
+    cappedTotalBalance,
     owedTo: sourceBreakdown.filter(source => Number(source.amount) < 0).length,
     pickleball: {
       sessionsAttended: monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length,
@@ -584,7 +589,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     todaySession: session ? toTodaySessionCard(session, pickle, members) : null,
     currentUserId,
     currentUserName: state?.currentUserName || 'Bạn',
-    currentProfileId: profileIdForMember(currentUserId, members),
+    currentProfileId,
     expenses: buildHomeExpenses(expenseGroups, currentUserId, members, state?.currentUserName, today),
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),

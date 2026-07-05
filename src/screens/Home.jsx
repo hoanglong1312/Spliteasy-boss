@@ -43,13 +43,14 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const [paymentRecordDetail, setPaymentRecordDetail] = useState(null);
   const [confirmedRefunds, setConfirmedRefunds] = useState(() => new Set());
   const [savingAction, setSavingAction] = useState('');
-  const isNeg = d.totalBalance < 0;
-  const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : d.totalBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
+  const memberHeroBalance = Number(d.cappedTotalBalance ?? d.totalBalance) || 0;
+  const isNeg = memberHeroBalance < 0;
+  const balanceLabel = isNeg && Number(d.paymentSummary?.paidAmount || 0) > 0 ? 'Cần nộp thêm' : isNeg ? 'Bạn cần nộp quỹ' : memberHeroBalance > 0 ? 'Quỹ cần bù bạn' : 'Đã cân bằng';
   const progressRowsForHero = isTreasurer ? (d.paymentSummary?.paymentProgress || []).filter(r => !d.currentProfileId || String(r.profileId || '') !== String(d.currentProfileId)) : [];
   const outstandingAmount = progressRowsForHero
     .filter(r => ['pending', 'unpaid'].includes(String(r.status || '').toLowerCase()))
     .reduce((sum, r) => sum + Math.abs(Number(r.amount) || 0), 0);
-  const heroBalance = isTreasurer ? outstandingAmount : d.totalBalance;
+  const heroBalance = isTreasurer ? outstandingAmount : memberHeroBalance;
   const heroBalanceLabel = isTreasurer
     ? (outstandingAmount > 0 ? 'Còn cần thu' : 'Đã thu đủ')
     : balanceLabel;

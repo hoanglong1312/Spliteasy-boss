@@ -1134,7 +1134,7 @@ describe('buildHomeData', () => {
     expect(source.monthBreakdown.reduce((sum, row) => sum + row.amount, 0)).toBe(source.amount)
   })
 
-  test('keeps member balance point-in-time while treasurer progress stops at viewed month end', () => {
+  test('caps member home hero balance to viewed month while payment sheet keeps full debt', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
@@ -1170,13 +1170,16 @@ describe('buildHomeData', () => {
       settlementCheckpoints: [],
     }
 
-    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
-    const source = result.sourceBreakdown.find(row => row.sourceId === 'group-1')
-    const progressRow = result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
+    const june = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const july = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
 
-    expect(result.totalBalance).toBe(-80000)
-    expect(source.amount).toBe(-80000)
-    expect(progressRow).toMatchObject({ amount: 50000, status: 'unpaid' })
+    expect(june.cappedTotalBalance).toBe(-50000)
+    expect(june.totalBalance).toBe(-80000)
+    expect(june.paymentSummary.netBalance).toBe(-80000)
+    expect(july.cappedTotalBalance).toBe(-80000)
+    expect(july.totalBalance).toBe(-80000)
+    expect(july.paymentSummary.netBalance).toBe(-80000)
+    expect(june.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 50000, status: 'unpaid' })
   })
 
   test('uses confirmed payment notification as settlement cutoff across later months', () => {
