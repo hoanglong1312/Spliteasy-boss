@@ -89,16 +89,11 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           pendingSettlementCheckpoint={d.pendingSettlementCheckpoint}
           onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
+          viewedMonthKey={d.selectedYearMonth || d.yearMonth}
+          onViewMonth={(ym) => onAction?.('setMonth', { yearMonth: ym })}
         />
 
 
-        {d.prevMonthUnpaid && (
-          <PrevMonthNotice
-            label={d.prevMonthUnpaid.label}
-            balance={d.prevMonthUnpaid.balance}
-            onView={() => onAction?.('monthPrev')}
-          />
-        )}
         {isPickleballTreasurer && (
           <PendingTicketsBanner
             items={d.pendingTickets?.items || []}
@@ -515,7 +510,7 @@ function approvalButton(background, color) {
   };
 }
 
-export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, onOpenPayment, onAction }) {
+export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, onOpenPayment, onAction, viewedMonthKey = '', onViewMonth }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
@@ -696,17 +691,44 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
               }}>
                 {monthBreakdown.map(row => {
                   const monthAmount = Number(row.amount) || 0;
+                  const isPast = row.month && viewedMonthKey && row.month < viewedMonthKey;
                   return (
                     <div key={row.month || row.label} style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: 10,
+                      ...(isPast ? {
+                        border: '1px solid rgba(251,191,36,0.45)',
+                        borderRadius: 8,
+                        padding: '4px 6px',
+                        background: 'rgba(251,191,36,0.06)',
+                      } : {}),
                       fontSize: 11,
                       color: colors.textSecondary,
                       lineHeight: 1.25,
                     }}>
-                      <span>{row.label || row.month}</span>
-                      <span style={{ color: monthAmount < 0 ? colors.danger : colors.success, ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                        <span>{row.label || row.month}</span>
+                        <span style={{ color: monthAmount < 0 ? colors.danger : colors.success, ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
+                      </div>
+                      {isPast && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 3 }}>
+                          <span style={{ fontSize: 10, color: '#fbbf24', fontWeight: 800 }}>⚠️ chưa trả</span>
+                          <button
+                            type="button"
+                            onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); }}
+                            style={{
+                              padding: 0,
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#fbbf24',
+                              fontSize: 10,
+                              fontWeight: 800,
+                              fontFamily: 'inherit',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Xem →
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

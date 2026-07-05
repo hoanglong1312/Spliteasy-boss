@@ -841,6 +841,11 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'setMonth') {
+      await dispatch({ type: 'SET_SELECTED_MONTH', selectedYearMonth: payload.yearMonth })
+      return
+    }
+
     if (type === 'monthPrev' || type === 'monthNext') {
       const route = stack[stack.length - 1]
       const currentYearMonth = state.selectedYearMonth || route?.params?.yearMonth || monthKey(new Date())
