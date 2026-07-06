@@ -649,7 +649,15 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     currentProfileId,
     expenses: buildHomeExpenses(expenseGroups, currentUserId, members, state?.currentUserName, today),
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
-    transactions: buildTransactions(expenseGroups, currentUserId, members, state?.currentUserName),
+    transactions: buildTransactions(
+      [
+        ...expenseGroups,
+        buildPickleballTicketTransactionGroup(state, pickleballState, today),
+      ].filter(Boolean),
+      currentUserId,
+      members,
+      state?.currentUserName
+    ),
     pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
     pendingPayments: buildPendingPaymentConfirmations(state),
     paymentRecords: buildPaymentManagementRecords(state, me, today),
@@ -3087,6 +3095,38 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
     .slice(0, 8)
 }
 
+function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate) {
+  const group = pickleballState?.currentGroup || state?.currentGroup || {}
+  const rows = monthTicketsForState(pickleballState || state, monthDate)
+    .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+    .map(ticket => {
+      const memberIds = ticketMemberIds(ticket)
+      const amountPerPerson = ticketAmountPerPerson(ticket)
+      return {
+        id: `ticket:${ticket?.id || ticketDate(ticket)}`,
+        type: 'pickleball_ticket',
+        groupId: group.id || pickleballState?.currentGroupId || state?.currentGroupId,
+        title: ticket?.title || 'Trả tiền sân theo xé vé tháng',
+        amount: ticketTotalAmount(ticket) + (Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0),
+        paidBy: ticketAdvancerId(ticket) || '',
+        participants: memberIds,
+        splits: memberIds.map(memberId => ({ memberId, amount: amountPerPerson })),
+        date: ticketDate(ticket),
+        status: 'approved',
+        category: 'pickleball',
+        yearMonth: ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket)),
+      }
+    })
+  if (!rows.length) return null
+  return {
+    ...group,
+    id: group.id || pickleballState?.currentGroupId || state?.currentGroupId || 'pickleball',
+    name: group.name || 'Pickleball',
+    emoji: group.emoji || '🏸',
+    expenses: rows,
+  }
+}
+
 function buildExpenseActivity(groups) {
   return safeArray(groups).flatMap(group => safeArray(group?.expenses).map(expense => ({
     ...expense,
@@ -3117,6 +3157,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
 
       return {
         id: expense.id,
+        type: expense.type,
         groupId: expense.groupId,
         icon: expenseIcon(expense),
         category: expenseCategory(expense),
@@ -3126,6 +3167,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
         dateLabel: relativeDateLabel(expense.date),
         amount,
         status: expense.status,
+        yearMonth: expense.yearMonth || expense.year_month || monthKey(expense.date),
         paidBy,
         payerName: memberName(paidBy, members) || '',
         participants,

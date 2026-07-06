@@ -152,7 +152,13 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
               isTreasurer={isTreasurer}
               onApprove={() => onAction?.('approveExpense', { expenseId: tx.id, groupId: tx.groupId })}
               onReject={() => onAction?.('rejectExpense', { expenseId: tx.id, groupId: tx.groupId })}
-              onView={() => onAction?.('viewExpense', { expenseId: tx.id })}
+              onView={() => {
+                if (tx.type === 'pickleball_ticket') {
+                  onAction?.('push', { screen: 'pickleball-calendar', params: { yearMonth: tx.yearMonth, selectedDate: tx.date } });
+                  return;
+                }
+                onAction?.('viewExpense', { expenseId: tx.id });
+              }}
             />
           )) : (
             <div style={{ padding: '14px 0', fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>
@@ -703,6 +709,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                 {monthBreakdown.map(row => {
                   const monthAmount = Number(row.amount) || 0;
                   const isPast = row.month && viewedMonthKey && row.month < viewedMonthKey;
+                  const canViewMonth = Boolean(row.month);
                   return (
                     <div key={row.month || row.label} style={{
                       border: isPast ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)',
@@ -732,7 +739,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                             fontWeight: 900,
                             ...type.mono,
                           }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
-                          {isPast && (
+                          {canViewMonth && (
                             <button
                               type="button"
                               onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); }}
@@ -740,7 +747,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                                 padding: 0,
                                 border: 'none',
                                 background: 'transparent',
-                                color: '#fbbf24',
+                                color: isPast ? '#fbbf24' : colors.brandLight,
                                 fontSize: 10,
                                 fontWeight: 800,
                                 fontFamily: 'inherit',
