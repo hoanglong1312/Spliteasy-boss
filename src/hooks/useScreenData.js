@@ -258,16 +258,23 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
   const checkpoint = safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, state?.members))
     .filter(row => String(row.groupId || '') === String(groupId || ''))
-    .filter(row => String(row.memberId || '') === String(memberId || ''))
+    .filter(row => (
+      String(row.memberId || '') === String(memberId || '') ||
+      (isPickleballGroup && targetName && normalizeName(row.memberName) === targetName)
+    ))
     .filter(row => String(row.status || '').toLowerCase() === 'confirmed')
     .sort((a, b) => parseDateValue(b.confirmedAt || b.periodEnd) - parseDateValue(a.confirmedAt || a.periodEnd))[0] || null
   const notice = safeArray(state?.notifications)
     .filter(row => String(row?.type || '') === 'payment_submitted')
-    .filter(row => String(row?.groupId || row?.group_id || '') === String(groupId || ''))
+    .filter(row => (
+      String(row?.groupId || row?.group_id || '') === String(groupId || '') ||
+      (isPickleballGroup && isLegacyNamePaymentNotice(row, { name: memberName(memberId, state?.members) }))
+    ))
     .filter(row => {
       const actorMemberId = row?.actorMemberId || row?.actor_member_id || ''
       if (String(actorMemberId) === String(memberId || '')) return true
       if (String(row?.memberId || row?.member_id || '') === String(memberId || '')) return false
+      if (isPickleballGroup && isLegacyNamePaymentNotice(row, { name: memberName(memberId, state?.members) })) return true
       if (!isPickleballGroup) return false
       const metadata = row?.metadata || {}
       const noticeNames = [
@@ -826,7 +833,12 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const amount = Math.abs(Number(metadata.amount) || 0)
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
     const recipientMemberId = notification?.memberId || notification?.member_id || ''
-    const noticeScope = { ...scope, isActor: scope.memberIds.has(String(actorMemberId)), isRecipient: !!recipientMemberId && scope.memberIds.has(String(recipientMemberId)) }
+    const noticeScope = {
+      ...scope,
+      isActor: scope.memberIds.has(String(actorMemberId)),
+      isRecipient: !!recipientMemberId && scope.memberIds.has(String(recipientMemberId)),
+      isLegacyNameMatch: isLegacyNamePaymentNotice(notification, member),
+    }
     if (
       noticeScope.isActor &&
       isConfirmedPaymentSubmittedNotice(notification, status) &&
@@ -875,7 +887,7 @@ function paymentNoticesForMember(state, member, monthLabel) {
   return safeArray(state?.notifications)
     .filter(notification => String(notification?.type || '').toLowerCase().includes('payment'))
     .filter(notification => String((notification?.metadata || {}).status || 'pending').toLowerCase() !== 'deleted')
-    .filter(notification => paymentNoticeCoversMember(notification, memberIds, profileId))
+    .filter(notification => paymentNoticeCoversMember(notification, memberIds, profileId, member))
     .filter(notification => {
       const metadata = notification?.metadata || {}
       const status = String(metadata.status || 'pending').toLowerCase()
@@ -885,7 +897,7 @@ function paymentNoticesForMember(state, member, monthLabel) {
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
 }
 
-function paymentNoticeCoversMember(notification, memberIds, profileId) {
+function paymentNoticeCoversMember(notification, memberIds, profileId, member = null) {
   if (memberIds.has(String(notification?.actorMemberId || notification?.actor_member_id || ''))) return true
   const metadata = notification?.metadata || {}
   const notificationMemberId = notification?.memberId || notification?.member_id || ''
@@ -896,6 +908,7 @@ function paymentNoticeCoversMember(notification, memberIds, profileId) {
     String(metadata.status || '').toLowerCase() === 'confirmed'
   ) return true
   const profileKey = String(profileId || '')
+  if (isLegacyNamePaymentNotice(notification, member)) return true
   return safeArray(metadata.coveredMembers || metadata.covered_members).some(row => (
     (profileKey && String(row?.profileId || row?.profile_id || '') === profileKey) ||
     safeArray(row?.memberIds || row?.member_ids).some(id => memberIds.has(String(id))) ||
@@ -904,6 +917,19 @@ function paymentNoticeCoversMember(notification, memberIds, profileId) {
     (profileKey && String(source?.profileId || source?.profile_id || '') === profileKey) ||
     memberIds.has(String(source?.memberId || source?.member_id || ''))
   ))
+}
+
+function isLegacyNamePaymentNotice(notification, member) {
+  if (!member) return false
+  const metadata = notification?.metadata || {}
+  const targetName = normalizeName(member?.displayName || member?.display_name || member?.name || member?.memberName || member?.member_name || '')
+  const noticeName = normalizeName(metadata.memberName || metadata.member_name || notification?.actorName || notification?.actor_name || '')
+  return String(notification?.type || '').toLowerCase() === 'payment_submitted' &&
+    String(metadata.status || '').toLowerCase() === 'confirmed' &&
+    !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
+    !safeArray(metadata.coveredMembers || metadata.covered_members).length &&
+    !!targetName &&
+    noticeName === targetName
 }
 
 function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
@@ -938,6 +964,17 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
     })
     .filter(source => source.amount !== 0)
   if (explicit.length > 0) return explicit
+
+  if (scope.isLegacyNameMatch && coveredMonth) {
+    return safeArray(sourceBreakdown)
+      .map(source => {
+        const monthRow = safeArray(source.monthBreakdown || source.month_breakdown)
+          .find(row => String(row?.month || '') === String(coveredMonth) && Number(row?.amount) < 0)
+        if (!monthRow) return null
+        return { ...source, amount: Number(monthRow.amount) || 0, month: coveredMonth }
+      })
+      .filter(Boolean)
+  }
 
   let remaining = coveredMemberAmountForScope(metadata, scope) || ((scope.isActor || scope.isRecipient) ? Math.abs(Number(metadata?.amount) || 0) : 0)
   if (remaining <= 0) return []
