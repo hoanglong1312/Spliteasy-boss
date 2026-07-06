@@ -1544,6 +1544,52 @@ describe('buildHomeData', () => {
     expect(transaction).toMatchObject({ title: 'Viếng đám bố Hưng', amount: -200000 })
   })
 
+  test('counts cross-group source when participants are Supabase rows', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-june-expense',
+        title: 'Viếng đám bố Hưng',
+        amount: 400000,
+        date: '2026-06-21',
+        expense_date: '2026-06-21',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: [
+          { expense_id: 'life-june-expense', member_id: 'life-tuan' },
+          { expense_id: 'life-june-expense', member_id: 'long-life' },
+        ],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const source = result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(source).toMatchObject({ sourceLabel: 'Lấy vk để trưởng thành', amount: -200000 })
+  })
+
   test('counts cross-group expense source when payer is outside group members', () => {
     const members = [
       { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },

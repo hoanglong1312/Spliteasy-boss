@@ -5171,7 +5171,9 @@ function normalizeExpenseForBalance(expense) {
   return {
     ...(expense || {}),
     paidBy: expense?.paidBy || expense?.paid_by_member_id || expense?.payerId || expense?.payer_id || '',
-    participants: safeArray(expense?.participants),
+    participants: safeArray(expense?.participants)
+      .map(participant => typeof participant === 'object' ? (participant.memberId || participant.member_id || participant.id) : participant)
+      .filter(Boolean),
     splits: safeArray(expense?.splits).map(split => ({
       ...split,
       memberId: split?.memberId || split?.member_id || '',
