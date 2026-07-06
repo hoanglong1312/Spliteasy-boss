@@ -12,6 +12,7 @@ import {
   buildPickleballCalendarData,
   buildPickleballTicketsData,
   buildPrevMonthUnpaid,
+  buildAllExpensesData,
   buildPersonalPickleSummaryCards,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
@@ -334,6 +335,39 @@ describe('flex billing helpers', () => {
     expect(transaction).toMatchObject({
       amount: -550000,
       currentMemberId: 'member-1',
+    })
+  })
+
+  test('buildAllExpensesData includes monthly ticket and ticket water for mapped pickleball member', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 550000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }))
+    state.selectedYearMonth = '2026-07'
+    state.currentUserId = 'user-pham-tien'
+    state.currentUserName = 'Phạm Tiến'
+    state.members = state.members.map(member => {
+      if (member.id === 'member-1') return { ...member, name: 'Phạm Tiến' }
+      return member
+    })
+    state.groups = [{ id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball', members: state.members.map(member => member.id) }]
+    state.currentGroup = state.groups[0]
+
+    const result = buildAllExpensesData(state, state.currentUserId, state.members, state.currentUserName)
+    const monthlyTicket = result.transactions.find(row => row.type === 'pickleball_monthly_ticket')
+    const water = result.transactions.find(row => row.type === 'pickleball_ticket_water')
+
+    expect(monthlyTicket).toMatchObject({
+      amount: -550000,
+      currentMemberId: 'member-1',
+      yearMonth: '2026-07',
+    })
+    expect(water).toMatchObject({
+      amount: -10714,
+      currentMemberId: 'member-1',
+      yearMonth: '2026-07',
     })
   })
 

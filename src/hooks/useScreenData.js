@@ -3129,10 +3129,13 @@ function buildExpenseDetailData(state, params) {
   }
 }
 
-function buildAllExpensesData(state, currentUserId, members, currentUserName) {
+export function buildAllExpensesData(state, currentUserId, members, currentUserName) {
   const groups = safeArray(state?.groups)
+  const pickleballState = scopedPickleballState(state)
+  const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, currentUserName)
+  const pickleballTicketGroup = buildPickleballTicketTransactionGroup(state, pickleballState, dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())), pickleballMemberId)
   return {
-    transactions: buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName),
+    transactions: buildTransactionRows(buildExpenseActivity([...groups, pickleballTicketGroup].filter(Boolean)), [...groups, pickleballTicketGroup].filter(Boolean), currentUserId, members, currentUserName),
     currentUserId,
   }
 }
@@ -3147,12 +3150,21 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
   const sourceState = mergePickleballScreenState(state, pickleballState)
   const yearMonth = monthKey(monthDate)
   const monthlyConfig = currentMonthlyPickleConfig(sourceState, yearMonth)
+  const groupId = group.id || pickleballState?.currentGroupId || state?.currentGroupId
+  const isFlexBilling = isBillingModeFlexForMonth(sourceState, yearMonth)
   const monthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0) || 0
+  const perSessionTicketPrice = Number(
+    monthlyConfig?.perSessionTicketPrice ??
+    monthlyConfig?.per_session_ticket_price ??
+    monthlyConfig?.ticketPrice ??
+    monthlyConfig?.ticket_price ??
+    50000
+  ) || 50000
   const monthlyTicketRow = currentUserId && memberFlexTicketType(sourceState, currentUserId, yearMonth) === 'monthly' && monthlyTicketPrice > 0
     ? {
-      id: `monthly-ticket:${group.id || sourceState?.currentGroupId || 'pickleball'}:${yearMonth}:${currentUserId}`,
+      id: `monthly-ticket:${groupId || sourceState?.currentGroupId || 'pickleball'}:${yearMonth}:${currentUserId}`,
       type: 'pickleball_monthly_ticket',
-      groupId: group.id || pickleballState?.currentGroupId || state?.currentGroupId,
+      groupId,
       title: 'Trả tiền sân theo xé vé tháng',
       amount: monthlyTicketPrice,
       paidBy: '',
@@ -3164,18 +3176,44 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
       yearMonth,
     }
     : null
-  const rows = monthlyTicketRow ? [monthlyTicketRow] : monthTicketsForState(sourceState, monthDate)
+  const monthTickets = monthTicketsForState(sourceState, monthDate)
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+  const ticketRows = monthlyTicketRow ? [] : monthTickets
     .map(ticket => {
       const memberIds = ticketMemberIds(ticket)
-      const amountPerPerson = ticketAmountPerPerson(ticket)
+      const billedMemberIds = isFlexBilling
+        ? memberIds.filter(memberId => memberFlexTicketType(sourceState, memberId, yearMonth) === 'per_session')
+        : memberIds
+      const amountPerPerson = isFlexBilling ? perSessionTicketPrice : ticketAmountPerPerson(ticket)
+      if (billedMemberIds.length === 0) return null
       return {
         id: `ticket:${ticket?.id || ticketDate(ticket)}`,
         type: 'pickleball_ticket',
-        groupId: group.id || pickleballState?.currentGroupId || state?.currentGroupId,
-        title: ticket?.title || 'Trả tiền sân theo xé vé tháng',
-        amount: ticketTotalAmount(ticket) + (Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0),
+        groupId,
+        title: ticket?.title || (isFlexBilling ? 'Trả tiền sân vé lượt' : 'Trả tiền sân theo xé vé tháng'),
+        amount: amountPerPerson * billedMemberIds.length,
         paidBy: ticketAdvancerId(ticket) || '',
+        participants: billedMemberIds,
+        splits: billedMemberIds.map(memberId => ({ memberId, amount: amountPerPerson })),
+        date: ticketDate(ticket),
+        status: 'approved',
+        category: 'pickleball',
+        yearMonth: ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket)),
+      }
+    })
+    .filter(Boolean)
+  const waterRows = isFlexBilling ? monthTickets
+    .filter(ticket => Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) > 0)
+    .map(ticket => {
+      const memberIds = ticketMemberIds(ticket)
+      const amountPerPerson = ticketWaterSharePerPerson(ticket)
+      return {
+        id: `ticket-water:${ticket?.id || ticketDate(ticket)}`,
+        type: 'pickleball_ticket_water',
+        groupId,
+        title: 'Tiền nước xé vé',
+        amount: (Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0),
+        paidBy: '',
         participants: memberIds,
         splits: memberIds.map(memberId => ({ memberId, amount: amountPerPerson })),
         date: ticketDate(ticket),
@@ -3183,11 +3221,12 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
         category: 'pickleball',
         yearMonth: ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket)),
       }
-    })
+    }) : []
+  const rows = [monthlyTicketRow, ...ticketRows, ...waterRows].filter(Boolean)
   if (!rows.length) return null
   return {
     ...group,
-    id: group.id || pickleballState?.currentGroupId || state?.currentGroupId || 'pickleball',
+    id: groupId || 'pickleball',
     name: group.name || 'Pickleball',
     emoji: group.emoji || '🏸',
     expenses: rows,
