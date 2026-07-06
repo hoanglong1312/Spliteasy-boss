@@ -686,8 +686,8 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
             {monthBreakdown.length > 1 && (
               <div style={{
                 display: 'grid',
-                gap: 4,
-                padding: '7px 12px 2px 56px',
+                gap: 6,
+                padding: '8px 12px 2px 56px',
               }}>
                 <div style={{ fontSize: 9, color: colors.textMuted, paddingBottom: 2, letterSpacing: '0.05em' }}>
                   theo tháng
@@ -698,37 +698,52 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                   return (
                     <div key={row.month || row.label} style={{
                       border: isPast ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 8,
-                      padding: '4px 6px',
-                      background: isPast ? 'rgba(251,191,36,0.06)' : 'transparent',
+                      borderRadius: 10,
+                      padding: '8px 9px',
+                      background: isPast ? 'rgba(251,191,36,0.07)' : 'rgba(255,255,255,0.025)',
                       fontSize: 11,
                       color: colors.textSecondary,
-                      lineHeight: 1.25,
+                      lineHeight: 1.2,
                     }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: colors.textMuted, fontSize: 9 }}>›</span>
-                        <span>{row.label || row.month}</span>
-                        {isPast && <span style={{ fontSize: 9, color: '#fbbf24', fontWeight: 800, whiteSpace: 'nowrap' }}>⚠️ chưa quyết toán</span>}
-                        <span style={{ flex: 1, textAlign: 'right', color: monthAmount < 0 ? colors.danger : colors.success, whiteSpace: 'nowrap', ...type.mono }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
-                        {isPast && (
-                          <button
-                            type="button"
-                            onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); openSource(); }}
-                            style={{
-                              padding: 0,
-                              border: 'none',
-                              background: 'transparent',
-                              color: '#fbbf24',
-                              fontSize: 10,
-                              fontWeight: 800,
-                              fontFamily: 'inherit',
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            Xem →
-                          </button>
-                        )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, color: '#f8fafc' }}>
+                            <span style={{ color: colors.textMuted, fontSize: 9 }}>›</span>
+                            <span>{row.label || row.month}</span>
+                          </div>
+                          {isPast && <div style={{ marginTop: 4, fontSize: 9, color: '#fbbf24', fontWeight: 800 }}>⚠️ chưa quyết toán</div>}
+                        </div>
+                        <div style={{ display: 'grid', justifyItems: 'end', gap: 4 }}>
+                          <span style={{
+                            padding: '3px 7px',
+                            borderRadius: 999,
+                            background: monthAmount < 0 ? 'rgba(248,113,113,0.10)' : 'rgba(52,211,153,0.12)',
+                            color: monthAmount < 0 ? colors.danger : colors.success,
+                            whiteSpace: 'nowrap',
+                            fontSize: 12,
+                            fontWeight: 900,
+                            ...type.mono,
+                          }}>{monthAmount < 0 ? '' : '+'}{formatVND(monthAmount)}</span>
+                          {isPast && (
+                            <button
+                              type="button"
+                              onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); openSource(); }}
+                              style={{
+                                padding: 0,
+                                border: 'none',
+                                background: 'transparent',
+                                color: '#fbbf24',
+                                fontSize: 10,
+                                fontWeight: 800,
+                                fontFamily: 'inherit',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              Xem →
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );

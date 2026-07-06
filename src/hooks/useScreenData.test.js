@@ -1357,7 +1357,7 @@ describe('buildHomeData', () => {
     expect(progressRow.amount).not.toBe(994590)
   })
 
-  test('removes confirmed pickleball month from home source month breakdown', () => {
+  test('keeps pickleball month residual after partial confirmed payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Phạm Tiến' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'pickle-1', name: 'Treasurer One', role: 'treasurer' },
@@ -1408,12 +1408,14 @@ describe('buildHomeData', () => {
     const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
     const source = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
 
-    expect(source.amount).toBe(-1273992)
+    expect(source.amount).toBe(-1310978)
     expect(source.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -36986 },
       { month: '2026-06', label: 'Tháng 6', amount: -652564 },
       { month: '2026-07', label: 'Tháng 7', amount: -621428 },
     ])
     expect(result.cappedSourceBreakdown.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -36986 },
       { month: '2026-06', label: 'Tháng 6', amount: -652564 },
       { month: '2026-07', label: 'Tháng 7', amount: -621428 },
     ])
