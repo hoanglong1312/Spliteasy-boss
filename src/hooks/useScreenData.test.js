@@ -376,9 +376,10 @@ describe('flex billing helpers', () => {
     expect(result.attendedSessionsCount).toBe(2)
   })
 
-  test('buildMemberMonthBalanceFlex splits ticket total only across per-session members', () => {
+  test('buildMemberMonthBalanceFlex charges configured ticket price for flex ticket attendance', () => {
     const state = addJulyFlexTickets(makeFlexState({
       billing_mode: 'flex',
+      per_session_ticket_price: 50000,
       monthly_ticket_member_ids: ['member-1', 'member-4'],
       per_session_ticket_member_ids: ['member-2', 'member-3', 'member-5', 'member-6', 'member-7'],
     }))
@@ -387,7 +388,7 @@ describe('flex billing helpers', () => {
 
     expect(result.ticketType).toBe('per_session')
     expect(result.attendedSessionsCount).toBe(2)
-    expect(result.perSessionTicketFee).toBe(153333)
+    expect(result.perSessionTicketFee).toBe(100000)
     expect(result.waterFee).toBe(10714)
   })
 
@@ -617,9 +618,10 @@ describe('buildPickleballCalendarData', () => {
     ])
   })
 
-  test('ticket rows show per-session share instead of all attendee share in flex mode', () => {
+  test('ticket rows show configured per-session price in flex mode', () => {
     const state = addJulyFlexTickets(makeFlexState({
       billing_mode: 'flex',
+      per_session_ticket_price: 50000,
       monthly_ticket_member_ids: ['member-1', 'member-4'],
       per_session_ticket_member_ids: ['member-2', 'member-3', 'member-5', 'member-6', 'member-7'],
     }))
@@ -627,8 +629,8 @@ describe('buildPickleballCalendarData', () => {
     const data = buildPickleballCalendarData(state, { yearMonth: '2026-07', selectedDate: '2026-07-01' })
     const ticket = data.selectedTickets.find(row => row.id === 'ticket-1')
 
-    expect(ticket.displayAmountPerPerson).toBe(70000)
-    expect(ticket.displayAmountLabel).toBe('vé lẻ')
+    expect(ticket.displayAmountPerPerson).toBe(50000)
+    expect(ticket.displayAmountLabel).toBe('vé lượt')
     expect(ticket.billedMemberCount).toBe(5)
     expect(ticket.waterAmountPerPerson).toBe(10714)
   })

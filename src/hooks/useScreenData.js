@@ -4168,7 +4168,7 @@ function toTicketRow(ticket, index, state) {
     waterAmount,
     amountPerPerson,
     displayAmountPerPerson: flexDisplay.amountPerPerson || amountPerPerson,
-    displayAmountLabel: flexDisplay.amountPerPerson ? 'vé lẻ' : 'người',
+    displayAmountLabel: flexDisplay.amountPerPerson ? 'vé lượt' : 'người',
     billedMemberIds: flexDisplay.billedMemberIds,
     billedMemberCount: flexDisplay.billedMemberIds.length || memberIds.length,
     waterAmountPerPerson: memberIds.length > 0 ? Math.round(waterAmount / memberIds.length) : 0,
@@ -4187,10 +4187,18 @@ function toTicketRow(ticket, index, state) {
 function flexTicketDisplay(ticket, state) {
   const yearMonth = ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket))
   if (!isBillingModeFlexForMonth(state, yearMonth)) return { amountPerPerson: 0, billedMemberIds: [] }
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const perSessionTicketPrice = Number(
+    monthlyConfig?.perSessionTicketPrice ??
+    monthlyConfig?.per_session_ticket_price ??
+    monthlyConfig?.ticketPrice ??
+    monthlyConfig?.ticket_price ??
+    50000
+  ) || 50000
   const billedMemberIds = ticketMemberIds(ticket)
     .filter(memberId => memberFlexTicketType(state, memberId, yearMonth) === 'per_session')
   return {
-    amountPerPerson: billedMemberIds.length > 0 ? Math.round(ticketTotalAmount(ticket) / billedMemberIds.length) : 0,
+    amountPerPerson: billedMemberIds.length > 0 ? perSessionTicketPrice : 0,
     billedMemberIds,
   }
 }
@@ -4387,7 +4395,13 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
   const monthlyConfig = currentMonthlyPickleConfig(state, currentYearMonth)
   const ticketType = memberFlexTicketType(state, memberId, currentYearMonth)
   const monthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0)
-  const perSessionTicketPrice = Number(monthlyConfig?.perSessionTicketPrice ?? monthlyConfig?.per_session_ticket_price ?? 0)
+  const perSessionTicketPrice = Number(
+    monthlyConfig?.perSessionTicketPrice ??
+    monthlyConfig?.per_session_ticket_price ??
+    monthlyConfig?.ticketPrice ??
+    monthlyConfig?.ticket_price ??
+    50000
+  ) || 50000
   const monthlyTicketFee = ticketType === 'monthly' ? monthlyTicketPrice : 0
   const attendedSessionsCount = safeArray(sessions).reduce((count, session) => (
     effectiveSessionMemberIdsFlex(session).some(id => String(id) === String(memberId)) ? count + 1 : count
@@ -4404,10 +4418,7 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
   const ticketWaterFee = myTickets.reduce((sum, t) => sum + ticketWaterSharePerPerson(t), 0)
   const ticketAttendedCount = myTickets.length
   const ticketPerSessionFee = ticketType === 'per_session'
-    ? myTickets.reduce((sum, t) => {
-      const billedCount = ticketMemberIds(t).filter(id => memberFlexTicketType(state, id, currentYearMonth) === 'per_session').length
-      return sum + (billedCount > 0 ? Math.round(ticketTotalAmount(t) / billedCount) : 0)
-    }, 0)
+    ? myTickets.length * perSessionTicketPrice
     : 0
   const combinedAttendedSessionsCount = attendedSessionsCount + ticketAttendedCount
   const combinedPerSessionTicketFee = perSessionTicketFee + ticketPerSessionFee
