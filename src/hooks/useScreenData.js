@@ -430,19 +430,19 @@ function sourceMonthBreakdown(rows) {
 
 function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members, endDate = null) {
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
-    membersForGroup(group, members).map(member => {
+    balanceMembersForGroup(group, members).map(member => {
       const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, member.id)
       const checkpointGroup = groupWithExpensesAfter(group, checkpoint?.periodEnd || null, endDate)
       const monthBreakdown = sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
         month: monthKey(expense.date || expense.expense_date),
-        amount: groupNet({ ...checkpointGroup, expenses: [expense] }, member.id),
+        amount: groupSourceNet({ ...checkpointGroup, expenses: [expense] }, member.id),
       })))
       return {
         sourceId: group.id,
         sourceType: 'group',
         sourceLabel: group.name || 'Nhóm',
         memberId: member.id,
-        amount: groupNet(checkpointGroup, member.id),
+        amount: groupSourceNet(checkpointGroup, member.id),
         monthBreakdown,
       }
     })
@@ -619,7 +619,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const transactionExpenseGroups = settlementExpenseGroups.map(group => {
     const source = sourceBreakdown.find(row => row.sourceType === 'group' && String(row.sourceId) === String(group.id))
     const sourceMonths = new Set(safeArray(source?.monthBreakdown).map(row => row.month).filter(Boolean))
-    if (!sourceMonths.size) return groupWithMonthExpenses(group, today)
+    if (!sourceMonths.size) return { ...group, expenses: [] }
     return {
       ...group,
       expenses: safeArray(group.expenses).filter(expense => sourceMonths.has(monthKey(expense.date || expense.expense_date))),
@@ -933,6 +933,7 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const recipientMemberId = notification?.memberId || notification?.member_id || ''
     const noticeScope = {
       ...scope,
+      groupId: notification?.groupId || notification?.group_id || metadata.groupId || metadata.group_id || '',
       isActor: scope.memberIds.has(String(actorMemberId)),
       isRecipient: !!recipientMemberId && scope.memberIds.has(String(recipientMemberId)),
       isLegacyNameMatch: isLegacyNamePaymentNotice(notification, member),
@@ -1065,6 +1066,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
 
   if (scope.isLegacyNameMatch && coveredMonth) {
     return safeArray(sourceBreakdown)
+      .filter(source => !scope.groupId || String(source.sourceId || source.source_id || '') === String(scope.groupId))
       .map(source => {
         const monthRow = safeArray(source.monthBreakdown || source.month_breakdown)
           .find(row => String(row?.month || '') === String(coveredMonth) && Number(row?.amount) < 0)
@@ -1077,8 +1079,9 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
   let remaining = coveredMemberAmountForScope(metadata, scope) || ((scope.isActor || scope.isRecipient) ? Math.abs(Number(metadata?.amount) || 0) : 0)
   if (remaining <= 0) return []
   if (scope.isRecipient) {
-    const debtSources = safeArray(sourceBreakdown).filter(source => Number(source.amount) < 0)
-    const rows = debtSources.length ? debtSources : safeArray(sourceBreakdown).filter(source => Number(source.amount) > 0)
+    const scopedSources = paymentScopedSources(sourceBreakdown, scope)
+    const debtSources = scopedSources.filter(source => Number(source.amount) < 0)
+    const rows = debtSources.length ? debtSources : scopedSources.filter(source => Number(source.amount) > 0)
     return rows
       .map(source => {
         if (remaining <= 0) return null
@@ -1089,7 +1092,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       })
       .filter(Boolean)
   }
-  return safeArray(sourceBreakdown)
+  return paymentScopedSources(sourceBreakdown, scope)
     .filter(source => Number(source.amount) < 0)
     .map(source => {
       if (remaining <= 0) return null
@@ -1098,6 +1101,11 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       return { ...source, amount: -covered, month: coveredMonth || source.month || '' }
     })
     .filter(Boolean)
+}
+
+function paymentScopedSources(sourceBreakdown, scope = {}) {
+  if (!scope.groupId) return safeArray(sourceBreakdown)
+  return safeArray(sourceBreakdown).filter(source => String(source.sourceId || source.source_id || '') === String(scope.groupId))
 }
 
 function sourceForCoveredSource(coveredSource, sourceBreakdown, coveredMonth = '') {
@@ -1238,7 +1246,7 @@ function buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, 
       sourceType: 'group',
       sourceLabel: group.name || 'Nhóm',
       memberId: member.id,
-      amount: groupNet(group, member.id),
+      amount: groupSourceNet(group, member.id),
     }))
   ))
   const pickleRows = currentGroupMembers(pickleballState)
@@ -1252,6 +1260,15 @@ function buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, 
       month: monthKey(monthDate),
     }))
   return [...expenseRows, ...pickleRows].filter(row => row.memberId && row.amount !== 0)
+}
+
+function groupSourceNet(group, memberId) {
+  const normalizedGroup = safeGroup(group)
+  const expenseNet = safeArray(normalizedGroup.expenses)
+    .filter(expense => !expense.status || expense.status === 'approved')
+    .reduce((sum, expense) => sum + expenseImpact(expense, memberId), 0)
+  const settlementNet = groupNet({ ...normalizedGroup, expenses: [] }, memberId)
+  return expenseNet + settlementNet
 }
 
 function buildHomeMemberBalances(state, pickle, monthDate) {
@@ -5184,6 +5201,21 @@ function memberName(memberId, members) {
 function membersForGroup(group, members) {
   return allMembersForGroup(group, members)
     .filter(isExpenseActiveMember)
+}
+
+function balanceMembersForGroup(group, members) {
+  const expenseMemberIds = new Set()
+  safeArray(group?.expenses).forEach(expense => {
+    const paidBy = expense?.paidBy || expense?.paid_by_member_id || ''
+    if (paidBy) expenseMemberIds.add(String(paidBy))
+    safeArray(expense?.participants).forEach(memberId => expenseMemberIds.add(String(memberId)))
+    safeArray(expense?.splits).forEach(split => {
+      const memberId = split?.memberId || split?.member_id || ''
+      if (memberId) expenseMemberIds.add(String(memberId))
+    })
+  })
+  return allMembersForGroup(group, members)
+    .filter(member => isExpenseActiveMember(member) || expenseMemberIds.has(String(member.id)))
 }
 
 function allMembersForGroup(group, members) {
