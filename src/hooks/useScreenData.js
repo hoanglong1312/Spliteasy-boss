@@ -495,7 +495,7 @@ function capSourceBreakdownByMonth(sourceBreakdown, selectedYearMonth) {
       if (!monthBreakdown.length) return source
       const cappedMonths = monthBreakdown.filter(row => !row.month || String(row.month) <= String(selectedYearMonth))
       const amount = cappedMonths.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
-      return amount === 0 ? null : { ...source, amount, monthBreakdown: cappedMonths }
+      return amount === 0 && !source.paidAmount ? null : { ...source, amount, monthBreakdown: cappedMonths }
     })
     .filter(Boolean)
 }
@@ -1142,7 +1142,7 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
       return { ...source, amount: remaining, monthBreakdown, paidAmount: paid }
     })
     .filter(Boolean)
-    .filter(source => Number(source.amount) !== 0)
+    .filter(source => Number(source.amount) !== 0 || Number(source.paidAmount) > 0)
 }
 
 function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmount, coveredMonths = new Map()) {

@@ -1295,6 +1295,83 @@ describe('buildHomeData', () => {
     expect(cappedSource).toMatchObject({ amount: -100000 })
   })
 
+  test('keeps paid cross-group source visible with zero balance', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+      { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'expense-1', name: 'Lê Tuấn' },
+      { id: 'long-expense', profile_id: 'profile-long', group_id: 'expense-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-june-expense',
+        title: 'Chi tiêu tháng 6',
+        amount: 200000,
+        date: '2026-06-03',
+        expense_date: '2026-06-03',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['life-tuan', 'long-life'],
+      }],
+    }, {
+      id: 'expense-1',
+      name: 'Chi tiêu Virgo 246',
+      members: ['expense-tuan', 'long-expense'],
+      expenses: [{
+        id: 'expense-july',
+        title: 'Chi tiêu tháng 7',
+        amount: 100000,
+        date: '2026-07-01',
+        expense_date: '2026-07-01',
+        paidBy: 'long-expense',
+        paid_by_member_id: 'long-expense',
+        participants: ['expense-tuan', 'long-expense'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'life-paid',
+        type: 'payment_submitted',
+        actor_member_id: 'life-tuan',
+        member_id: 'life-tuan',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 6 · 2026',
+          amount: 100000,
+          coveredSources: [{ sourceId: 'life-1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', memberId: 'life-tuan', amount: -100000 }],
+        },
+        created_at: '2026-07-01T00:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const paidSource = result.sourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(result.totalBalance).toBe(-50000)
+    expect(paidSource).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      amount: 0,
+      paidAmount: 100000,
+    })
+    expect(result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')).toMatchObject({ amount: 0 })
+  })
+
   test('uses last confirmed checkpoint as payment balance start', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
