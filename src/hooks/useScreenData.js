@@ -3266,7 +3266,6 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
   return [
     ticketCostCard,
     { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows },
-    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: -ticketAdjustment, sub: 'Qua quỹ team', key: 'ticket' },
   ]
 }
 

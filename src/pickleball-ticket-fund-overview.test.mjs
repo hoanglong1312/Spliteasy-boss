@@ -81,7 +81,6 @@ test('overview rolls individual tickets into team-fund member adjustments', () =
   assert.equal(JSON.stringify(data.yourBalance.summaryCards.map(row => [row.label, row.amount, row.sub])), JSON.stringify([
     ['Sân của bạn', 0, 'Phần của bạn'],
     ['Nước của bạn', 0, '0 buổi có nước'],
-    ['Vé lẻ qua quỹ', -50000, 'Qua quỹ team'],
   ]))
   assert.equal(JSON.stringify(data.yourBalance.breakdown.map(row => [row.label, row.amount])), JSON.stringify([
     ['🏸 Tiền sân', 0],
@@ -238,7 +237,7 @@ test('team fund tracks venue bank info and owner payment history', () => {
 test('overview separates personal tickets from treasurer team-fund view', () => {
   assert.doesNotMatch(overviewSource, /d\.ticketFund\?\.rows\?\.length > 0/)
   assert.doesNotMatch(overviewSource, /Vé lẻ trong quỹ/)
-  assert.match(overviewSource, /Vé lẻ qua quỹ/)
+  assert.doesNotMatch(overviewSource, /label: 'Vé lẻ qua quỹ'/)
   assert.doesNotMatch(overviewSource, /ticketFund\.rows\.map/)
   assert.doesNotMatch(overviewSource, /Chênh lệch qua quỹ/)
   assert.doesNotMatch(overviewSource, /Cần thu/)

@@ -620,7 +620,7 @@ describe('buildPersonalPickleSummaryCards', () => {
       sub: 'Vé tháng cố định',
     })
     expect(Number.isNaN(result[0].amount)).toBe(false)
-    expect(result.map(card => card.label)).toContain('Vé lẻ qua quỹ')
+    expect(result.map(card => card.label)).not.toContain('Vé lẻ qua quỹ')
   })
 
   test('uses flex per-session ticket cost and unassigned fallback', () => {

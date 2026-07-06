@@ -50,7 +50,6 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
   const personalSummaryCards = d.yourBalance.summaryCards || [
     { icon: '🏸', label: 'Sân của bạn', amount: 0, sub: 'Phần của bạn' },
     { icon: '💧', label: 'Nước của bạn', amount: 0, sub: '0 buổi có nước' },
-    { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: 0, sub: 'Qua quỹ team' },
   ];
   const [tab, setTab] = useState('overview');
   const [configExpanded, setConfigExpanded] = useState(false);

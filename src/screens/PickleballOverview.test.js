@@ -27,7 +27,6 @@ const baseData = {
     summaryCards: [
       { icon: '🏸', label: 'Vé lượt của bạn', amount: -240000, sub: 'Theo buổi tham gia' },
       { icon: '💧', label: 'Nước của bạn', amount: 0, sub: '0 buổi có nước', key: 'water', rows: [] },
-      { icon: '🎟️', label: 'Vé lẻ qua quỹ', amount: 0, sub: 'Qua quỹ team', key: 'ticket' },
     ],
     breakdown: [],
   },
