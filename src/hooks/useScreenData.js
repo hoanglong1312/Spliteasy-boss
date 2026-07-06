@@ -296,7 +296,10 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
     })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))[0] || null
   const noticeMonth = monthKeyFromPaymentLabel((notice?.metadata || {}).monthLabel || (notice?.metadata || {}).month_label)
-  const noticeDate = isPickleballGroup && noticeMonth ? endOfYearMonth(noticeMonth).toISOString() : (notice?.createdAt || notice?.created_at || null)
+  const createdAt = notice?.createdAt || notice?.created_at || null
+  const noticeDate = isPickleballGroup && noticeMonth
+    ? endOfYearMonth(noticeMonth).toISOString()
+    : (noticeMonth && noticeMonth !== monthKey(createdAt) ? endOfYearMonth(noticeMonth).toISOString() : createdAt)
   if (!noticeDate) return checkpoint
   if (parseDateValue(checkpoint?.confirmedAt || checkpoint?.periodEnd) >= parseDateValue(noticeDate)) return checkpoint
   return {
@@ -304,6 +307,8 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
     group_id: groupId,
     memberId,
     member_id: memberId,
+    periodStart: noticeMonth ? dateFromYearMonth(noticeMonth).toISOString() : null,
+    period_start: noticeMonth ? dateFromYearMonth(noticeMonth).toISOString() : null,
     periodEnd: noticeDate,
     period_end: noticeDate,
     confirmedAt: noticeDate,
@@ -344,6 +349,23 @@ function groupWithExpensesAfter(group, startDate, endDate = null) {
       const time = parseDateValue(expense.date || expense.expense_date)
       if (!time) return false
       return (!startMs || time > startMs) && (!endMs || time <= endMs)
+    }),
+  })
+}
+
+function groupWithExpensesAfterCheckpoint(group, checkpoint, endDate = null) {
+  if (!checkpoint?.periodStart && !checkpoint?.period_start) {
+    return groupWithExpensesAfter(group, checkpoint?.periodEnd || checkpoint?.period_end || null, endDate)
+  }
+  const startMs = parseDateValue(checkpoint.periodStart || checkpoint.period_start)
+  const cutoffMs = parseDateValue(checkpoint.periodEnd || checkpoint.period_end)
+  const endMs = parseDateValue(endDate)
+  return safeGroup({
+    ...group,
+    expenses: safeArray(group?.expenses).filter(expense => {
+      const time = parseDateValue(expense.date || expense.expense_date)
+      if (!time || (endMs && time > endMs)) return false
+      return time < startMs || time > cutoffMs
     }),
   })
 }
@@ -433,7 +455,7 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
     balanceMembersForGroup(group, members).map(member => {
       const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, member.id)
-      const checkpointGroup = groupWithExpensesAfter(group, checkpoint?.periodEnd || null, endDate)
+      const checkpointGroup = groupWithExpensesAfterCheckpoint(group, checkpoint, endDate)
       const monthBreakdown = sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
         month: monthKey(expense.date || expense.expense_date),
         amount: groupSourceNet({ ...checkpointGroup, expenses: [expense] }, member.id),

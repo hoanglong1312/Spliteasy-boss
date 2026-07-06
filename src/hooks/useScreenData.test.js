@@ -1662,6 +1662,61 @@ describe('buildHomeData', () => {
     })
   })
 
+  test('does not turn a confirmed group notice without covered sources into a settlement cutoff', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-june-expense',
+        title: 'Viếng đám bố Hưng',
+        amount: 1012500,
+        date: '2026-06-21',
+        expense_date: '2026-06-21',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['life-tuan', 'long-life'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'life-confirmed-without-sources',
+        type: 'payment_submitted',
+        group_id: 'life-1',
+        actor_member_id: 'life-tuan',
+        member_id: 'life-tuan',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 7 · 2026', memberName: 'Lê Tuấn', amount: 506250 },
+        created_at: '2026-07-02T00:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const lifeSource = result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(lifeSource).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      amount: -506250,
+      monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -506250 }],
+    })
+  })
+
   test('counts cross-group source when participants are Supabase rows', () => {
     const members = [
       { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
