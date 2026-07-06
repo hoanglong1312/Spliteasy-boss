@@ -266,6 +266,27 @@ describe('flex billing helpers', () => {
     })
   })
 
+  test('buildHomeData shows monthly ticket price in recent transactions for monthly members', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 550000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }))
+    state.currentUserId = 'member-1'
+    state.currentUserName = 'Member One'
+    state.groups = [{ id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball', members: state.members.map(member => member.id) }]
+    state.currentGroup = state.groups[0]
+
+    const result = buildHomeData(state, 'member-1', state.members, state.groups, {}, state, '2026-07')
+    const transaction = result.transactions.find(row => row.type === 'pickleball_monthly_ticket')
+
+    expect(transaction).toMatchObject({
+      title: 'Trả tiền sân theo xé vé tháng',
+      amount: -550000,
+    })
+  })
+
   test('buildMemberMonthBalanceFlex charges per-session ticket by attendance count', () => {
     const state = makeFlexState({
       billingMode: 'flex',

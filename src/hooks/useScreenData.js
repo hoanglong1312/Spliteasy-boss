@@ -653,7 +653,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     transactions: buildTransactions(
       [
         ...expenseGroups,
-        buildPickleballTicketTransactionGroup(state, pickleballState, today),
+        buildPickleballTicketTransactionGroup(state, pickleballState, today, currentUserId),
       ].filter(Boolean),
       currentUserId,
       members,
@@ -3142,9 +3142,29 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
     .slice(0, 8)
 }
 
-function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate) {
+function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId) {
   const group = pickleballState?.currentGroup || state?.currentGroup || {}
-  const rows = monthTicketsForState(pickleballState || state, monthDate)
+  const sourceState = pickleballState || state
+  const yearMonth = monthKey(monthDate)
+  const monthlyConfig = currentMonthlyPickleConfig(sourceState, yearMonth)
+  const monthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0) || 0
+  const monthlyTicketRow = currentUserId && memberFlexTicketType(sourceState, currentUserId, yearMonth) === 'monthly' && monthlyTicketPrice > 0
+    ? {
+      id: `monthly-ticket:${group.id || sourceState?.currentGroupId || 'pickleball'}:${yearMonth}:${currentUserId}`,
+      type: 'pickleball_monthly_ticket',
+      groupId: group.id || pickleballState?.currentGroupId || state?.currentGroupId,
+      title: 'Trả tiền sân theo xé vé tháng',
+      amount: monthlyTicketPrice,
+      paidBy: '',
+      participants: [currentUserId],
+      splits: [{ memberId: currentUserId, amount: monthlyTicketPrice }],
+      date: `${yearMonth}-01`,
+      status: 'approved',
+      category: 'pickleball',
+      yearMonth,
+    }
+    : null
+  const rows = monthlyTicketRow ? [monthlyTicketRow] : monthTicketsForState(sourceState, monthDate)
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
     .map(ticket => {
       const memberIds = ticketMemberIds(ticket)
