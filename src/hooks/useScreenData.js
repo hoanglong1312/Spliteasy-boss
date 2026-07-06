@@ -461,6 +461,7 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
       const startDate = checkpoint?.periodEnd || null
       const pickleState = pickleStateAfter(pickleballState, startDate, endDate)
       return settlementRelevantMonthDates(pickleState, startDate, endDate).map(monthDate => {
+        const month = monthKey(monthDate)
         const monthSessions = getStateMonthSessions(pickleState, monthDate)
         return {
         sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
@@ -468,7 +469,7 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
         sourceLabel: pickleState?.currentGroup?.name || 'Pickleball',
         memberId: member.id,
         amount: buildMemberMonthBalance(pickleState, pickle, monthSessions, member.id, monthDate).netBalance || 0,
-        month: monthKey(monthDate),
+        month,
         }
       })
     })
@@ -679,7 +680,10 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
 function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate, progressProfileBreakdown = profileBreakdown) {
   const monthLabel = formatMonthLabel(monthDate)
   const coverage = paymentCoverageForMember(state, me, monthLabel, sourceBreakdown)
-  const adjustedSources = applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources)
+  const adjustedSources = suppressSettledSourceMonths(
+    applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources),
+    state?.monthSettlements,
+  )
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
   const paymentStatus = netBalance > 0 || (netBalance < 0 && coverage.pendingAmount <= 0) ? '' : paymentNotice?.status || ''
@@ -707,6 +711,27 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
         bank: bankData(findProfileMember(row.profileId, members), true),
       })),
   }
+}
+
+function suppressSettledSourceMonths(sourceBreakdown, settlements) {
+  const settledMonths = new Set(safeArray(settlements)
+    .map(row => `${row?.groupId || row?.group_id || ''}:${row?.memberId || row?.member_id || ''}:${row?.month || ''}`))
+  if (!settledMonths.size) return sourceBreakdown
+  return safeArray(sourceBreakdown)
+    .map(source => {
+      if (String(source?.sourceType || source?.source_type || '') !== 'pickleball') return source
+      const monthBreakdown = safeArray(source.monthBreakdown || source.month_breakdown)
+      if (!monthBreakdown.length) return source
+      const sourceId = source.sourceId || source.source_id || ''
+      const memberId = source.memberId || source.member_id || ''
+      const visibleMonths = monthBreakdown.filter(row => (
+        !settledMonths.has(`${sourceId}:${memberId}:${row?.month || ''}`)
+      ))
+      if (visibleMonths.length === monthBreakdown.length) return source
+      const amount = visibleMonths.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+      return amount === 0 ? null : { ...source, amount, monthBreakdown: visibleMonths }
+    })
+    .filter(Boolean)
 }
 
 export function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, settlements = [], selectedYearMonth = '') {
