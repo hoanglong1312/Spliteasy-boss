@@ -1305,7 +1305,8 @@ export default function AppV2() {
       const isTeamFund = wantsTeamFund || (!isAdvancerMode && !advancerId)
       if (!sessionDate) throw new Error('ticket_session_date_required')
       if (memberIds.length === 0) throw new Error('ticket_members_required')
-      if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
+      const hasBillableTicketMembers = selectedTicketMemberIdsHavePerSessionMember(state, memberIds, sessionDate)
+      if (totalAmount <= 0 && hasBillableTicketMembers) throw new Error('ticket_total_amount_required')
       if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
       const actorMemberId = activePickleballActorMemberId(state, groupId)
       const ticketStatus = isPickleballTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
@@ -1357,7 +1358,8 @@ export default function AppV2() {
       const isTeamFund = wantsTeamFund || (!isAdvancerMode && !advancerId)
       if (!sessionDate) throw new Error('ticket_session_date_required')
       if (memberIds.length === 0) throw new Error('ticket_members_required')
-      if (totalAmount <= 0) throw new Error('ticket_total_amount_required')
+      const hasBillableTicketMembers = selectedTicketMemberIdsHavePerSessionMember(state, memberIds, sessionDate)
+      if (totalAmount <= 0 && hasBillableTicketMembers) throw new Error('ticket_total_amount_required')
       if (!advancerId && !isTeamFund) throw new Error('ticket_payment_required')
       const ticketStatus = isPickleballTreasurer ? (advancerId ? 'unpaid' : 'team_fund') : 'pending_review'
       const { token } = getStoredAuth()
@@ -2994,6 +2996,16 @@ function normalizeTicketDate(value) {
   if (!slash) return text
   const [, day, month, year] = slash
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function selectedTicketMemberIdsHavePerSessionMember(state, memberIds, sessionDate) {
+  const groupId = activePickleballGroupId(state)
+  const config = findMonthlyPickleConfig(state, groupId, monthKey(sessionDate || new Date()))
+  const monthlyIds = new Set(safeArray(config?.monthlyTicketMemberIds ?? config?.monthly_ticket_member_ids).map(String))
+  const perSessionIds = new Set(safeArray(config?.perSessionTicketMemberIds ?? config?.per_session_ticket_member_ids).map(String))
+  const hasFlexTicketConfig = String(config?.billingMode || config?.billing_mode || '').toLowerCase() === 'flex' || monthlyIds.size > 0 || perSessionIds.size > 0
+  if (!hasFlexTicketConfig) return true
+  return safeArray(memberIds).map(String).filter(Boolean).some(id => perSessionIds.has(id) || !monthlyIds.has(id))
 }
 
 function normalizeTicketMemberIds(value, state) {
