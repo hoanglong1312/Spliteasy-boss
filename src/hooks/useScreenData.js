@@ -890,6 +890,7 @@ function paymentNoticeCoversMember(notification, memberIds, profileId) {
 function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
   const sourceProfileIds = new Set(safeArray(sourceBreakdown).map(source => String(source.profileId || source.profile_id || '')).filter(Boolean))
   const sourceMemberIds = new Set(safeArray(sourceBreakdown).map(source => String(source.memberId || source.member_id || '')).filter(Boolean))
+  const coveredMonth = monthKeyFromPaymentLabel(metadata?.monthLabel || metadata?.month_label)
   const explicit = safeArray(metadata?.coveredSources || metadata?.covered_sources)
     .filter(source => {
       const profileId = String(source?.profileId || source?.profile_id || '')
@@ -901,23 +902,26 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       if (scope.isRecipient) return true
       return !profileId && !memberId && scope.isActor === true
     })
-    .map(source => ({
-      sourceId: source.sourceId || source.source_id,
-      sourceType: source.sourceType || source.source_type || sourceTypeForCoveredSource(source, sourceBreakdown),
-      sourceLabel: source.sourceLabel || source.source_label || 'Nguồn tiền',
-      profileId: source.profileId || source.profile_id || '',
-      memberId: source.memberId || source.member_id || '',
-      memberName: source.memberName || source.member_name || '',
-      amount: Number(source.amount) || 0,
-      month: source.month || source.yearMonth || source.year_month || '',
-      monthBreakdown: safeArray(source.monthBreakdown || source.month_breakdown),
-    }))
+    .map(source => {
+      const matchedSource = sourceForCoveredSource(source, sourceBreakdown, coveredMonth)
+      const hasSourceIdentity = !!(source.sourceId || source.source_id || source.sourceLabel || source.source_label || source.sourceType || source.source_type)
+      return {
+        sourceId: source.sourceId || source.source_id || matchedSource?.sourceId || matchedSource?.source_id,
+        sourceType: source.sourceType || source.source_type || matchedSource?.sourceType || matchedSource?.source_type || 'group',
+        sourceLabel: source.sourceLabel || source.source_label || matchedSource?.sourceLabel || matchedSource?.source_label || 'Nguồn tiền',
+        profileId: source.profileId || source.profile_id || matchedSource?.profileId || matchedSource?.profile_id || '',
+        memberId: source.memberId || source.member_id || matchedSource?.memberId || matchedSource?.member_id || '',
+        memberName: source.memberName || source.member_name || '',
+        amount: Number(source.amount) || 0,
+        month: source.month || source.yearMonth || source.year_month || (hasSourceIdentity ? '' : coveredMonth) || '',
+        monthBreakdown: safeArray(source.monthBreakdown || source.month_breakdown),
+      }
+    })
     .filter(source => source.amount !== 0)
   if (explicit.length > 0) return explicit
 
   let remaining = coveredMemberAmountForScope(metadata, scope) || ((scope.isActor || scope.isRecipient) ? Math.abs(Number(metadata?.amount) || 0) : 0)
   if (remaining <= 0) return []
-  const coveredMonth = monthKeyFromPaymentLabel(metadata?.monthLabel || metadata?.month_label)
   if (scope.isRecipient) {
     const debtSources = safeArray(sourceBreakdown).filter(source => Number(source.amount) < 0)
     const rows = debtSources.length ? debtSources : safeArray(sourceBreakdown).filter(source => Number(source.amount) > 0)
@@ -942,15 +946,28 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
     .filter(Boolean)
 }
 
-function sourceTypeForCoveredSource(coveredSource, sourceBreakdown) {
+function sourceForCoveredSource(coveredSource, sourceBreakdown, coveredMonth = '') {
   const sourceId = String(coveredSource?.sourceId || coveredSource?.source_id || '')
   const sourceLabel = String(coveredSource?.sourceLabel || coveredSource?.source_label || '')
-  const match = safeArray(sourceBreakdown).find(source => {
+  const sourceType = String(coveredSource?.sourceType || coveredSource?.source_type || '')
+  const sourceMonth = coveredSource?.month || coveredSource?.yearMonth || coveredSource?.year_month || coveredMonth || ''
+  const amount = Math.abs(Number(coveredSource?.amount) || 0)
+  const exactMatch = safeArray(sourceBreakdown).find(source => {
     const rowSourceId = String(source?.sourceId || source?.source_id || '')
     const rowSourceLabel = String(source?.sourceLabel || source?.source_label || '')
     return (sourceId && rowSourceId === sourceId) || (sourceLabel && rowSourceLabel === sourceLabel)
   })
-  return match?.sourceType || match?.source_type || 'group'
+  if (exactMatch) return exactMatch
+  const candidates = safeArray(sourceBreakdown).filter(source => {
+    if (sourceType && String(source?.sourceType || source?.source_type || '') !== sourceType) return false
+    if (!sourceMonth) return false
+    return safeArray(source.monthBreakdown || source.month_breakdown).some(row => String(row?.month || '') === String(sourceMonth))
+  })
+  if (candidates.length === 1) return candidates[0]
+  return candidates.find(source => safeArray(source.monthBreakdown || source.month_breakdown).some(row => (
+    String(row?.month || '') === String(sourceMonth) &&
+    Math.abs(Number(row?.amount) || 0) === amount
+  ))) || null
 }
 
 function coveredMemberAmountForScope(metadata, scope = {}) {

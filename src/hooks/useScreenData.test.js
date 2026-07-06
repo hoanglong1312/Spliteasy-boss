@@ -1533,6 +1533,77 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('matches legacy confirmed source by month amount when source identity is missing', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'pickle-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['member-1', 'treasurer-1'],
+    }, {
+      id: 'group-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [{
+        id: 'may-group-expense',
+        amount: 200000,
+        expense_date: '2026-05-15T12:00:00.000Z',
+        paid_by_member_id: 'treasurer-1',
+        participants: ['member-1', 'treasurer-1'],
+      }],
+    }]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      _allPickle: {
+        externalTickets: [
+          { id: 'may-ticket', group_id: 'pickle-1', year_month: '2026-05', session_date: '2026-05-20', total_amount: 1589180, member_ids: ['member-1', 'treasurer-1'], advancer_id: 'treasurer-1', status: 'unpaid' },
+          { id: 'june-ticket', group_id: 'pickle-1', year_month: '2026-06', session_date: '2026-06-20', total_amount: 1336164, member_ids: ['member-1', 'treasurer-1'], advancer_id: 'treasurer-1', status: 'unpaid' },
+          { id: 'july-ticket', group_id: 'pickle-1', year_month: '2026-07', session_date: '2026-07-20', total_amount: 1092856, member_ids: ['member-1', 'treasurer-1'], advancer_id: 'treasurer-1', status: 'unpaid' },
+        ],
+      },
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      pickleballGroupId: 'pickle-1',
+      pickleballGroup: groups[0],
+      members,
+      groups,
+      notifications: [{
+        id: 'identity-missing-confirmed-may',
+        type: 'payment_submitted',
+        group_id: 'pickle-1',
+        actor_member_id: 'treasurer-1',
+        member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 5 · 2026',
+          amount: 794590,
+          coveredSources: [{ memberId: 'member-1', amount: -794590 }],
+        },
+        created_at: '2026-07-01T00:05:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
+    const pickleballSource = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
+
+    expect(pickleballSource.amount).toBe(-1214510)
+    expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -668082 },
+      { month: '2026-07', label: 'Tháng 7', amount: -546428 },
+    ])
+    expect(pickleballSource.monthBreakdown.some(row => row.month === '2026-05')).toBe(false)
+  })
+
   test('labels confirmed payment records with group name and month', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },

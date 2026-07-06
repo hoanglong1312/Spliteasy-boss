@@ -512,6 +512,7 @@ function approvalButton(background, color) {
 
 export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, onOpenPayment, onAction, viewedMonthKey = '', onViewMonth }) {
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [openSourceKeys, setOpenSourceKeys] = useState(() => new Set());
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
   const total = sourceRows.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
@@ -621,25 +622,30 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
 
       {sourcesOpen && sourceRows.map((source, index) => {
         const amount = Number(source.amount) || 0;
-        const isPickleball = source.sourceType === 'pickleball';
+        const sourceType = source.sourceType || 'group';
+        const sourceId = source.sourceId || source.sourceLabel || index;
+        const sourceKey = `${sourceType}:${sourceId}`;
+        const isPickleball = sourceType === 'pickleball';
         const isNegative = amount < 0;
         const monthBreakdown = safeArray(source.monthBreakdown).filter(row => Number(row.amount) !== 0);
-        const openSource = () => {
-          if (isPickleball) {
-            onAction?.('tab', 'pickleball');
-            return;
-          }
-          onAction?.('open', source.sourceId);
+        const sourceExpanded = openSourceKeys.has(sourceKey);
+        const toggleSource = () => {
+          setOpenSourceKeys(prev => {
+            const next = new Set(prev);
+            next.has(sourceKey) ? next.delete(sourceKey) : next.add(sourceKey);
+            return next;
+          });
         };
         return (
           <div
-            key={`${source.sourceType}-${source.sourceId || source.sourceLabel}-${index}`}
+            key={`${sourceType}-${sourceId}-${index}`}
             style={{ marginTop: 8 }}
           >
             <button
               type="button"
-              aria-label={`Mở ${source.sourceLabel}`}
-              onClick={openSource}
+              aria-expanded={sourceExpanded}
+              aria-label={`${sourceExpanded ? 'Thu gọn' : 'Mở'} ${source.sourceLabel}`}
+              onClick={toggleSource}
               style={{
                 width: '100%',
                 display: 'flex',
@@ -681,9 +687,9 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                 color: isNegative ? colors.danger : colors.success,
                 ...type.mono,
               }}>{isNegative ? '' : '+'}{formatVND(amount)}</div>
-              <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
+              <div style={{ color: isPickleball ? '#6ee7b7' : colors.textMuted, fontSize: 18, flexShrink: 0 }}>{sourceExpanded ? '⌃' : '⌄'}</div>
             </button>
-            {monthBreakdown.length > 1 && (
+            {sourceExpanded && monthBreakdown.length > 0 && (
               <div style={{
                 display: 'grid',
                 gap: 6,
@@ -729,7 +735,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                           {isPast && (
                             <button
                               type="button"
-                              onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); openSource(); }}
+                              onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); }}
                               style={{
                                 padding: 0,
                                 border: 'none',
