@@ -689,12 +689,12 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
 function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate, progressProfileBreakdown = profileBreakdown) {
   const monthLabel = formatMonthLabel(monthDate)
   const coverage = paymentCoverageForMember(state, me, monthLabel, sourceBreakdown)
-  const adjustedSources = suppressSettledSourceMonths(
+  const adjustedSources = appendProfileGroupSources(suppressSettledSourceMonths(
     applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources),
     state?.monthSettlements,
     members,
     state?.groups,
-  )
+  ), state, members, me)
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
   const paymentStatus = netBalance > 0 || (netBalance < 0 && coverage.pendingAmount <= 0) ? '' : paymentNotice?.status || ''
@@ -722,6 +722,40 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
         bank: bankData(findProfileMember(row.profileId, members), true),
       })),
   }
+}
+
+function appendProfileGroupSources(sourceBreakdown, state, members = [], member = {}) {
+  const profileId = profileIdForMember(member?.id || state?.currentUserId, members)
+  const currentName = normalizeName(member?.displayName || member?.display_name || member?.name || state?.currentUserName || '')
+  const memberIds = new Set(memberIdsForProfile(profileId, members).map(String))
+  if (currentName) {
+    safeArray(members)
+      .filter(row => normalizeName(row?.displayName || row?.display_name || row?.name || row?.memberName || row?.member_name) === currentName)
+      .forEach(row => { if (row?.id) memberIds.add(String(row.id)) })
+  }
+  if (member?.id) memberIds.add(String(member.id))
+  const existingKeys = new Set(safeArray(sourceBreakdown).map(sourceKey))
+  const missingSources = safeArray(state?.groups)
+    .filter(group => groupKind(group) !== 'pickleball')
+    .map(group => {
+      const groupMember = membersForGroup(group, members).find(row => memberIds.has(String(row?.id || '')))
+      if (!groupMember) return null
+      const source = {
+        sourceId: group.id,
+        sourceType: 'group',
+        sourceLabel: group.name || 'Nhóm',
+        profileId,
+        memberId: groupMember.id,
+        amount: 0,
+        monthBreakdown: [],
+      }
+      const key = sourceKey(source)
+      if (!key || existingKeys.has(key)) return null
+      existingKeys.add(key)
+      return source
+    })
+    .filter(Boolean)
+  return [...safeArray(sourceBreakdown), ...missingSources]
 }
 
 function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = []) {
@@ -1103,10 +1137,15 @@ function coveredMemberAmountForScope(metadata, scope = {}) {
 function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
   const coveredBySource = new Map()
   const coveredMonthsBySource = new Map()
+  const paidOnlySources = new Map()
   safeArray(confirmedSources).forEach(source => {
     const key = sourceKey(source)
     const amount = Math.abs(Number(source.amount) || 0)
     coveredBySource.set(key, (coveredBySource.get(key) || 0) + amount)
+    if ((source.sourceId || source.source_id || source.sourceLabel || source.source_label) && amount > 0) {
+      const current = paidOnlySources.get(key)
+      paidOnlySources.set(key, { ...(current || source), paidAmount: (Number(current?.paidAmount) || 0) + amount })
+    }
     const sourceMonth = source.month || source.yearMonth || source.year_month
     const months = safeArray(source.monthBreakdown || source.month_breakdown)
     if (sourceMonth) {
@@ -1123,10 +1162,11 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
       })
     }
   })
-  return safeArray(sourceBreakdown)
+  const adjusted = safeArray(sourceBreakdown)
     .map(source => {
       const amount = Number(source.amount) || 0
       const key = sourceKey(source)
+      paidOnlySources.delete(key)
       const paid = Math.min(Math.abs(amount), coveredBySource.get(key) || 0)
       coveredBySource.set(key, Math.max((coveredBySource.get(key) || 0) - paid, 0))
       const monthBreakdown = applyConfirmedPaymentCoverageToMonths(source.monthBreakdown, paid, amount, coveredMonthsBySource.get(key))
@@ -1143,6 +1183,15 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
     })
     .filter(Boolean)
     .filter(source => Number(source.amount) !== 0 || Number(source.paidAmount) > 0)
+  return [
+    ...adjusted,
+    ...[...paidOnlySources.values()].map(source => ({
+      ...source,
+      amount: 0,
+      paidAmount: Number(source.paidAmount) || Math.abs(Number(source.amount) || 0),
+      monthBreakdown: safeArray(source.monthBreakdown || source.month_breakdown),
+    })),
+  ]
 }
 
 function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmount, coveredMonths = new Map()) {
