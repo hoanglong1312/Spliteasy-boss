@@ -683,6 +683,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   const adjustedSources = suppressSettledSourceMonths(
     applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources),
     state?.monthSettlements,
+    members,
   )
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
@@ -713,9 +714,20 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   }
 }
 
-function suppressSettledSourceMonths(sourceBreakdown, settlements) {
-  const settledMonths = new Set(safeArray(settlements)
-    .map(row => `${row?.groupId || row?.group_id || ''}:${row?.memberId || row?.member_id || ''}:${row?.month || ''}`))
+function suppressSettledSourceMonths(sourceBreakdown, settlements, members = []) {
+  const settledMonths = new Set()
+  safeArray(settlements).forEach(row => {
+    const groupId = row?.groupId || row?.group_id || ''
+    const memberId = row?.memberId || row?.member_id || ''
+    const month = row?.month || ''
+    if (!groupId || !memberId || !month) return
+    const profileId = profileIdForMember(memberId, members)
+    const memberIds = memberIdsForProfile(profileId, members)
+    const settledMemberIds = memberIds.length ? memberIds : [memberId]
+    settledMemberIds.forEach(settledMemberId => {
+      settledMonths.add(`${groupId}:${settledMemberId}:${month}`)
+    })
+  })
   if (!settledMonths.size) return sourceBreakdown
   return safeArray(sourceBreakdown)
     .map(source => {
