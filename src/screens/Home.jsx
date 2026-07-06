@@ -90,7 +90,16 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           onOpenPayment={() => setPaymentSheetOpen(true)}
           onAction={onAction}
           viewedMonthKey={d.selectedYearMonth || d.yearMonth}
-          onViewMonth={(ym) => onAction?.('setMonth', { yearMonth: ym })}
+          onViewMonth={async (ym, source) => {
+            await onAction?.('setMonth', { yearMonth: ym });
+            if (source?.sourceType === 'pickleball') {
+              onAction?.('push', { screen: 'pickleball-calendar', params: { yearMonth: ym } });
+              return;
+            }
+            if (source?.sourceId) {
+              onAction?.('open', source.sourceId);
+            }
+          }}
         />
 
 
@@ -742,7 +751,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                           {canViewMonth && (
                             <button
                               type="button"
-                              onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month); }}
+                              onClick={(event) => { event.stopPropagation(); onViewMonth?.(row.month, source); }}
                               style={{
                                 padding: 0,
                                 border: 'none',

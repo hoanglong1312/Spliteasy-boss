@@ -58,4 +58,7 @@ test('home recent transactions include approved pickleball ticket payments for s
 test('home monthly source rows render view action for current month too', () => {
   assert.match(homeSource, /const canViewMonth = Boolean\(row\.month\)/)
   assert.match(homeSource, /canViewMonth && \(/)
+  assert.match(homeSource, /onViewMonth\?\.\(row\.month, source\)/)
+  assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/)
+  assert.match(homeSource, /screen: 'pickleball-calendar', params: \{ yearMonth: ym \}/)
 })
