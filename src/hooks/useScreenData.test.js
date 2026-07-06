@@ -1544,6 +1544,124 @@ describe('buildHomeData', () => {
     expect(transaction).toMatchObject({ title: 'Viếng đám bố Hưng', amount: -200000 })
   })
 
+  test('carries unpaid cross-group June debt into July when only pickleball was paid', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-june-expense',
+        title: 'Viếng đám bố Hưng',
+        amount: 1012500,
+        date: '2026-06-21',
+        expense_date: '2026-06-21',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['life-tuan', 'long-life'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'pickle-paid-june',
+        type: 'payment_submitted',
+        group_id: 'pickle-1',
+        actor_member_id: 'pickle-tuan',
+        member_id: 'pickle-tuan',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 6 · 2026', memberName: 'Lê Tuấn', amount: 668082 },
+        created_at: '2026-07-01T00:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'pickle-june-settlement',
+        group_id: 'pickle-1',
+        member_id: 'pickle-tuan',
+        month: '2026-06',
+        amount: 668082,
+      }],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const lifeSource = result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(lifeSource).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      memberId: 'life-tuan',
+      amount: -506250,
+      monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -506250 }],
+    })
+  })
+
+  test('does not turn a zero confirmed group notice into a settlement cutoff', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-june-expense',
+        title: 'Viếng đám bố Hưng',
+        amount: 1012500,
+        date: '2026-06-21',
+        expense_date: '2026-06-21',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['life-tuan', 'long-life'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'life-empty-confirmed',
+        type: 'payment_submitted',
+        group_id: 'life-1',
+        actor_member_id: 'life-tuan',
+        member_id: 'life-tuan',
+        metadata: { status: 'confirmed', monthLabel: 'Tháng 6 · 2026', memberName: 'Lê Tuấn', amount: 0 },
+        created_at: '2026-07-01T00:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const lifeSource = result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(lifeSource).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      amount: -506250,
+      monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -506250 }],
+    })
+  })
+
   test('counts cross-group source when participants are Supabase rows', () => {
     const members = [
       { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },

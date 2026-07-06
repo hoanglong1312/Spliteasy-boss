@@ -288,6 +288,7 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
       return targetName && noticeNames.some(name => normalizeName(name) === targetName)
     })
     .filter(row => String((row?.metadata || {}).status || '').toLowerCase() === 'confirmed')
+    .filter(row => Math.abs(Number((row?.metadata || {}).amount) || 0) > 0)
     .filter(row => {
       const metadata = row?.metadata || {}
       return !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
