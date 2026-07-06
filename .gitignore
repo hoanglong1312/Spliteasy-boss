@@ -8,6 +8,7 @@ package-lock.json
 .superpowers/brainstorm/
 test-results/
 screenshots/
+reports/
 .vercel
 .DS_Store
 .claude/settings.local.json
