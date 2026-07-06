@@ -252,6 +252,9 @@ function normalizeSettlementCheckpoint(row, members = []) {
 }
 
 function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
+  const targetName = normalizeName(memberName(memberId, state?.members))
+  const settlementGroup = safeArray(state?.groups).find(group => String(group?.id || '') === String(groupId || '')) || state?.currentGroup
+  const isPickleballGroup = groupKind(settlementGroup) === 'pickleball'
   const checkpoint = safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, state?.members))
     .filter(row => String(row.groupId || '') === String(groupId || ''))
@@ -261,7 +264,22 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
   const notice = safeArray(state?.notifications)
     .filter(row => String(row?.type || '') === 'payment_submitted')
     .filter(row => String(row?.groupId || row?.group_id || '') === String(groupId || ''))
-    .filter(row => String(row?.actorMemberId || row?.actor_member_id || '') === String(memberId || ''))
+    .filter(row => {
+      const actorMemberId = row?.actorMemberId || row?.actor_member_id || ''
+      if (String(actorMemberId) === String(memberId || '')) return true
+      if (String(row?.memberId || row?.member_id || '') === String(memberId || '')) return false
+      if (!isPickleballGroup) return false
+      const metadata = row?.metadata || {}
+      const noticeNames = [
+        metadata.memberName,
+        metadata.member_name,
+        row?.actorName,
+        row?.actor_name,
+        memberName(actorMemberId, state?.members),
+        memberName(row?.memberId || row?.member_id || '', state?.members),
+      ]
+      return targetName && noticeNames.some(name => normalizeName(name) === targetName)
+    })
     .filter(row => String((row?.metadata || {}).status || '').toLowerCase() === 'confirmed')
     .filter(row => {
       const metadata = row?.metadata || {}
@@ -269,7 +287,8 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
         !safeArray(metadata.coveredMembers || metadata.covered_members).length
     })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))[0] || null
-  const noticeDate = notice?.createdAt || notice?.created_at || null
+  const noticeMonth = monthKeyFromPaymentLabel((notice?.metadata || {}).monthLabel || (notice?.metadata || {}).month_label)
+  const noticeDate = isPickleballGroup && noticeMonth ? endOfYearMonth(noticeMonth).toISOString() : (notice?.createdAt || notice?.created_at || null)
   if (!noticeDate) return checkpoint
   if (parseDateValue(checkpoint?.confirmedAt || checkpoint?.periodEnd) >= parseDateValue(noticeDate)) return checkpoint
   return {
