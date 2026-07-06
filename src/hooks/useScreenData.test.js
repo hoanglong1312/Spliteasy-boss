@@ -312,6 +312,31 @@ describe('flex billing helpers', () => {
     expect(transaction.amount).toBe(-550000)
   })
 
+  test('buildHomeData maps logged-in user to pickleball member id for monthly ticket transactions', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 550000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }))
+    state.currentUserId = 'user-pham-tien'
+    state.currentUserName = 'Phạm Tiến'
+    state.members = state.members.map(member => {
+      if (member.id === 'member-1') return { ...member, name: 'Phạm Tiến' }
+      return member
+    })
+    state.groups = [{ id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball', members: state.members.map(member => member.id) }]
+    state.currentGroup = state.groups[0]
+
+    const result = buildHomeData(state, state.currentUserId, state.members, state.groups, {}, state, '2026-07')
+    const transaction = result.transactions.find(row => row.type === 'pickleball_monthly_ticket')
+
+    expect(transaction).toMatchObject({
+      amount: -550000,
+      currentMemberId: 'member-1',
+    })
+  })
+
   test('buildMemberMonthBalanceFlex charges per-session ticket by attendance count', () => {
     const state = makeFlexState({
       billingMode: 'flex',

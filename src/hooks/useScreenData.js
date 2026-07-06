@@ -653,7 +653,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     transactions: buildTransactions(
       [
         ...expenseGroups,
-        buildPickleballTicketTransactionGroup(state, pickleballState, today, currentUserId),
+        buildPickleballTicketTransactionGroup(state, pickleballState, today, pickleballMemberId),
       ].filter(Boolean),
       currentUserId,
       members,
