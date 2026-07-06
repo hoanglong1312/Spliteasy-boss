@@ -684,6 +684,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources),
     state?.monthSettlements,
     members,
+    state?.groups,
   )
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
@@ -714,7 +715,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   }
 }
 
-function suppressSettledSourceMonths(sourceBreakdown, settlements, members = []) {
+function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = []) {
   const settledMonths = new Set()
   safeArray(settlements).forEach(row => {
     const groupId = row?.groupId || row?.group_id || ''
@@ -724,8 +725,11 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [])
     const profileId = profileIdForMember(memberId, members)
     const memberIds = memberIdsForProfile(profileId, members)
     const settledMemberIds = memberIds.length ? memberIds : [memberId]
+    const groupIds = groupIdsForSettlementSource(groupId, groups)
     settledMemberIds.forEach(settledMemberId => {
-      settledMonths.add(`${groupId}:${settledMemberId}:${month}`)
+      groupIds.forEach(settledGroupId => {
+        settledMonths.add(`${settledGroupId}:${settledMemberId}:${month}`)
+      })
     })
   })
   if (!settledMonths.size) return sourceBreakdown
@@ -744,6 +748,12 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [])
       return amount === 0 ? null : { ...source, amount, monthBreakdown: visibleMonths }
     })
     .filter(Boolean)
+}
+
+function groupIdsForSettlementSource(groupId, groups = []) {
+  const group = safeArray(groups).find(item => String(item.id) === String(groupId))
+  const linkedPickleballGroupId = group?.linkedPickleballGroupId || group?.linked_pickleball_group_id || ''
+  return [...new Set([groupId, linkedPickleballGroupId].filter(Boolean).map(String))]
 }
 
 export function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, settlements = [], selectedYearMonth = '') {

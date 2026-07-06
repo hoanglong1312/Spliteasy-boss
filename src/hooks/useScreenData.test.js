@@ -1484,7 +1484,7 @@ describe('buildHomeData', () => {
       monthSettlements: [{
         id: 'settled-may',
         member_id: 'member-1',
-        group_id: 'pickle-1',
+        group_id: 'expense-1',
         month: '2026-05',
         expense_id: 'carry-expense-1',
         expenses: { amount: 36986 },
@@ -1505,7 +1505,7 @@ describe('buildHomeData', () => {
     ])
   })
 
-  test('does not show carried pickleball residual when settlement uses linked group member id', () => {
+  test('does not show carried pickleball residual when settlement uses linked group and member ids', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Tuấn' },
       { id: 'expense-member-1', profile_id: 'profile-1', group_id: 'expense-1', name: 'Tuấn' },
@@ -1555,7 +1555,7 @@ describe('buildHomeData', () => {
       monthSettlements: [{
         id: 'settled-may',
         member_id: 'expense-member-1',
-        group_id: 'pickle-1',
+        group_id: 'expense-1',
         month: '2026-05',
         expense_id: 'carry-expense-1',
         expenses: { amount: 36986 },
