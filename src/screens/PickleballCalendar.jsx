@@ -307,7 +307,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
                 </div>
               </div>
               <div style={{ fontSize: 13, fontWeight: 900, color: '#fde68a', ...type.mono }}>
-                {formatVNDShort(ticket.amountPerPerson)}/người
+                {formatVNDShort(ticket.displayAmountPerPerson || ticket.amountPerPerson)}/{ticket.displayAmountLabel || 'người'}
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 9 }}>
@@ -335,7 +335,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
                 {!waterEditOpen[ticket.id] ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 800 }}>
-                      💧 Nước: {formatVNDShort(ticket.waterAmount)} (+{formatVNDShort(Math.round(ticket.waterAmount / Math.max(ticket.memberIds.length, 1)))}/người)
+                      💧 Nước: {formatVNDShort(ticket.waterAmount)} (+{formatVNDShort(ticket.waterAmountPerPerson || Math.round(ticket.waterAmount / Math.max(ticket.memberIds.length, 1)))}/người)
                     </span>
                     {isTreasurer && (
                       <button

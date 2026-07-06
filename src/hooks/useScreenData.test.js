@@ -287,6 +287,31 @@ describe('flex billing helpers', () => {
     })
   })
 
+  test('buildHomeData uses app monthly config when pickleball state omits it', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 550000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }))
+    state.currentUserId = 'member-1'
+    state.currentUserName = 'Member One'
+    state.groups = [{ id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball', members: state.members.map(member => member.id) }]
+    state.currentGroup = state.groups[0]
+    const pickleballState = {
+      currentGroupId: 'group-1',
+      currentGroup: state.currentGroup,
+      members: state.members,
+      groups: state.groups,
+      _allPickle: { externalTickets: state.pickle.externalTickets },
+    }
+
+    const result = buildHomeData(state, 'member-1', state.members, state.groups, {}, pickleballState, '2026-07')
+    const transaction = result.transactions.find(row => row.type === 'pickleball_monthly_ticket')
+
+    expect(transaction.amount).toBe(-550000)
+  })
+
   test('buildMemberMonthBalanceFlex charges per-session ticket by attendance count', () => {
     const state = makeFlexState({
       billingMode: 'flex',
@@ -590,6 +615,22 @@ describe('buildPickleballCalendarData', () => {
       { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
       { id: 'member-3', ticketType: null, sessionsAttended: 0 },
     ])
+  })
+
+  test('ticket rows show per-session share instead of all attendee share in flex mode', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1', 'member-4'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-5', 'member-6', 'member-7'],
+    }))
+
+    const data = buildPickleballCalendarData(state, { yearMonth: '2026-07', selectedDate: '2026-07-01' })
+    const ticket = data.selectedTickets.find(row => row.id === 'ticket-1')
+
+    expect(ticket.displayAmountPerPerson).toBe(70000)
+    expect(ticket.displayAmountLabel).toBe('vé lẻ')
+    expect(ticket.billedMemberCount).toBe(5)
+    expect(ticket.waterAmountPerPerson).toBe(10714)
   })
 
   test('ticket picker members keep fixed mode ticket types null', () => {

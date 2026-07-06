@@ -3144,7 +3144,7 @@ function buildTransactions(groups, currentUserId, members, currentUserName) {
 
 function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId) {
   const group = pickleballState?.currentGroup || state?.currentGroup || {}
-  const sourceState = pickleballState || state
+  const sourceState = mergePickleballScreenState(state, pickleballState)
   const yearMonth = monthKey(monthDate)
   const monthlyConfig = currentMonthlyPickleConfig(sourceState, yearMonth)
   const monthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0) || 0
@@ -3191,6 +3191,30 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
     name: group.name || 'Pickleball',
     emoji: group.emoji || '🏸',
     expenses: rows,
+  }
+}
+
+function mergePickleballScreenState(state, pickleballState) {
+  if (!pickleballState) return state
+  const appMonthlyConfigs = safeArray(state?._allPickle?.monthlyConfigs).length
+    ? safeArray(state?._allPickle?.monthlyConfigs)
+    : safeArray(state?.pickle?.monthlyConfigs)
+  const screenMonthlyConfigs = safeArray(pickleballState?._allPickle?.monthlyConfigs).length
+    ? safeArray(pickleballState?._allPickle?.monthlyConfigs)
+    : safeArray(pickleballState?.pickle?.monthlyConfigs)
+  return {
+    ...state,
+    ...pickleballState,
+    pickle: {
+      ...(state?.pickle || {}),
+      ...(pickleballState?.pickle || {}),
+      monthlyConfigs: screenMonthlyConfigs.length ? screenMonthlyConfigs : appMonthlyConfigs,
+    },
+    _allPickle: {
+      ...(state?._allPickle || {}),
+      ...(pickleballState?._allPickle || {}),
+      monthlyConfigs: screenMonthlyConfigs.length ? screenMonthlyConfigs : appMonthlyConfigs,
+    },
   }
 }
 
@@ -4126,6 +4150,7 @@ function toTicketRow(ticket, index, state) {
   const totalAmount = ticketTotalAmount(ticket)
   const amountPerPerson = ticketAmountPerPerson(ticket)
   const waterAmount = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
+  const flexDisplay = flexTicketDisplay(ticket, state)
   const advancerId = ticketAdvancerId(ticket)
   const advancerName = advancerId ? memberName(advancerId, safeArray(state?.members)) : null
   const date = ticketDate(ticket)
@@ -4142,6 +4167,11 @@ function toTicketRow(ticket, index, state) {
     totalAmount,
     waterAmount,
     amountPerPerson,
+    displayAmountPerPerson: flexDisplay.amountPerPerson || amountPerPerson,
+    displayAmountLabel: flexDisplay.amountPerPerson ? 'vé lẻ' : 'người',
+    billedMemberIds: flexDisplay.billedMemberIds,
+    billedMemberCount: flexDisplay.billedMemberIds.length || memberIds.length,
+    waterAmountPerPerson: memberIds.length > 0 ? Math.round(waterAmount / memberIds.length) : 0,
     memberIds,
     memberLabels: attendees.map(row => row.name),
     memberChips: attendees,
@@ -4151,6 +4181,17 @@ function toTicketRow(ticket, index, state) {
     expanded: index < 2,
     expiringSoon: Boolean(ticket?.expiringSoon || ticket?.expiring_soon),
     attendees,
+  }
+}
+
+function flexTicketDisplay(ticket, state) {
+  const yearMonth = ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket))
+  if (!isBillingModeFlexForMonth(state, yearMonth)) return { amountPerPerson: 0, billedMemberIds: [] }
+  const billedMemberIds = ticketMemberIds(ticket)
+    .filter(memberId => memberFlexTicketType(state, memberId, yearMonth) === 'per_session')
+  return {
+    amountPerPerson: billedMemberIds.length > 0 ? Math.round(ticketTotalAmount(ticket) / billedMemberIds.length) : 0,
+    billedMemberIds,
   }
 }
 

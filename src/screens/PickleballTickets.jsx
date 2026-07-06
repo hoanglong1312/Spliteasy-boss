@@ -226,12 +226,14 @@ function TicketCard({ t, isTreasurer, savingAction, setSavingAction, onAction })
           </div>
         </div>
         <div style={{ fontSize: 17, fontWeight: 900, color: accentColor, ...type.mono }}>
-          {formatShortAmount(t.amountPerPerson)}/người
+          {formatShortAmount(t.displayAmountPerPerson || t.amountPerPerson)}/{t.displayAmountLabel || 'người'}
         </div>
       </div>
 
       <div style={{ fontSize: 12, color: colors.textSecondary, fontWeight: 700, marginTop: 8 }}>
-        {isTeamFund ? `${formatShortAmount(t.amountPerPerson)}/người · ${memberCount} người tham gia` : `${formatShortAmount(t.amountPerPerson)}/người · ${t.advancerName} ứng`}
+        {isTeamFund
+          ? `${formatShortAmount(t.displayAmountPerPerson || t.amountPerPerson)}/${t.displayAmountLabel || 'người'} · ${memberCount} người tham gia`
+          : `${formatShortAmount(t.displayAmountPerPerson || t.amountPerPerson)}/${t.displayAmountLabel || 'người'} · ${t.advancerName} ứng`}
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
