@@ -214,7 +214,7 @@ export function buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, 
   const prevSessions = getStateMonthSessions(pickleballState, prevDate)
   const prevSourceBalances = buildHomeSourceBalances(state, prevExpenseGroups, pickleballState, pickle, prevSessions, members, prevDate)
   const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
-  const prevSourceBreakdown = currentProfileSourceBreakdown(prevSourceBalances, currentUserId, members)
+  const prevSourceBreakdown = currentProfileSourceBreakdown(prevSourceBalances, currentUserId, members, state?.currentUserName)
   const prevPaymentSummary = buildHomePaymentSummary(state, prevSourceBreakdown, null, members, me, prevDate)
   const prevTotal = prevPaymentSummary.netBalance
   if (prevTotal >= 0) return null
@@ -525,7 +525,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const sourceBalances = settlementSourceBalances
   const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
-  const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members)
+  const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members, state?.currentUserName)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
   const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
   const treasurerExpenseGroups = safeGroups
@@ -2891,7 +2891,7 @@ function buildSettleAllData(state) {
   const pickle = state?.pickle || {}
   const monthSessions = getStateMonthSessions(state, today)
   const sourceBalances = buildHomeSourceBalances(state, expenseGroups, state, pickle, monthSessions, members, today)
-  const sources = currentProfileSourceBreakdown(sourceBalances, state?.currentUserId, members)
+  const sources = currentProfileSourceBreakdown(sourceBalances, state?.currentUserId, members, state?.currentUserName)
   const me = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
   const debts = sources
     .filter(source => Number(source.amount) < 0)
@@ -4706,9 +4706,18 @@ function memberIdsForProfile(profileId, members) {
     .filter(Boolean)
 }
 
-function currentProfileSourceBreakdown(sourceBalances, currentUserId, members) {
+function currentProfileSourceBreakdown(sourceBalances, currentUserId, members, currentUserName = '') {
   const profileId = profileIdForMember(currentUserId, members)
+  const currentMember = safeArray(members).find(item => String(item.id) === String(currentUserId)) || {}
+  const currentName = normalizeName(currentMember.displayName || currentMember.display_name || currentMember.name || currentMember.memberName || currentMember.member_name || currentUserName)
   const memberIds = new Set(memberIdsForProfile(profileId, members).map(String))
+  if (currentName) {
+    safeArray(members)
+      .filter(member => normalizeName(member.displayName || member.display_name || member.name || member.memberName || member.member_name) === currentName)
+      .forEach(member => {
+        if (member.id) memberIds.add(String(member.id))
+      })
+  }
   if (memberIds.size === 0 && currentUserId) memberIds.add(String(currentUserId))
   const bySource = new Map()
 

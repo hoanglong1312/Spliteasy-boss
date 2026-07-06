@@ -1191,6 +1191,110 @@ describe('buildHomeData', () => {
     ]))
   })
 
+  test('includes source breakdown from other groups matched by profile id', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Tuấn Lê' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['expense-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-may-expense',
+        title: 'Chi tiêu tháng 5',
+        amount: 200000,
+        date: '2026-05-03',
+        expense_date: '2026-05-03',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['expense-tuan', 'long-life'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const source = result.sourceBreakdown.find(row => row.sourceId === 'life-1')
+    const cappedSource = result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(source).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      memberId: 'expense-tuan',
+      amount: -100000,
+      monthBreakdown: [{ month: '2026-05', label: 'Tháng 5', amount: -100000 }],
+    })
+    expect(cappedSource).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      amount: -100000,
+      monthBreakdown: [{ month: '2026-05', label: 'Tháng 5', amount: -100000 }],
+    })
+  })
+
+  test('includes source breakdown from legacy groups matched by member name', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'legacy-tuan', profile_id: 'legacy-profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan'],
+      expenses: [],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['legacy-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-july-expense',
+        title: 'Chi tiêu tháng 7',
+        amount: 200000,
+        date: '2026-07-03',
+        expense_date: '2026-07-03',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['legacy-tuan', 'long-life'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const source = result.sourceBreakdown.find(row => row.sourceId === 'life-1')
+    const cappedSource = result.cappedSourceBreakdown.find(row => row.sourceId === 'life-1')
+
+    expect(source).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      memberId: 'legacy-tuan',
+      amount: -100000,
+      monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -100000 }],
+    })
+    expect(cappedSource).toMatchObject({ amount: -100000 })
+  })
+
   test('uses last confirmed checkpoint as payment balance start', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
