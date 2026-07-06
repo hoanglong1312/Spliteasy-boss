@@ -616,6 +616,15 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
         approveStatus: advancerId ? 'unpaid' : 'team_fund',
       }
     })
+  const transactionExpenseGroups = settlementExpenseGroups.map(group => {
+    const source = sourceBreakdown.find(row => row.sourceType === 'group' && String(row.sourceId) === String(group.id))
+    const sourceMonths = new Set(safeArray(source?.monthBreakdown).map(row => row.month).filter(Boolean))
+    if (!sourceMonths.size) return groupWithMonthExpenses(group, today)
+    return {
+      ...group,
+      expenses: safeArray(group.expenses).filter(expense => sourceMonths.has(monthKey(expense.date || expense.expense_date))),
+    }
+  })
   const pendingTickets = {
     count: pendingTicketItems.length,
     totalAmount: pendingTicketItems.reduce((sum, t) => sum + t.totalAmount, 0),
@@ -652,7 +661,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     memberBalances: buildHomeMemberBalances(pickleballState, pickle, today),
     transactions: buildTransactions(
       [
-        ...expenseGroups,
+        ...transactionExpenseGroups,
         buildPickleballTicketTransactionGroup(state, pickleballState, today, pickleballMemberId),
       ].filter(Boolean),
       currentUserId,
@@ -5135,6 +5144,12 @@ function memberIdForGroup(group, currentUserId, members, currentUserName) {
   if (groupMemberIds.has(String(currentUserId))) return currentUserId
 
   const currentMember = safeArray(members).find(m => String(m.id) === String(currentUserId))
+  const currentProfileId = currentMember?.profileId || currentMember?.profile_id
+  const profileMatch = currentProfileId
+    ? allMembersForGroup(group, members).filter(isActiveMember).find(member => String(member.profileId || member.profile_id || '') === String(currentProfileId))
+    : null
+  if (profileMatch?.id) return profileMatch.id
+
   const currentName = currentUserName || currentMember?.name
   const match = allMembersForGroup(group, members).filter(isActiveMember).find(member => sameName(member.name, currentName))
   return match?.id || currentUserId
