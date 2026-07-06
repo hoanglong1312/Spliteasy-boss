@@ -687,9 +687,11 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
               <div style={{
                 display: 'grid',
                 gap: 6,
-                padding: '8px 12px 2px 56px',
+                marginLeft: 17,
+                padding: '8px 0 2px 17px',
+                borderLeft: '1px solid rgba(148,163,184,0.18)',
               }}>
-                <div style={{ fontSize: 9, color: colors.textMuted, paddingBottom: 2, letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: 9, color: colors.textMuted, paddingBottom: 2, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   theo tháng
                 </div>
                 {monthBreakdown.map(row => {
@@ -699,16 +701,16 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
                     <div key={row.month || row.label} style={{
                       border: isPast ? '1px solid rgba(251,191,36,0.45)' : '1px solid rgba(255,255,255,0.08)',
                       borderRadius: 10,
-                      padding: '8px 9px',
+                      padding: '9px 10px',
                       background: isPast ? 'rgba(251,191,36,0.07)' : 'rgba(255,255,255,0.025)',
                       fontSize: 11,
                       color: colors.textSecondary,
                       lineHeight: 1.2,
+                      minHeight: 44,
                     }}>
                       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
                         <div style={{ minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 800, color: '#f8fafc' }}>
-                            <span style={{ color: colors.textMuted, fontSize: 9 }}>›</span>
                             <span>{row.label || row.month}</span>
                           </div>
                           {isPast && <div style={{ marginTop: 4, fontSize: 9, color: '#fbbf24', fontWeight: 800 }}>⚠️ chưa quyết toán</div>}

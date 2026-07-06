@@ -903,7 +903,7 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
     })
     .map(source => ({
       sourceId: source.sourceId || source.source_id,
-      sourceType: source.sourceType || source.source_type || 'group',
+      sourceType: source.sourceType || source.source_type || sourceTypeForCoveredSource(source, sourceBreakdown),
       sourceLabel: source.sourceLabel || source.source_label || 'Nguồn tiền',
       profileId: source.profileId || source.profile_id || '',
       memberId: source.memberId || source.member_id || '',
@@ -940,6 +940,17 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
       return { ...source, amount: -covered, month: coveredMonth || source.month || '' }
     })
     .filter(Boolean)
+}
+
+function sourceTypeForCoveredSource(coveredSource, sourceBreakdown) {
+  const sourceId = String(coveredSource?.sourceId || coveredSource?.source_id || '')
+  const sourceLabel = String(coveredSource?.sourceLabel || coveredSource?.source_label || '')
+  const match = safeArray(sourceBreakdown).find(source => {
+    const rowSourceId = String(source?.sourceId || source?.source_id || '')
+    const rowSourceLabel = String(source?.sourceLabel || source?.source_label || '')
+    return (sourceId && rowSourceId === sourceId) || (sourceLabel && rowSourceLabel === sourceLabel)
+  })
+  return match?.sourceType || match?.source_type || 'group'
 }
 
 function coveredMemberAmountForScope(metadata, scope = {}) {

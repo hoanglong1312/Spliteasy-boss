@@ -1475,6 +1475,64 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('matches legacy confirmed pickleball source without source type', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'pickle-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['member-1', 'treasurer-1'],
+    }]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      _allPickle: {
+        externalTickets: [
+          { id: 'may-ticket', group_id: 'pickle-1', year_month: '2026-05', session_date: '2026-05-20', total_amount: 1554704, member_ids: ['member-1', 'treasurer-1'], advancer_id: 'treasurer-1', status: 'unpaid' },
+          { id: 'june-ticket', group_id: 'pickle-1', year_month: '2026-06', session_date: '2026-06-20', total_amount: 1305128, member_ids: ['member-1', 'treasurer-1'], advancer_id: 'treasurer-1', status: 'unpaid' },
+          { id: 'july-ticket', group_id: 'pickle-1', year_month: '2026-07', session_date: '2026-07-20', total_amount: 1242856, member_ids: ['member-1', 'treasurer-1'], advancer_id: 'treasurer-1', status: 'unpaid' },
+        ],
+      },
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      pickleballGroupId: 'pickle-1',
+      pickleballGroup: groups[0],
+      members,
+      groups,
+      notifications: [{
+        id: 'legacy-confirmed-may',
+        type: 'payment_submitted',
+        group_id: 'pickle-1',
+        actor_member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 5 · 2026',
+          amount: 777352,
+          coveredSources: [{ sourceId: 'pickle-1', sourceLabel: 'Virgo Pickleball 246', memberId: 'member-1', amount: -777352, month: '2026-05' }],
+        },
+        created_at: '2026-07-01T00:05:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
+    const source = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
+
+    expect(source.amount).toBe(-1273992)
+    expect(source.monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -652564 },
+      { month: '2026-07', label: 'Tháng 7', amount: -621428 },
+    ])
+  })
+
   test('labels confirmed payment records with group name and month', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },
