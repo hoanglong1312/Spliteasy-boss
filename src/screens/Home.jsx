@@ -196,10 +196,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         setSavingAction={setSavingAction}
         onAction={onAction}
         onViewPaymentRecord={setPaymentRecordDetail}
-        onConfirmPayment={(payload) => onAction?.('requestSettlementCheckpoint', {
-          ...payload,
-          groups: buildSettlementCheckpointGroups(payload?.coveredSources),
-        })}
+        onConfirmPayment={(payload) => onAction?.('confirmPaymentSent', payload)}
         onConfirmRefund={(row) => {
           const key = String(row.profileId || row.name || 'member');
           setConfirmedRefunds(prev => new Set([...prev, key]));
@@ -784,29 +781,49 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
 function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, savingAction, setSavingAction, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose }) {
   const [copiedField, setCopiedField] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const debtSources = safeArray(data?.sourceBreakdown).filter(source => Number(source.amount) < 0);
+  const ownPaymentItems = debtSources.flatMap((source, index) => sourcePaymentItems(source, {
+    prefix: `own:${index}`,
+    memberId: data?.memberId || data?.currentMemberId || source.memberId || source.member_id || '',
+    profileId: data?.profileId || data?.currentProfileId || source.profileId || source.profile_id || '',
+  }));
+  const ownPaymentItemKeys = ownPaymentItems.map(item => item.key).join('|');
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
+  const [selectedPaymentSourceKeys, setSelectedPaymentSourceKeys] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
+  useEffect(() => {
+    setSelectedPaymentSourceKeys(new Set(ownPaymentItems.map(item => item.key)));
+    setCopiedField('');
+    setPaymentConfirmed(false);
+  }, [open, ownPaymentItemKeys]);
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
   const target = data?.paymentTarget || {};
   const qrBank = resolveVietQrBank(target);
   const payForRows = safeArray(data?.payForRows);
   const selectedPayForRows = payForRows.filter(row => selectedPayForIds.has(String(row.profileId || row.name)));
-  const debtSources = safeArray(data?.sourceBreakdown).filter(source => Number(source.amount) < 0);
+  const selectedOwnPaymentItems = ownPaymentItems.filter(item => selectedPaymentSourceKeys.has(item.key));
   const coveredSources = [
-    ...debtSources.map(source => ({ ...source, memberName: data?.memberName || 'Thành viên' })),
-    ...selectedPayForRows.flatMap(row => safeArray(row.sources).filter(source => Number(source.amount) < 0).map(source => ({ ...source, profileId: row.profileId, memberName: row.name }))),
+    ...selectedOwnPaymentItems.map(paymentItemToCoveredSource),
+    ...selectedPayForRows.flatMap(row => safeArray(row.sources).flatMap((source, index) => sourcePaymentItems(source, {
+      prefix: `payfor:${row.profileId || row.name}:${index}`,
+      memberId: row.memberId || source.memberId || source.member_id || '',
+      profileId: row.profileId || source.profileId || source.profile_id || '',
+    })).map(item => paymentItemToCoveredSource({ ...item, memberName: row.name }))),
   ];
-  const amountToPay = Math.max(0, Math.abs(netBalance)) + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
-  const canShowQr = netBalance < 0 && qrBank && target.account && target.holder;
+  const amountToPay = selectedOwnPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
+    + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
+  const canShowQr = amountToPay > 0 && qrBank && target.account && target.holder;
   const memberBank = data?.memberBank || {};
   const memberBankReady = Boolean(resolveVietQrBank(memberBank) && memberBank.account && memberBank.holder);
   const needsBankSetup = netBalance > 0 && !memberBankReady;
   const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
+  const paymentPeriodLabel = paymentItemsPeriodLabel(selectedOwnPaymentItems, data?.monthLabel);
+  const paymentSectionTitle = paymentPeriodLabel === data?.monthLabel ? paymentPeriodLabel : 'Các khoản chưa thanh toán';
   const payForSummary = selectedPayForRows.length
     ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0))}`
     : 'Chưa chọn ai';
-  const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${data?.monthLabel || ''}`.trim();
+  const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${paymentPeriodLabel}`.trim();
   const refundRows = safeArray(data?.refundRows);
   const pendingPaymentRecords = safeArray(paymentRecords).filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const qrUrl = canShowQr ? generateQRUrl({
@@ -822,7 +839,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     setCopiedField(field);
   };
   const confirmPayment = async () => {
-    if (savingAction || paymentConfirmed) return;
+    if (savingAction || paymentConfirmed || amountToPay <= 0) return;
     setSavingAction('confirmPayment');
     try {
       await onConfirmPayment?.({
@@ -831,6 +848,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         coveredMembers: selectedPayForRows,
         coveredSources,
         transferDescription,
+        monthLabel: paymentPeriodLabel,
         paymentTarget: target,
       });
       setPaymentConfirmed(true);
@@ -844,6 +862,15 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
+      return next;
+    });
+    setCopiedField('');
+    setPaymentConfirmed(false);
+  };
+  const togglePaymentSource = (key) => {
+    setSelectedPaymentSourceKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
     setCopiedField('');
@@ -1004,6 +1031,14 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
               )}
             </div>
           )}
+          <div style={{ marginTop: 12 }}>
+            <PaymentItemSection
+              title={paymentSectionTitle}
+              items={ownPaymentItems}
+              checkedKeys={selectedPaymentSourceKeys}
+              onToggle={togglePaymentSource}
+            />
+          </div>
           {canShowQr ? (
             <div>
               <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
@@ -1029,7 +1064,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                     textDecoration: 'none',
                   }}
                 >Lưu QR</a>
-                <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || Boolean(data?.pendingSettlementCheckpoint)} style={{
+                <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || Boolean(data?.pendingSettlementCheckpoint)} style={{
                   minHeight: 42,
                   borderRadius: 12,
                   background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
@@ -1038,7 +1073,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                   fontSize: 12,
                   fontWeight: 900,
                   fontFamily: 'inherit',
-                  cursor: savingAction === 'confirmPayment' || paymentConfirmed || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
+                  cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
                   opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
                 }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ thủ quỹ duyệt' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
               </div>
@@ -1563,20 +1598,6 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
     });
   }
 
-  function itemCoveredSource(item) {
-    return {
-      sourceType: item.sourceType,
-      sourceId: item.sourceId,
-      sourceLabel: item.sourceLabel,
-      memberId: item.memberId,
-      profileId: item.profileId,
-      month: item.month,
-      monthLabel: item.monthLabel,
-      amount: item.amount,
-      monthBreakdown: item.month ? [{ month: item.month, label: item.monthLabel, amount: item.amount }] : [],
-    };
-  }
-
   async function submit() {
     if (submitting || selectedTotal <= 0) return;
     setSubmitting(true);
@@ -1586,7 +1607,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
         amount: selectedTotal,
         monthLabel: payloadMonthLabel,
         memberName: row.name || row.memberName || 'Thành viên',
-        coveredSources: selectedItems.map(itemCoveredSource),
+        coveredSources: selectedItems.map(paymentItemToCoveredSource),
         groupId: row.linkGroupId || row.groupId || '',
       });
     } finally {
@@ -1669,6 +1690,53 @@ function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
 
 function paymentRowCurrentAmount(row) {
   return Number(row?.payableAmount) || Math.abs(Number(row?.amount) || 0);
+}
+
+function sourcePaymentItems(source, { prefix = 'source', memberId = '', profileId = '' } = {}) {
+  const sourceType = source.sourceType || source.source_type || 'group';
+  const sourceId = source.sourceId || source.source_id || source.groupId || source.group_id || '';
+  const sourceLabel = source.sourceLabel || source.source_label || source.label || source.name || 'Nguồn tiền';
+  const baseMemberId = source.memberId || source.member_id || memberId || '';
+  const baseProfileId = source.profileId || source.profile_id || profileId || '';
+  const months = safeArray(source.monthBreakdown).length
+    ? safeArray(source.monthBreakdown)
+    : [{ month: source.month || source.yearMonth || source.year_month || '', label: source.monthLabel || source.month_label || '', amount: source.amount }];
+  return months
+    .map((row, index) => ({
+      key: `${prefix}:${sourceType}:${sourceId}:${baseMemberId}:${baseProfileId}:${row.month || index}`,
+      sourceType,
+      sourceId,
+      sourceLabel,
+      memberId: baseMemberId,
+      profileId: baseProfileId,
+      month: row.month || row.yearMonth || row.year_month || '',
+      monthLabel: row.label || row.monthLabel || row.month_label || fullMonthLabel(row.month || row.yearMonth || row.year_month),
+      amount: Number(row.amount) || 0,
+      defaultSelected: true,
+    }))
+    .filter(item => Number(item.amount) < 0);
+}
+
+function paymentItemsPeriodLabel(items, fallback = '') {
+  const months = [...new Set(safeArray(items).map(item => item.monthLabel || fullMonthLabel(item.month)).filter(Boolean))];
+  if (months.length === 1) return months[0];
+  if (months.length > 1) return `${months.length} tháng`;
+  return fallback || 'Khoản cần thanh toán';
+}
+
+function paymentItemToCoveredSource(item) {
+  return {
+    sourceType: item.sourceType,
+    sourceId: item.sourceId,
+    sourceLabel: item.sourceLabel,
+    memberId: item.memberId,
+    profileId: item.profileId,
+    memberName: item.memberName,
+    month: item.month,
+    monthLabel: item.monthLabel,
+    amount: item.amount,
+    monthBreakdown: item.month ? [{ month: item.month, label: item.monthLabel, amount: item.amount }] : [],
+  };
 }
 
 function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {
@@ -1976,27 +2044,6 @@ function fullMonthLabel(yearMonth) {
   const [year, month] = String(yearMonth || '').split('-');
   const monthNumber = Number(month);
   return year && monthNumber ? `Tháng ${monthNumber} · ${year}` : '';
-}
-
-function buildSettlementCheckpointGroups(coveredSources) {
-  const byMemberGroup = new Map();
-  safeArray(coveredSources)
-    .filter(source => Number(source.amount) < 0)
-    .forEach(source => {
-      const groupId = source.sourceId || source.source_id || '';
-      const memberId = source.memberId || source.member_id || '';
-      if (!groupId || !memberId) return;
-      const key = `${groupId}:${memberId}`;
-      const current = byMemberGroup.get(key) || {
-        groupId,
-        memberId,
-        amount: 0,
-        groupName: source.sourceLabel || source.source_label || '',
-      };
-      current.amount += Math.abs(Number(source.amount) || 0);
-      byMemberGroup.set(key, current);
-    });
-  return [...byMemberGroup.values()].filter(row => row.amount > 0);
 }
 
 function normalizeSearch(value) {
