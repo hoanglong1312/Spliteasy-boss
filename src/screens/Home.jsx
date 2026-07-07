@@ -800,7 +800,6 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const [selectedPaymentSourceKeys, setSelectedPaymentSourceKeys] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   const [paymentDetailsExpanded, setPaymentDetailsExpanded] = useState(false);
-  const [payForDetailsExpanded, setPayForDetailsExpanded] = useState(false);
   useEffect(() => {
     setSelectedPaymentSourceKeys(new Set(ownPaymentItems.map(item => item.key)));
     setCopiedField('');
@@ -823,6 +822,22 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   }).filter(group => group.items.length > 0);
   const selectedPayForPaymentItems = selectedPayForGroups.flatMap(group => group.items);
   const selectedPayForTotal = selectedPayForPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+  const paymentDisplayGroups = [
+    {
+      key: 'own',
+      title: `Các khoản của ${data?.memberName || 'bạn'}`,
+      items: ownPaymentItems,
+      checkedKeys: selectedPaymentSourceKeys,
+      onToggle: togglePaymentSource,
+    },
+    ...selectedPayForGroups.map(group => ({
+      key: String(group.row.profileId || group.row.name),
+      title: `Các khoản của ${group.row.name}`,
+      items: group.items,
+      checkedKeys: new Set(group.items.map(item => item.key)),
+      onToggle: null,
+    })),
+  ].filter(group => group.items.length > 0);
   const coveredSources = [
     ...selectedOwnPaymentItems.map(paymentItemToCoveredSource),
     ...selectedPayForPaymentItems.map(paymentItemToCoveredSource),
@@ -881,9 +896,8 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     });
     setCopiedField('');
     setPaymentConfirmed(false);
-    setPayForDetailsExpanded(false);
   };
-  const togglePaymentSource = (key) => {
+  function togglePaymentSource(key) {
     setSelectedPaymentSourceKeys(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
@@ -891,7 +905,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     });
     setCopiedField('');
     setPaymentConfirmed(false);
-  };
+  }
 
   return (
     <BottomSheet title="Thanh toán" onClose={onClose}>
@@ -1114,55 +1128,17 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
               )}
             </div>
           )}
-          <div style={{ marginTop: 12 }}>
-            <PaymentItemSection
-              title={`Các khoản của ${data?.memberName || 'bạn'}`}
-              items={ownPaymentItems}
-              checkedKeys={selectedPaymentSourceKeys}
-              onToggle={togglePaymentSource}
-            />
-          </div>
-          {selectedPayForGroups.length > 0 && (
-            <div style={{ marginTop: 12, padding: 10, borderRadius: 14, border: '1px solid rgba(52,211,153,0.30)', background: 'rgba(16,185,129,0.10)', display: 'grid', gap: 9 }}>
-              <button
-                type="button"
-                aria-expanded={payForDetailsExpanded}
-                onClick={() => setPayForDetailsExpanded(value => !value)}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  padding: 0,
-                  color: colors.textPrimary,
-                  fontFamily: 'inherit',
-                  cursor: 'pointer',
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0,1fr) auto',
-                  gap: 8,
-                  alignItems: 'center',
-                  textAlign: 'left',
-                }}
-              >
-                <span style={{ minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 10, color: '#6ee7b7', fontWeight: 950, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Đang thanh toán hộ</span>
-                  <span style={{ display: 'block', marginTop: 3, fontSize: 13, color: '#f8fafc', fontWeight: 950, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {selectedPayForGroups.map(group => group.row.name).join(', ')}
-                  </span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 950, ...type.mono }}>{formatVND(selectedPayForTotal)}</span>
-                  <span style={{ color: '#6ee7b7', fontSize: 16, lineHeight: 1 }}>{payForDetailsExpanded ? '⌃' : '⌄'}</span>
-                </span>
-              </button>
-              {payForDetailsExpanded && selectedPayForGroups.map(group => (
+          <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+            {paymentDisplayGroups.map(group => (
                 <PaymentItemSection
-                  key={String(group.row.profileId || group.row.name)}
-                  title={`Chi tiết khoản của ${group.row.name}`}
+                  key={group.key}
+                  title={group.title}
                   items={group.items}
-                  checkedKeys={new Set(group.items.map(item => item.key))}
+                  checkedKeys={group.checkedKeys}
+                  onToggle={group.onToggle}
                 />
-              ))}
-            </div>
-          )}
+            ))}
+          </div>
           {!canShowQr && (
             <div style={{ fontSize: 12, color: '#fde68a', lineHeight: 1.45, fontWeight: 700, marginTop: 10 }}>
               Chưa có đủ thông tin ngân hàng của thủ quỹ. Nhờ Long cập nhật STK trong tab cá nhân.
@@ -1204,6 +1180,21 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   );
 }
 
+function treasurerProfileStatKey(record = {}) {
+  const name = String(record.name || record.memberName || record.member_name || '').trim().toLowerCase();
+  if (name) return `name:${name}`;
+  const profileId = String(record.profileId || record.profile_id || '').trim();
+  const memberIds = [
+    record.memberId,
+    record.member_id,
+    record.linkMemberId,
+    record.link_member_id,
+    ...safeArray(record.memberIds || record.member_ids),
+  ].map(value => String(value || '').trim()).filter(Boolean);
+  if (profileId && !memberIds.includes(profileId)) return `profile:${profileId}`;
+  return '';
+}
+
 function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
   const [memberExpanded, setMemberExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
@@ -1225,8 +1216,21 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const totalNeedCollect = memberRows.reduce((sum, row) => sum + row.amountDue, 0);
   const totalReceived = memberRows.reduce((sum, row) => sum + row.amountPaid, 0);
   const totalRefund = memberRows.reduce((sum, row) => sum + row.amountRefund, 0);
-  const paidItemCount = memberRows.reduce((sum, row) => sum + row.items.filter(item => item.paid).length, 0);
-  const unpaidItemCount = memberRows.reduce((sum, row) => sum + row.items.filter(item => !item.paid && item.kind !== 'refund').length, 0);
+  const profileStats = new Map();
+  memberRows.forEach(row => {
+    const key = treasurerProfileStatKey(row);
+    if (!key) return;
+    const stat = profileStats.get(key) || { amountDue: 0, amountPaid: 0, amountRefund: 0 };
+    stat.amountDue += row.amountDue;
+    stat.amountPaid += row.amountPaid;
+    stat.amountRefund += row.amountRefund;
+    profileStats.set(key, stat);
+  });
+  const profileStatRows = [...profileStats.values()];
+  const totalProfileCount = profileStatRows.length;
+  const paidMemberCount = profileStatRows.filter(row => row.amountPaid > 0 && row.amountDue <= 0).length;
+  const pendingMemberCount = new Set([...pendingRecordsRaw, ...pendingCheckpoints].map(treasurerProfileStatKey).filter(Boolean)).size;
+  const unpaidMemberCount = profileStatRows.filter(row => row.amountDue > 0).length;
   const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
   const selectedTreasurerTotal = selectedTreasurerItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   const isSearching = Boolean(searchQuery.trim());
@@ -1261,14 +1265,14 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       <Card style={{ padding: 14, borderColor: 'rgba(59,130,246,0.24)', background: 'rgba(59,130,246,0.07)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>Tiến độ thu</div>
-          <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', flexShrink: 0 }}>{memberRows.length} member</div>
+          <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', flexShrink: 0 }}>{totalProfileCount} member</div>
         </div>
         <div style={{ fontSize: 22, fontWeight: 950, color: '#f8fafc', marginTop: 4, ...type.mono, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatVND(totalNeedCollect)}</div>
         <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Còn theo dõi · {data?.monthLabel || 'tháng này'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 6, marginTop: 10 }}>
-          <ProgressStat label="Đã nhận" count={paidItemCount} color="#6ee7b7" />
-          <ProgressStat label="Chờ duyệt" count={pendingRecordsRaw.length + pendingCheckpoints.length} color="#fcd34d" />
-          <ProgressStat label="Chưa thu" count={unpaidItemCount} color="#fca5a5" />
+          <ProgressStat label="Đã nhận" count={paidMemberCount} color="#6ee7b7" />
+          <ProgressStat label="Chờ duyệt" count={pendingMemberCount} color="#fcd34d" />
+          <ProgressStat label="Chưa thu" count={unpaidMemberCount} color="#fca5a5" />
         </div>
       </Card>
 
@@ -1410,7 +1414,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
 function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, matchSearch, confirmedRefunds, monthLabel }) {
   const byMember = new Map();
   const ensureRow = (seed = {}) => {
-    const key = String(seed.profileId || seed.memberId || seed.name || 'member');
+    const key = treasurerProfileStatKey(seed) || String(seed.memberId || seed.name || 'member');
     const existing = byMember.get(key) || {
       key,
       profileId: seed.profileId || '',

@@ -194,6 +194,50 @@ test('Treasurer payment dashboard can select multiple unpaid items before TT', (
   assert.match(dashboardSource, /onToggleSelect=\{toggleTreasurerItemSelection\}/);
 });
 
+test('Treasurer payment dashboard counts payment progress by profile', () => {
+  const dashboardSource = homeSource.slice(
+    homeSource.indexOf('function TreasurerPaymentDashboard'),
+    homeSource.indexOf('function buildTreasurerMemberRows')
+  );
+
+  assert.match(dashboardSource, /const profileStats = new Map/);
+  assert.match(dashboardSource, /const key = treasurerProfileStatKey\(row\)/);
+  assert.match(dashboardSource, /const totalProfileCount = profileStatRows\.length/);
+  assert.match(dashboardSource, /const paidMemberCount = profileStatRows\.filter/);
+  assert.match(dashboardSource, /const pendingMemberCount = new Set\(\[\.\.\.pendingRecordsRaw, \.\.\.pendingCheckpoints\]\.map\(treasurerProfileStatKey\)\.filter\(Boolean\)\)\.size/);
+  assert.match(dashboardSource, /const unpaidMemberCount = profileStatRows\.filter\(row => row\.amountDue > 0\)\.length/);
+  assert.match(dashboardSource, /\{totalProfileCount\} member/);
+  assert.match(dashboardSource, /<ProgressStat label="Đã nhận" count=\{paidMemberCount\}/);
+  assert.match(dashboardSource, /<ProgressStat label="Chờ duyệt" count=\{pendingMemberCount\}/);
+  assert.match(dashboardSource, /<ProgressStat label="Chưa thu" count=\{unpaidMemberCount\}/);
+  assert.doesNotMatch(dashboardSource, /\{memberRows\.length\} member/);
+  assert.doesNotMatch(dashboardSource, /paidItemCount/);
+  assert.doesNotMatch(dashboardSource, /unpaidItemCount/);
+});
+
+test('Treasurer payment member rows group by profile key instead of member id', () => {
+  const rowBuilderSource = homeSource.slice(
+    homeSource.indexOf('function buildTreasurerMemberRows'),
+    homeSource.indexOf('function paymentRowFromTreasurerItem')
+  );
+
+  assert.match(rowBuilderSource, /const key = treasurerProfileStatKey\(seed\) \|\| String\(seed\.memberId \|\| seed\.name \|\| 'member'\)/);
+});
+
+test('Member payment QR groups selected own and pay-for debts with the same breakdown style', () => {
+  const paymentSheetSource = homeSource.slice(
+    homeSource.indexOf('function PaymentSheet'),
+    homeSource.indexOf('function TreasurerPaymentDashboard')
+  );
+
+  assert.match(paymentSheetSource, /const paymentDisplayGroups = \[/);
+  assert.match(paymentSheetSource, /title: `Các khoản của \$\{data\?\.memberName \|\| 'bạn'\}`/);
+  assert.match(paymentSheetSource, /title: `Các khoản của \$\{group\.row\.name\}`/);
+  assert.match(paymentSheetSource, /paymentDisplayGroups\.map\(group => \(/);
+  assert.match(paymentSheetSource, /<PaymentItemSection[\s\S]*title=\{group\.title\}[\s\S]*items=\{group\.items\}[\s\S]*checkedKeys=\{group\.checkedKeys\}[\s\S]*onToggle=\{group\.onToggle\}/);
+  assert.doesNotMatch(paymentSheetSource, /Chi tiết khoản của \$\{group\.row\.name\}/);
+});
+
 test('GroupDetail hero balances amount on the right', () => {
   const heroBalanceSource = groupDetailSource.slice(
     groupDetailSource.indexOf('<ModuleHero'),
