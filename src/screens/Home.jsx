@@ -97,7 +97,15 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
               return;
             }
             if (source?.sourceId) {
-              onAction?.('open', source.sourceId);
+              onAction?.('push', {
+                screen: 'group-detail',
+                params: {
+                  groupId: source.sourceId,
+                  focusMemberId: source.memberId || source.member_id || '',
+                  focusProfileId: source.profileId || source.profile_id || '',
+                  focusMonth: ym,
+                },
+              });
             }
           }}
         />
@@ -153,7 +161,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           </>
         )}
         <ListCard>
-          {visibleTransactions.length > 0 ? visibleTransactions.map((tx, i) => (
+          {visibleTransactions.length > 0 ? visibleTransactions.slice(0, 8).map((tx, i) => (
             <ActivityRow
               key={tx.id}
               tx={tx}
@@ -791,6 +799,8 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [selectedPaymentSourceKeys, setSelectedPaymentSourceKeys] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
+  const [paymentDetailsExpanded, setPaymentDetailsExpanded] = useState(false);
+  const [payForDetailsExpanded, setPayForDetailsExpanded] = useState(false);
   useEffect(() => {
     setSelectedPaymentSourceKeys(new Set(ownPaymentItems.map(item => item.key)));
     setCopiedField('');
@@ -803,25 +813,30 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const payForRows = safeArray(data?.payForRows);
   const selectedPayForRows = payForRows.filter(row => selectedPayForIds.has(String(row.profileId || row.name)));
   const selectedOwnPaymentItems = ownPaymentItems.filter(item => selectedPaymentSourceKeys.has(item.key));
-  const coveredSources = [
-    ...selectedOwnPaymentItems.map(paymentItemToCoveredSource),
-    ...selectedPayForRows.flatMap(row => safeArray(row.sources).flatMap((source, index) => sourcePaymentItems(source, {
+  const selectedPayForGroups = selectedPayForRows.map(row => {
+    const items = safeArray(row.sources).flatMap((source, index) => sourcePaymentItems(source, {
       prefix: `payfor:${row.profileId || row.name}:${index}`,
       memberId: row.memberId || source.memberId || source.member_id || '',
       profileId: row.profileId || source.profileId || source.profile_id || '',
-    })).map(item => paymentItemToCoveredSource({ ...item, memberName: row.name }))),
+    })).map(item => ({ ...item, memberName: row.name }));
+    return { row, items };
+  }).filter(group => group.items.length > 0);
+  const selectedPayForPaymentItems = selectedPayForGroups.flatMap(group => group.items);
+  const selectedPayForTotal = selectedPayForPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+  const coveredSources = [
+    ...selectedOwnPaymentItems.map(paymentItemToCoveredSource),
+    ...selectedPayForPaymentItems.map(paymentItemToCoveredSource),
   ];
   const amountToPay = selectedOwnPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
-    + selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
+    + selectedPayForPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   const canShowQr = amountToPay > 0 && qrBank && target.account && target.holder;
   const memberBank = data?.memberBank || {};
   const memberBankReady = Boolean(resolveVietQrBank(memberBank) && memberBank.account && memberBank.holder);
   const needsBankSetup = netBalance > 0 && !memberBankReady;
   const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
-  const paymentPeriodLabel = paymentItemsPeriodLabel(selectedOwnPaymentItems, data?.monthLabel);
-  const paymentSectionTitle = paymentPeriodLabel === data?.monthLabel ? paymentPeriodLabel : 'Các khoản chưa thanh toán';
+  const paymentPeriodLabel = paymentItemsPeriodLabel([...selectedOwnPaymentItems, ...selectedPayForPaymentItems], data?.monthLabel);
   const payForSummary = selectedPayForRows.length
-    ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0))}`
+    ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForTotal)}`
     : 'Chưa chọn ai';
   const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${paymentPeriodLabel}`.trim();
   const refundRows = safeArray(data?.refundRows);
@@ -866,6 +881,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     });
     setCopiedField('');
     setPaymentConfirmed(false);
+    setPayForDetailsExpanded(false);
   };
   const togglePaymentSource = (key) => {
     setSelectedPaymentSourceKeys(prev => {
@@ -906,58 +922,125 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
           </div>
           {canShowQr && (
             <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
-              <div style={{
-                display: 'grid',
-                gap: 7,
-                padding: '9px 10px',
-                borderRadius: 11,
-                background: 'rgba(255,255,255,0.045)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                minWidth: 0,
-              }}>
-                <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Thông tin chủ tài khoản</span>
-                <div style={{ display: 'grid', gap: 5 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '74px 1fr', gap: 8, alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Người nhận</span>
-                    <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.holder || 'Long'}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '74px 1fr', gap: 8, alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Ngân hàng</span>
-                    <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.name || target.code || 'Ngân hàng'}</span>
-                  </div>
-                </div>
-              </div>
-              {[
-                ['amount', 'Số tiền', formatVND(amountToPay)],
-                ['account', 'STK', target.account],
-                ['description', 'Nội dung', transferDescription],
-              ].filter(([, , value]) => value).map(([field, label, value]) => (
-                <div key={field} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '74px 1fr auto',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 9px',
-                  borderRadius: 11,
-                  background: 'rgba(255,255,255,0.045)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                }}>
-                  <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>{label}</span>
-                  <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
-                  <button type="button" onClick={() => copyPaymentField(field, value)} style={{
-                    border: 'none',
-                    borderRadius: 8,
-                    padding: '5px 7px',
-                    background: copiedField === field ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
-                    color: copiedField === field ? colors.brandLight : colors.textSecondary,
-                    fontSize: 10,
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 10, borderRadius: 14, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <img src={qrUrl} alt="QR thanh toán thủ quỹ" style={{ width: 210, height: 210, borderRadius: 16, background: '#fff', objectFit: 'cover' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
+                  <a
+                    href={qrUrl}
+                    download="vietqr-thanh-toan.png"
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 38,
+                      borderRadius: 10,
+                      background: 'rgba(59,130,246,0.18)',
+                      border: '1px solid rgba(96,165,250,0.42)',
+                      color: '#93c5fd',
+                      fontSize: 12,
+                      fontWeight: 900,
+                      textDecoration: 'none',
+                    }}
+                  >Lưu QR</a>
+                  <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || Boolean(data?.pendingSettlementCheckpoint)} style={{
+                    minHeight: 38,
+                    borderRadius: 10,
+                    background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
+                    border: `1px solid ${paymentConfirmed ? 'rgba(110,231,183,0.42)' : 'rgba(16,185,129,0.62)'}`,
+                    color: paymentConfirmed ? '#6ee7b7' : '#052e16',
+                    fontSize: 12,
                     fontWeight: 900,
                     fontFamily: 'inherit',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}>{copiedField === field ? 'Đã copy' : 'Copy'}</button>
+                    cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
+                    opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
+                  }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ duyệt' : paymentConfirmed ? 'Đã báo' : 'Đã thanh toán'}</button>
                 </div>
-              ))}
+              </div>
+              <div>
+                <button
+                  type="button"
+                  aria-expanded={paymentDetailsExpanded}
+                  onClick={() => setPaymentDetailsExpanded(value => !value)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 11px',
+                    borderRadius: 13,
+                    border: '1px solid rgba(255,255,255,0.10)',
+                    background: 'rgba(255,255,255,0.045)',
+                    color: colors.textPrimary,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 900 }}>Chi tiết chuyển khoản</span>
+                    <span style={{ display: 'block', fontSize: 11, color: colors.textSecondary, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.name || target.code || 'Ngân hàng'} · {target.account}</span>
+                  </span>
+                  <span style={{ color: colors.textSecondary, fontSize: 16, lineHeight: 1 }}>{paymentDetailsExpanded ? '⌃' : '⌄'}</span>
+                </button>
+                {paymentDetailsExpanded && (
+                  <div style={{ display: 'grid', gap: 7, marginTop: 8 }}>
+                    <div style={{
+                      display: 'grid',
+                      gap: 7,
+                      padding: '9px 10px',
+                      borderRadius: 11,
+                      background: 'rgba(255,255,255,0.045)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      minWidth: 0,
+                    }}>
+                      <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Thông tin chủ tài khoản</span>
+                      <div style={{ display: 'grid', gap: 5 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '74px 1fr', gap: 8, alignItems: 'baseline' }}>
+                          <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Người nhận</span>
+                          <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.holder || 'Long'}</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '74px 1fr', gap: 8, alignItems: 'baseline' }}>
+                          <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>Ngân hàng</span>
+                          <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 850, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{target.name || target.code || 'Ngân hàng'}</span>
+                        </div>
+                      </div>
+                    </div>
+                    {[
+                      ['amount', 'Số tiền', formatVND(amountToPay)],
+                      ['account', 'STK', target.account],
+                      ['description', 'Nội dung', transferDescription],
+                    ].filter(([, , value]) => value).map(([field, label, value]) => (
+                      <div key={field} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '74px 1fr auto',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 9px',
+                        borderRadius: 11,
+                        background: 'rgba(255,255,255,0.045)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                      }}>
+                        <span style={{ fontSize: 10, fontWeight: 900, color: colors.textMuted, textTransform: 'uppercase' }}>{label}</span>
+                        <span style={{ minWidth: 0, color: colors.textSecondary, fontSize: 11, fontWeight: 750, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</span>
+                        <button type="button" onClick={() => copyPaymentField(field, value)} style={{
+                          border: 'none',
+                          borderRadius: 8,
+                          padding: '5px 7px',
+                          background: copiedField === field ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
+                          color: copiedField === field ? colors.brandLight : colors.textSecondary,
+                          fontSize: 10,
+                          fontWeight: 900,
+                          fontFamily: 'inherit',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}>{copiedField === field ? 'Đã copy' : 'Copy'}</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {canShowQr && payForRows.length > 0 && (
@@ -1033,52 +1116,54 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
           )}
           <div style={{ marginTop: 12 }}>
             <PaymentItemSection
-              title={paymentSectionTitle}
+              title={`Các khoản của ${data?.memberName || 'bạn'}`}
               items={ownPaymentItems}
               checkedKeys={selectedPaymentSourceKeys}
               onToggle={togglePaymentSource}
             />
           </div>
-          {canShowQr ? (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-                <img src={qrUrl} alt="QR thanh toán thủ quỹ" style={{ width: 210, height: 210, borderRadius: 16, background: '#fff', objectFit: 'cover' }} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
-                <a
-                  href={qrUrl}
-                  download="vietqr-thanh-toan.png"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 42,
-                    borderRadius: 12,
-                    background: 'rgba(59,130,246,0.18)',
-                    border: '1px solid rgba(96,165,250,0.42)',
-                    color: '#93c5fd',
-                    fontSize: 12,
-                    fontWeight: 900,
-                    textDecoration: 'none',
-                  }}
-                >Lưu QR</a>
-                <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || Boolean(data?.pendingSettlementCheckpoint)} style={{
-                  minHeight: 42,
-                  borderRadius: 12,
-                  background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
-                  border: `1px solid ${paymentConfirmed ? 'rgba(110,231,183,0.42)' : 'rgba(16,185,129,0.62)'}`,
-                  color: paymentConfirmed ? '#6ee7b7' : '#052e16',
-                  fontSize: 12,
-                  fontWeight: 900,
+          {selectedPayForGroups.length > 0 && (
+            <div style={{ marginTop: 12, padding: 10, borderRadius: 14, border: '1px solid rgba(52,211,153,0.30)', background: 'rgba(16,185,129,0.10)', display: 'grid', gap: 9 }}>
+              <button
+                type="button"
+                aria-expanded={payForDetailsExpanded}
+                onClick={() => setPayForDetailsExpanded(value => !value)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  color: colors.textPrimary,
                   fontFamily: 'inherit',
-                  cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
-                  opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
-                }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ thủ quỹ duyệt' : paymentConfirmed ? 'Đã báo thanh toán' : 'Xác nhận đã thanh toán'}</button>
-              </div>
+                  cursor: 'pointer',
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0,1fr) auto',
+                  gap: 8,
+                  alignItems: 'center',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 10, color: '#6ee7b7', fontWeight: 950, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Đang thanh toán hộ</span>
+                  <span style={{ display: 'block', marginTop: 3, fontSize: 13, color: '#f8fafc', fontWeight: 950, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {selectedPayForGroups.map(group => group.row.name).join(', ')}
+                  </span>
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 950, ...type.mono }}>{formatVND(selectedPayForTotal)}</span>
+                  <span style={{ color: '#6ee7b7', fontSize: 16, lineHeight: 1 }}>{payForDetailsExpanded ? '⌃' : '⌄'}</span>
+                </span>
+              </button>
+              {payForDetailsExpanded && selectedPayForGroups.map(group => (
+                <PaymentItemSection
+                  key={String(group.row.profileId || group.row.name)}
+                  title={`Chi tiết khoản của ${group.row.name}`}
+                  items={group.items}
+                  checkedKeys={new Set(group.items.map(item => item.key))}
+                />
+              ))}
             </div>
-          ) : (
+          )}
+          {!canShowQr && (
             <div style={{ fontSize: 12, color: '#fde68a', lineHeight: 1.45, fontWeight: 700, marginTop: 10 }}>
               Chưa có đủ thông tin ngân hàng của thủ quỹ. Nhờ Long cập nhật STK trong tab cá nhân.
             </div>
@@ -1664,26 +1749,53 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
   );
 }
 
+function groupPaymentItemsBySource(items) {
+  const groups = new Map();
+  safeArray(items).forEach(item => {
+    const key = `${item.sourceType || 'group'}:${item.sourceId || item.sourceLabel || 'source'}`;
+    const existing = groups.get(key) || {
+      key,
+      label: item.sourceLabel || 'Nguồn tiền',
+      items: [],
+    };
+    existing.items.push(item);
+    groups.set(key, existing);
+  });
+  return [...groups.values()];
+}
+
 function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
   if (!items.length) return null;
+  const groupedItems = groupPaymentItemsBySource(items);
   return (
     <div style={{ display: 'grid', gap: 7 }}>
       <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{title}</div>
-      {items.map(item => (
-        <label key={item.key} style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto', alignItems: 'center', gap: 9, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: checkedKeys.has(item.key) ? 'rgba(34,197,94,0.10)' : 'rgba(15,23,42,0.72)', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={checkedKeys.has(item.key)}
-            onChange={() => onToggle(item.key)}
-            style={{ width: 16, height: 16, accentColor: '#22c55e' }}
-          />
-          <span style={{ minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 12, color: '#f8fafc', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.sourceLabel}</span>
-            <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 900, color: '#fca5a5', ...type.mono }}>-{formatVND(Math.abs(Number(item.amount) || 0))}</span>
-        </label>
-      ))}
+      {groupedItems.map(group => {
+        const groupTotal = group.items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+        return (
+          <div key={group.key} style={{ display: 'grid', gap: 6, padding: 10, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(15,23,42,0.72)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ minWidth: 0, fontSize: 13, color: '#f8fafc', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
+              <div style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>-{formatVND(groupTotal)}</div>
+            </div>
+            <div style={{ display: 'grid', gap: 6, marginLeft: 10, paddingLeft: 10, borderLeft: '2px solid rgba(52,211,153,0.34)' }}>
+              {group.items.map(item => (
+                <label key={item.key} style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto', alignItems: 'center', gap: 9, padding: '8px 9px', borderRadius: 10, border: `1px solid ${checkedKeys.has(item.key) ? 'rgba(34,197,94,0.32)' : 'rgba(255,255,255,0.07)'}`, background: checkedKeys.has(item.key) ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.035)', cursor: onToggle ? 'pointer' : 'default' }}>
+                  <input
+                    type="checkbox"
+                    checked={checkedKeys.has(item.key)}
+                    readOnly={!onToggle}
+                    onChange={() => onToggle?.(item.key)}
+                    style={{ width: 16, height: 16, accentColor: '#22c55e' }}
+                  />
+                  <span style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 900, color: '#fca5a5', ...type.mono }}>-{formatVND(Math.abs(Number(item.amount) || 0))}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1720,7 +1832,7 @@ function sourcePaymentItems(source, { prefix = 'source', memberId = '', profileI
 function paymentItemsPeriodLabel(items, fallback = '') {
   const months = [...new Set(safeArray(items).map(item => item.monthLabel || fullMonthLabel(item.month)).filter(Boolean))];
   if (months.length === 1) return months[0];
-  if (months.length > 1) return `${months.length} tháng`;
+  if (months.length > 1) return months.join(', ');
   return fallback || 'Khoản cần thanh toán';
 }
 
