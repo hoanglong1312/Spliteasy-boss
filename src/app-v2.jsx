@@ -515,10 +515,10 @@ export default function AppV2() {
       await dispatch({
         type: 'LOGIN',
         token: authToken,
-        memberId: payload.memberId || resolved.memberId,
-        groupId: payload.groupId || resolved.groupId,
-        memberName: payload.memberName || resolved.memberName,
-        groupName: payload.groupName || resolved.groupName,
+        memberId: resolved.memberId || payload.memberId,
+        groupId: resolved.groupId || payload.groupId,
+        memberName: resolved.memberName || payload.memberName,
+        groupName: resolved.groupName || payload.groupName,
       })
       return
     }

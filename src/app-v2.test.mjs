@@ -252,6 +252,19 @@ test('AppV2 sends payment confirmations to treasurer notifications', () => {
   assert.match(appSource, /status: type === 'confirmPaymentNotice' \? 'confirmed' : 'rejected'/)
 })
 
+test('AppV2 trusts resumed session identity before cached recent-session identity', () => {
+  const block = appSource.slice(
+    appSource.indexOf("if (type === 'resumeRecentSession')"),
+    appSource.indexOf("if (type === 'joinGroup_direct')")
+  )
+
+  assert.match(block, /memberId: resolved\.memberId \|\| payload\.memberId/)
+  assert.match(block, /groupId: resolved\.groupId \|\| payload\.groupId/)
+  assert.match(block, /memberName: resolved\.memberName \|\| payload\.memberName/)
+  assert.match(block, /groupName: resolved\.groupName \|\| payload\.groupName/)
+  assert.doesNotMatch(block, /memberId: payload\.memberId \|\| resolved\.memberId/)
+})
+
 test('AppV2 renders a deactivated-member error state when no groups or members load', () => {
   assert.match(appSource, /const groups = state\.groups \|\| \[\]/)
   assert.match(appSource, /const members = state\.members \|\| \[\]/)
