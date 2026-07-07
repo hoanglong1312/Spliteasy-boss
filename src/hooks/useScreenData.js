@@ -836,6 +836,10 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       const memberIds = row.memberIds || row.member_ids || memberIdsForProfile(profileId, members)
       const groupSource = safeArray(row.sources).find(source => (source?.sourceType || source?.source_type || 'group') === 'group')
         || safeArray(row.sources).find(source => !!(source?.sourceId || source?.source_id))
+      const paymentItems = buildTreasurerPaymentItems(row.sources, profileId, memberIds, selectedYearMonth)
+      const defaultPaymentItemKeys = paymentItems.filter(item => item.defaultSelected).map(item => item.key)
+      const payableSources = paymentItems.filter(item => item.defaultSelected).map(paymentItemToCoveredSource)
+      const payableAmount = payableSources.reduce((sum, source) => sum + Math.abs(Number(source.amount) || 0), 0)
       rowsByProfile.set(profileId, {
         profileId,
         memberIds,
@@ -847,6 +851,10 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
         status: nextStatus,
         sources: safeArray(row.sources),
         coveredSources: safeArray(row.coveredSources || row.covered_sources || row.sources),
+        paymentItems,
+        defaultPaymentItemKeys,
+        payableSources,
+        payableAmount,
         sourceSummary: row.sourceSummary || row.source_summary || `${safeArray(row.sources).length || 1} nguồn tiền`,
         prevMonthResidual: 0,
         prevMonthSettled: false,
@@ -913,6 +921,53 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       }
     })
     .sort((a, b) => paymentProgressStatusRank(b.status) - paymentProgressStatusRank(a.status) || b.amount - a.amount || a.name.localeCompare(b.name, 'vi'))
+}
+
+function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearMonth = '') {
+  return safeArray(sources)
+    .flatMap(source => {
+      const sourceType = source.sourceType || source.source_type || 'group'
+      const sourceId = source.sourceId || source.source_id || ''
+      const sourceLabel = source.sourceLabel || source.source_label || source.label || 'Nguồn tiền'
+      const memberId = source.memberId || source.member_id || memberIds?.[0] || ''
+      const monthRows = safeArray(source.monthBreakdown || source.month_breakdown)
+      const rows = monthRows.length
+        ? monthRows
+        : [{ month: source.month || source.yearMonth || source.year_month || selectedYearMonth, label: '', amount: source.amount }]
+      return rows
+        .filter(row => Number(row?.amount) < 0)
+        .map(row => {
+          const month = row.month || source.month || source.yearMonth || source.year_month || ''
+          const amount = Number(row.amount) || 0
+          const key = [sourceType, sourceId || sourceLabel, memberId, profileId, month, Math.abs(amount)].join(':')
+          return {
+            key,
+            sourceType,
+            sourceId,
+            sourceLabel,
+            memberId,
+            profileId,
+            month,
+            monthLabel: row.label || (month ? sourceMonthLabel(month) : ''),
+            amount,
+            defaultSelected: Boolean(selectedYearMonth && month === selectedYearMonth),
+          }
+        })
+    })
+}
+
+function paymentItemToCoveredSource(item) {
+  return {
+    sourceType: item.sourceType,
+    sourceId: item.sourceId,
+    sourceLabel: item.sourceLabel,
+    memberId: item.memberId,
+    profileId: item.profileId,
+    month: item.month,
+    monthLabel: item.monthLabel,
+    amount: item.amount,
+    monthBreakdown: item.month ? [{ month: item.month, label: item.monthLabel, amount: item.amount }] : [],
+  }
 }
 
 function paymentProgressStatusRank(status) {

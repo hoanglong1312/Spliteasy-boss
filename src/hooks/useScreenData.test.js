@@ -1089,6 +1089,60 @@ describe('buildPaymentProgressRows', () => {
 
     expect(rows).toEqual([])
   })
+
+  test('splits treasurer payment items by source month and defaults current month only', () => {
+    const rows = buildPaymentProgressRows(
+      [{
+        profileId: 'profile-tuan',
+        memberIds: ['pickle-tuan', 'life-tuan'],
+        memberId: 'pickle-tuan',
+        name: 'Lê Tuấn',
+        amount: -300000,
+        sources: [{
+          sourceType: 'group',
+          sourceId: 'life-1',
+          sourceLabel: 'Lấy vk để trưởng thành',
+          profileId: 'profile-tuan',
+          memberId: 'life-tuan',
+          amount: -300000,
+          monthBreakdown: [
+            { month: '2026-06', label: 'Tháng 6', amount: -100000 },
+            { month: '2026-07', label: 'Tháng 7', amount: -200000 },
+          ],
+        }],
+      }],
+      [
+        { id: 'pickle-tuan', profile_id: 'profile-tuan', name: 'Lê Tuấn' },
+        { id: 'life-tuan', profile_id: 'profile-tuan', name: 'Lê Tuấn' },
+      ],
+      { notifications: [] },
+      'Tháng 7 · 2026',
+      [],
+      '2026-07',
+    )
+
+    expect(rows[0].paymentItems).toHaveLength(2)
+    expect(rows[0].defaultPaymentItemKeys).toEqual([rows[0].paymentItems[1].key])
+    expect(rows[0].payableAmount).toBe(200000)
+    expect(rows[0].payableSources).toMatchObject([{
+      sourceId: 'life-1',
+      sourceLabel: 'Lấy vk để trưởng thành',
+      memberId: 'life-tuan',
+      month: '2026-07',
+      amount: -200000,
+    }])
+    expect(rows[0].paymentItems[0]).toMatchObject({
+      sourceLabel: 'Lấy vk để trưởng thành',
+      month: '2026-06',
+      amount: -100000,
+      defaultSelected: false,
+    })
+    expect(rows[0].paymentItems[1]).toMatchObject({
+      month: '2026-07',
+      amount: -200000,
+      defaultSelected: true,
+    })
+  })
 })
 
 describe('buildHomeData', () => {

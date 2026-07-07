@@ -1092,6 +1092,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [shareMember, setShareMember] = useState(null);
+  const [paymentRow, setPaymentRow] = useState(null);
   const [loading, setLoading] = useState(false);
   // New QR states
   const [selectMode, setSelectMode] = useState(false);
@@ -1125,7 +1126,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
     amount: refundAmount,
     description: refundDescription,
   }) : '';
-  const totalNeedCollect = [...pendingRowsRaw, ...unpaidRowsRaw].reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0);
+  const totalNeedCollect = [...pendingRowsRaw, ...unpaidRowsRaw].reduce((sum, row) => sum + paymentRowCurrentAmount(row), 0);
   const totalRefund = refunds.reduce((sum, row) => sum + Math.max(0, Number(row.amount) || 0), 0);
   const isSearching = Boolean(searchQuery.trim());
 
@@ -1264,7 +1265,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <DashboardSection
           title={`Còn chưa thanh toán · ${unpaidRows.length}${isSearching ? `/${unpaidRowsRaw.length}` : ''}`}
           subtitle="Các member còn âm tiền sau khi trừ khoản đã nhận"
-          amount={unpaidRows.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0)}
+          amount={unpaidRows.reduce((sum, row) => sum + paymentRowCurrentAmount(row), 0)}
           icon="⌁"
           color="#fca5a5"
           amountPrefix="-"
@@ -1298,9 +1299,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         >
         {unpaidRows.length > 0 ? unpaidRows.map(row => {
           const rowKey = row.linkMemberId || row.memberId;
-          const rowAmount = Number(row.amount) || 0;
+          const rowAmount = paymentRowCurrentAmount(row);
           const prevMonthResidual = Number(row.prevMonthResidual) || 0;
-          const payableAmount = Math.abs(rowAmount) + prevMonthResidual;
           const isSelected = selectMode && selectModeSelected.has(rowKey) && rowAmount > 0;
           const isPaidLocal = localPaidSet.has(row.linkMemberId || row.memberId);
 
@@ -1389,22 +1389,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const key = row.linkMemberId || row.memberId;
                         if (!isPaidLocal) {
-                          withLoading(() => onAction?.('markMemberPaid', {
-                            memberId: row.linkMemberId || row.memberId || '',
-                            amount: payableAmount,
-                            monthLabel: data?.monthLabel || '',
-                            memberName: row.name || row.memberName || 'Thành viên',
-                            coveredSources: safeArray(row.coveredSources),
-                            groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-                          }));
+                          setPaymentRow(row);
                         }
-                        setLocalPaidSet(prev => {
-                          const next = new Set(prev);
-                          next.has(key) ? next.delete(key) : next.add(key);
-                          return next;
-                        });
                       }}
                       style={{ ...miniDashButton(isPaidLocal ? 'rgba(34,197,94,0.20)' : '#22c55e', isPaidLocal ? '#6ee7b7' : '#052e16'), padding: '6px 10px', fontSize: 11, fontWeight: 900 }}
                     >{isPaidLocal ? '✓ Đã TT' : '✓TT'}</button>
@@ -1491,10 +1478,10 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
               selectedRows.forEach(row => {
                 withLoading(() => onAction?.('markMemberPaid', {
                   memberId: row.linkMemberId || row.memberId || '',
-                  amount: Math.abs(Number(row.amount) || 0) + (Number(row.prevMonthResidual) || 0),
+                  amount: Number(row.payableAmount) || Math.abs(Number(row.amount) || 0),
                   monthLabel: data?.monthLabel || '',
                   memberName: row.name || row.memberName || 'Thành viên',
-                  coveredSources: safeArray(row.coveredSources),
+                  coveredSources: safeArray(row.payableSources).length ? safeArray(row.payableSources) : safeArray(row.coveredSources),
                   groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
                 }));
               });
@@ -1519,6 +1506,20 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         />
       )}
 
+      {paymentRow && (
+        <TreasurerConfirmPaymentSheet
+          row={paymentRow}
+          monthLabel={data?.monthLabel || ''}
+          currentMonth={data?.yearMonth || ''}
+          onClose={() => setPaymentRow(null)}
+          onConfirm={(payload) => withLoading(async () => {
+            await onAction?.('markMemberPaid', payload);
+            setLocalPaidSet(prev => new Set(prev).add(paymentRow.linkMemberId || paymentRow.memberId));
+            setPaymentRow(null);
+          })}
+        />
+      )}
+
       {qrSheetMembers && (
         <MultiMemberQRSheet
           members={qrSheetMembers}
@@ -1528,6 +1529,137 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       )}
     </div>
   );
+}
+
+function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, onConfirm }) {
+  const items = safeArray(row?.paymentItems);
+  const fallbackItems = items.length ? items : safeArray(row?.coveredSources).map((source, index) => ({
+    key: `fallback:${index}`,
+    sourceType: source.sourceType || source.source_type || 'group',
+    sourceId: source.sourceId || source.source_id || '',
+    sourceLabel: source.sourceLabel || source.source_label || 'Nguồn tiền',
+    memberId: source.memberId || source.member_id || row?.memberId || '',
+    profileId: source.profileId || source.profile_id || row?.profileId || '',
+    month: source.month || source.yearMonth || source.year_month || currentMonth,
+    monthLabel: source.monthLabel || source.month_label || monthLabel,
+    amount: Number(source.amount) || 0,
+    defaultSelected: true,
+  })).filter(item => Number(item.amount) < 0);
+  const defaultKeys = safeArray(row?.defaultPaymentItemKeys);
+  const [checkedKeys, setCheckedKeys] = useState(() => new Set(defaultKeys.length ? defaultKeys : fallbackItems.filter(item => item.defaultSelected).map(item => item.key)));
+  const currentItems = fallbackItems.filter(item => !currentMonth || String(item.month || '') === String(currentMonth));
+  const previousItems = fallbackItems.filter(item => currentMonth && String(item.month || '') !== String(currentMonth));
+  const selectedItems = fallbackItems.filter(item => checkedKeys.has(item.key));
+  const selectedTotal = selectedItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+  const selectedMonths = [...new Set(selectedItems.map(item => item.month).filter(Boolean))];
+  const payloadMonthLabel = selectedMonths.length === 1 ? fullMonthLabel(selectedMonths[0]) : monthLabel;
+
+  function toggleItem(key) {
+    setCheckedKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function itemCoveredSource(item) {
+    return {
+      sourceType: item.sourceType,
+      sourceId: item.sourceId,
+      sourceLabel: item.sourceLabel,
+      memberId: item.memberId,
+      profileId: item.profileId,
+      month: item.month,
+      monthLabel: item.monthLabel,
+      amount: item.amount,
+      monthBreakdown: item.month ? [{ month: item.month, label: item.monthLabel, amount: item.amount }] : [],
+    };
+  }
+
+  const submit = () => onConfirm?.({
+    memberId: row.linkMemberId || row.memberId || '',
+    amount: selectedTotal,
+    monthLabel: payloadMonthLabel,
+    memberName: row.name || row.memberName || 'Thành viên',
+    coveredSources: selectedItems.map(itemCoveredSource),
+    groupId: row.linkGroupId || row.groupId || '',
+  });
+
+  return (
+    <BottomSheet title={`Xác nhận TT · ${row?.name || row?.memberName || 'Thành viên'}`} onClose={onClose}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <Card style={{ padding: 12, borderColor: 'rgba(34,197,94,0.24)', background: 'rgba(34,197,94,0.07)' }}>
+          <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750 }}>Đang chọn thu</div>
+          <div style={{ marginTop: 3, color: '#f8fafc', fontWeight: 950, fontSize: 21, ...type.mono }}>{formatVND(selectedTotal)}</div>
+          <div style={{ marginTop: 2, color: '#94a3b8', fontSize: 11 }}>Tick khoản đã thu đủ. Không tick thì chưa trừ nợ.</div>
+        </Card>
+
+        <PaymentItemSection
+          title={monthLabel || 'Tháng đang xem'}
+          items={currentItems}
+          checkedKeys={checkedKeys}
+          onToggle={toggleItem}
+        />
+
+        {previousItems.length > 0 && (
+          <PaymentItemSection
+            title="Tháng trước"
+            items={previousItems}
+            checkedKeys={checkedKeys}
+            onToggle={toggleItem}
+          />
+        )}
+
+        <button
+          type="button"
+          disabled={selectedTotal <= 0}
+          onClick={submit}
+          style={{
+            width: '100%',
+            border: 'none',
+            borderRadius: 12,
+            padding: '12px 14px',
+            background: selectedTotal > 0 ? '#22c55e' : 'rgba(148,163,184,0.18)',
+            color: selectedTotal > 0 ? '#052e16' : '#94a3b8',
+            fontWeight: 950,
+            fontSize: 13,
+            cursor: selectedTotal > 0 ? 'pointer' : 'not-allowed',
+            fontFamily: 'inherit',
+          }}
+        >
+          Xác nhận đã thu {formatVND(selectedTotal)}
+        </button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ display: 'grid', gap: 7 }}>
+      <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{title}</div>
+      {items.map(item => (
+        <label key={item.key} style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto', alignItems: 'center', gap: 9, padding: 10, borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)', background: checkedKeys.has(item.key) ? 'rgba(34,197,94,0.10)' : 'rgba(15,23,42,0.72)', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={checkedKeys.has(item.key)}
+            onChange={() => onToggle(item.key)}
+            style={{ width: 16, height: 16, accentColor: '#22c55e' }}
+          />
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 12, color: '#f8fafc', fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.sourceLabel}</span>
+            <span style={{ display: 'block', fontSize: 10, color: colors.textSecondary, marginTop: 1 }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
+          </span>
+          <span style={{ fontSize: 12, fontWeight: 900, color: '#fca5a5', ...type.mono }}>-{formatVND(Math.abs(Number(item.amount) || 0))}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+function paymentRowCurrentAmount(row) {
+  return Number(row?.payableAmount) || Math.abs(Number(row?.amount) || 0);
 }
 
 function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {
@@ -1829,6 +1961,12 @@ function resolveVietQrBank(bank = {}) {
 }
 function safeArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function fullMonthLabel(yearMonth) {
+  const [year, month] = String(yearMonth || '').split('-');
+  const monthNumber = Number(month);
+  return year && monthNumber ? `Tháng ${monthNumber} · ${year}` : '';
 }
 
 function buildSettlementCheckpointGroups(coveredSources) {
