@@ -1547,6 +1547,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
   })).filter(item => Number(item.amount) < 0);
   const defaultKeys = safeArray(row?.defaultPaymentItemKeys);
   const [checkedKeys, setCheckedKeys] = useState(() => new Set(defaultKeys.length ? defaultKeys : fallbackItems.filter(item => item.defaultSelected).map(item => item.key)));
+  const [submitting, setSubmitting] = useState(false);
   const currentItems = fallbackItems.filter(item => !currentMonth || String(item.month || '') === String(currentMonth));
   const previousItems = fallbackItems.filter(item => currentMonth && String(item.month || '') !== String(currentMonth));
   const selectedItems = fallbackItems.filter(item => checkedKeys.has(item.key));
@@ -1576,14 +1577,22 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
     };
   }
 
-  const submit = () => onConfirm?.({
-    memberId: row.linkMemberId || row.memberId || '',
-    amount: selectedTotal,
-    monthLabel: payloadMonthLabel,
-    memberName: row.name || row.memberName || 'Thành viên',
-    coveredSources: selectedItems.map(itemCoveredSource),
-    groupId: row.linkGroupId || row.groupId || '',
-  });
+  async function submit() {
+    if (submitting || selectedTotal <= 0) return;
+    setSubmitting(true);
+    try {
+      await onConfirm?.({
+        memberId: row.linkMemberId || row.memberId || '',
+        amount: selectedTotal,
+        monthLabel: payloadMonthLabel,
+        memberName: row.name || row.memberName || 'Thành viên',
+        coveredSources: selectedItems.map(itemCoveredSource),
+        groupId: row.linkGroupId || row.groupId || '',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <BottomSheet title={`Xác nhận TT · ${row?.name || row?.memberName || 'Thành viên'}`} onClose={onClose}>
@@ -1612,18 +1621,18 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
 
         <button
           type="button"
-          disabled={selectedTotal <= 0}
+          disabled={selectedTotal <= 0 || submitting}
           onClick={submit}
           style={{
             width: '100%',
             border: 'none',
             borderRadius: 12,
             padding: '12px 14px',
-            background: selectedTotal > 0 ? '#22c55e' : 'rgba(148,163,184,0.18)',
-            color: selectedTotal > 0 ? '#052e16' : '#94a3b8',
+            background: selectedTotal > 0 && !submitting ? '#22c55e' : 'rgba(148,163,184,0.18)',
+            color: selectedTotal > 0 && !submitting ? '#052e16' : '#94a3b8',
             fontWeight: 950,
             fontSize: 13,
-            cursor: selectedTotal > 0 ? 'pointer' : 'not-allowed',
+            cursor: selectedTotal > 0 && !submitting ? 'pointer' : 'not-allowed',
             fontFamily: 'inherit',
           }}
         >

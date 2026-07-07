@@ -1072,6 +1072,10 @@ function paymentNoticesForMember(state, member, monthLabel) {
       return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
     })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
+    .filter((notification, index, notifications) => {
+      const key = paymentNoticeDuplicateKey(notification)
+      return !key || notifications.findIndex(item => paymentNoticeDuplicateKey(item) === key) === index
+    })
 }
 
 function paymentNoticeCoversMember(notification, memberIds, profileId, member = null) {
@@ -1107,6 +1111,34 @@ function isLegacyNamePaymentNotice(notification, member) {
     !safeArray(metadata.coveredMembers || metadata.covered_members).length &&
     !!targetName &&
     noticeName === targetName
+}
+
+function paymentNoticeDuplicateKey(notification) {
+  const metadata = notification?.metadata || {}
+  const status = String(metadata.status || 'pending').toLowerCase()
+  if (status !== 'confirmed') return ''
+  const coveredSources = safeArray(metadata.coveredSources || metadata.covered_sources)
+  const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
+  const sources = coveredSources.map(source => ({
+    sourceType: source.sourceType || source.source_type || 'group',
+    sourceId: source.sourceId || source.source_id || '',
+    sourceLabel: source.sourceLabel || source.source_label || '',
+    month: source.month || source.yearMonth || source.year_month || monthKeyFromPaymentLabel(source.monthLabel || source.month_label || metadata.monthLabel || metadata.month_label),
+    amount: Math.round(Math.abs(Number(source.amount) || 0)),
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  const members = coveredMembers.map(member => ({
+    name: normalizeName(member.name || member.memberName || member.member_name || ''),
+    amount: Math.round(Math.abs(Number(member.amount) || 0)),
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  return JSON.stringify({
+    type: notification?.type || '',
+    groupId: notification?.groupId || notification?.group_id || metadata.groupId || metadata.group_id || '',
+    memberName: normalizeName(metadata.memberName || metadata.member_name || notification?.actorName || notification?.actor_name || ''),
+    monthLabel: metadata.monthLabel || metadata.month_label || '',
+    amount: Math.round(Math.abs(Number(metadata.amount) || 0)),
+    sources,
+    members,
+  })
 }
 
 function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
@@ -1476,6 +1508,11 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
       const metadata = notification?.metadata || {}
       return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
     })
+    .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
+    .filter((notification, index, notifications) => {
+      const key = paymentNoticeDuplicateKey(notification)
+      return !key || notifications.findIndex(item => paymentNoticeDuplicateKey(item) === key) === index
+    })
     .map(notification => {
       const metadata = notification.metadata || {}
       const memberName = metadata.memberName || notification.actorName || notification.actor_name || 'Thành viên'
@@ -1507,6 +1544,20 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
       }
     })
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
+    .filter((record, index, records) => {
+      const key = paymentRecordDuplicateKey(record)
+      return !key || records.findIndex(item => paymentRecordDuplicateKey(item) === key) === index
+    })
+}
+
+function paymentRecordDuplicateKey(record) {
+  if (String(record?.status || '').toLowerCase() !== 'confirmed') return ''
+  return JSON.stringify({
+    memberName: normalizeName(record.memberName || record.name || ''),
+    amount: Math.round(Math.abs(Number(record.amount) || 0)),
+    monthLabel: record.monthLabel || '',
+    sourceSummary: record.sourceSummary || '',
+  })
 }
 
 function adjustedGroupNetForMember(group, memberId, groupMembers, state, monthDate) {

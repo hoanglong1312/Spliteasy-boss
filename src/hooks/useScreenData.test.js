@@ -1299,6 +1299,77 @@ describe('buildHomeData', () => {
     })
   })
 
+  test('dedupes identical confirmed treasurer payments by member source month amount', () => {
+    const members = [
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long', role: 'treasurer' },
+      { id: 'phuong-life', profile_id: 'profile-phuong', group_id: 'life-1', name: 'Phương Thảo' },
+    ]
+    const groups = [{
+      id: 'life-1',
+      name: 'Hạ Long Thả Gió',
+      members: ['long-life', 'phuong-life'],
+      expenses: [{
+        id: 'halong-june-expense',
+        title: 'Hạ Long',
+        amount: 200000,
+        date: '2026-06-03',
+        expense_date: '2026-06-03',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['long-life', 'phuong-life'],
+      }],
+    }, {
+      id: 'life-2',
+      name: 'Hạ Long Thả Gió',
+      members: ['long-life', 'phuong-life'],
+      expenses: [],
+    }]
+    const coveredSource = {
+      sourceType: 'group',
+      sourceId: 'life-1',
+      sourceLabel: 'Hạ Long Thả Gió',
+      memberId: 'phuong-life',
+      profileId: 'profile-phuong',
+      month: '2026-06',
+      monthLabel: 'Tháng 6 · 2026',
+      amount: -100000,
+    }
+    const state = {
+      currentUserId: 'long-life',
+      currentUserName: 'Hoàng Long',
+      currentGroupId: 'life-1',
+      members,
+      groups,
+      notifications: ['notice-1', 'notice-2'].map((id, index) => ({
+        id,
+        type: 'payment_submitted',
+        actor_member_id: index === 0 ? 'phuong-life' : 'phuong-life-duplicate',
+        group_id: index === 0 ? 'life-1' : 'life-2',
+        created_at: `2026-06-10T10:00:0${index}.000Z`,
+        metadata: {
+          status: 'confirmed',
+          amount: 100000,
+          memberName: 'Phương Thảo',
+          monthLabel: 'Tháng 6 · 2026',
+          coveredSources: [coveredSource],
+        },
+      })),
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'long-life', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+
+    expect(result.paymentRecords).toHaveLength(1)
+    expect(result.paymentRecords[0]).toMatchObject({
+      memberName: 'Phương Thảo',
+      amount: 100000,
+      sourceSummary: 'Hạ Long Thả Gió · Tháng 6 · 2026',
+    })
+    expect(result.paymentSummary.paidAmount).toBe(0)
+    const phuongRow = result.paymentSummary.paymentProgress.find(row => row.name === 'Phương Thảo')
+    expect(phuongRow).toBeUndefined()
+  })
+
   test('includes source breakdown from legacy groups matched by member name', () => {
     const members = [
       { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
