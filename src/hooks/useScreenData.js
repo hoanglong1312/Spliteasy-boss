@@ -252,69 +252,15 @@ function normalizeSettlementCheckpoint(row, members = []) {
 }
 
 function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
-  const targetName = normalizeName(memberName(memberId, state?.members))
-  const settlementGroup = safeArray(state?.groups).find(group => String(group?.id || '') === String(groupId || '')) || state?.currentGroup
-  const isPickleballGroup = groupKind(settlementGroup) === 'pickleball'
-  const checkpoint = safeArray(state?.settlementCheckpoints)
+  const profileId = profileIdForMember(memberId, state?.members)
+  const memberIds = new Set(memberIdsForProfile(profileId, state?.members).map(String))
+  if (memberId) memberIds.add(String(memberId))
+  return safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, state?.members))
     .filter(row => String(row.groupId || '') === String(groupId || ''))
-    .filter(row => (
-      String(row.memberId || '') === String(memberId || '') ||
-      (isPickleballGroup && targetName && normalizeName(row.memberName) === targetName)
-    ))
+    .filter(row => memberIds.has(String(row.memberId || '')))
     .filter(row => String(row.status || '').toLowerCase() === 'confirmed')
     .sort((a, b) => parseDateValue(b.confirmedAt || b.periodEnd) - parseDateValue(a.confirmedAt || a.periodEnd))[0] || null
-  const notice = safeArray(state?.notifications)
-    .filter(row => String(row?.type || '') === 'payment_submitted')
-    .filter(row => (
-      String(row?.groupId || row?.group_id || '') === String(groupId || '') ||
-      (isPickleballGroup && isLegacyNamePaymentNotice(row, { name: memberName(memberId, state?.members) }))
-    ))
-    .filter(row => {
-      const actorMemberId = row?.actorMemberId || row?.actor_member_id || ''
-      if (String(actorMemberId) === String(memberId || '')) return true
-      if (String(row?.memberId || row?.member_id || '') === String(memberId || '')) return false
-      if (isPickleballGroup && isLegacyNamePaymentNotice(row, { name: memberName(memberId, state?.members) })) return true
-      if (!isPickleballGroup) return false
-      const metadata = row?.metadata || {}
-      const noticeNames = [
-        metadata.memberName,
-        metadata.member_name,
-        row?.actorName,
-        row?.actor_name,
-        memberName(actorMemberId, state?.members),
-        memberName(row?.memberId || row?.member_id || '', state?.members),
-      ]
-      return targetName && noticeNames.some(name => normalizeName(name) === targetName)
-    })
-    .filter(row => String((row?.metadata || {}).status || '').toLowerCase() === 'confirmed')
-    .filter(row => Math.abs(Number((row?.metadata || {}).amount) || 0) > 0)
-    .filter(row => {
-      const metadata = row?.metadata || {}
-      return !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
-        !safeArray(metadata.coveredMembers || metadata.covered_members).length
-    })
-    .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))[0] || null
-  const noticeMonth = monthKeyFromPaymentLabel((notice?.metadata || {}).monthLabel || (notice?.metadata || {}).month_label)
-  const createdAt = notice?.createdAt || notice?.created_at || null
-  const noticeDate = isPickleballGroup && noticeMonth
-    ? endOfYearMonth(noticeMonth).toISOString()
-    : (noticeMonth && noticeMonth !== monthKey(createdAt) ? endOfYearMonth(noticeMonth).toISOString() : createdAt)
-  if (!noticeDate) return checkpoint
-  if (parseDateValue(checkpoint?.confirmedAt || checkpoint?.periodEnd) >= parseDateValue(noticeDate)) return checkpoint
-  return {
-    groupId,
-    group_id: groupId,
-    memberId,
-    member_id: memberId,
-    periodStart: noticeMonth ? dateFromYearMonth(noticeMonth).toISOString() : null,
-    period_start: noticeMonth ? dateFromYearMonth(noticeMonth).toISOString() : null,
-    periodEnd: noticeDate,
-    period_end: noticeDate,
-    confirmedAt: noticeDate,
-    confirmed_at: noticeDate,
-    status: 'confirmed',
-  }
 }
 
 function pendingSettlementCheckpointsForProfile(state, memberId, members = [], groups = []) {
@@ -531,7 +477,15 @@ function endOfYearMonth(yearMonth) {
 export function buildHomeData(state, currentUserId, members, groups, pickle, pickleballState = state, selectedYearMonth = monthKey(new Date())) {
   const today = dateFromYearMonth(selectedYearMonth)
   const endOfSelectedMonth = endOfYearMonth(selectedYearMonth)
-  const safeGroups = safeArray(groups).map(safeGroup)
+  const allExpenseRows = allExpenses(state)
+  const safeGroups = safeArray(groups).map(group => {
+    const existingIds = new Set(safeArray(group?.expenses).map(expense => String(expense?.id || '')).filter(Boolean))
+    const extraExpenses = allExpenseRows.filter(expense => (
+      String(expense?.groupId || expense?.group_id || '') === String(group?.id || '') &&
+      (!expense?.id || !existingIds.has(String(expense.id)))
+    ))
+    return safeGroup({ ...group, expenses: [...safeArray(group?.expenses), ...extraExpenses] })
+  })
   const expenseGroups = safeGroups
     .filter(group => groupKind(group) !== 'pickleball')
     .map(group => groupWithMonthExpenses(group, today))
@@ -541,14 +495,15 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const monthSessions = getStateMonthSessions(pickleballState, today)
   const summary = pickleSummary(pickle || {})
   const session = findNearestOpenSession(pickle, today)
-  const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, state?.currentUserName)
+  const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
+  const currentProfileId = state?.currentProfileId || state?.currentProfile_id || me?.profileId || me?.profile_id || profileIdForMember(currentUserId, members)
+  const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, state?.currentUserName, currentProfileId)
   const settlementSourceBalances = buildSettlementSourceBalances(state, settlementExpenseGroups, pickleballState, pickle, members)
   const pickleballBalance = settlementSourceBalances
     .filter(source => source.sourceType === 'pickleball' && String(source.memberId) === String(pickleballMemberId))
     .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const sourceBalances = settlementSourceBalances
-  const me = safeArray(members).find(member => String(member.id) === String(currentUserId))
-  const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members, state?.currentUserName)
+  const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members, state?.currentUserName, currentProfileId)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
   const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
   const treasurerExpenseGroups = safeGroups
@@ -561,7 +516,6 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     members,
     today,
   )
-  const currentProfileId = me?.profileId || me?.profile_id || profileIdForMember(currentUserId, members)
   const cappedTotalBalance = Number(safeArray(treasurerProfileBreakdown).find(row => (
     String(row.profileId || row.profile_id || '') === String(currentProfileId || '')
   ))?.amount) || 0
@@ -642,10 +596,23 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const transactionExpenseGroups = settlementExpenseGroups.map(group => {
     const source = sourceBreakdown.find(row => row.sourceType === 'group' && String(row.sourceId) === String(group.id))
     const sourceMonths = new Set(safeArray(source?.monthBreakdown).map(row => row.month).filter(Boolean))
-    if (!sourceMonths.size) return { ...group, expenses: [] }
+    if (!sourceMonths.size) {
+      const groupMemberId = memberIdForGroup(group, currentUserId, members, state?.currentUserName, currentProfileId)
+      const hasUnpaidSource = source && Number(source.amount) !== 0
+      return {
+        ...group,
+        expenses: hasUnpaidSource ? safeArray(group.expenses).filter(expense => {
+          const expenseMonth = monthKey(expense.date || expense.expense_date)
+          return expenseMonth === selectedYearMonth && expenseImpact(expense, groupMemberId) !== 0
+        }) : [],
+      }
+    }
     return {
       ...group,
-      expenses: safeArray(group.expenses).filter(expense => sourceMonths.has(monthKey(expense.date || expense.expense_date))),
+      expenses: safeArray(group.expenses).filter(expense => {
+        const expenseMonth = monthKey(expense.date || expense.expense_date)
+        return expenseMonth === selectedYearMonth && sourceMonths.has(expenseMonth)
+      }),
     }
   })
   const pendingTickets = {
@@ -748,7 +715,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
 }
 
 function appendProfileGroupSources(sourceBreakdown, state, members = [], member = {}) {
-  const profileId = profileIdForMember(member?.id || state?.currentUserId, members)
+  const profileId = state?.currentProfileId || state?.currentProfile_id || member?.profileId || member?.profile_id || profileIdForMember(member?.id || state?.currentUserId, members)
   const currentName = normalizeName(member?.displayName || member?.display_name || member?.name || state?.currentUserName || '')
   const memberIds = new Set(memberIdsForProfile(profileId, members).map(String))
   if (currentName) {
@@ -791,11 +758,8 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
     const profileId = profileIdForMember(memberId, members)
     const memberIds = memberIdsForProfile(profileId, members)
     const settledMemberIds = memberIds.length ? memberIds : [memberId]
-    const groupIds = groupIdsForSettlementSource(groupId, groups)
     settledMemberIds.forEach(settledMemberId => {
-      groupIds.forEach(settledGroupId => {
-        settledMonths.add(`${settledGroupId}:${settledMemberId}:${month}`)
-      })
+      settledMonths.add(`${groupId}:${settledMemberId}:${month}`)
     })
   })
   if (!settledMonths.size) return sourceBreakdown
@@ -806,20 +770,12 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
       if (!monthBreakdown.length) return source
       const sourceId = source.sourceId || source.source_id || ''
       const memberId = source.memberId || source.member_id || ''
-      const visibleMonths = monthBreakdown.filter(row => (
-        !settledMonths.has(`${sourceId}:${memberId}:${row?.month || ''}`)
-      ))
+      const visibleMonths = monthBreakdown.filter(row => !settledMonths.has(`${sourceId}:${memberId}:${row?.month || ''}`))
       if (visibleMonths.length === monthBreakdown.length) return source
       const amount = visibleMonths.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
       return amount === 0 ? null : { ...source, amount, monthBreakdown: visibleMonths }
     })
     .filter(Boolean)
-}
-
-function groupIdsForSettlementSource(groupId, groups = []) {
-  const group = safeArray(groups).find(item => String(item.id) === String(groupId))
-  const linkedPickleballGroupId = group?.linkedPickleballGroupId || group?.linked_pickleball_group_id || ''
-  return [...new Set([groupId, linkedPickleballGroupId].filter(Boolean).map(String))]
 }
 
 export function buildPaymentProgressRows(profileBreakdown, members, state, monthLabel, settlements = [], selectedYearMonth = '') {
@@ -1009,6 +965,8 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const amount = Math.abs(Number(metadata.amount) || 0)
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
     const recipientMemberId = notification?.memberId || notification?.member_id || ''
+    const hasExplicitCoverage = safeArray(metadata.coveredSources || metadata.covered_sources).length > 0 ||
+      safeArray(metadata.coveredMembers || metadata.covered_members).length > 0
     const noticeScope = {
       ...scope,
       groupId: notification?.groupId || notification?.group_id || metadata.groupId || metadata.group_id || '',
@@ -1016,12 +974,7 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
       isRecipient: !!recipientMemberId && scope.memberIds.has(String(recipientMemberId)),
       isLegacyNameMatch: isLegacyNamePaymentNotice(notification, member),
     }
-    if (
-      noticeScope.isActor &&
-      isConfirmedPaymentSubmittedNotice(notification, status) &&
-      !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
-      !safeArray(metadata.coveredMembers || metadata.covered_members).length
-    ) return
+    if (isConfirmedPaymentSubmittedNotice(notification, status) && !hasExplicitCoverage) return
     const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
     const scopedAmount = coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
     if (status === 'confirmed') {
@@ -1069,13 +1022,41 @@ function paymentNoticesForMember(state, member, monthLabel) {
       const metadata = notification?.metadata || {}
       const status = String(metadata.status || 'pending').toLowerCase()
       if (status === 'confirmed') return true
-      return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
+      return paymentNoticeMatchesMonth(metadata, monthLabel)
     })
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
     .filter((notification, index, notifications) => {
       const key = paymentNoticeDuplicateKey(notification)
       return !key || notifications.findIndex(item => paymentNoticeDuplicateKey(item) === key) === index
     })
+}
+
+function paymentNoticeMatchesMonth(metadata, monthLabel) {
+  if (!monthLabel) return true
+  const targetMonth = monthKeyFromPaymentLabel(monthLabel)
+  const coveredMonths = new Set(
+    safeArray(metadata?.coveredSources || metadata?.covered_sources)
+      .map(source => source?.month || source?.yearMonth || source?.year_month || monthKeyFromPaymentLabel(source?.monthLabel || source?.month_label))
+      .filter(Boolean)
+  )
+  if (targetMonth && coveredMonths.size > 0) return coveredMonths.has(targetMonth)
+  return !metadata?.monthLabel || String(metadata.monthLabel) === String(monthLabel)
+}
+
+function paymentRecordMonths(metadata) {
+  return [...new Set(
+    safeArray(metadata?.coveredSources || metadata?.covered_sources)
+      .map(source => source?.month || source?.yearMonth || source?.year_month || monthKeyFromPaymentLabel(source?.monthLabel || source?.month_label))
+      .filter(Boolean)
+  )]
+}
+
+function paymentRecordMatchesMonth(metadata, monthLabel) {
+  if (!monthLabel) return true
+  const targetMonth = monthKeyFromPaymentLabel(monthLabel)
+  const coveredMonths = paymentRecordMonths(metadata)
+  if (targetMonth && coveredMonths.length > 0) return coveredMonths.includes(targetMonth)
+  return !metadata?.monthLabel || String(metadata.monthLabel) === String(monthLabel)
 }
 
 function paymentNoticeCoversMember(notification, memberIds, profileId, member = null) {
@@ -1504,10 +1485,7 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
       const metadata = notification?.metadata || {}
       return String(metadata.status || 'pending') !== 'deleted'
     })
-    .filter(notification => {
-      const metadata = notification?.metadata || {}
-      return !monthLabel || !metadata.monthLabel || String(metadata.monthLabel) === String(monthLabel)
-    })
+    .filter(notification => paymentRecordMatchesMonth(notification?.metadata || {}, monthLabel))
     .sort((a, b) => parseDateValue(b.createdAt || b.created_at) - parseDateValue(a.createdAt || a.created_at))
     .filter((notification, index, notifications) => {
       const key = paymentNoticeDuplicateKey(notification)
@@ -1526,6 +1504,8 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
         memberId: source.memberId || source.member_id || actorMemberId || '',
         memberName: source.memberName || source.member_name || memberName,
       }))
+      const recordMonths = paymentRecordMonths(metadata)
+      const recordMonthLabel = recordMonths.length === 1 ? formatMonthLabel(dateFromYearMonth(recordMonths[0])) : (metadata.monthLabel || monthLabel)
       const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
       const names = [memberName, ...coveredMembers.map(row => row?.name)].filter(Boolean)
       const status = String(metadata.status || 'pending').toLowerCase()
@@ -1537,10 +1517,10 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
         amount: Number(metadata.amount) || 0,
         status,
         date: notification.createdAt || notification.created_at,
-        monthLabel: metadata.monthLabel || monthLabel,
+        monthLabel: recordMonthLabel,
         transferDescription: metadata.transferDescription || metadata.transfer_description || '',
         coveredSources,
-        sourceSummary: groupName ? `${groupName} · ${metadata.monthLabel || monthLabel}` : (coveredSources.length ? `${coveredSources.length} nguồn tiền` : 'Chưa rõ nguồn'),
+        sourceSummary: groupName ? `${groupName} · ${recordMonthLabel}` : (coveredSources.length ? `${coveredSources.length} nguồn tiền` : 'Chưa rõ nguồn'),
       }
     })
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -1832,6 +1812,7 @@ export function buildGroupDetailData(group, currentUserId, members, currentUserN
       const memberTransactions = buildMemberTransactions(g, member.id, selectedYearMonth, groupMembers)
       return {
         id: member.id,
+        profileId: member.profileId || member.profile_id || '',
         groupId: g.id,
         monthLabel: formatMonthLabel(monthDate),
         currentYearMonth: monthKey(monthDate),
@@ -1856,6 +1837,7 @@ export function buildGroupDetailData(group, currentUserId, members, currentUserN
     balanceRows: groupMembers
       .map(member => ({
         id: member.id,
+        profileId: member.profileId || member.profile_id || '',
         name: member.displayName || member.name,
         initials: initials(member),
         color: memberDisplayColor(member),
@@ -3086,7 +3068,7 @@ function buildSettleAllData(state) {
   const pickle = state?.pickle || {}
   const monthSessions = getStateMonthSessions(state, today)
   const sourceBalances = buildHomeSourceBalances(state, expenseGroups, state, pickle, monthSessions, members, today)
-  const sources = currentProfileSourceBreakdown(sourceBalances, state?.currentUserId, members, state?.currentUserName)
+  const sources = currentProfileSourceBreakdown(sourceBalances, state?.currentUserId, members, state?.currentUserName, state?.currentProfileId || state?.currentProfile_id)
   const me = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
   const debts = sources
     .filter(source => Number(source.amount) < 0)
@@ -3346,7 +3328,6 @@ export function buildAllExpensesData(state, currentUserId, members, currentUserN
 
 function buildTransactions(groups, currentUserId, members, currentUserName) {
   return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName)
-    .slice(0, 8)
 }
 
 function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId) {
@@ -4901,8 +4882,8 @@ function memberIdsForProfile(profileId, members) {
     .filter(Boolean)
 }
 
-function currentProfileSourceBreakdown(sourceBalances, currentUserId, members, currentUserName = '') {
-  const profileId = profileIdForMember(currentUserId, members)
+function currentProfileSourceBreakdown(sourceBalances, currentUserId, members, currentUserName = '', currentProfileId = '') {
+  const profileId = currentProfileId || profileIdForMember(currentUserId, members)
   const currentMember = safeArray(members).find(item => String(item.id) === String(currentUserId)) || {}
   const currentName = normalizeName(currentMember.displayName || currentMember.display_name || currentMember.name || currentMember.memberName || currentMember.member_name || currentUserName)
   const memberIds = new Set(memberIdsForProfile(profileId, members).map(String))
@@ -5359,15 +5340,15 @@ function allMembersForGroup(group, members) {
   })
 }
 
-function memberIdForGroup(group, currentUserId, members, currentUserName) {
+function memberIdForGroup(group, currentUserId, members, currentUserName, currentProfileId = '') {
   if (!group) return currentUserId
   const groupMemberIds = new Set(safeArray(group.members).map(String))
   if (groupMemberIds.has(String(currentUserId))) return currentUserId
 
   const currentMember = safeArray(members).find(m => String(m.id) === String(currentUserId))
-  const currentProfileId = currentMember?.profileId || currentMember?.profile_id
-  const profileMatch = currentProfileId
-    ? allMembersForGroup(group, members).filter(isActiveMember).find(member => String(member.profileId || member.profile_id || '') === String(currentProfileId))
+  const profileId = currentProfileId || currentMember?.profileId || currentMember?.profile_id
+  const profileMatch = profileId
+    ? allMembersForGroup(group, members).filter(isActiveMember).find(member => String(member.profileId || member.profile_id || '') === String(profileId))
     : null
   if (profileMatch?.id) return profileMatch.id
 

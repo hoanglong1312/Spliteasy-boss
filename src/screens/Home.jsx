@@ -1205,49 +1205,27 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 }
 
 function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
-  const [unpaidExpanded, setUnpaidExpanded] = useState(true);
+  const [memberExpanded, setMemberExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
-  const [confirmedExpanded, setConfirmedExpanded] = useState(false);
-  const [refundExpanded, setRefundExpanded] = useState(false);
-  const [selectedRefundKey, setSelectedRefundKey] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [shareMember, setShareMember] = useState(null);
   const [paymentRow, setPaymentRow] = useState(null);
   const [loading, setLoading] = useState(false);
-  // New QR states
-  const [selectMode, setSelectMode] = useState(false);
-  const [selectModeSelected, setSelectModeSelected] = useState(new Set());
-  const [localPaidSet, setLocalPaidSet] = useState(new Set());
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
-  const [qrSheetIndex, setQrSheetIndex] = useState(0);
   const rows = safeArray(progressRows);
   const pending = safeArray(pendingRecords);
   const pendingCheckpoints = safeArray(pendingCheckpointsForTreasurer);
   const refunds = safeArray(refundRows);
   const confirmedRecords = pending.filter(record => String(record.status || '').toLowerCase() === 'confirmed');
-  const pendingRowsRaw = rows.filter(row => String(row.status || '').toLowerCase() === 'pending');
-  const unpaidRowsRaw = rows.filter(row => String(row.status || '').toLowerCase() === 'unpaid');
   const matchSearch = makeMatcher(searchQuery);
   const pendingRecordsRaw = pending.filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
-  const confirmedRecordsFiltered = confirmedRecords.filter(record => matchSearch(record.memberName || record.name));
-  const pendingRows = pendingRowsRaw.filter(row => matchSearch(row.name || row.memberName));
-  const unpaidRows = unpaidRowsRaw.filter(row => matchSearch(row.name || row.memberName));
-  const refundsFiltered = refunds.filter(row => matchSearch(row.name || row.memberName));
-  const selectedRefund = refundsFiltered.find(row => String(row.profileId || row.name || 'member') === selectedRefundKey) || null;
-  const refundBank = selectedRefund?.bank || {};
-  const refundQrBank = resolveVietQrBank(refundBank);
-  const refundAmount = Math.max(0, Number(selectedRefund?.amount) || 0);
-  const refundDescription = selectedRefund ? `Hoan tien ${selectedRefund.name || 'thanh vien'} ${data?.monthLabel || ''}`.trim() : '';
-  const refundQrUrl = selectedRefund && refundQrBank && refundBank.account && refundBank.holder ? generateQRUrl({
-    bankId: refundQrBank.id,
-    account: refundBank.account,
-    accountName: refundBank.holder,
-    amount: refundAmount,
-    description: refundDescription,
-  }) : '';
-  const totalNeedCollect = [...pendingRowsRaw, ...unpaidRowsRaw].reduce((sum, row) => sum + paymentRowCurrentAmount(row), 0);
-  const totalRefund = refunds.reduce((sum, row) => sum + Math.max(0, Number(row.amount) || 0), 0);
+  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
+  const totalNeedCollect = memberRows.reduce((sum, row) => sum + row.amountDue, 0);
+  const totalReceived = memberRows.reduce((sum, row) => sum + row.amountPaid, 0);
+  const totalRefund = memberRows.reduce((sum, row) => sum + row.amountRefund, 0);
+  const paidItemCount = memberRows.reduce((sum, row) => sum + row.items.filter(item => item.paid).length, 0);
+  const unpaidItemCount = memberRows.reduce((sum, row) => sum + row.items.filter(item => !item.paid && item.kind !== 'refund').length, 0);
   const isSearching = Boolean(searchQuery.trim());
 
   async function withLoading(action) {
@@ -1260,17 +1238,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
     }
   }
 
-  const handleOpenQrSheet = () => {
-    const rows = unpaidRows.filter(r => selectModeSelected.has(r.linkMemberId || r.memberId));
-    setQrSheetMembers(rows.map(r => ({
-      name: r.name || r.memberName,
-      amount: Math.abs(Number(r.amount) || 0) + (Number(r.prevMonthResidual) || 0),
-      memberId: r.linkMemberId || r.memberId,
-    })));
-    setQrSheetIndex(0);
-  };
-
-
   return (
     <div style={{ position: 'relative', display: 'grid', gap: 12, minWidth: 0, gridTemplateColumns: 'minmax(0, 1fr)' }}>
       {loading && (
@@ -1282,14 +1249,14 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       <Card style={{ padding: 14, borderColor: 'rgba(59,130,246,0.24)', background: 'rgba(59,130,246,0.07)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', letterSpacing: '1px', textTransform: 'uppercase' }}>Tiến độ thu</div>
-          <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', flexShrink: 0 }}>{rows.length} member</div>
+          <div style={{ fontSize: 10, fontWeight: 900, color: '#93c5fd', flexShrink: 0 }}>{memberRows.length} member</div>
         </div>
         <div style={{ fontSize: 22, fontWeight: 950, color: '#f8fafc', marginTop: 4, ...type.mono, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatVND(totalNeedCollect)}</div>
         <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Còn theo dõi · {data?.monthLabel || 'tháng này'}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)', gap: 6, marginTop: 10 }}>
-          <ProgressStat label="Đã nhận" count={confirmedRecords.length} color="#6ee7b7" />
-          <ProgressStat label="Chờ duyệt" count={pendingRowsRaw.length || pendingRecordsRaw.length} color="#fcd34d" />
-          <ProgressStat label="Chưa thu" count={unpaidRowsRaw.length} color="#fca5a5" />
+          <ProgressStat label="Đã nhận" count={paidItemCount} color="#6ee7b7" />
+          <ProgressStat label="Chờ duyệt" count={pendingRecordsRaw.length + pendingCheckpoints.length} color="#fcd34d" />
+          <ProgressStat label="Chưa thu" count={unpaidItemCount} color="#fca5a5" />
         </div>
       </Card>
 
@@ -1359,263 +1326,32 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         </DashboardSection>
       )}
 
-      {confirmedRecords.length > 0 && (
-        <DashboardSection
-          title={`Đã nhận · ${confirmedRecordsFiltered.length}${isSearching ? `/${confirmedRecords.length}` : ''}`}
-          subtitle="Các báo thanh toán đã xác nhận"
-          amount={confirmedRecordsFiltered.reduce((sum, record) => sum + (Number(record.amount) || 0), 0)}
-          icon="✓"
-          color="#6ee7b7"
-          expanded={confirmedExpanded}
-          onToggle={() => setConfirmedExpanded(value => !value)}
-          listScroll
-        >
-          {confirmedRecordsFiltered.length > 0 ? confirmedRecordsFiltered.map(record => (
-            <PaymentDashboardRow key={record.notificationId || record.id} row={record} tone="confirmed">
-              <button type="button" onClick={() => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }} style={miniDashButton('rgba(99,102,241,0.20)', colors.brandLight)}>Xem</button>
-              <button type="button" onClick={() => withLoading(() => onAction?.('cancelPaymentRecord', record))} style={miniDashButton(colors.danger, '#fff')}>Hủy</button>
-            </PaymentDashboardRow>
-          )) : (
-            <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>Không có member khớp tìm kiếm.</div>
-          )}
-        </DashboardSection>
-      )}
-
-      <div style={{ position: 'relative' }}>
-        <DashboardSection
-          title={`Còn chưa thanh toán · ${unpaidRows.length}${isSearching ? `/${unpaidRowsRaw.length}` : ''}`}
-          subtitle="Các member còn âm tiền sau khi trừ khoản đã nhận"
-          amount={unpaidRows.reduce((sum, row) => sum + paymentRowCurrentAmount(row), 0)}
-          icon="⌁"
-          color="#fca5a5"
-          amountPrefix="-"
-          expanded={unpaidExpanded}
-          onToggle={() => setUnpaidExpanded(value => !value)}
-          listScroll
-          headerRight={
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const next = !selectMode;
-                setSelectMode(next);
-                setSelectModeSelected(new Set());
-                if (next) setUnpaidExpanded(true);
-              }}
-              style={{
-                padding: '4px 10px',
-                borderRadius: 8,
-                background: selectMode ? '#1e40af' : '#334155',
-                border: 'none',
-                color: selectMode ? '#93c5fd' : '#94a3b8',
-                fontSize: 10,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {selectMode ? '✕ Hủy' : '☑ Chọn'}
-            </button>
-          }
-        >
-        {unpaidRows.length > 0 ? unpaidRows.map(row => {
-          const rowKey = row.linkMemberId || row.memberId;
-          const rowAmount = paymentRowCurrentAmount(row);
-          const prevMonthResidual = Number(row.prevMonthResidual) || 0;
-          const isSelected = selectMode && selectModeSelected.has(rowKey) && rowAmount > 0;
-          const isPaidLocal = localPaidSet.has(row.linkMemberId || row.memberId);
-
-          return (
-            <div
-              key={row.profileId || row.name}
-              onClick={() => {
-                if (selectMode && rowAmount > 0) {
-                  const newSet = new Set(selectModeSelected);
-                  if (newSet.has(rowKey)) newSet.delete(rowKey);
-                  else newSet.add(rowKey);
-                  setSelectModeSelected(newSet);
-                }
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: selectMode ? 10 : 0,
-                background: isSelected ? 'rgba(59,130,246,0.10)' : 'transparent',
-                padding: '8px 0',
-                borderRadius: isSelected ? 10 : 0,
-                opacity: (selectMode && rowAmount <= 0) ? 0.5 : 1,
-                cursor: selectMode ? 'pointer' : 'default',
-              }}
-            >
-              {selectMode && (
-                <div style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: '50%',
-                  flexShrink: 0,
-                  border: `2px solid ${isSelected ? '#3b82f6' : 'rgba(255,255,255,0.3)'}`,
-                  background: isSelected ? '#3b82f6' : 'transparent',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  {isSelected && <div style={{ fontSize: 12, color: '#fff' }}>✓</div>}
-                </div>
-              )}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {row.name || row.memberName}
-                  </div>
-                  <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>
-                    {row.sourceSummary || (row.sourceCount ? `${row.sourceCount} nguồn` : 'nguồn tiền')}
-                    {rowAmount > 0 && <span style={{ color: '#f87171', marginLeft: 4 }}>· -{(rowAmount).toLocaleString('vi-VN')} đ</span>}
-                    {row.prevMonthResidual > 0 && (
-                      <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', borderRadius: 5, padding: '1px 5px', fontSize: 9, fontWeight: 700, marginLeft: 4 }}>
-                        +{formatVND(row.prevMonthResidual)} tháng trước
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {!selectMode && (
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAction?.('copyProfileShareLink', {
-                          profileId: row.profileId,
-                          memberId: row.linkMemberId || row.memberId || '',
-                          groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-                          name: row.name || row.memberName || '',
-                        });
-                      }}
-                      style={{ ...miniDashButton('#334155', '#94a3b8'), padding: '6px 8px', fontSize: 11 }}
-                      title="Copy link chia sẻ"
-                    >🔗</button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setQrSheetMembers([{
-                          name: row.name || row.memberName,
-                          memberId: row.linkMemberId || row.memberId || '',
-                          amount: rowAmount + prevMonthResidual,
-                        }]);
-                        setQrSheetIndex(0);
-                      }}
-                      style={{ ...miniDashButton('#4f46e5', '#f8fafc'), padding: '6px 9px', fontSize: 11 }}
-                    >QR</button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!isPaidLocal) {
-                          setPaymentRow(row);
-                        }
-                      }}
-                      style={{ ...miniDashButton(isPaidLocal ? 'rgba(34,197,94,0.20)' : '#22c55e', isPaidLocal ? '#6ee7b7' : '#052e16'), padding: '6px 10px', fontSize: 11, fontWeight: 900 }}
-                    >{isPaidLocal ? '✓ Đã TT' : '✓TT'}</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        }) : (
-          <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{isSearching ? 'Không có member khớp tìm kiếm.' : 'Không còn ai cần nộp.'}</div>
+      <DashboardSection
+        title={`Danh sách member · ${memberRows.length}`}
+        subtitle={`Còn thu ${formatVND(totalNeedCollect)} · đã nhận ${formatVND(totalReceived)}${totalRefund > 0 ? ` · cần hoàn ${formatVND(totalRefund)}` : ''}`}
+        amount={totalNeedCollect}
+        icon="⇄"
+        color="#93c5fd"
+        amountPrefix="-"
+        expanded={memberExpanded}
+        onToggle={() => setMemberExpanded(value => !value)}
+        listScroll
+      >
+        {memberRows.length > 0 ? memberRows.map(row => (
+          <TreasurerMemberPaymentRow
+            key={row.key}
+            row={row}
+            onShare={(member) => setShareMember(member)}
+            onQr={(member) => setQrSheetMembers([member])}
+            onPayItem={(item) => setPaymentRow(paymentRowFromTreasurerItem(item, data))}
+            onCancelPaid={(record) => withLoading(() => onAction?.('cancelPaymentRecord', record))}
+            onViewPaid={(record) => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }}
+            onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
+          />
+        )) : (
+          <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{isSearching ? 'Không có member khớp tìm kiếm.' : 'Không còn dữ liệu cần xử lý.'}</div>
         )}
       </DashboardSection>
-      </div>
-
-      {refunds.length > 0 && (
-        <DashboardSection
-          title={`Cần hoàn tiền · ${refundsFiltered.length}${isSearching ? `/${refunds.length}` : ''}`}
-          subtitle="Chọn member để mở QR chuyển ngược lại"
-          amount={totalRefund}
-          icon="↩"
-          color="#6ee7b7"
-          expanded={refundExpanded}
-          onToggle={() => setRefundExpanded(value => !value)}
-        >
-          {refundsFiltered.length > 0 ? refundsFiltered.map(row => {
-            const key = String(row.profileId || row.name || 'member');
-            const selected = String(selectedRefund?.profileId || selectedRefund?.name || '') === key;
-            const done = confirmedRefunds?.has?.(key);
-            return (
-              <React.Fragment key={key}>
-                <button type="button" onClick={() => setSelectedRefundKey(selected ? '' : key)} style={{ width: '100%', border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', padding: 0, cursor: 'pointer' }}>
-                  <PaymentDashboardRow row={{ ...row, amount: row.amount, sourceSummary: row.bank?.account ? `${row.bank?.name || 'Ngân hàng'} · ${row.bank.account}` : 'Chưa có STK nhận tiền' }} tone="refund" sign="+" arrow={selected ? '⌃' : '›'} />
-                </button>
-                {selected && selectedRefund && (
-                  <Card style={{ padding: 12, borderColor: 'rgba(110,231,183,0.26)', background: 'rgba(52,211,153,0.07)' }}>
-                    {refundQrUrl ? (
-                      <>
-                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                          <img src={refundQrUrl} alt={`QR nhận tiền của ${selectedRefund.name}`} style={{ width: 150, height: 150, borderRadius: 14, background: '#fff', padding: 6 }} />
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 11 }}>
-                          <a href={refundQrUrl} download={`hoan-tien-${selectedRefund.name || 'member'}.png`} style={dashLinkButton('rgba(99,102,241,0.16)', '#c4b5fd')}>Lưu QR</a>
-                          <button type="button" onClick={() => onConfirmRefund?.(selectedRefund)} disabled={done} style={miniDashButton(done ? 'rgba(16,185,129,0.20)' : '#10b981', done ? '#6ee7b7' : '#052e16')}>{done ? 'Đã chuyển' : 'Xác nhận đã chuyển'}</button>
-                        </div>
-                      </>
-                    ) : (
-                      <div style={{ fontSize: 12, color: '#fde68a', fontWeight: 750, lineHeight: 1.45 }}>Member này chưa có đủ thông tin ngân hàng để tạo QR nhận tiền.</div>
-                    )}
-                  </Card>
-                )}
-              </React.Fragment>
-            );
-          }) : (
-            <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>Không có member khớp tìm kiếm.</div>
-          )}
-        </DashboardSection>
-      )}
-
-      {selectMode && selectModeSelected.size > 0 && (
-        <div style={{
-          position: 'sticky',
-          bottom: 0,
-          zIndex: 10,
-          padding: '10px 12px',
-          background: '#1e40af',
-          borderRadius: 12,
-          marginTop: 6,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-        }}>
-          <span style={{ color: '#93c5fd', fontSize: 11, fontWeight: 700, flex: 1 }}>
-            {selectModeSelected.size} member đã chọn
-          </span>
-          <button
-            onClick={handleOpenQrSheet}
-            style={{ ...miniDashButton('#2563eb', '#f8fafc'), padding: '7px 11px', fontSize: 11, fontWeight: 800 }}
-          >QR</button>
-          <button
-            onClick={() => {
-              const selectedRows = unpaidRows.filter(r =>
-                selectModeSelected.has(r.linkMemberId || r.memberId)
-              );
-              selectedRows.forEach(row => {
-                withLoading(() => onAction?.('markMemberPaid', {
-                  memberId: row.linkMemberId || row.memberId || '',
-                  amount: Number(row.payableAmount) || Math.abs(Number(row.amount) || 0),
-                  monthLabel: data?.monthLabel || '',
-                  memberName: row.name || row.memberName || 'Thành viên',
-                  coveredSources: safeArray(row.payableSources).length ? safeArray(row.payableSources) : safeArray(row.coveredSources),
-                  groupId: row.linkGroupId || row.groupId || data?.currentGroupId || '',
-                }));
-              });
-              setSelectMode(false);
-              setSelectModeSelected(new Set());
-            }}
-            style={{ ...miniDashButton('#22c55e', '#052e16'), padding: '7px 11px', fontSize: 11, fontWeight: 900 }}
-          >✓ ĐÃ TT</button>
-          <button
-            onClick={() => { setSelectMode(false); setSelectModeSelected(new Set()); }}
-            style={{ background: 'transparent', border: 'none', color: '#94a3b8', padding: '7px 8px', fontSize: 11, cursor: 'pointer' }}
-          >✕</button>
-        </div>
-      )}
 
       {shareMember && (
         <MemberShareLinkSheet
@@ -1634,7 +1370,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           onClose={() => setPaymentRow(null)}
           onConfirm={(payload) => withLoading(async () => {
             await onAction?.('markMemberPaid', payload);
-            setLocalPaidSet(prev => new Set(prev).add(paymentRow.linkMemberId || paymentRow.memberId));
             setPaymentRow(null);
           })}
         />
@@ -1644,8 +1379,219 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <MultiMemberQRSheet
           members={qrSheetMembers}
           paymentTarget={data?.paymentTarget}
-          onClose={() => { setQrSheetMembers(null); setQrSheetIndex(0); setSelectMode(false); setSelectModeSelected(new Set()); }}
+          onClose={() => setQrSheetMembers(null)}
         />
+      )}
+    </div>
+  );
+}
+
+function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, matchSearch, confirmedRefunds, monthLabel }) {
+  const byMember = new Map();
+  const ensureRow = (seed = {}) => {
+    const key = String(seed.profileId || seed.memberId || seed.name || 'member');
+    const existing = byMember.get(key) || {
+      key,
+      profileId: seed.profileId || '',
+      memberId: seed.memberId || '',
+      groupId: seed.groupId || '',
+      name: seed.name || seed.memberName || 'Thành viên',
+      amountDue: 0,
+      amountPaid: 0,
+      amountRefund: 0,
+      items: [],
+    };
+    existing.profileId = existing.profileId || seed.profileId || '';
+    existing.memberId = existing.memberId || seed.memberId || '';
+    existing.groupId = existing.groupId || seed.groupId || '';
+    existing.name = existing.name || seed.name || seed.memberName || 'Thành viên';
+    byMember.set(key, existing);
+    return existing;
+  };
+
+  safeArray(progressRows)
+    .filter(row => ['pending', 'unpaid'].includes(String(row.status || '').toLowerCase()))
+    .forEach(row => {
+      const memberId = row.linkMemberId || row.memberId || '';
+      const profileId = row.profileId || '';
+      const base = {
+        profileId,
+        memberId,
+        groupId: row.linkGroupId || row.groupId || '',
+        name: row.name || row.memberName,
+      };
+      const memberRow = ensureRow(base);
+      const items = safeArray(row.paymentItems).length
+        ? safeArray(row.paymentItems)
+        : safeArray(row.payableSources || row.coveredSources || row.sources).flatMap((source, index) => sourcePaymentItems(source, { prefix: `member:${memberRow.key}:${index}`, memberId, profileId }));
+      items.forEach((item, index) => {
+        const amount = Math.abs(Number(item.amount) || 0);
+        if (amount <= 0) return;
+        memberRow.amountDue += amount;
+        memberRow.items.push({
+          ...item,
+          key: item.key || `due:${memberRow.key}:${index}`,
+          paid: false,
+          kind: 'collect',
+          memberName: memberRow.name,
+          groupId: row.linkGroupId || row.groupId || '',
+          row,
+        });
+      });
+    });
+
+  safeArray(confirmedRecords).forEach(record => {
+    const coveredSources = safeArray(record.coveredSources || record.covered_sources);
+    const fallbackItem = {
+      key: `paid:${record.notificationId || record.id}`,
+      sourceType: 'payment',
+      sourceId: record.notificationId || record.id || '',
+      sourceLabel: record.sourceSummary || 'Đã nhận',
+      memberId: record.memberId || record.member_id || '',
+      profileId: record.profileId || record.profile_id || '',
+      memberName: record.memberName || record.name,
+      month: '',
+      monthLabel: record.monthLabel || monthLabel,
+      amount: -Math.abs(Number(record.amount) || 0),
+    };
+    const items = coveredSources.length ? coveredSources.map((source, index) => ({
+      key: `paid:${record.notificationId || record.id}:${index}`,
+      sourceType: source.sourceType || source.source_type || 'group',
+      sourceId: source.sourceId || source.source_id || '',
+      sourceLabel: source.sourceLabel || source.source_label || 'Nguồn tiền',
+      memberId: source.memberId || source.member_id || record.memberId || '',
+      profileId: source.profileId || source.profile_id || record.profileId || '',
+      memberName: source.memberName || source.member_name || record.memberName,
+      month: source.month || source.yearMonth || source.year_month || '',
+      monthLabel: source.monthLabel || source.month_label || record.monthLabel || monthLabel,
+      amount: Number(source.amount) || -Math.abs(Number(record.amount) || 0),
+    })) : [fallbackItem];
+    items.forEach(item => {
+      const amount = Math.abs(Number(item.amount) || 0);
+      if (amount <= 0) return;
+      const memberRow = ensureRow({
+        profileId: item.profileId,
+        memberId: item.memberId || record.memberId,
+        name: item.memberName || record.memberName || record.name,
+      });
+      memberRow.amountPaid += amount;
+      memberRow.items.push({ ...item, paid: true, kind: 'collect', record });
+    });
+  });
+
+  safeArray(refundRows).forEach(row => {
+    const amount = Math.max(0, Number(row.amount) || 0);
+    if (amount <= 0) return;
+    const memberRow = ensureRow({
+      profileId: row.profileId || '',
+      memberId: row.memberId || '',
+      name: row.name || row.memberName,
+    });
+    const refundKey = String(row.profileId || row.name || 'member');
+    memberRow.amountRefund += amount;
+    memberRow.items.push({
+      key: `refund:${refundKey}`,
+      kind: 'refund',
+      paid: Boolean(confirmedRefunds?.has?.(refundKey)),
+      sourceType: 'refund',
+      sourceId: refundKey,
+      sourceLabel: 'Cần hoàn tiền',
+      monthLabel,
+      amount,
+      refundRow: row,
+    });
+  });
+
+  return [...byMember.values()]
+    .filter(row => matchSearch(row.name))
+    .map(row => ({
+      ...row,
+      items: row.items.sort((a, b) => String(a.sourceLabel || '').localeCompare(String(b.sourceLabel || ''), 'vi') || String(a.month || a.monthLabel || '').localeCompare(String(b.month || b.monthLabel || '')) || Number(a.paid) - Number(b.paid)),
+    }))
+    .filter(row => row.items.length > 0)
+    .sort((a, b) => (b.amountDue + b.amountPaid + b.amountRefund) - (a.amountDue + a.amountPaid + a.amountRefund) || a.name.localeCompare(b.name, 'vi'));
+}
+
+function paymentRowFromTreasurerItem(item, data) {
+  const paymentItem = {
+    ...item,
+    key: item.key || `${item.sourceType || 'group'}:${item.sourceId || item.sourceLabel || 'source'}:${item.month || data?.yearMonth || ''}`,
+    defaultSelected: true,
+  };
+  return {
+    profileId: item.profileId || item.row?.profileId || '',
+    memberId: item.memberId || item.row?.linkMemberId || item.row?.memberId || '',
+    linkMemberId: item.memberId || item.row?.linkMemberId || item.row?.memberId || '',
+    groupId: item.groupId || item.row?.groupId || data?.currentGroupId || '',
+    linkGroupId: item.groupId || item.row?.linkGroupId || item.row?.groupId || data?.currentGroupId || '',
+    name: item.memberName || item.row?.name || item.row?.memberName || 'Thành viên',
+    memberName: item.memberName || item.row?.memberName || item.row?.name || 'Thành viên',
+    paymentItems: [paymentItem],
+    defaultPaymentItemKeys: [paymentItem.key],
+    payableSources: [paymentItemToCoveredSource(paymentItem)],
+    payableAmount: Math.abs(Number(paymentItem.amount) || 0),
+  };
+}
+
+function TreasurerMemberPaymentRow({ row, onShare, onQr, onPayItem, onCancelPaid, onViewPaid, onConfirmRefund }) {
+  const [expanded, setExpanded] = useState(false);
+  const groupedItems = groupPaymentItemsBySource(row.items);
+  return (
+    <div style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
+      <button type="button" onClick={() => setExpanded(value => !value)} style={{ width: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 950, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</div>
+            <div style={{ marginTop: 2, fontSize: 10, color: colors.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {row.amountDue > 0 ? `Chưa thu ${formatVND(row.amountDue)}` : 'Không còn nợ'}
+              {row.amountPaid > 0 ? ` · đã nhận ${formatVND(row.amountPaid)}` : ''}
+              {row.amountRefund > 0 ? ` · hoàn ${formatVND(row.amountRefund)}` : ''}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {row.amountDue > 0 && <span style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono }}>-{formatVND(row.amountDue)}</span>}
+            <span style={{ color: colors.textMuted, fontSize: 15 }}>{expanded ? '⌃' : '⌄'}</span>
+          </div>
+        </div>
+      </button>
+      {expanded && (
+        <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
+            {row.amountDue > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, amount: row.amountDue })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
+          </div>
+          {groupedItems.map(group => (
+            <div key={group.key} style={{ display: 'grid', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ minWidth: 0, fontSize: 12, color: '#e2e8f0', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
+                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>{group.items.length} khoản</div>
+              </div>
+              <div style={{ display: 'grid', gap: 6, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(147,197,253,0.34)' }}>
+                {group.items.map(item => {
+                  const isRefund = item.kind === 'refund';
+                  const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : (item.paid ? 'Đã nhận' : 'TT');
+                  const amountColor = isRefund ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
+                  return (
+                    <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}` }}>
+                      <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{isRefund ? '+' : '-'}{formatVND(Math.abs(Number(item.amount) || 0))}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isRefund) return onConfirmRefund?.(item);
+                          if (item.paid) return onCancelPaid?.(item.record);
+                          return onPayItem?.(item);
+                        }}
+                        onDoubleClick={() => item.paid && !isRefund ? onViewPaid?.(item.record) : undefined}
+                        style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
+                      >{label}</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

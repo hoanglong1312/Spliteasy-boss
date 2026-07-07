@@ -148,24 +148,34 @@ test('GroupDetail lets group creators manage members without treasurer role', ()
   assert.match(screenDataSource, /isGroupCreator,/);
 });
 
-test('Treasurer payment dashboard keeps unpaid selection controls local and visible', () => {
+test('Treasurer payment dashboard uses record-backed member toggles', () => {
   const dashboardSource = homeSource.slice(
     homeSource.indexOf('function TreasurerPaymentDashboard'),
     homeSource.indexOf('function PaymentDashboardRow')
   );
 
-  assert.match(dashboardSource, /const \[localPaidSet, setLocalPaidSet\] = useState\(new Set\(\)\)/);
-  assert.match(dashboardSource, /onClick=\{\(e\) => \{\s*e\.stopPropagation\(\);\s*const next = !selectMode;/);
-  assert.match(dashboardSource, /position: 'sticky',[\s\S]*bottom: 0,[\s\S]*zIndex: 10,/);
-  assert.match(dashboardSource, /const isPaidLocal = localPaidSet\.has\(row\.linkMemberId \|\| row\.memberId\)/);
-  assert.match(dashboardSource, /setLocalPaidSet\(prev => \{[\s\S]*const next = new Set\(prev\);[\s\S]*next\.has\(key\) \? next\.delete\(key\) : next\.add\(key\);[\s\S]*return next;[\s\S]*\}\)/);
-  assert.match(dashboardSource, /\{isPaidLocal \? '✓ Đã TT' : '✓TT'\}/);
+  assert.match(dashboardSource, /const memberRows = buildTreasurerMemberRows\(/);
+  assert.match(dashboardSource, /const paidItemCount = memberRows\.reduce/);
+  assert.match(dashboardSource, /onPayItem=\{\(item\) => setPaymentRow\(paymentRowFromTreasurerItem\(item, data\)\)\}/);
+  assert.match(dashboardSource, /onCancelPaid=\{\(record\) => withLoading\(\(\) => onAction\?\.\('cancelPaymentRecord', record\)\)\}/);
+  assert.doesNotMatch(dashboardSource, /localPaidSet/);
+  assert.doesNotMatch(dashboardSource, /setLocalPaidSet/);
+});
 
-  const perRowButtonSource = dashboardSource.slice(
-    dashboardSource.indexOf('const isPaidLocal = localPaidSet.has'),
-    dashboardSource.indexOf('{refunds.length > 0 &&')
+test('Treasurer payment dashboard uses member rows with paid toggle records', () => {
+  const dashboardSource = homeSource.slice(
+    homeSource.indexOf('function TreasurerPaymentDashboard'),
+    homeSource.indexOf('function TreasurerConfirmPaymentSheet')
   );
-  assert.doesNotMatch(perRowButtonSource, /onAction\?\.\('markMemberPaid'/);
+
+  assert.match(dashboardSource, /const memberRows = buildTreasurerMemberRows\(/);
+  assert.match(dashboardSource, /title=\{`Danh sách member · \$\{memberRows\.length\}/);
+  assert.match(dashboardSource, /function TreasurerMemberPaymentRow/);
+  assert.match(dashboardSource, /item\.paid \? 'Đã nhận' : 'TT'/);
+  assert.match(dashboardSource, /onCancelPaid\?\.\(item\.record\)/);
+  assert.match(dashboardSource, /onPayItem\?\.\(item\)/);
+  assert.doesNotMatch(dashboardSource, /title=\{`Còn chưa thanh toán/);
+  assert.doesNotMatch(dashboardSource, /title=\{`Cần hoàn tiền/);
 });
 
 test('GroupDetail hero balances amount on the right', () => {
@@ -695,16 +705,17 @@ test('Home payment sheet gives treasurers a payment progress dashboard', () => {
   assert.match(homeSource, /Đã nhận/);
   assert.match(homeSource, /Chờ duyệt/);
   assert.match(homeSource, /Chưa thu/);
-  assert.match(homeSource, /Cần hoàn tiền/);
-  assert.match(homeSource, /Còn chưa thanh toán/);
+  assert.match(homeSource, /Danh sách member/);
+  assert.match(homeSource, /buildTreasurerMemberRows/);
+  assert.match(homeSource, /item\.paid \? 'Đã nhận' : 'TT'/);
   assert.match(homeSource, /onAction\?\.\('confirmPaymentNotice', record\)/);
   assert.match(homeSource, /onAction\?\.\('rejectPaymentNotice', record\)/);
   assert.match(homeSource, /onSelect=\{\(\) => setShareMember\(\{[\s\S]*memberId: record\.memberId \|\| record\.member_id/);
-  assert.match(homeSource, /onSelect=\{\(\) => setShareMember\(\{[\s\S]*memberId: row\.linkMemberId \|\| row\.memberId/);
+  assert.match(homeSource, /onShare=\{\(member\) => setShareMember\(member\)\}/);
   assert.match(homeSource, /function MemberShareLinkSheet\(\{ member, monthLabel, onAction, onClose \}\)/);
   assert.match(homeSource, /onAction\?\.\('createMemberBillShare', \{ groupId: member\.groupId, memberId: member\.memberId, copy: false \}\)/);
   assert.match(homeSource, /gridTemplateColumns: 'minmax\(0,1fr\) minmax\(0,1fr\) minmax\(0,1fr\)'/);
-  assert.match(homeSource, /title=\{`Còn chưa thanh toán · \$\{unpaidRows\.length\}[\s\S]*listScroll/);
+  assert.match(homeSource, /title=\{`Danh sách member · \$\{memberRows\.length\}/);
   assert.match(homeSource, /maxHeight: 340, overflowY: 'auto'/);
 });
 
