@@ -1212,6 +1212,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [paymentRow, setPaymentRow] = useState(null);
   const [loading, setLoading] = useState(false);
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
+  const [selectedTreasurerItemKeys, setSelectedTreasurerItemKeys] = useState(() => new Set());
   const rows = safeArray(progressRows);
   const pending = safeArray(pendingRecords);
   const pendingCheckpoints = safeArray(pendingCheckpointsForTreasurer);
@@ -1226,6 +1227,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const totalRefund = memberRows.reduce((sum, row) => sum + row.amountRefund, 0);
   const paidItemCount = memberRows.reduce((sum, row) => sum + row.items.filter(item => item.paid).length, 0);
   const unpaidItemCount = memberRows.reduce((sum, row) => sum + row.items.filter(item => !item.paid && item.kind !== 'refund').length, 0);
+  const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
+  const selectedTreasurerTotal = selectedTreasurerItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   const isSearching = Boolean(searchQuery.trim());
 
   async function withLoading(action) {
@@ -1236,6 +1239,15 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
     } finally {
       setLoading(false);
     }
+  }
+
+  function toggleTreasurerItemSelection(item) {
+    if (!item || item.paid || item.kind === 'refund') return;
+    setSelectedTreasurerItemKeys(prev => {
+      const next = new Set(prev);
+      next.has(item.key) ? next.delete(item.key) : next.add(item.key);
+      return next;
+    });
   }
 
   return (
@@ -1341,9 +1353,12 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           <TreasurerMemberPaymentRow
             key={row.key}
             row={row}
+            selectedKeys={selectedTreasurerItemKeys}
             onShare={(member) => setShareMember(member)}
             onQr={(member) => setQrSheetMembers([member])}
             onPayItem={(item) => setPaymentRow(paymentRowFromTreasurerItem(item, data))}
+            onPaySelected={(items) => setPaymentRow(paymentRowFromTreasurerItems(items, data))}
+            onToggleSelect={toggleTreasurerItemSelection}
             onCancelPaid={(record) => withLoading(() => onAction?.('cancelPaymentRecord', record))}
             onViewPaid={(record) => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }}
             onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
@@ -1370,6 +1385,12 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           onClose={() => setPaymentRow(null)}
           onConfirm={(payload) => withLoading(async () => {
             await onAction?.('markMemberPaid', payload);
+            setSelectedTreasurerItemKeys(prev => {
+              if (!selectedTreasurerTotal) return prev;
+              const next = new Set(prev);
+              safeArray(paymentRow?.paymentItems).forEach(item => next.delete(item.key));
+              return next;
+            });
             setPaymentRow(null);
           })}
         />
@@ -1513,29 +1534,37 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
 }
 
 function paymentRowFromTreasurerItem(item, data) {
-  const paymentItem = {
+  return paymentRowFromTreasurerItems([item], data);
+}
+
+function paymentRowFromTreasurerItems(items, data) {
+  const paymentItems = safeArray(items).map((item, index) => ({
     ...item,
-    key: item.key || `${item.sourceType || 'group'}:${item.sourceId || item.sourceLabel || 'source'}:${item.month || data?.yearMonth || ''}`,
+    key: item.key || `${item.sourceType || 'group'}:${item.sourceId || item.sourceLabel || 'source'}:${item.month || data?.yearMonth || index}`,
     defaultSelected: true,
-  };
+  }));
+  const firstItem = paymentItems[0] || {};
+  const amount = paymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   return {
-    profileId: item.profileId || item.row?.profileId || '',
-    memberId: item.memberId || item.row?.linkMemberId || item.row?.memberId || '',
-    linkMemberId: item.memberId || item.row?.linkMemberId || item.row?.memberId || '',
-    groupId: item.groupId || item.row?.groupId || data?.currentGroupId || '',
-    linkGroupId: item.groupId || item.row?.linkGroupId || item.row?.groupId || data?.currentGroupId || '',
-    name: item.memberName || item.row?.name || item.row?.memberName || 'Thành viên',
-    memberName: item.memberName || item.row?.memberName || item.row?.name || 'Thành viên',
-    paymentItems: [paymentItem],
-    defaultPaymentItemKeys: [paymentItem.key],
-    payableSources: [paymentItemToCoveredSource(paymentItem)],
-    payableAmount: Math.abs(Number(paymentItem.amount) || 0),
+    profileId: firstItem.profileId || firstItem.row?.profileId || '',
+    memberId: firstItem.memberId || firstItem.row?.linkMemberId || firstItem.row?.memberId || '',
+    linkMemberId: firstItem.memberId || firstItem.row?.linkMemberId || firstItem.row?.memberId || '',
+    groupId: firstItem.groupId || firstItem.row?.groupId || data?.currentGroupId || '',
+    linkGroupId: firstItem.groupId || firstItem.row?.linkGroupId || firstItem.row?.groupId || data?.currentGroupId || '',
+    name: firstItem.memberName || firstItem.row?.name || firstItem.row?.memberName || 'Thành viên',
+    memberName: firstItem.memberName || firstItem.row?.memberName || firstItem.row?.name || 'Thành viên',
+    paymentItems,
+    defaultPaymentItemKeys: paymentItems.map(item => item.key),
+    payableSources: paymentItems.map(paymentItemToCoveredSource),
+    payableAmount: amount,
   };
 }
 
-function TreasurerMemberPaymentRow({ row, onShare, onQr, onPayItem, onCancelPaid, onViewPaid, onConfirmRefund }) {
+function TreasurerMemberPaymentRow({ row, selectedKeys, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onCancelPaid, onViewPaid, onConfirmRefund }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
+  const selectedUnpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedKeys?.has?.(item.key));
+  const selectedUnpaidTotal = selectedUnpaidItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   return (
     <div style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
       <button type="button" onClick={() => setExpanded(value => !value)} style={{ width: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
@@ -1559,6 +1588,7 @@ function TreasurerMemberPaymentRow({ row, onShare, onQr, onPayItem, onCancelPaid
           <div style={{ display: 'flex', gap: 5 }}>
             <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
             {row.amountDue > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, amount: row.amountDue })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
+            {selectedUnpaidTotal > 0 && <button type="button" onClick={() => onPaySelected?.(selectedUnpaidItems)} style={miniDashButton('#22c55e', '#052e16')}>TT tổng {formatVND(selectedUnpaidTotal)}</button>}
           </div>
           {groupedItems.map(group => (
             <div key={group.key} style={{ display: 'grid', gap: 6 }}>
@@ -1571,13 +1601,28 @@ function TreasurerMemberPaymentRow({ row, onShare, onQr, onPayItem, onCancelPaid
                   const isRefund = item.kind === 'refund';
                   const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : (item.paid ? 'Đã nhận' : 'TT');
                   const amountColor = isRefund ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
+                  const selected = !item.paid && !isRefund && selectedKeys?.has?.(item.key);
                   return (
-                    <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}` }}>
+                    <div
+                      key={item.key}
+                      role={!item.paid && !isRefund ? 'button' : undefined}
+                      tabIndex={!item.paid && !isRefund ? 0 : undefined}
+                      onClick={() => !item.paid && !isRefund ? onToggleSelect?.(item) : undefined}
+                      onKeyDown={(event) => {
+                        if ((event.key === 'Enter' || event.key === ' ') && !item.paid && !isRefund) {
+                          event.preventDefault();
+                          onToggleSelect?.(item);
+                        }
+                      }}
+                      style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: !item.paid && !isRefund ? 'pointer' : 'default' }}
+                    >
+                      <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : ''}</div>
                       <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{isRefund ? '+' : '-'}{formatVND(Math.abs(Number(item.amount) || 0))}</div>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.stopPropagation();
                           if (isRefund) return onConfirmRefund?.(item);
                           if (item.paid) return onCancelPaid?.(item.record);
                           return onPayItem?.(item);

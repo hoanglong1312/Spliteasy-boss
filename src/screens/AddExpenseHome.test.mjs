@@ -178,6 +178,22 @@ test('Treasurer payment dashboard uses member rows with paid toggle records', ()
   assert.doesNotMatch(dashboardSource, /title=\{`Cần hoàn tiền/);
 });
 
+test('Treasurer payment dashboard can select multiple unpaid items before TT', () => {
+  const dashboardSource = homeSource.slice(
+    homeSource.indexOf('function TreasurerPaymentDashboard'),
+    homeSource.indexOf('function TreasurerConfirmPaymentSheet')
+  );
+
+  assert.match(dashboardSource, /const \[selectedTreasurerItemKeys, setSelectedTreasurerItemKeys\] = useState\(\(\) => new Set\(\)\)/);
+  assert.match(dashboardSource, /const selectedTreasurerItems = memberRows\.flatMap/);
+  assert.match(dashboardSource, /const selectedTreasurerTotal = selectedTreasurerItems\.reduce/);
+  assert.match(dashboardSource, /toggleTreasurerItemSelection/);
+  assert.match(dashboardSource, /onPaySelected=\{\(items\) => setPaymentRow\(paymentRowFromTreasurerItems\(items, data\)\)\}/);
+  assert.match(dashboardSource, />TT tổng \{formatVND\(selectedUnpaidTotal\)\}<\/button>/);
+  assert.match(dashboardSource, /selectedKeys=\{selectedTreasurerItemKeys\}/);
+  assert.match(dashboardSource, /onToggleSelect=\{toggleTreasurerItemSelection\}/);
+});
+
 test('GroupDetail hero balances amount on the right', () => {
   const heroBalanceSource = groupDetailSource.slice(
     groupDetailSource.indexOf('<ModuleHero'),
