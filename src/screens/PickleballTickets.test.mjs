@@ -121,6 +121,30 @@ test('PickleballCalendar ticket sheet keeps member save errors visible', () => {
   assert.match(sheetSource, /ticket_rls_denied/)
 })
 
+test('PickleballCalendar ticket day rows open full participant detail sheet', () => {
+  const ticketDayPanel = calendarSource.slice(
+    calendarSource.indexOf('function TicketDayPanel'),
+    calendarSource.indexOf('function AddTicketSheet')
+  )
+  const detailSheet = calendarSource.slice(
+    calendarSource.indexOf('function TicketDetailSheet'),
+    calendarSource.indexOf('function AddTicketSheet')
+  )
+
+  assert.match(calendarSource, /BottomSheet/)
+  assert.match(ticketDayPanel, /const \[detailTicket, setDetailTicket\] = useState\(null\)/)
+  assert.match(ticketDayPanel, /function openTicketOnEnter\(event, ticket\)/)
+  assert.match(ticketDayPanel, /role="button"/)
+  assert.match(ticketDayPanel, /onClick=\{\(\) => setDetailTicket\(ticket\)\}/)
+  assert.match(ticketDayPanel, /onKeyDown=\{\(event\) => openTicketOnEnter\(event, ticket\)\}/)
+  assert.match(ticketDayPanel, /<TicketDetailSheet[\s\S]*?ticket=\{detailTicket\}[\s\S]*?onClose=\{\(\) => setDetailTicket\(null\)\}/)
+  assert.doesNotMatch(ticketDayPanel, /displayAmountPerPerson \|\| ticket\.amountPerPerson/)
+  assert.match(detailSheet, /function TicketDetailSheet\(\{ ticket, onClose \}\)/)
+  assert.match(detailSheet, /<BottomSheet title=\{`Vé lẻ · \$\{formatDayLabel\(ticket\.date\)\}`\}/)
+  assert.match(detailSheet, /members\.map/)
+  assert.match(detailSheet, />vé lẻ</)
+})
+
 test('PickleballCalendar preserves selected session id across data refreshes', () => {
   const topLevel = calendarSource.slice(
     calendarSource.indexOf('export default function PickleballCalendar'),

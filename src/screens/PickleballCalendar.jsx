@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, MonthNav, Card, Button, Badge, SubTabs, Input,
-  LoadingSpinner, loadingOverlayStyle,
+  BottomSheet, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 
 const DAYS_OF_WEEK = ['T2','T3','T4','T5','T6','T7','CN'];
@@ -239,6 +239,13 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
   const total = tickets.reduce((sum, ticket) => sum + (Number(ticket.totalAmount) || 0), 0);
   const [ticketWaterEdits, setTicketWaterEdits] = useState({});
   const [waterEditOpen, setWaterEditOpen] = useState({});
+  const [detailTicket, setDetailTicket] = useState(null);
+
+  function openTicketOnEnter(event, ticket) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    setDetailTicket(ticket);
+  }
 
   async function saveTicketWater(ticketId) {
     const raw = ticketWaterEdits[ticketId];
@@ -291,11 +298,18 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12 }}>
         {tickets.map(ticket => (
-          <div key={ticket.id} style={{
+          <div
+            key={ticket.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => setDetailTicket(ticket)}
+            onKeyDown={(event) => openTicketOnEnter(event, ticket)}
+            style={{
             padding: 10,
             borderRadius: 12,
             background: 'rgba(255,255,255,0.035)',
             border: `1px solid ${colors.borderSubtle}`,
+            cursor: 'pointer',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <div style={{ minWidth: 0 }}>
@@ -306,8 +320,8 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
                   {(ticket.memberLabels || []).join(', ')}
                 </div>
               </div>
-              <div style={{ fontSize: 13, fontWeight: 900, color: '#fde68a', ...type.mono }}>
-                {formatVNDShort(ticket.displayAmountPerPerson || ticket.amountPerPerson)}/{ticket.displayAmountLabel || 'người'}
+              <div style={{ fontSize: 10, fontWeight: 900, color: '#fde68a', textTransform: 'uppercase', letterSpacing: '0.7px' }}>
+                Xem
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 9 }}>
@@ -317,7 +331,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
                   : ticket.status === 'team_fund' ? 'Quỹ team trả' : `${ticket.advancerName || 'Người ứng'} ứng`}
               </div>
               {isTreasurer && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div onClick={event => event.stopPropagation()} style={{ display: 'flex', gap: 8 }}>
                   {ticket.status === 'pending_review' && (
                     <button
                       type="button"
@@ -331,7 +345,7 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
               )}
             </div>
             {(ticket.waterAmount > 0 || waterEditOpen[ticket.id]) && (
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.borderSubtle}` }}>
+              <div onClick={event => event.stopPropagation()} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${colors.borderSubtle}` }}>
                 {!waterEditOpen[ticket.id] ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 800 }}>
@@ -384,7 +398,8 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
             {isTreasurer && ticket.waterAmount === 0 && !waterEditOpen[ticket.id] && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={(event) => {
+                  event.stopPropagation();
                   setTicketWaterEdits(prev => ({ ...prev, [ticket.id]: '' }));
                   setWaterEditOpen(prev => ({ ...prev, [ticket.id]: true }));
                 }}
@@ -394,8 +409,92 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
           </div>
         ))}
       </div>
+      {detailTicket && (
+        <TicketDetailSheet ticket={detailTicket} onClose={() => setDetailTicket(null)} />
+      )}
     </Card>
   );
+}
+
+function TicketDetailSheet({ ticket, onClose }) {
+  const members = ticketMembers(ticket);
+  const waterPerPerson = ticket.waterAmountPerPerson || Math.round((Number(ticket.waterAmount) || 0) / Math.max(members.length, 1));
+  return (
+    <BottomSheet title={`Vé lẻ · ${formatDayLabel(ticket.date)}`} onClose={onClose} tone="pickleball">
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 900 }}>
+            {formatTimeLabel(ticket.timeLabel)} · {members.length} người
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 700 }}>
+            {ticket.status === 'pending_review'
+              ? 'Chờ thủ quỹ duyệt'
+              : ticket.status === 'team_fund' ? 'Quỹ team trả' : `${ticket.advancerName || 'Người ứng'} ứng`}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 800, textTransform: 'uppercase' }}>Tổng vé</div>
+          <div style={{ ...type.mono, fontSize: 16, color: '#fde68a', fontWeight: 900 }}>
+            {formatVNDShort(ticket.totalAmount || ticket.amount)}
+          </div>
+        </div>
+      </div>
+
+      {ticket.waterAmount > 0 && (
+        <div style={{
+          marginTop: 12,
+          padding: '9px 10px',
+          borderRadius: 10,
+          background: 'rgba(52,211,153,0.08)',
+          border: '1px solid rgba(52,211,153,0.18)',
+          color: '#6ee7b7',
+          fontSize: 11,
+          fontWeight: 800,
+        }}>
+          Nước {formatVNDShort(ticket.waterAmount)} · {formatVNDShort(waterPerPerson)}/người
+        </div>
+      )}
+
+      <div style={{ marginTop: 14, fontSize: 10, color: colors.textSecondary, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+        Người đánh ngày này
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+        {members.map(member => (
+          <div key={member.id} style={ticketMemberStyle}>
+            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {member.name}
+            </span>
+            <span style={{
+              flexShrink: 0,
+              padding: '4px 8px',
+              borderRadius: 999,
+              background: 'rgba(251,191,36,0.12)',
+              border: '1px solid rgba(251,191,36,0.24)',
+              color: '#fde68a',
+              fontSize: 10,
+              fontWeight: 900,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}>vé lẻ</span>
+          </div>
+        ))}
+      </div>
+    </BottomSheet>
+  );
+}
+
+function ticketMembers(ticket) {
+  const chips = ticket.memberChips || ticket.attendees || [];
+  if (chips.length > 0) {
+    return chips.map((member, index) => ({
+      id: member.id || `${member.name || 'member'}-${index}`,
+      name: member.name || member.label || `Người ${index + 1}`,
+    }));
+  }
+  return (ticket.memberLabels || []).map((name, index) => ({
+    id: ticket.memberIds?.[index] || `${name}-${index}`,
+    name,
+  }));
 }
 
 function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onSave }) {
@@ -1382,6 +1481,19 @@ function ticketActionStyle(tone) {
     cursor: 'pointer',
   };
 }
+
+const ticketMemberStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 10,
+  padding: '9px 10px',
+  borderRadius: 10,
+  background: 'rgba(255,255,255,0.035)',
+  border: `1px solid ${colors.borderSubtle}`,
+  fontSize: 13,
+  fontWeight: 850,
+};
 
 function paymentRowStyle(active) {
   return {
