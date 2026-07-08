@@ -93,7 +93,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           onViewMonth={async (ym, source) => {
             await onAction?.('setMonth', { yearMonth: ym });
             if (source?.sourceType === 'pickleball') {
-              onAction?.('push', { screen: 'pickleball-calendar', params: { yearMonth: ym } });
+              onAction?.('push', { screen: 'pickleball-overview', params: { yearMonth: ym } });
               return;
             }
             if (source?.sourceId) {
@@ -535,6 +535,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
   const [openSourceKeys, setOpenSourceKeys] = useState(() => new Set());
   const sourceRows = safeArray(sources);
   const hasSources = sourceRows.length > 0;
+  const sourceKeys = sourceRows.map((source, index) => `${source.sourceType || 'group'}:${source.sourceId || source.sourceLabel || index}`);
   const total = sourceRows.reduce((sum, source) => sum + (Number(source.amount) || 0), 0);
   const isNegativeTotal = totalBalance < 0;
   const isPositiveTotal = totalBalance > 0;
@@ -552,6 +553,13 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
   const ctaBg = paymentDisabled ? 'rgba(148,163,184,0.16)' : isNegativeTotal ? 'rgba(248,113,113,0.20)' : 'rgba(52,211,153,0.18)';
   const ctaBorder = paymentDisabled ? 'rgba(148,163,184,0.24)' : isNegativeTotal ? 'rgba(248,113,113,0.40)' : 'rgba(52,211,153,0.38)';
   const ctaColor = paymentDisabled ? colors.textSecondary : isNegativeTotal ? '#fecaca' : '#86efac';
+  const toggleSourcesOpen = () => {
+    setSourcesOpen(open => {
+      const nextOpen = !open;
+      if (nextOpen) setOpenSourceKeys(new Set(sourceKeys));
+      return nextOpen;
+    });
+  };
   return (
     <Card style={{ padding: 14 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '8px 6px 14px' }}>
@@ -615,7 +623,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
         <button
           type="button"
           aria-expanded={sourcesOpen}
-          onClick={() => setSourcesOpen(open => !open)}
+          onClick={toggleSourcesOpen}
           style={{
             width: '100%',
             display: 'flex',
@@ -1760,37 +1768,102 @@ function groupPaymentItemsBySource(items) {
 }
 
 function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
+  const [expanded, setExpanded] = useState(true);
   if (!items.length) return null;
   const groupedItems = groupPaymentItemsBySource(items);
+  const sectionTotal = items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   return (
-    <div style={{ display: 'grid', gap: 7 }}>
-      <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{title}</div>
-      {groupedItems.map(group => {
-        const groupTotal = group.items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
-        return (
-          <div key={group.key} style={{ display: 'grid', gap: 6, padding: 10, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(15,23,42,0.72)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <div style={{ minWidth: 0, fontSize: 13, color: '#f8fafc', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
-              <div style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>-{formatVND(groupTotal)}</div>
-            </div>
-            <div style={{ display: 'grid', gap: 6, marginLeft: 10, paddingLeft: 10, borderLeft: '2px solid rgba(52,211,153,0.34)' }}>
-              {group.items.map(item => (
-                <label key={item.key} style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto', alignItems: 'center', gap: 9, padding: '8px 9px', borderRadius: 10, border: `1px solid ${checkedKeys.has(item.key) ? 'rgba(34,197,94,0.32)' : 'rgba(255,255,255,0.07)'}`, background: checkedKeys.has(item.key) ? 'rgba(34,197,94,0.10)' : 'rgba(255,255,255,0.035)', cursor: onToggle ? 'pointer' : 'default' }}>
-                  <input
-                    type="checkbox"
-                    checked={checkedKeys.has(item.key)}
-                    readOnly={!onToggle}
-                    onChange={() => onToggle?.(item.key)}
-                    style={{ width: 16, height: 16, accentColor: '#22c55e' }}
-                  />
-                  <span style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
-                  <span style={{ fontSize: 12, fontWeight: 900, color: '#fca5a5', ...type.mono }}>-{formatVND(Math.abs(Number(item.amount) || 0))}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        );
-      })}
+    <div style={{
+      display: 'grid',
+      gap: expanded ? 10 : 0,
+      padding: 10,
+      borderRadius: 14,
+      border: '1px solid rgba(52,211,153,0.26)',
+      background: 'rgba(15,23,42,0.58)',
+      boxShadow: 'inset 3px 0 0 rgba(52,211,153,0.22)',
+    }}>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(value => !value)}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto',
+          alignItems: 'center',
+          columnGap: 8,
+          rowGap: 2,
+          width: '100%',
+          padding: 0,
+          border: 'none',
+          background: 'transparent',
+          color: colors.textPrimary,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+          textAlign: 'left',
+        }}
+      >
+        <span style={{ minWidth: 0, fontSize: 10, color: '#a7b6cc', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.25 }}>{title}</span>
+        <span style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</span>
+        <span style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>Tổng -{formatVND(sectionTotal)}</span>
+      </button>
+      {expanded && (
+        <div style={{ display: 'grid', gap: 11 }}>
+          {groupedItems.map(group => {
+            const groupTotal = group.items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+            return (
+              <div key={group.key} style={{ display: 'grid', gap: 7 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', gap: 8 }}>
+                  <div style={{ minWidth: 0, fontSize: 13, color: '#f8fafc', fontWeight: 950, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>-{formatVND(groupTotal)}</div>
+                </div>
+                <div style={{ display: 'grid', gap: 6, marginLeft: 7, paddingLeft: 12, borderLeft: '4px solid rgba(96,165,250,0.54)' }}>
+                  {group.items.map(item => {
+                    const checked = checkedKeys.has(item.key);
+                    return (
+                      <label key={item.key} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '22px minmax(0,1fr) auto',
+                        alignItems: 'center',
+                        gap: 8,
+                        minHeight: 38,
+                        padding: '7px 10px',
+                        borderRadius: 11,
+                        border: `1px solid ${checked ? 'rgba(34,197,94,0.58)' : 'rgba(255,255,255,0.09)'}`,
+                        background: checked ? 'rgba(34,197,94,0.13)' : 'rgba(255,255,255,0.045)',
+                        cursor: onToggle ? 'pointer' : 'default',
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          readOnly={!onToggle}
+                          onChange={() => onToggle?.(item.key)}
+                          style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+                        />
+                        <span style={{
+                          width: 18,
+                          height: 18,
+                          borderRadius: 6,
+                          border: `1.5px solid ${checked ? '#22c55e' : 'rgba(148,163,184,0.48)'}`,
+                          background: checked ? '#22c55e' : 'transparent',
+                          color: checked ? '#052e16' : 'transparent',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 13,
+                          fontWeight: 950,
+                          lineHeight: 1,
+                        }}>✓</span>
+                        <span style={{ minWidth: 0, fontSize: 12, color: colors.textSecondary, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
+                        <span style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>-{formatVND(Math.abs(Number(item.amount) || 0))}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
