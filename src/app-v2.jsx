@@ -968,6 +968,33 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'archiveGroup') {
+      const groupId = payload?.groupId || payload?.id || payload
+      if (!groupId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('archive_expense_group', {
+        p_group_id: groupId,
+      })
+      if (error || data?.error) throw error || new Error(data.error)
+      await dispatch({ type: 'REFRESH' })
+      setStack((s) => s.slice(0, -1))
+      return
+    }
+
+    if (type === 'restoreGroup') {
+      const groupId = payload?.groupId || payload?.id || payload
+      if (!groupId) return
+      const { token } = getStoredAuth()
+      const sb = createSupabase(token)
+      const { data, error } = await sb.rpc('restore_expense_group', {
+        p_group_id: groupId,
+      })
+      if (error || data?.error) throw error || new Error(data.error)
+      await dispatch({ type: 'REFRESH' })
+      return
+    }
+
     if (type === 'editMember') {
       const memberId = payload?.memberId
       if (!memberId) return

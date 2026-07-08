@@ -39,6 +39,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [inviteExpanded, setInviteExpanded] = useState(false);
   const [fabOpen, setFabOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
+  const [archiveConfirmGroup, setArchiveConfirmGroup] = useState(false);
   const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
@@ -111,6 +112,17 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
     try {
       await onAction?.('deleteGroup', { groupId: d.id });
       setDeleteConfirmGroup(false);
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  async function archiveGroup() {
+    if (savingAction) return;
+    setSavingAction('archiveGroup');
+    try {
+      await onAction?.('archiveGroup', { groupId: d.id });
+      setArchiveConfirmGroup(false);
     } finally {
       setSavingAction('');
     }
@@ -358,6 +370,14 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             <TextArea label="Mô tả nhóm" value={groupDescription} onChange={setGroupDescription} placeholder={selectedGroupType.descriptionPlaceholder} />
             <Button block variant="brand" style={{ marginTop: 14 }} type="submit">Lưu nhóm</Button>
             <ActionButton
+              type="button"
+              style={{ marginTop: 10 }}
+              onClick={() => {
+                setEditingGroup(false);
+                setArchiveConfirmGroup(true);
+              }}
+            >Lưu trữ nhóm</ActionButton>
+            <ActionButton
               danger
               type="button"
               style={{ marginTop: 10 }}
@@ -367,6 +387,23 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               }}
             >🗑️ Xóa nhóm</ActionButton>
           </form>
+        </BottomSheet>
+      )}
+
+      {archiveConfirmGroup && canManageGroup && (
+        <BottomSheet title="Lưu trữ nhóm?" onClose={() => setArchiveConfirmGroup(false)}>
+          <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
+            Nhóm sẽ ẩn khỏi danh sách chính. Dữ liệu tiền vẫn giữ nguyên để rà soát sau.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="ghost" onClick={() => setArchiveConfirmGroup(false)}>Hủy</Button>
+            <Button
+              type="button"
+              variant="brand"
+              onClick={archiveGroup}
+              disabled={savingAction === 'archiveGroup'}
+            >{savingAction === 'archiveGroup' ? 'Đang lưu…' : 'Lưu trữ'}</Button>
+          </div>
         </BottomSheet>
       )}
 

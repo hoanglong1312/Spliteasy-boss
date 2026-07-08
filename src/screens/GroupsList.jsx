@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { colors, type, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Card, Pill, PillRow, Avatar, Badge,
-  SectionHeader, ModuleHero, SearchInput, ListCard,
+  SectionHeader, ModuleHero, SearchInput, ListCard, Button,
 } from '../primitives';
 
 const GROUP_TYPE_LABELS = {
@@ -46,16 +46,23 @@ const GROUP_TYPE_EMOJI_LABELS = {
 export default function GroupsList({ data, onAction }) {
   const d = data || DEMO;
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState(d.activeFilter || 'all');
   const normalizedSearch = search.trim().toLowerCase();
+  const filteredGroups = (d.groups || []).filter(group => {
+    if (activeFilter === 'owed') return group.balance < 0;
+    if (activeFilter === 'balanced') return group.balance === 0;
+    return true;
+  });
   const visibleGroups = normalizedSearch
-    ? d.groups.filter(g => `${g.name || ''} ${g.emoji || ''}`.toLowerCase().includes(normalizedSearch))
-    : d.groups;
+    ? filteredGroups.filter(g => `${g.name || ''} ${g.emoji || ''}`.toLowerCase().includes(normalizedSearch))
+    : filteredGroups;
   const visibleArchived = normalizedSearch
-    ? d.archived.filter(g => `${g.name || ''} ${g.emoji || ''}`.toLowerCase().includes(normalizedSearch))
-    : d.archived;
+    ? (d.archived || []).filter(g => `${g.name || ''} ${g.emoji || ''}`.toLowerCase().includes(normalizedSearch))
+    : (d.archived || []);
   const pickleballGroups = visibleGroups.filter(isPickleballLikeGroup);
   const expenseGroups = visibleGroups.filter(g => !isPickleballLikeGroup(g));
   const showExpenseDivider = pickleballGroups.length > 0 && expenseGroups.length > 0;
+  const showingArchived = activeFilter === 'closed';
 
   return (
     <PhoneFrame>
@@ -77,19 +84,32 @@ export default function GroupsList({ data, onAction }) {
 
         <PillRow>
           {d.filters.map(f => (
-            <Pill key={f.key} active={f.key === d.activeFilter} onClick={() => onAction?.('filter', f.key)}>
+            <Pill key={f.key} active={f.key === activeFilter} onClick={() => setActiveFilter(f.key)}>
               {f.label}
             </Pill>
           ))}
         </PillRow>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {pickleballGroups.map(g => <GroupCard key={g.id} g={g} onClick={() => onAction?.('open', g.id)} />)}
-          {showExpenseDivider && <GroupsDivider />}
-          {expenseGroups.map(g => <GroupCard key={g.id} g={g} onClick={() => onAction?.('open', g.id)} />)}
-
-          <SectionHeader>Đã chốt sổ</SectionHeader>
-          {visibleArchived.map(g => <ArchivedCard key={g.id} g={g} />)}
+          {showingArchived ? (
+            <>
+              <SectionHeader>Đã chốt sổ</SectionHeader>
+              {visibleArchived.map(g => (
+                <ArchivedCard
+                  key={g.id}
+                  g={g}
+                  onOpen={() => onAction?.('open', g.id)}
+                  onRestore={() => onAction?.('restoreGroup', { groupId: g.id })}
+                />
+              ))}
+            </>
+          ) : (
+            <>
+              {pickleballGroups.map(g => <GroupCard key={g.id} g={g} onClick={() => onAction?.('open', g.id)} />)}
+              {showExpenseDivider && <GroupsDivider />}
+              {expenseGroups.map(g => <GroupCard key={g.id} g={g} onClick={() => onAction?.('open', g.id)} />)}
+            </>
+          )}
         </div>
       </Screen>
 
@@ -221,7 +241,7 @@ function groupTypeLabelFor(g) {
   return GROUP_TYPE_EMOJI_LABELS[g?.emoji] || GROUP_TYPE_LABELS[g?.groupType] || GROUP_TYPE_LABELS[g?.kind] || 'Chi tiêu';
 }
 
-function ArchivedCard({ g }) {
+function ArchivedCard({ g, onOpen, onRestore }) {
   return (
     <Card style={{ padding: '14px 16px', opacity: 0.7 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -235,7 +255,10 @@ function ArchivedCard({ g }) {
           <div style={{ fontSize: 13, fontWeight: 700, color: '#cbd5e1' }}>{g.name}</div>
           <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 3 }}>{g.closedLabel}</div>
         </div>
-        <Badge tone="muted">✓ Đóng</Badge>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Button type="button" variant="ghost" size="sm" onClick={onOpen}>Mở</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onRestore}>Khôi phục</Button>
+        </div>
       </div>
     </Card>
   );

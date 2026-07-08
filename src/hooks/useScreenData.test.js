@@ -8,6 +8,7 @@ import {
   buildPickleballSettingsData,
   buildHomeData,
   buildGroupDetailData,
+  buildGroupsListData,
   buildPaymentProgressRows,
   buildPickleballCalendarData,
   buildPickleballTicketsData,
@@ -29,6 +30,51 @@ const fixedMembers = [
 const casualMembers = [
   { id: 'casual-1', name: 'Casual One', memberType: 'casual' },
 ]
+
+describe('buildGroupsListData', () => {
+  test('hides archived groups from the active list while keeping them reviewable with balances', () => {
+    const members = [
+      { id: 'member-1', name: 'Member One', group_id: 'active-group' },
+      { id: 'payer-1', name: 'Payer One', group_id: 'active-group' },
+      { id: 'member-archived', name: 'Member One', profile_id: 'profile-1', group_id: 'archived-group' },
+      { id: 'payer-archived', name: 'Payer One', group_id: 'archived-group' },
+    ]
+    const groups = [
+      {
+        id: 'active-group',
+        name: 'Nhóm đang chạy',
+        emoji: '🍜',
+        members: ['member-1', 'payer-1'],
+        expenses: [],
+      },
+      {
+        id: 'archived-group',
+        name: 'Hạ Long thả gió',
+        emoji: '🏖️',
+        archived_at: '2026-07-08T10:00:00.000Z',
+        members: ['member-archived', 'payer-archived'],
+        expenses: [{
+          id: 'expense-1',
+          amount: 200000,
+          expense_date: '2026-05-10',
+          paid_by_member_id: 'payer-archived',
+          participants: ['member-archived', 'payer-archived'],
+        }],
+      },
+    ]
+
+    const result = buildGroupsListData(groups, 'member-archived', members, 'Member One', '2026-05')
+
+    expect(result.groups.map(group => group.id)).toEqual(['active-group'])
+    expect(result.archived.map(group => group.id)).toEqual(['archived-group'])
+    expect(result.activeCount).toBe(1)
+    expect(result.archivedCount).toBe(1)
+    expect(result.archived[0]).toMatchObject({
+      name: 'Hạ Long thả gió',
+      balance: -100000,
+    })
+  })
+})
 
 describe('effectiveSessionMemberIds', () => {
   test('counts member without a record as present when session has records and fallback is enabled', () => {

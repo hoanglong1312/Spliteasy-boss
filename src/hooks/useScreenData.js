@@ -1671,7 +1671,7 @@ function resolveExpenseGroupContext(state, requestedGroup = null) {
   return groups.find(group => groupKind(group) !== 'pickleball') || candidate || safeGroup(null)
 }
 
-function buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth) {
+export function buildGroupsListData(groups, currentUserId, members, currentUserName, selectedYearMonth) {
   const monthDate = dateFromYearMonth(selectedYearMonth)
   const pickleballGroup = safeArray(groups).find(group => groupKind(group) === 'pickleball')
   const rows = safeArray(groups).map(safeGroup).filter(group => groupKind(group) !== 'pickleball').map(group => {
@@ -1680,6 +1680,7 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
     const balance = groupNetForMember(monthlyGroup, currentUserId, members, currentUserName)
     const avatars = groupMembers.slice(0, 4).map(m => initials(m))
     const linkedPickleballGroupId = group.linkedPickleballGroupId || group.linked_pickleball_group_id || null
+    const archivedAt = group.archivedAt || group.archived_at || ''
 
     return {
       id: group.id,
@@ -1698,23 +1699,27 @@ function buildGroupsListData(groups, currentUserId, members, currentUserName, se
       members: avatars,
       avatars,
       balance,
+      archivedAt,
+      closedLabel: archivedAt ? `Lưu trữ · ${formatDayMonth(archivedAt)}` : '',
     }
   })
-  const owed = rows.filter(g => g.balance < 0).length
-  const balanced = rows.filter(g => g.balance === 0).length
+  const activeRows = rows.filter(g => !g.archivedAt)
+  const archivedRows = rows.filter(g => g.archivedAt)
+  const owed = activeRows.filter(g => g.balance < 0).length
+  const balanced = activeRows.filter(g => g.balance === 0).length
 
   return {
-    activeCount: rows.length,
-    archivedCount: 0,
+    activeCount: activeRows.length,
+    archivedCount: archivedRows.length,
     activeFilter: 'all',
     filters: [
-      { key: 'all', label: `Tất cả · ${rows.length}` },
+      { key: 'all', label: `Tất cả · ${activeRows.length}` },
       { key: 'owed', label: `Còn nợ · ${owed}` },
       { key: 'balanced', label: `0 · ${balanced}` },
-      { key: 'closed', label: 'Đã chốt' },
+      { key: 'closed', label: `Đã chốt · ${archivedRows.length}` },
     ],
-    groups: rows,
-    archived: [],
+    groups: activeRows,
+    archived: archivedRows,
   }
 }
 
