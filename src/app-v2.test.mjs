@@ -76,6 +76,8 @@ test('parseWaterOcrText parses dated OCR rows into water quantities and skips to
     },
     detectedWaterTotal: 96000,
     calculatedWaterTotal: 96000,
+    ticketAmount: 0,
+    accessoriesAmount: 0,
     extraNotes: [],
     status: 'ok',
     warnings: [],
@@ -93,6 +95,8 @@ test('parseWaterOcrText parses dated OCR rows into water quantities and skips to
     },
     detectedWaterTotal: 76000,
     calculatedWaterTotal: 76000,
+    ticketAmount: 0,
+    accessoriesAmount: 0,
     extraNotes: [],
     status: 'ok',
     warnings: [],
@@ -115,19 +119,21 @@ test('parseWaterOcrText detects xé vé but excludes it from water totals', () =
     },
     detectedWaterTotal: 10000,
     calculatedWaterTotal: 10000,
-    extraNotes: ['Có xé vé 200.000 đ — không nhập vào nước'],
+    ticketAmount: 200000,
+    accessoriesAmount: 0,
+    extraNotes: ['Có xé vé 200.000 đ — vé sẽ được thêm riêng'],
     status: 'ok',
     warnings: [],
   })
 })
 
-test('parseWaterOcrText marks mismatched rows as needs_review', () => {
+test('parseWaterOcrText trusts detected money total when quantity OCR differs', () => {
   const result = parseWaterOcrText(`01/05/2026\n2\n2\n4\n95.000 đ`)
 
-  assert.equal(result.rows[0].status, 'needs_review')
+  assert.equal(result.rows[0].status, 'ok')
   assert.equal(result.rows[0].calculatedWaterTotal, 88000) // fallback: [10k,10k,12k] → 2*10+2*10+4*12=88k
   assert.equal(result.rows[0].detectedWaterTotal, 95000)
-  assert.equal(result.rows[0].warnings.includes('Tổng tiền nước không khớp'), true)
+  assert.deepEqual(result.rows[0].warnings, [])
 })
 
 test('parseWaterOcrText returns a top-level error for empty or dateless text', () => {
@@ -170,7 +176,7 @@ test('PinEntryScreen uses a controlled numeric password input instead of a numpa
 
 test('recent session resume asks for the simple PIN input before login when PIN is enabled', () => {
   assert.match(appSource, /const \[pendingPinSession, setPendingPinSession\] = useState\(null\)/)
-  assert.match(appSource, /const requiresPin = await checkMemberPinRequired\(payload\?\.memberId\)/)
+  assert.match(appSource, /const requiresPin = await checkMemberPinRequired\(payload\?\.memberId, payload\?\.profileId\)/)
   assert.doesNotMatch(appSource, /const requiresPin = Boolean\(payload\?\.hasPin\) && await checkMemberPinRequired\(payload\?\.memberId\)/)
   assert.match(appSource, /async function checkMemberPinRequired\(memberId, profileId\)/)
   assert.match(appSource, /if \(profileId\) \{[\s\S]*?return profilePinRequired\(profileId\)/)
@@ -184,8 +190,7 @@ test('recent session resume asks for the simple PIN input before login when PIN 
   assert.doesNotMatch(appSource, /localStorage\.getItem\('spliteasy_pin'\)/)
   assert.doesNotMatch(appSource, /memberPinStorageKey/)
   assert.match(appSource, /setPendingPinSession\(payload\)/)
-  assert.match(appSource, /const useProfilePath = !!\(pending\?\.profileId && !pending\?\.memberId\)/)
-  assert.match(appSource, /if \(useProfilePath\) \{[\s\S]*?\.rpc\('verify_pin_by_profile'/)
+  assert.match(appSource, /if \(profileId\) \{[\s\S]*?pinOk = await verifyProfilePin\(profileId, value\)/)
   assert.match(appSource, /pinOk = await verifyMemberPin\(memberId, value\)/)
   assert.match(appSource, /const pending = pendingPinSession[\s\S]*handle\('resumeRecentSession', \{ \.\.\.pending, hasPin: false \}\)/)
   assert.ok(appSource.indexOf('async function submitPin') < appSource.lastIndexOf('if (!state.currentUserId)'))
@@ -246,6 +251,7 @@ test('AppV2 sends payment confirmations to treasurer notifications', () => {
   assert.match(block, /targetMemberId: payload\?\.paymentTarget\?\.memberId/)
   assert.match(block, /coveredMembers: covered/)
   assert.match(block, /coveredSources/)
+  assert.match(block, /monthLabel: payload\?\.monthLabel \|\| homeData\?\.monthLabel/)
   assert.match(block, /await dispatch\(\{ type: 'REFRESH' \}\)/)
   assert.match(appSource, /if \(type === 'confirmPaymentNotice' \|\| type === 'rejectPaymentNotice'\)/)
   assert.match(appSource, /type: 'REVIEW_PAYMENT_NOTIFICATION'/)
@@ -282,8 +288,9 @@ test('AppV2 wires member detail route and member management updates', () => {
   assert.match(appSource, /memberDetail:\s*'member-detail'/)
 
   assert.match(appSource, /if \(type === 'editMember'\)/)
-  assert.match(appSource, /name: payload\?\.name/)
-  assert.match(appSource, /bank_account: payload\?\.bankAccount/)
+  assert.match(appSource, /if \(payload\?\.name !== undefined\) profileUpdate\.name = payload\.name/)
+  assert.match(appSource, /profileUpdate\.bank_account = payload\?\.bankAccount \?\? payload\?\.bank_account/)
+  assert.match(appSource, /sync_member_names_for_profile/)
   assert.match(appSource, /if \(type === 'setMemberRole'\)/)
   assert.match(appSource, /role: payload\?\.role/)
   assert.match(appSource, /if \(type === 'setMemberType'\)/)
@@ -319,10 +326,11 @@ test('AppV2 editMember falls back to membership update when profile RLS returns 
     appSource.indexOf("if (type === 'linkProfile')")
   )
 
-  assert.match(editMemberBlock, /let updatedRows = \[\]/)
-  assert.match(editMemberBlock, /if \(profileId\) \{[\s\S]*?\.from\('profiles'\)[\s\S]*?\.update\(profileUpdate\)[\s\S]*?\.eq\('id', profileId\)[\s\S]*?\.select\('id'\)/)
-  assert.match(editMemberBlock, /if \(!safeArray\(updatedRows\)\.length\) \{[\s\S]*?\.from\('members'\)[\s\S]*?\.update\(memberUpdate\)[\s\S]*?\.eq\('id', memberId\)[\s\S]*?\.eq\('group_id', targetGroupId\)[\s\S]*?\.select\('id'\)/)
-  assert.match(editMemberBlock, /if \(!safeArray\(updatedRows\)\.length\) throw new Error\(`Không thể cập nhật thành viên/)
+  assert.match(editMemberBlock, /const profileId = payload\?\.profileId \|\| payload\?\.profile_id \|\| member\?\.profileId \|\| member\?\.profile_id/)
+  assert.match(editMemberBlock, /if \(!profileId\) throw new Error\('Member không có profile — không thể cập nhật\.'\)/)
+  assert.match(editMemberBlock, /\.from\('profiles'\)\.update\(profileUpdate\)\.eq\('id', profileId\)/)
+  assert.match(editMemberBlock, /\.rpc\('sync_member_names_for_profile', \{ p_profile_id: profileId, p_name: profileUpdate\.name \}\)/)
+  assert.doesNotMatch(editMemberBlock, /\.from\('members'\)[\s\S]*?\.update\(memberUpdate\)/)
 })
 
 test('AppV2 uses the profile-aware role RPC for expense groups', () => {
@@ -358,9 +366,9 @@ test('AppV2 snapshots pickleball member type changes into monthly config', () =>
 test('PickleballSettings member type actions include the current month', () => {
   const settingsSource = readFileSync(new URL('./screens/PickleballSettings.jsx', import.meta.url), 'utf8')
 
-  assert.match(settingsSource, /fixedMemberIds = safeArray\(d\.monthlyConfig\?\.fixedMemberIds \?\? d\.monthlyConfig\?\.fixed_member_ids\)/)
-  assert.match(settingsSource, /const displayType = fixedMemberIds\.length > 0/)
-  assert.match(settingsSource, /onAction\?\.\('setMemberType', \{ memberId: member\.id, groupId: d\.groupId, yearMonth: d\.currentYearMonth, type: nextType \}\)/)
+  assert.match(settingsSource, /const \[fixedMemberIds, setFixedMemberIds\] = useState\(\(\) => safeArray\(d\.fixedMemberIds\)\.map\(String\)\)/)
+  assert.match(settingsSource, /setFixedMemberIds\(safeArray\(d\.fixedMemberIds\)\.map\(String\)\)/)
+  assert.match(settingsSource, /yearMonth: d\.yearMonth,/)
 })
 
 test('AppV2 edit group preserves descriptions for expense group settings', () => {
@@ -639,7 +647,7 @@ test('AppV2 passes pickleball settings time and home treasurer role through prop
   assert.match(appSource, /scheduleStartDay: payload\?\.startDate,\s*scheduleTime: payload\?\.scheduleTime,/)
   assert.doesNotMatch(appSource, /courtFee: payload\?\.courtFee,[\s\S]*?scheduleWeekdays: payload\?\.weekdays/)
   assert.doesNotMatch(appSource, /ticketPrice: payload\?\.ticketPrice,[\s\S]*?scheduleWeekdays: payload\?\.weekdays/)
-  assert.match(appSource, /return <Home data=\{homeData\} isTreasurer=\{isTreasurer\} paymentOpen=\{homePaymentOpen\} onPaymentClose=\{\(\) => handle\('closeHomePayment'\)\} onAction=\{handle\} \/>/)
+  assert.match(appSource, /return <Home data=\{homeData\} isTreasurer=\{isTreasurer\} isPickleballTreasurer=\{isPickleballTreasurer\} paymentOpen=\{homePaymentOpen\} onPaymentClose=\{\(\) => handle\('closeHomePayment'\)\} onAction=\{handle\} \/>/)
 })
 
 test('AppV2 routes treasurer team-fund config through a dedicated screen and handler', () => {
@@ -702,7 +710,7 @@ test('AppV2 routes pickleball month navigation through calendar params and auto-
   assert.match(appSource, /const nextYearMonth = shiftYearMonth\(currentYearMonth, type === 'monthNext' \? 1 : -1\)/)
   assert.match(appSource, /screen: 'pickleball-calendar'[\s\S]*params: \{ \.\.\.route\.params, yearMonth: nextYearMonth \}/)
   assert.match(appSource, /type: 'AUTO_GENERATE_SESSIONS'[\s\S]*yearMonth: nextYearMonth[\s\S]*config: generationConfig/)
-  assert.match(appSource, /case 'pickleball-calendar': return <PickleballCalendar data=\{getPickleballCalendarData\(route\.params\)\}/)
+  assert.match(appSource, /case 'pickleball-calendar': return <PickleballCalendar data=\{getPickleballCalendarData\(route\.params\)\} isTreasurer=\{isPickleballTreasurer\}/)
   assert.match(appSource, /function shiftYearMonth\(yearMonth, delta\)/)
   assert.doesNotMatch(appSource, /'monthPrev',\s*\n\s*'monthNext',/)
 })
@@ -711,10 +719,9 @@ test('Member management screens are registered in the app source', () => {
   const memberListSource = readFileSync(new URL('./screens/PickleballMembers.jsx', import.meta.url), 'utf8')
   assert.match(memberListSource, /const \[search, setSearch\] = useState\(''\)/)
   assert.match(memberListSource, /Xem thêm/)
-  assert.match(memberListSource, /onAction\?\.\('memberDetail', \{ memberId: member\.id \}\)/)
-  assert.match(memberListSource, /quickAction/)
-  assert.match(memberListSource, /Cố định ·/)
-  assert.match(memberListSource, /Vãng lai ·/)
+  assert.match(memberListSource, /profileId: editingMember\?\.profileId \|\| editingMember\?\.profile_id \|\| ''/)
+  assert.match(memberListSource, /Cố định\s*<\/MemberTypeButton>/)
+  assert.match(memberListSource, /Vãng lai\s*<\/MemberTypeButton>/)
   assert.match(memberListSource, /const memberCandidates = d\.memberCandidates \|\| \[\]/)
   assert.match(memberListSource, /selectedCandidateIds/)
   assert.match(memberListSource, /placeholder="Tìm thành viên hoặc nhập tên mới"/)

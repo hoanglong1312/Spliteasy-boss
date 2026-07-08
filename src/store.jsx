@@ -552,6 +552,7 @@ async function ensureProfileForMember(sb, member) {
 function buildEmptyState() {
   return {
     currentUserId: null,
+    currentProfileId: null,
     currentUserName: null,
     selectedYearMonth: monthKey(new Date()),
     currentGroupId: null,
@@ -780,7 +781,7 @@ function findPickleSessionInState(state, sessionId) {
   ].find(session => String(session?.id) === id) || null
 }
 
-function resolveMemberForGroup({ members, memberTokens, groupId, currentMemberId, currentUserName }) {
+function resolveMemberForGroup({ members, memberTokens, groupId, currentMemberId, currentProfileId, currentUserName }) {
   const groupMembers = safeArray(members).filter(m => (m.groupId ?? m.group_id) === groupId)
   const tokenMemberIds = new Set(normalizeMemberTokens(memberTokens).map(t => t.memberId))
   const tokenMember = groupMembers.find(m => tokenMemberIds.has(m.id))
@@ -788,6 +789,11 @@ function resolveMemberForGroup({ members, memberTokens, groupId, currentMemberId
 
   const currentMember = groupMembers.find(m => m.id === currentMemberId)
   if (currentMember) return currentMember
+
+  const profileMember = currentProfileId
+    ? groupMembers.find(m => String(m.profileId || m.profile_id || '') === String(currentProfileId))
+    : null
+  if (profileMember) return profileMember
 
   const namedMember = groupMembers.find(m => sameMemberName(m.name, currentUserName))
   if (namedMember) return namedMember
@@ -899,15 +905,18 @@ function applyGroupSelection(state, groupId, options = {}) {
     memberTokens: state.memberTokens,
     groupId,
     currentMemberId: options.currentMemberId ?? state.currentUserId,
+    currentProfileId: options.currentProfileId ?? options.currentProfile_id ?? state.currentProfileId,
     currentUserName: options.currentUserName ?? state.currentUserName,
   })
   const currentUserId = nextMember?.id || state.currentUserId
+  const currentProfileId = options.currentProfileId || options.currentProfile_id || nextMember?.profileId || nextMember?.profile_id || state.currentProfileId || null
   const currentUserName = nextMember?.name || state.currentUserName || ''
   const members = safeArray(state.members).map(m => ({ ...m, isMe: m.id === currentUserId }))
 
   return {
     ...state,
     currentUserId,
+    currentProfileId,
     currentUserName,
     currentGroupId: groupId,
     currentGroup,
@@ -915,7 +924,7 @@ function applyGroupSelection(state, groupId, options = {}) {
   }
 }
 
-function normalize(raw, currentMemberId, preferredGroupId = null, preferredMemberName = '') {
+function normalize(raw, currentMemberId, preferredGroupId = null, preferredMemberName = '', preferredProfileId = '') {
   const {
     members,
     profiles = [],
@@ -945,7 +954,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
   const activeGroups = safeArray(groups).filter(group => !group.deleted_at && !group.deletedAt)
   if (activeGroups.length === 0) return null  // signal: data empty but keep session
 
-  const me = members.find(m => m.id === currentMemberId)
+  const me = members.find(m => m.id === currentMemberId) ||
+    (preferredProfileId ? members.find(m => String(m.profile_id || m.profileId || '') === String(preferredProfileId)) : null)
   const currentGroup = activeGroups.find(g => g.id === preferredGroupId) || activeGroups.find(g => g.id === me?.group_id) || activeGroups[0]
   const normalJoinRequests = safeArray(joinRequests)
     .map(r => ({
@@ -1389,6 +1399,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
   }))
   const baseState = {
     currentUserId: currentMemberId,
+    currentProfileId: me?.profileId || me?.profile_id || null,
     currentUserName: me?.name || '',
     currentGroupId: currentGroup.id,
     currentGroup: typedGroups.find(g => g.id === currentGroup.id) || typedGroups[0] || null,
@@ -1423,6 +1434,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
 
   const selectedState = applyGroupSelection(baseState, currentGroup.id, {
     currentMemberId,
+    currentProfileId: preferredProfileId || me?.profileId || me?.profile_id || null,
     currentUserName: preferredMemberName || me?.name || '',
   })
   return applyPickleballSelection(selectedState, preferredGroupId)
@@ -1436,6 +1448,7 @@ export function AppProvider({ children }) {
       return {
         ...buildEmptyState(),
         currentUserId: storedMember.id,
+        currentProfileId: storedMember.profileId || storedMember.profile_id || null,
         currentUserName: storedMember.name,
         currentGroupId: storedMember.groupId || storedMember.group_id,
         _loading: true,
@@ -1463,7 +1476,7 @@ export function AppProvider({ children }) {
     try {
       const { member } = getStoredAuth()
       const raw = await fetchGroupData(t)
-      const next = normalize(raw, member?.id, member?.groupId || member?.group_id, member?.name)
+      const next = normalize(raw, member?.id, member?.groupId || member?.group_id, member?.name, member?.profileId || member?.profile_id)
       if (next) {
         const nextState = {
           ...next,
@@ -1477,7 +1490,7 @@ export function AppProvider({ children }) {
             id: nextState.currentUserId,
             groupId: nextState.currentGroupId,
             name: nextState.currentUserName,
-            profileId: currentMember?.profileId || currentMember?.profile_id || '',
+            profileId: nextState.currentProfileId || currentMember?.profileId || currentMember?.profile_id || '',
             groupName: nextState.currentGroup?.name || '',
             hasPin: currentMember?.hasPin === true || currentMember?.has_pin === true,
           })
@@ -1582,8 +1595,8 @@ export function AppProvider({ children }) {
       }
 
       case 'LOGIN': {
-        const { token: newToken, memberId, groupId, memberName, groupName, inviteCode } = action
-        storeAuth(newToken, { id: memberId, groupId, name: memberName, groupName, inviteCode: inviteCode || '' })
+        const { token: newToken, memberId, groupId, memberName, groupName, inviteCode, profileId, profile_id } = action
+        storeAuth(newToken, { id: memberId, groupId, name: memberName, groupName, inviteCode: inviteCode || '', profileId: profileId || profile_id || '' })
         tokenRef.current = newToken
         await refresh(newToken)
         break
@@ -1624,6 +1637,7 @@ export function AppProvider({ children }) {
             id: next.currentUserId,
             groupId: next.currentGroupId,
             name: next.currentUserName,
+            profileId: next.currentProfileId || '',
           })
         }
         stateRef.current = next

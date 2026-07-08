@@ -65,6 +65,19 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
     return normalizeSearch(`${member.name} ${member.bankName} ${member.bankAccount}`).includes(query);
   });
 
+  useEffect(() => {
+    const focusMemberId = d.focusMemberId || d.focus_member_id || '';
+    const focusProfileId = d.focusProfileId || d.focus_profile_id || '';
+    if (!focusMemberId && !focusProfileId) return;
+    const member = (d.members || []).find(candidate => (
+      String(candidate.id) === String(focusMemberId) ||
+      String(candidate.profileId || candidate.profile_id || '') === String(focusProfileId)
+    ));
+    if (!member) return;
+    setActiveTab('members');
+    setSelectedMember(member);
+  }, [d.id, d.currentYearMonth, d.focusMemberId, d.focusProfileId]);
+
   function closeMemberSheets() {
     setAddingMember(false);
     setEditingMember(null);

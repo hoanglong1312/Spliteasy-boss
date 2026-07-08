@@ -432,13 +432,15 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
       return settlementRelevantMonthDates(pickleState, startDate, endDate).map(monthDate => {
         const month = monthKey(monthDate)
         const monthSessions = getStateMonthSessions(pickleState, monthDate)
+        const balance = buildMemberMonthBalance(pickleState, pickle, monthSessions, member.id, monthDate)
         return {
         sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
         sourceType: 'pickleball',
         sourceLabel: pickleState?.currentGroup?.name || 'Pickleball',
         memberId: member.id,
-        amount: buildMemberMonthBalance(pickleState, pickle, monthSessions, member.id, monthDate).netBalance || 0,
+        amount: balance.netBalance || 0,
         month,
+        monthBreakdown: [{ month, label: sourceMonthLabel(month), amount: balance.netBalance || 0 }],
         }
       })
     })

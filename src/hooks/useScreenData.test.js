@@ -1195,7 +1195,7 @@ describe('buildHomeData', () => {
     })
   })
 
-  test('includes outstanding transactions from previous months in other groups', () => {
+  test('shows only selected month transactions in recent list', () => {
     const members = [
       { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
@@ -1220,6 +1220,15 @@ describe('buildHomeData', () => {
         paidBy: 'long-life',
         paid_by_member_id: 'long-life',
         participants: ['expense-tuan', 'long-life'],
+      }, {
+        id: 'life-june-expense',
+        title: 'Chi tiêu tháng 6',
+        amount: 200000,
+        date: '2026-06-03',
+        expense_date: '2026-06-03',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['expense-tuan', 'long-life'],
       }],
     }]
     const state = {
@@ -1232,7 +1241,7 @@ describe('buildHomeData', () => {
       settlementCheckpoints: [],
     }
 
-    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-05')
 
     expect(result.transactions).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -1243,6 +1252,7 @@ describe('buildHomeData', () => {
         amount: -100000,
       }),
     ]))
+    expect(result.transactions.some(row => row.id === 'life-june-expense')).toBe(false)
   })
 
   test('includes source breakdown from other groups matched by profile id', () => {
@@ -1297,6 +1307,161 @@ describe('buildHomeData', () => {
       amount: -100000,
       monthBreakdown: [{ month: '2026-05', label: 'Tháng 5', amount: -100000 }],
     })
+  })
+
+  test('uses profile id, not login member id, for member home source totals', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'expense-1', name: 'Lê Tuấn' },
+      { id: 'long-pickle', profile_id: 'profile-long', group_id: 'pickle-1', name: 'Hoàng Long', role: 'treasurer' },
+      { id: 'long-life', profile_id: 'profile-long', group_id: 'life-1', name: 'Hoàng Long', role: 'treasurer' },
+      { id: 'long-expense', profile_id: 'profile-long', group_id: 'expense-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan', 'long-pickle'],
+    }, {
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'long-life'],
+      expenses: [{
+        id: 'life-may',
+        title: 'Lấy vk tháng 5',
+        amount: 200000,
+        date: '2026-05-05',
+        expense_date: '2026-05-05',
+        paidBy: 'long-life',
+        paid_by_member_id: 'long-life',
+        participants: ['life-tuan', 'long-life'],
+      }],
+    }, {
+      id: 'expense-1',
+      name: 'Chi tiêu Virgo 246',
+      members: ['expense-tuan', 'long-expense'],
+      expenses: [{
+        id: 'expense-may',
+        title: 'Nước tháng 5',
+        amount: 825000,
+        date: '2026-05-06',
+        expense_date: '2026-05-06',
+        paidBy: 'long-expense',
+        paid_by_member_id: 'long-expense',
+        participants: ['expense-tuan', 'long-expense'],
+      }],
+    }]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      _allPickle: {
+        externalTickets: [{
+          id: 'pickle-may',
+          group_id: 'pickle-1',
+          year_month: '2026-05',
+          session_date: '2026-05-07',
+          total_amount: 1589180,
+          member_ids: ['pickle-tuan', 'long-pickle'],
+          status: 'team_fund',
+        }],
+      },
+    }
+    const state = {
+      currentUserId: 'stale-login-member',
+      currentProfileId: 'profile-tuan',
+      currentUserName: '',
+      currentGroupId: 'life-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'stale-login-member', members, groups, {}, pickleballState, '2026-05')
+
+    expect(result.cappedTotalBalance).toBe(-1307090)
+    expect(result.cappedSourceBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceId: 'pickle-1', sourceType: 'pickleball', amount: -794590 }),
+      expect.objectContaining({ sourceId: 'life-1', amount: -100000 }),
+      expect.objectContaining({ sourceId: 'expense-1', amount: -412500 }),
+    ]))
+    expect(result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-tuan')).toMatchObject({
+      amount: 1307090,
+      sourceSummary: '3 nguồn tiền',
+    })
+  })
+
+  test('does not let linked expense month settlement hide pickleball month debt', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'expense-1', name: 'Lê Tuấn' },
+      { id: 'long-pickle', profile_id: 'profile-long', group_id: 'pickle-1', name: 'Hoàng Long', role: 'treasurer' },
+      { id: 'long-expense', profile_id: 'profile-long', group_id: 'expense-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan', 'long-pickle'],
+    }, {
+      id: 'expense-1',
+      name: 'Chi tiêu Virgo 246',
+      linked_pickleball_group_id: 'pickle-1',
+      members: ['expense-tuan', 'long-expense'],
+      expenses: [{
+        id: 'expense-may',
+        title: 'Nước tháng 5',
+        amount: 825000,
+        date: '2026-05-06',
+        expense_date: '2026-05-06',
+        paidBy: 'long-expense',
+        paid_by_member_id: 'long-expense',
+        participants: ['expense-tuan', 'long-expense'],
+      }],
+    }]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      _allPickle: {
+        externalTickets: [{
+          id: 'pickle-may',
+          group_id: 'pickle-1',
+          year_month: '2026-05',
+          session_date: '2026-05-07',
+          total_amount: 1589180,
+          member_ids: ['pickle-tuan', 'long-pickle'],
+          status: 'team_fund',
+        }],
+      },
+    }
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'expense-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'expense-settled-may',
+        member_id: 'expense-tuan',
+        group_id: 'expense-1',
+        month: '2026-05',
+        expense_id: 'expense-may',
+      }],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, pickleballState, '2026-05')
+
+    expect(result.cappedSourceBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceId: 'pickle-1', sourceType: 'pickleball', amount: -794590 }),
+    ]))
   })
 
   test('dedupes identical confirmed treasurer payments by member source month amount', () => {
@@ -1935,11 +2100,7 @@ describe('buildHomeData', () => {
       amount: -200000,
       monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -200000 }],
     })
-    expect(transaction).toMatchObject({
-      amount: -200000,
-      currentMemberId: 'life-tuan',
-      isMine: true,
-    })
+    expect(transaction).toBeUndefined()
   })
 
   test('scopes explicit covered source payment to notice month', () => {
@@ -2182,6 +2343,64 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('does not apply same-name checkpoint from another profile to pickleball debt', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'legacy-member-1', profile_id: 'legacy-profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'pickle-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['member-1', 'legacy-member-1', 'treasurer-1'],
+    }]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      _allPickle: {
+        externalTickets: [{
+          id: 'ticket-1',
+          group_id: 'pickle-1',
+          year_month: '2026-05',
+          session_date: '2026-05-10',
+          total_amount: 100000,
+          member_ids: ['member-1', 'treasurer-1'],
+          status: 'team_fund',
+        }],
+      },
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentProfileId: 'profile-1',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'legacy-checkpoint',
+        group_id: 'pickle-1',
+        member_id: 'legacy-member-1',
+        period_end: '2026-05-31T23:59:59.999Z',
+        confirmed_at: '2026-05-31T23:59:59.999Z',
+        status: 'confirmed',
+      }],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-05')
+
+    expect(result.cappedSourceBreakdown).toEqual([
+      expect.objectContaining({
+        sourceId: 'pickle-1',
+        sourceType: 'pickleball',
+        amount: -50000,
+      }),
+    ])
+  })
+
   test('adds source month breakdown without changing total amount', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
@@ -2295,7 +2514,7 @@ describe('buildHomeData', () => {
     expect(june.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 50000, status: 'unpaid' })
   })
 
-  test('uses confirmed payment notification as settlement cutoff across later months', () => {
+  test('uses explicit confirmed payment coverage across later months', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
@@ -2332,7 +2551,12 @@ describe('buildHomeData', () => {
         type: 'payment_submitted',
         group_id: 'group-1',
         actor_member_id: 'member-1',
-        metadata: { status: 'confirmed', monthLabel: 'Tháng 6 · 2026', amount: 50000 },
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 6 · 2026',
+          amount: 50000,
+          coveredSources: [{ sourceId: 'group-1', memberId: 'member-1', amount: -50000, month: '2026-06' }],
+        },
         created_at: '2026-06-30T12:00:00.000Z',
       }],
       settlementCheckpoints: [],
@@ -2347,7 +2571,7 @@ describe('buildHomeData', () => {
     expect(progressRow).toMatchObject({ amount: 30000, status: 'unpaid' })
   })
 
-  test('keeps treasurer outstanding stable across month views after confirmed payment notice', () => {
+  test('keeps treasurer outstanding stable across month views after explicit confirmed payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
@@ -2384,7 +2608,12 @@ describe('buildHomeData', () => {
         type: 'payment_submitted',
         group_id: 'group-1',
         actor_member_id: 'member-1',
-        metadata: { status: 'confirmed', monthLabel: 'Tháng 7 · 2026', amount: 50000 },
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 7 · 2026',
+          amount: 50000,
+          coveredSources: [{ sourceId: 'group-1', memberId: 'member-1', amount: -50000, month: '2026-07' }],
+        },
         created_at: '2026-07-10T12:00:00.000Z',
       }],
       settlementCheckpoints: [],
@@ -2402,7 +2631,7 @@ describe('buildHomeData', () => {
     expect(august.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 20000, status: 'unpaid' })
   })
 
-  test('shows only post-confirmation debt after confirmed payment notice', () => {
+  test('shows only post-confirmation debt after explicit confirmed payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
@@ -2439,7 +2668,12 @@ describe('buildHomeData', () => {
         type: 'payment_submitted',
         group_id: 'group-1',
         actor_member_id: 'member-1',
-        metadata: { status: 'confirmed', monthLabel: 'Tháng 5 · 2026', amount: 894590 },
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 5 · 2026',
+          amount: 894590,
+          coveredSources: [{ sourceId: 'group-1', memberId: 'member-1', amount: -894590, month: '2026-05' }],
+        },
         created_at: '2026-07-05T05:11:13.000Z',
       }],
       settlementCheckpoints: [],
@@ -2516,7 +2750,7 @@ describe('buildHomeData', () => {
     ])
   })
 
-  test('does not show carried pickleball residual twice after month settlement', () => {
+  test('keeps pickleball residual separate from linked expense month settlement', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Phạm Tiến' },
       { id: 'expense-member-1', profile_id: 'profile-1', group_id: 'expense-1', name: 'Phạm Tiến' },
@@ -2590,8 +2824,9 @@ describe('buildHomeData', () => {
     const pickleballSource = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
     const expenseSource = result.sourceBreakdown.find(row => row.sourceId === 'expense-1')
 
-    expect(pickleballSource.amount).toBe(-1273992)
+    expect(pickleballSource.amount).toBe(-1310978)
     expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -36986 },
       { month: '2026-06', label: 'Tháng 6', amount: -652564 },
       { month: '2026-07', label: 'Tháng 7', amount: -621428 },
     ])
@@ -2600,7 +2835,7 @@ describe('buildHomeData', () => {
     ])
   })
 
-  test('does not show carried pickleball residual when settlement uses linked group and member ids', () => {
+  test('does not settle pickleball debt from linked group month settlement', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Tuấn' },
       { id: 'expense-member-1', profile_id: 'profile-1', group_id: 'expense-1', name: 'Tuấn' },
@@ -2662,6 +2897,7 @@ describe('buildHomeData', () => {
     const expenseSource = result.sourceBreakdown.find(row => row.sourceId === 'expense-1')
 
     expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -814338 },
       { month: '2026-06', label: 'Tháng 6', amount: -652564 },
     ])
     expect(expenseSource.monthBreakdown).toEqual([
@@ -2669,7 +2905,7 @@ describe('buildHomeData', () => {
     ])
   })
 
-  test('removes treasurer-confirmed pickleball payment without explicit sources', () => {
+  test('keeps treasurer-confirmed pickleball payment without explicit sources unpaid', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Phạm Tiến' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'pickle-1', name: 'Treasurer One', role: 'treasurer' },
@@ -2716,8 +2952,9 @@ describe('buildHomeData', () => {
     const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
     const source = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
 
-    expect(source.amount).toBe(-1273992)
+    expect(source.amount).toBe(-2051344)
     expect(source.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -777352 },
       { month: '2026-06', label: 'Tháng 6', amount: -652564 },
       { month: '2026-07', label: 'Tháng 7', amount: -621428 },
     ])
@@ -2852,7 +3089,7 @@ describe('buildHomeData', () => {
     expect(pickleballSource.monthBreakdown.some(row => row.month === '2026-05')).toBe(false)
   })
 
-  test('removes confirmed pickleball checkpoint when member id differs but name matches', () => {
+  test('keeps pickleball debt when confirmed checkpoint only matches another profile name', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'legacy-member-1', profile_id: 'legacy-profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
@@ -2899,14 +3136,15 @@ describe('buildHomeData', () => {
 
     const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
     const pickleballSource = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
-    expect(pickleballSource.amount).toBe(-1214510)
+    expect(pickleballSource.amount).toBe(-2009100)
     expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -794590 },
       { month: '2026-06', label: 'Tháng 6', amount: -668082 },
       { month: '2026-07', label: 'Tháng 7', amount: -546428 },
     ])
   })
 
-  test('removes confirmed pickleball payment when paid member id differs but name matches', () => {
+  test('keeps confirmed pickleball payment without explicit coverage unpaid when paid member id differs but name matches', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'legacy-member-1', profile_id: 'legacy-profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
@@ -2964,14 +3202,15 @@ describe('buildHomeData', () => {
 
     const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
     const pickleballSource = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
-    expect(pickleballSource.amount).toBe(-1214510)
+    expect(pickleballSource.amount).toBe(-2009100)
     expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -794590 },
       { month: '2026-06', label: 'Tháng 6', amount: -668082 },
       { month: '2026-07', label: 'Tháng 7', amount: -546428 },
     ])
   })
 
-  test('removes legacy cross-group pickleball payment by member name and month only', () => {
+  test('keeps legacy cross-group pickleball payment without explicit coverage unpaid', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'legacy-member-1', profile_id: 'legacy-profile-1', group_id: 'legacy-group-1', name: 'Lê Tuấn' },
@@ -3023,14 +3262,15 @@ describe('buildHomeData', () => {
 
     const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
     const pickleballSource = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
-    expect(pickleballSource.amount).toBe(-1214510)
+    expect(pickleballSource.amount).toBe(-2009100)
     expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -794590 },
       { month: '2026-06', label: 'Tháng 6', amount: -668082 },
       { month: '2026-07', label: 'Tháng 7', amount: -546428 },
     ])
   })
 
-  test('removes legacy cross-group pickleball checkpoint from pickleball state notices', () => {
+  test('keeps legacy cross-group pickleball state notice without explicit coverage unpaid', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'legacy-member-1', profile_id: 'legacy-profile-1', group_id: 'legacy-group-1', name: 'Lê Tuấn' },
@@ -3084,8 +3324,9 @@ describe('buildHomeData', () => {
 
     const result = buildHomeData(state, 'member-1', members, groups, {}, pickleballState, '2026-07')
     const pickleballSource = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
-    expect(pickleballSource.amount).toBe(-1214510)
+    expect(pickleballSource.amount).toBe(-2009100)
     expect(pickleballSource.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -794590 },
       { month: '2026-06', label: 'Tháng 6', amount: -668082 },
       { month: '2026-07', label: 'Tháng 7', amount: -546428 },
     ])
@@ -3123,6 +3364,120 @@ describe('buildHomeData', () => {
 
     expect(result.paymentRecords[0].sourceSummary).toBe('Lấy vk để trưởng thành · Tháng 5 · 2026')
     expect(result.paymentRecords[0].sourceSummary).not.toBe('Chưa rõ nguồn')
+  })
+
+  test('payment records follow covered source month instead of broad notice label', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [],
+    }]
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentUserName: 'Hoàng Long',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-confirmed-may',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 6 · 2026',
+          amount: 794590,
+          memberName: 'Lê Tuấn',
+          coveredSources: [{
+            sourceId: 'group-1',
+            sourceLabel: 'Lấy vk để trưởng thành',
+            memberId: 'member-1',
+            profileId: 'profile-1',
+            month: '2026-05',
+            amount: -794590,
+          }],
+        },
+        created_at: '2026-07-05T05:11:13.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const mayResult = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-05')
+    const juneResult = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+
+    expect(mayResult.paymentRecords).toHaveLength(1)
+    expect(mayResult.paymentRecords[0]).toMatchObject({ memberName: 'Lê Tuấn', status: 'confirmed' })
+    expect(juneResult.paymentRecords).toHaveLength(0)
+  })
+
+  test('ignores pending payment notices whose covered source month differs from selected month', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Hoàng Long', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [{
+        id: 'may-expense',
+        title: 'Tháng 5',
+        amount: 200000,
+        date: '2026-05-15',
+        expense_date: '2026-05-15',
+        paidBy: 'treasurer-1',
+        paid_by_member_id: 'treasurer-1',
+        participants: ['member-1', 'treasurer-1'],
+      }, {
+        id: 'june-expense',
+        title: 'Tháng 6',
+        amount: 200000,
+        date: '2026-06-15',
+        expense_date: '2026-06-15',
+        paidBy: 'treasurer-1',
+        paid_by_member_id: 'treasurer-1',
+        participants: ['member-1', 'treasurer-1'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'pending-may-mislabeled-june',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: {
+          status: 'pending',
+          monthLabel: 'Tháng 6 · 2026',
+          amount: 100000,
+          coveredSources: [{
+            sourceType: 'group',
+            sourceId: 'group-1',
+            sourceLabel: 'Lấy vk để trưởng thành',
+            memberId: 'member-1',
+            profileId: 'profile-1',
+            month: '2026-05',
+            amount: -100000,
+          }],
+        },
+        created_at: '2026-06-20T00:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+
+    expect(result.paymentSummary.paymentStatus).toBe('')
+    expect(result.paymentSummary.pendingAmount).toBe(0)
   })
 
   test('exposes pending settlement checkpoint state for member and treasurer', () => {

@@ -79,6 +79,7 @@ function memberIdentityKey(member) {
 }
 
 function currentProfileId(state) {
+  if (state?.currentProfileId || state?.currentProfile_id) return state.currentProfileId || state.currentProfile_id
   const me = safeArray(state?.members).find(m => String(m.id) === String(state?.currentUserId))
   return me?.profileId || me?.profile_id || ''
 }
@@ -258,6 +259,7 @@ export default function AppV2() {
         type: 'LOGIN',
         token: data.authToken,
         memberId: data.memberId,
+        profileId: data.profileId || data.profile_id,
         groupId: data.groupId,
         memberName: data.memberName,
         groupName: data.groupName,
@@ -331,6 +333,7 @@ export default function AppV2() {
       type: 'LOGIN',
       token: data.authToken,
       memberId: data.memberId,
+      profileId: data.profileId || data.profile_id,
       groupId: data.groupId,
       memberName: data.memberName,
       groupName: data.groupName,
@@ -375,7 +378,7 @@ export default function AppV2() {
         console.error('[app] resumeSessionByProfile:', error || data)
         return null
       }
-      return { authToken: data.authToken, memberId: data.memberId, groupId: data.groupId, memberName: data.memberName || session.memberName, groupName: data.groupName || session.groupName }
+      return { authToken: data.authToken, memberId: data.memberId, profileId: data.profileId || data.profile_id || session.profileId, groupId: data.groupId, memberName: data.memberName || session.memberName, groupName: data.groupName || session.groupName }
     }
 
     if (!session?.memberId) return null
@@ -388,7 +391,7 @@ export default function AppV2() {
       console.error('[app] resumeRecentSession:', error || data)
       return null
     }
-    return { authToken: data.authToken, memberId: data.memberId || session.memberId, groupId: data.groupId || session.groupId, memberName: data.memberName || session.memberName, groupName: data.groupName || session.groupName }
+    return { authToken: data.authToken, memberId: data.memberId || session.memberId, profileId: data.profileId || data.profile_id || session.profileId, groupId: data.groupId || session.groupId, memberName: data.memberName || session.memberName, groupName: data.groupName || session.groupName }
   }
 
   async function verifyMemberPin(memberId, pin) {
@@ -488,7 +491,7 @@ export default function AppV2() {
       if (!resolved?.authToken) return { error: 'no_token' }
       setStack([])
       setActiveTab('home')
-      await dispatch({ type: 'LOGIN', token: resolved.authToken, memberId: resolved.memberId, groupId: resolved.groupId, memberName: resolved.memberName, groupName: resolved.groupName || session?.groupName })
+      await dispatch({ type: 'LOGIN', token: resolved.authToken, memberId: resolved.memberId, profileId: resolved.profileId || session?.profileId, groupId: resolved.groupId, memberName: resolved.memberName, groupName: resolved.groupName || session?.groupName })
       return { ok: true }
     }
 
@@ -516,6 +519,7 @@ export default function AppV2() {
         type: 'LOGIN',
         token: authToken,
         memberId: resolved.memberId || payload.memberId,
+        profileId: resolved.profileId || payload.profileId,
         groupId: resolved.groupId || payload.groupId,
         memberName: resolved.memberName || payload.memberName,
         groupName: resolved.groupName || payload.groupName,
@@ -541,6 +545,7 @@ export default function AppV2() {
         type: 'LOGIN',
         token: payload.token,
         memberId: payload.memberId,
+        profileId: payload.profileId || payload.profile_id,
         groupId: payload.groupId,
         memberName: payload.memberName,
         groupName: payload.groupName,
@@ -607,6 +612,8 @@ export default function AppV2() {
       const route = typeof payload === 'string'
         ? { screen: payload }
         : { screen: payload?.screen, params: payload?.params }
+      const isPickleballRoute = route.screen && String(route.screen).startsWith('pickleball-')
+      if (isPickleballRoute) setActiveTab('pickleball')
       if (route.screen) setStack((s) => [...s, route])
       return
     }
@@ -2067,14 +2074,15 @@ export default function AppV2() {
       const manualSession = {
         authToken: result.token,
         memberId: result.member_id,
+        profileId: result.profile_id || result.profileId || '',
         groupId: result.group_id,
         memberName: result.member_name,
         groupName: result.group_name || result.groupName || payload.groupName || '',
         hasPin: true,
       }
-      const requiresPin = await checkMemberPinRequired(manualSession.memberId)
+      const requiresPin = await checkMemberPinRequired(manualSession.memberId, manualSession.profileId)
       const member = safeArray(state?.members).find(m => String(m.id) === String(manualSession.memberId))
-      const pinKey = member?.profileId || member?.profile_id || manualSession.memberId
+      const pinKey = manualSession.profileId || member?.profileId || member?.profile_id || manualSession.memberId
       if (requiresPin && sessionStorage.getItem(PIN_UNLOCK_KEY) !== pinKey) {
         return { status: 'requires_pin', memberId: manualSession.memberId, memberName: manualSession.memberName }
       }
@@ -2084,6 +2092,7 @@ export default function AppV2() {
         type: 'LOGIN',
         token: manualSession.authToken,
         memberId: manualSession.memberId,
+        profileId: manualSession.profileId,
         groupId: manualSession.groupId,
         memberName: manualSession.memberName,
         groupName: manualSession.groupName,
@@ -2384,7 +2393,7 @@ export default function AppV2() {
           coveredSources,
           transferDescription: payload?.transferDescription,
           paymentTarget: payload?.paymentTarget,
-          monthLabel: homeData?.monthLabel,
+          monthLabel: payload?.monthLabel || homeData?.monthLabel,
         })
         await dispatch({ type: 'REFRESH' })
         dispatch({ type: 'SHOW_TOAST', message: `Đã gửi báo thanh toán cho thủ quỹ: ${names || 'thành viên'}.` })
@@ -2668,10 +2677,17 @@ export default function AppV2() {
     switch (route.screen) {
       case 'group-detail': {
         const detailData = route.params?.groupId ? getGroupDetailData(route.params.groupId) : groupDetailData
-        return <GroupDetail data={detailData} isTreasurer={detailData?.isTreasurer ?? isTreasurer} onAction={handle} />
+        const focusedDetailData = {
+          ...detailData,
+          focusMemberId: route.params?.focusMemberId || '',
+          focusProfileId: route.params?.focusProfileId || '',
+          focusMonth: route.params?.focusMonth || '',
+        }
+        return <GroupDetail data={focusedDetailData} isTreasurer={focusedDetailData?.isTreasurer ?? isTreasurer} onAction={handle} />
       }
       case 'add-expense':         return <AddExpense data={getAddExpenseData(route.params)} onAction={handle} />
       case 'all-expenses':        return <AllExpenses data={allExpensesData} isTreasurer={isTreasurer} onAction={handle} />
+      case 'pickleball-overview': return <PickleballOverview data={pickleballOverviewData} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-calendar': return <PickleballCalendar data={getPickleballCalendarData(route.params)} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-members':  return <PickleballMembers data={getPickleballMembersData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
       case 'pickleball-settings': return <PickleballSettings data={getPickleballSettingsData()} isTreasurer={isPickleballTreasurer} onAction={handle} />
