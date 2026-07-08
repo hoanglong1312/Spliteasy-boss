@@ -1301,6 +1301,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     venueBankAccount: group.venue_bank_account || '',
     venue_bank_account: group.venue_bank_account || '',
     inviteCode: group.invite_code,
+    archivedAt: group.archived_at || null,
+    archived_at: group.archived_at || null,
     members: members.filter(m => m.group_id === group.id).map(m => m.id),
     expenses: normalExpenses.filter(e => e.groupId === group.id),
     settlements: normalSettlements.filter(s => s.groupId === group.id),

@@ -14,19 +14,24 @@ DECLARE
   v_actor_member_id uuid;
 BEGIN
   WITH current_actor AS (
-    SELECT id, profile_id, name
-    FROM public.members
-    WHERE id = public.get_current_member_id()
-      AND is_active IS NOT FALSE
+    SELECT m.id, m.profile_id, p.name
+    FROM public.members m
+    LEFT JOIN public.profiles p ON p.id = m.profile_id
+    WHERE m.id = public.get_current_member_id()
+      AND m.is_active IS NOT FALSE
     LIMIT 1
   )
   SELECT m.id
   INTO v_actor_member_id
   FROM public.members m
+  LEFT JOIN public.profiles mp ON mp.id = m.profile_id
   JOIN current_actor actor ON (
     m.id = actor.id
     OR (actor.profile_id IS NOT NULL AND m.profile_id = actor.profile_id)
-    OR lower(m.name) = lower(actor.name)
+    OR (
+      NULLIF(trim(actor.name), '') IS NOT NULL
+      AND lower(mp.name) = lower(actor.name)
+    )
   )
   JOIN public.groups g ON g.id = m.group_id
   WHERE m.group_id = p_group_id

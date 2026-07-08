@@ -40,6 +40,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [fabOpen, setFabOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(false);
   const [archiveConfirmGroup, setArchiveConfirmGroup] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
   const [deleteConfirmGroup, setDeleteConfirmGroup] = useState(false);
   const [groupName, setGroupName] = useState(d.name || '');
   const [groupTypeKey, setGroupTypeKey] = useState(initialGroupType.key);
@@ -120,9 +121,12 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   async function archiveGroup() {
     if (savingAction) return;
     setSavingAction('archiveGroup');
+    setArchiveError('');
     try {
       await onAction?.('archiveGroup', { groupId: d.id });
       setArchiveConfirmGroup(false);
+    } catch (error) {
+      setArchiveError(error?.message || 'Không lưu trữ được nhóm.');
     } finally {
       setSavingAction('');
     }
@@ -374,6 +378,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
               style={{ marginTop: 10 }}
               onClick={() => {
                 setEditingGroup(false);
+                setArchiveError('');
                 setArchiveConfirmGroup(true);
               }}
             >Lưu trữ nhóm</ActionButton>
@@ -395,6 +400,20 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           <div style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>
             Nhóm sẽ ẩn khỏi danh sách chính. Dữ liệu tiền vẫn giữ nguyên để rà soát sau.
           </div>
+          {archiveError && (
+            <div style={{
+              marginTop: 10,
+              padding: '9px 10px',
+              borderRadius: 10,
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.26)',
+              color: colors.danger,
+              fontSize: 12,
+              lineHeight: 1.4,
+            }}>
+              {archiveError}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 16 }}>
             <Button type="button" variant="ghost" onClick={() => setArchiveConfirmGroup(false)}>Hủy</Button>
             <Button

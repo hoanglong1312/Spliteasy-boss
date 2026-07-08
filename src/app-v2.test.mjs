@@ -394,6 +394,13 @@ test('AppV2 deletes expense groups through the profile-aware RPC', () => {
   assert.doesNotMatch(storeSource, /case 'DELETE_GROUP':[\s\S]*\.from\('groups'\)[\s\S]*deleted_at: new Date\(\)\.toISOString\(\)/)
 })
 
+test('store preserves expense group archive metadata for group list filtering', () => {
+  assert.match(storeSource, /archivedAt: group\.archived_at \|\| null/)
+  assert.match(storeSource, /archived_at: group\.archived_at \|\| null/)
+  assert.match(dataSource, /const activeRows = rows\.filter\(g => !g\.archivedAt\)/)
+  assert.match(dataSource, /const archivedRows = rows\.filter\(g => g\.archivedAt\)/)
+})
+
 test('AppV2 uses expense-group RPCs for normal member edits instead of pickleball writes', () => {
   assert.match(appSource, /if \(type === 'addExpenseGroupMember'\)/)
   assert.match(appSource, /\.rpc\('add_expense_group_member'/)
