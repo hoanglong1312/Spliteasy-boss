@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const paymentSettlementsMigrationSource = readFileSync(new URL('../supabase/migrations/20260709000001_record_payment_settlements.sql', import.meta.url), 'utf8')
+const paymentSettlementsProfileMigrationSource = readFileSync(new URL('../supabase/migrations/20260709000002_fix_payment_settlement_treasurer_profile.sql', import.meta.url), 'utf8')
 
 test('store owns toast state and hide lifecycle', () => {
   assert.match(storeSource, /const TOAST_HIDE_DELAY_MS = 3000/)
@@ -110,6 +111,16 @@ test('payment settlement migration records and backfills confirmed source months
   assert.match(paymentSettlementsMigrationSource, /jsonb_array_elements\(coalesce\(n\.metadata->'coveredSources'/)
   assert.match(paymentSettlementsMigrationSource, /lower\(coalesce\(n\.metadata->>'status', ''\)\) = 'confirmed'/)
   assert.match(paymentSettlementsMigrationSource, /on conflict \(member_id, month, group_id\) do nothing/)
+})
+
+test('payment settlement rpc resolves treasurer by profile for each source group', () => {
+  assert.match(paymentSettlementsProfileMigrationSource, /v_treasurer_profile_id uuid/)
+  assert.match(paymentSettlementsProfileMigrationSource, /v_settled_by_member_id uuid/)
+  assert.match(paymentSettlementsProfileMigrationSource, /select profile_id into v_treasurer_profile_id/)
+  assert.match(paymentSettlementsProfileMigrationSource, /profile_id = v_treasurer_profile_id/)
+  assert.match(paymentSettlementsProfileMigrationSource, /v_settled_by_member_id/)
+  assert.match(paymentSettlementsProfileMigrationSource, /left join public\.members actor_member/)
+  assert.match(paymentSettlementsProfileMigrationSource, /treasurer_by_profile\.id as settled_by_member_id/)
 })
 
 test('monthly pickleball config save persists schedule time aliases', () => {
