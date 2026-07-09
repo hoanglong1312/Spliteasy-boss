@@ -527,6 +527,34 @@ describe('flex billing helpers', () => {
     })
   })
 
+  test('buildMemberMonthBalanceFlex never splits team-fund ticket total in flex mode', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      per_session_ticket_price: 50000,
+    })
+    state.pickle.externalTickets = [{
+      id: 'ticket-flex-team-fund',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-06',
+      status: 'team_fund',
+      total_amount: 350000,
+      water_amount: 70000,
+      member_ids: ['member-1', 'member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }]
+
+    const result = buildMemberMonthBalanceFlex(state, {}, [], 'member-2', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      ticketType: null,
+      perSessionTicketFee: 0,
+      waterFee: 10000,
+      ticketShare: 0,
+      netBalance: -10000,
+      totalOwed: 10000,
+    })
+  })
+
   test('buildMemberMonthBalance uses configured ticket price for normal team-fund tickets', () => {
     const state = makeFlexState({
       ticket_price: 50000,
@@ -574,6 +602,35 @@ describe('flex billing helpers', () => {
       ticketShare: 60000,
       netBalance: -60000,
       totalOwed: 60000,
+    })
+  })
+
+  test('buildMemberMonthBalance prices normal team-fund tickets from monthly court rate', () => {
+    const fixedMemberIds = ['member-1', 'member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7']
+    const state = makeFlexState({
+      court_fee: 4550000,
+      sessions_count: 13,
+      fixed_member_ids: fixedMemberIds,
+    })
+    state.currentGroup.members = fixedMemberIds
+    state.members = fixedMemberIds.map(id => ({ id, group_id: 'group-1', name: id }))
+    state.pickle.externalTickets = [{
+      id: 'ticket-normal-court-rate',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-06',
+      status: 'team_fund',
+      total_amount: 770000,
+      water_amount: 0,
+      member_ids: fixedMemberIds,
+    }]
+
+    const result = buildMemberMonthBalance(state, {}, [], 'member-2', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      ticketShare: 50000,
+      netBalance: -50000,
+      totalOwed: 50000,
     })
   })
 
@@ -2942,6 +2999,148 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('pay-for rows hide settled group months the target profile no longer owes', () => {
+    const members = [
+      { id: 'tuan-halong', profile_id: 'profile-tuan', group_id: 'halong-1', name: 'Lê Tuấn' },
+      { id: 'myt-halong', profile_id: 'profile-myt', group_id: 'halong-1', name: 'Mýt' },
+      { id: 'payer-halong', profile_id: 'profile-payer', group_id: 'halong-1', name: 'Người ứng' },
+    ]
+    const groups = [{
+      id: 'halong-1',
+      name: 'Hạ Long thả gió',
+      members: ['tuan-halong', 'myt-halong', 'payer-halong'],
+      expenses: [
+        { id: 'myt-may', amount: 200000, expense_date: '2026-05-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
+        { id: 'myt-june', amount: 200000, expense_date: '2026-06-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
+      ],
+    }]
+    const state = {
+      currentUserId: 'tuan-halong',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'halong-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'myt-halong-may-settled',
+        member_id: 'myt-halong',
+        group_id: 'halong-1',
+        month: '2026-05',
+        expense_id: 'myt-halong-may-settlement',
+        expenses: { amount: 100000 },
+      }],
+    }
+
+    const tuanHome = buildHomeData(state, 'tuan-halong', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
+
+    expect(mytPayFor.amount).toBe(-100000)
+    expect(mytPayFor.sources.find(row => row.sourceType === 'group').monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -100000 },
+    ])
+  })
+
+  test('pay-for rows hide confirmed proxy-paid source months without source member id', () => {
+    const members = [
+      { id: 'tuan-halong', profile_id: 'profile-tuan', group_id: 'halong-1', name: 'Lê Tuấn' },
+      { id: 'myt-halong', profile_id: 'profile-myt', group_id: 'halong-1', name: 'Mýt' },
+      { id: 'payer-halong', profile_id: 'profile-payer', group_id: 'halong-1', name: 'Người ứng' },
+    ]
+    const groups = [{
+      id: 'halong-1',
+      name: 'Hạ Long thả gió',
+      members: ['tuan-halong', 'myt-halong', 'payer-halong'],
+      expenses: [
+        { id: 'myt-may', amount: 200000, expense_date: '2026-05-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
+        { id: 'myt-june', amount: 200000, expense_date: '2026-06-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
+      ],
+    }]
+    const state = {
+      currentUserId: 'tuan-halong',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'halong-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'tuan-paid-for-myt-may',
+        type: 'payment_submitted',
+        actor_member_id: 'tuan-halong',
+        member_id: 'payer-halong',
+        group_id: 'halong-1',
+        metadata: {
+          status: 'confirmed',
+          amount: 100000,
+          memberName: 'Lê Tuấn',
+          coveredMembers: [{ profileId: 'profile-myt', memberId: 'myt-halong', name: 'Mýt', amount: 100000 }],
+          coveredSources: [{ sourceId: 'halong-1', sourceType: 'group', sourceLabel: 'Hạ Long thả gió', month: '2026-05', amount: -100000 }],
+          monthLabel: 'Tháng 5 · 2026',
+        },
+      }],
+      settlementCheckpoints: [],
+      monthSettlements: [],
+    }
+
+    const tuanHome = buildHomeData(state, 'tuan-halong', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
+
+    expect(mytPayFor.amount).toBe(-100000)
+    expect(mytPayFor.sources.find(row => row.sourceType === 'group').monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -100000 },
+    ])
+  })
+
+  test('pay-for rows hide treasurer-confirmed target member source months', () => {
+    const members = [
+      { id: 'tuan-halong', profile_id: 'profile-tuan', group_id: 'halong-1', name: 'Lê Tuấn' },
+      { id: 'myt-halong', profile_id: 'profile-myt', group_id: 'halong-1', name: 'Mýt' },
+      { id: 'treasurer-halong', profile_id: 'profile-treasurer', group_id: 'halong-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'halong-1',
+      name: 'Hạ Long thả gió',
+      members: ['tuan-halong', 'myt-halong', 'treasurer-halong'],
+      expenses: [
+        { id: 'myt-may', amount: 200000, expense_date: '2026-05-10', paid_by_member_id: 'treasurer-halong', participants: ['myt-halong', 'treasurer-halong'] },
+        { id: 'myt-june', amount: 200000, expense_date: '2026-06-10', paid_by_member_id: 'treasurer-halong', participants: ['myt-halong', 'treasurer-halong'] },
+      ],
+    }]
+    const state = {
+      currentUserId: 'tuan-halong',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'halong-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'treasurer-confirmed-myt-may',
+        type: 'payment_confirmed',
+        actor_member_id: 'treasurer-halong',
+        member_id: 'myt-halong',
+        group_id: 'halong-1',
+        metadata: {
+          status: 'confirmed',
+          amount: 100000,
+          memberName: 'Mýt',
+          coveredSources: [{ sourceId: 'halong-1', sourceType: 'group', sourceLabel: 'Hạ Long thả gió', month: '2026-05', amount: -100000 }],
+          monthLabel: 'Tháng 5 · 2026',
+        },
+      }],
+      settlementCheckpoints: [],
+      monthSettlements: [],
+    }
+
+    const tuanHome = buildHomeData(state, 'tuan-halong', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
+
+    expect(mytPayFor.amount).toBe(-100000)
+    expect(mytPayFor.sources.find(row => row.sourceType === 'group').monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -100000 },
+    ])
+  })
+
   test('keeps pickleball month residual after partial confirmed payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Phạm Tiến' },
@@ -3919,6 +4118,53 @@ describe('buildGroupDetailData', () => {
     expect(member.balance).toBe(-80000)
     expect(member.monthBreakdown).toEqual([
       { month: '2026-05', label: 'Tháng 5', amount: -50000 },
+      { month: '2026-06', label: 'Tháng 6', amount: -30000 },
+    ])
+  })
+
+  test('hides settled source months from group detail balances', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const group = {
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'may-settled',
+          amount: 100000,
+          expense_date: '2026-05-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'june-open',
+          amount: 60000,
+          expense_date: '2026-06-10T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups: [group],
+      notifications: [],
+      settlementCheckpoints: [],
+      monthSettlements: [{ id: 'settlement-1', member_id: 'member-1', group_id: 'group-1', month: '2026-05' }],
+    }
+
+    const result = buildGroupDetailData(group, 'member-1', members, 'Member One', '2026-06', [], state)
+    const member = result.members.find(row => row.id === 'member-1')
+
+    expect(result.balance).toBe(-30000)
+    expect(member.balance).toBe(-30000)
+    expect(member.monthBreakdown).toEqual([
       { month: '2026-06', label: 'Tháng 6', amount: -30000 },
     ])
   })

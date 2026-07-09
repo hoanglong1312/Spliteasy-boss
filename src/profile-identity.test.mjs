@@ -184,17 +184,18 @@ test('screen data exposes profile aggregation helpers for home and monthly close
 })
 
 test('home renders source breakdown for the current profile', () => {
-  assert.match(screenDataSource, /currentProfileId: profileIdForMember\(currentUserId, members\)/)
-  assert.match(screenDataSource, /const rawSourceBreakdown = currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\)/)
+  assert.match(screenDataSource, /const currentProfileId = state\?\.currentProfileId \|\| state\?\.currentProfile_id \|\| me\?\.profileId \|\| me\?\.profile_id \|\| profileIdForMember\(currentUserId, members\)/)
+  assert.match(screenDataSource, /const rawSourceBreakdown = currentProfileSourceBreakdown\(sourceBalances, currentUserId, members, state\?\.currentUserName, currentProfileId\)/)
   assert.match(screenDataSource, /const sourceBreakdown = paymentSummary\.sourceBreakdown/)
-  assert.match(screenDataSource, /function currentProfileSourceBreakdown\(sourceBalances, currentUserId, members\) \{/)
-  assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{d\.sourceBreakdown \|\| \[\]\}[\s\S]*totalBalance=\{d\.totalBalance\}[\s\S]*paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}[\s\S]*onOpenPayment=\{\(\) => setPaymentSheetOpen\(true\)\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/)
-  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', onOpenPayment, onAction \}\) \{/)
-  assert.match(homeSource, /Theo nguồn tiền/)
+  assert.match(screenDataSource, /function currentProfileSourceBreakdown\(sourceBalances, currentUserId, members, currentUserName = '', currentProfileId = ''\) \{/)
+  assert.match(homeSource, /<SourceBreakdown[\s\S]*sources=\{heroSourceBreakdown\}[\s\S]*totalBalance=\{heroBalance\}[\s\S]*paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}[\s\S]*onOpenPayment=\{\(\) => setPaymentSheetOpen\(true\)\}[\s\S]*onAction=\{onAction\}[\s\S]*\/>/)
+  assert.match(homeSource, /function SourceBreakdown\(\{ sources, totalBalance = 0, balanceLabel = '', owedTo = 0, paymentStatus = '', pendingSettlementCheckpoint = null, onOpenPayment, onAction, viewedMonthKey = '', onViewMonth \}\) \{/)
+  assert.match(homeSource, /\{sourceRows\.length\} nguồn ·/)
   assert.match(homeSource, /source\.sourceLabel/)
-  assert.match(homeSource, /source\.sourceType === 'pickleball'/)
-  assert.match(homeSource, /onAction\?\.\('tab', 'pickleball'\)/)
-  assert.match(homeSource, /onAction\?\.\('open', source\.sourceId\)/)
+  assert.match(homeSource, /const isPickleball = sourceType === 'pickleball'/)
+  assert.match(homeSource, /source\?\.sourceType === 'pickleball'/)
+  assert.match(homeSource, /screen: 'pickleball-overview'/)
+  assert.match(homeSource, /screen: 'group-detail'/)
 })
 
 test('monthly close renders one profile bill with source breakdown rows', () => {

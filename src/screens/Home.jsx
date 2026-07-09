@@ -1,7 +1,8 @@
 // Spliteasy Boss — Trang chủ
 // Props: data { user, monthLabel, totalBalance, owedTo, pickleball, groups, todaySession, transactions[] }
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { toPng } from 'html-to-image';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, MonthNav, Card,
@@ -55,6 +56,22 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
     ? (outstandingAmount > 0 ? 'Còn cần thu' : 'Đã thu đủ')
     : balanceLabel;
   const heroSourceBreakdown = isTreasurer ? (d.sourceBreakdown || []) : (d.cappedSourceBreakdown || d.sourceBreakdown || []);
+  const paymentSourceBreakdown = d.paymentSummary?.sourceBreakdown || d.sourceBreakdown || heroSourceBreakdown;
+  const paymentNetBalance = Number(d.paymentSummary?.netBalance ?? d.totalBalance ?? memberHeroBalance) || 0;
+  const paymentSheetData = {
+    ...(d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }),
+    ...(isTreasurer ? {} : {
+      netBalance: paymentNetBalance,
+      sourceBreakdown: paymentSourceBreakdown,
+    }),
+    yearMonth: d.yearMonth || '',
+    currentProfileId: d.currentProfileId || '',
+    currentGroupId: d.currentGroupId || '',
+    currentUserId: d.currentUserId || '',
+    pendingSettlementCheckpoint: d.pendingSettlementCheckpoint || null,
+    pendingSettlementCheckpoints: d.pendingSettlementCheckpoints || [],
+    pendingCheckpointsForTreasurer: d.pendingCheckpointsForTreasurer || [],
+  };
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
   const pendingPayments = d.pendingPayments || [];
@@ -187,16 +204,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
 
       <PaymentSheet
         open={paymentOpen || paymentSheetOpen}
-        data={{
-          ...(d.paymentSummary || { netBalance: d.totalBalance, monthLabel: d.monthLabel }),
-          yearMonth: d.yearMonth || '',
-          currentProfileId: d.currentProfileId || '',
-          currentGroupId: d.currentGroupId || '',
-          currentUserId: d.currentUserId || '',
-          pendingSettlementCheckpoint: d.pendingSettlementCheckpoint || null,
-          pendingSettlementCheckpoints: d.pendingSettlementCheckpoints || [],
-          pendingCheckpointsForTreasurer: d.pendingCheckpointsForTreasurer || [],
-        }}
+        data={paymentSheetData}
         paymentRecords={d.paymentRecords || []}
         isTreasurer={isTreasurer}
         confirmedRefunds={confirmedRefunds}
@@ -806,10 +814,13 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const ownPaymentItemKeys = ownPaymentItems.map(item => item.key).join('|');
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [selectedPaymentSourceKeys, setSelectedPaymentSourceKeys] = useState(() => new Set());
+  const [selectedPayForSourceKeys, setSelectedPayForSourceKeys] = useState(() => new Set());
   const [payForExpanded, setPayForExpanded] = useState(false);
   const [paymentDetailsExpanded, setPaymentDetailsExpanded] = useState(false);
   useEffect(() => {
     setSelectedPaymentSourceKeys(new Set(ownPaymentItems.map(item => item.key)));
+    setSelectedPayForIds(new Set());
+    setSelectedPayForSourceKeys(new Set());
     setCopiedField('');
     setPaymentConfirmed(false);
   }, [open, ownPaymentItemKeys]);
@@ -818,18 +829,21 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const target = data?.paymentTarget || {};
   const qrBank = resolveVietQrBank(target);
   const payForRows = safeArray(data?.payForRows);
+  const payForRowKey = row => String(row.profileId || row.name);
+  const payForRowPaymentItems = row => safeArray(row.sources).flatMap((source, index) => sourcePaymentItems(source, {
+    prefix: `payfor:${row.profileId || row.name}:${index}`,
+    memberId: row.memberId || source.memberId || source.member_id || '',
+    profileId: row.profileId || source.profileId || source.profile_id || '',
+  })).map(item => ({ ...item, memberName: row.name }));
   const selectedPayForRows = payForRows.filter(row => selectedPayForIds.has(String(row.profileId || row.name)));
   const selectedOwnPaymentItems = ownPaymentItems.filter(item => selectedPaymentSourceKeys.has(item.key));
   const selectedPayForGroups = selectedPayForRows.map(row => {
-    const items = safeArray(row.sources).flatMap((source, index) => sourcePaymentItems(source, {
-      prefix: `payfor:${row.profileId || row.name}:${index}`,
-      memberId: row.memberId || source.memberId || source.member_id || '',
-      profileId: row.profileId || source.profileId || source.profile_id || '',
-    })).map(item => ({ ...item, memberName: row.name }));
+    const items = payForRowPaymentItems(row);
     return { row, items };
   }).filter(group => group.items.length > 0);
-  const selectedPayForPaymentItems = selectedPayForGroups.flatMap(group => group.items);
-  const selectedPayForTotal = selectedPayForPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+  const selectedPayForPaymentItems = selectedPayForGroups.flatMap(group => group.items).filter(item => selectedPayForSourceKeys.has(item.key));
+  const selectedPaymentItems = [...selectedOwnPaymentItems, ...selectedPayForPaymentItems];
+  const selectedPayForTotal = paymentItemsAmountDue(selectedPayForPaymentItems);
   const paymentDisplayGroups = [
     {
       key: 'own',
@@ -842,22 +856,18 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
       key: String(group.row.profileId || group.row.name),
       title: `Các khoản của ${group.row.name}`,
       items: group.items,
-      checkedKeys: new Set(group.items.map(item => item.key)),
-      onToggle: null,
+      checkedKeys: selectedPayForSourceKeys,
+      onToggle: togglePayForSource,
     })),
   ].filter(group => group.items.length > 0);
-  const coveredSources = [
-    ...selectedOwnPaymentItems.map(paymentItemToCoveredSource),
-    ...selectedPayForPaymentItems.map(paymentItemToCoveredSource),
-  ];
-  const amountToPay = selectedOwnPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0)
-    + selectedPayForPaymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+  const coveredSources = selectedPaymentItems.map(paymentItemToCoveredSource);
+  const amountToPay = paymentItemsAmountDue(selectedOwnPaymentItems) + paymentItemsAmountDue(selectedPayForPaymentItems);
   const canShowQr = amountToPay > 0 && qrBank && target.account && target.holder;
   const memberBank = data?.memberBank || {};
   const memberBankReady = Boolean(resolveVietQrBank(memberBank) && memberBank.account && memberBank.holder);
   const needsBankSetup = netBalance > 0 && !memberBankReady;
   const paymentNames = [data?.memberName || 'Thanh vien', ...selectedPayForRows.map(row => row.name)].filter(Boolean);
-  const paymentPeriodLabel = paymentItemsPeriodLabel([...selectedOwnPaymentItems, ...selectedPayForPaymentItems], data?.monthLabel);
+  const paymentPeriodLabel = paymentItemsPeriodLabel(selectedPaymentItems, data?.monthLabel);
   const payForSummary = selectedPayForRows.length
     ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForTotal)}`
     : 'Chưa chọn ai';
@@ -895,11 +905,21 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     }
   };
   const togglePayFor = (row) => {
-    const key = String(row.profileId || row.name);
+    const key = payForRowKey(row);
+    const rowItemKeys = payForRowPaymentItems(row).map(item => item.key);
     setSelectedPayForIds(prev => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
+      const selected = next.has(key);
+      if (selected) next.delete(key);
       else next.add(key);
+      setSelectedPayForSourceKeys(prevKeys => {
+        const nextKeys = new Set(prevKeys);
+        rowItemKeys.forEach(itemKey => {
+          if (selected) nextKeys.delete(itemKey);
+          else nextKeys.add(itemKey);
+        });
+        return nextKeys;
+      });
       return next;
     });
     setCopiedField('');
@@ -907,6 +927,15 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   };
   function togglePaymentSource(key) {
     setSelectedPaymentSourceKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+    setCopiedField('');
+    setPaymentConfirmed(false);
+  }
+  function togglePayForSource(key) {
+    setSelectedPayForSourceKeys(prev => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -936,50 +965,60 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 
       {!isTreasurer && netBalance < 0 && (
         <Card style={{ padding: 14, borderColor: canShowQr ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)' }}>
-          <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
-            Thanh toán về thủ quỹ
-          </div>
-          <div style={{ fontSize: 28, fontWeight: 950, color: '#fca5a5', marginTop: 6, ...type.mono }}>
-            {formatVND(amountToPay)}
-          </div>
+          {!canShowQr && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
+                Thanh toán về thủ quỹ
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 950, color: '#fca5a5', marginTop: 6, ...type.mono }}>
+                {formatVND(amountToPay)}
+              </div>
+            </>
+          )}
           {canShowQr && (
             <div style={{ display: 'grid', gap: 7, marginTop: 10 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 10, borderRadius: 14, background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <img src={qrUrl} alt="QR thanh toán thủ quỹ" style={{ width: 210, height: 210, borderRadius: 16, background: '#fff', objectFit: 'cover' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
-                  <a
-                    href={qrUrl}
-                    download="vietqr-thanh-toan.png"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+              <PaymentBillCardContent
+                memberName={paymentNames.join(' + ')}
+                amount={amountToPay}
+                transferDescription={transferDescription}
+                qrUrl={qrUrl}
+                paymentDisplayGroups={paymentDisplayGroups}
+                actions={(
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
+                    <a
+                      href={qrUrl}
+                      download="vietqr-thanh-toan.png"
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 38,
+                        borderRadius: 10,
+                        background: 'rgba(59,130,246,0.18)',
+                        border: '1px solid rgba(96,165,250,0.42)',
+                        color: '#93c5fd',
+                        fontSize: 12,
+                        fontWeight: 900,
+                        textDecoration: 'none',
+                      }}
+                    >Lưu QR</a>
+                    <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || Boolean(data?.pendingSettlementCheckpoint)} style={{
                       minHeight: 38,
                       borderRadius: 10,
-                      background: 'rgba(59,130,246,0.18)',
-                      border: '1px solid rgba(96,165,250,0.42)',
-                      color: '#93c5fd',
+                      background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
+                      border: `1px solid ${paymentConfirmed ? 'rgba(110,231,183,0.42)' : 'rgba(16,185,129,0.62)'}`,
+                      color: paymentConfirmed ? '#6ee7b7' : '#052e16',
                       fontSize: 12,
                       fontWeight: 900,
-                      textDecoration: 'none',
-                    }}
-                  >Lưu QR</a>
-                  <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || Boolean(data?.pendingSettlementCheckpoint)} style={{
-                    minHeight: 38,
-                    borderRadius: 10,
-                    background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
-                    border: `1px solid ${paymentConfirmed ? 'rgba(110,231,183,0.42)' : 'rgba(16,185,129,0.62)'}`,
-                    color: paymentConfirmed ? '#6ee7b7' : '#052e16',
-                    fontSize: 12,
-                    fontWeight: 900,
-                    fontFamily: 'inherit',
-                    cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
-                    opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
-                  }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ duyệt' : paymentConfirmed ? 'Đã báo' : 'Đã thanh toán'}</button>
-                </div>
-              </div>
+                      fontFamily: 'inherit',
+                      cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
+                      opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
+                    }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ duyệt' : paymentConfirmed ? 'Đã báo' : 'Đã thanh toán'}</button>
+                  </div>
+                )}
+              />
               <div>
                 <button
                   type="button"
@@ -1360,6 +1399,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         expanded={memberExpanded}
         onToggle={() => setMemberExpanded(value => !value)}
         listScroll
+        headerRight={selectedTreasurerTotal > 0 ? (
+          <button
+            type="button"
+            onClick={() => setPaymentRow(paymentRowFromTreasurerItems(selectedTreasurerItems, data))}
+            style={miniDashButton('#22c55e', '#052e16')}
+          >TT đã chọn {formatVND(selectedTreasurerTotal)}</button>
+        ) : null}
       >
         {memberRows.length > 0 ? memberRows.map(row => (
           <TreasurerMemberPaymentRow
@@ -1394,6 +1440,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           row={paymentRow}
           monthLabel={data?.monthLabel || ''}
           currentMonth={data?.yearMonth || ''}
+          paymentTarget={data?.paymentTarget}
           onClose={() => setPaymentRow(null)}
           onConfirm={(payload) => withLoading(async () => {
             await onAction?.('markMemberPaid', payload);
@@ -1556,6 +1603,26 @@ function paymentRowFromTreasurerItems(items, data) {
     defaultSelected: true,
   }));
   const firstItem = paymentItems[0] || {};
+  const profileGroups = new Map();
+  paymentItems.forEach((item, index) => {
+    const key = item.profileId || item.memberId || item.memberName || `member:${index}`;
+    const existing = profileGroups.get(key) || {
+      key,
+      name: item.memberName || item.row?.name || item.row?.memberName || 'Thành viên',
+      memberId: item.memberId || item.row?.linkMemberId || item.row?.memberId || '',
+      profileId: item.profileId || item.row?.profileId || '',
+      items: [],
+    };
+    existing.items.push(item);
+    profileGroups.set(key, existing);
+  });
+  const paymentGroups = [...profileGroups.values()].map(group => ({
+    key: group.key,
+    title: `Các khoản của ${group.name}`,
+    items: group.items,
+  }));
+  const memberNames = [...new Set([...profileGroups.values()].map(group => group.name).filter(Boolean))];
+  const displayName = memberNames.length > 1 ? `${memberNames[0]} + ${memberNames.length - 1} người` : (memberNames[0] || firstItem.memberName || firstItem.row?.memberName || firstItem.row?.name || 'Thành viên');
   const amount = paymentItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   return {
     profileId: firstItem.profileId || firstItem.row?.profileId || '',
@@ -1563,9 +1630,10 @@ function paymentRowFromTreasurerItems(items, data) {
     linkMemberId: firstItem.memberId || firstItem.row?.linkMemberId || firstItem.row?.memberId || '',
     groupId: firstItem.groupId || firstItem.row?.groupId || data?.currentGroupId || '',
     linkGroupId: firstItem.groupId || firstItem.row?.linkGroupId || firstItem.row?.groupId || data?.currentGroupId || '',
-    name: firstItem.memberName || firstItem.row?.name || firstItem.row?.memberName || 'Thành viên',
-    memberName: firstItem.memberName || firstItem.row?.memberName || firstItem.row?.name || 'Thành viên',
+    name: displayName,
+    memberName: displayName,
     paymentItems,
+    paymentGroups,
     defaultPaymentItemKeys: paymentItems.map(item => item.key),
     payableSources: paymentItems.map(paymentItemToCoveredSource),
     payableAmount: amount,
@@ -1654,7 +1722,7 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, onShare, onQr, onPayItem
   );
 }
 
-function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, onConfirm }) {
+function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTarget, onClose, onConfirm }) {
   const items = safeArray(row?.paymentItems);
   const fallbackItems = items.length ? items : safeArray(row?.coveredSources).map((source, index) => ({
     key: `fallback:${index}`,
@@ -1671,12 +1739,36 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
   const defaultKeys = safeArray(row?.defaultPaymentItemKeys);
   const [checkedKeys, setCheckedKeys] = useState(() => new Set(defaultKeys.length ? defaultKeys : fallbackItems.filter(item => item.defaultSelected).map(item => item.key)));
   const [submitting, setSubmitting] = useState(false);
+  const [copiedField, setCopiedField] = useState('');
+  const [billShareOpen, setBillShareOpen] = useState(false);
   const currentItems = fallbackItems.filter(item => !currentMonth || String(item.month || '') === String(currentMonth));
   const previousItems = fallbackItems.filter(item => currentMonth && String(item.month || '') !== String(currentMonth));
   const selectedItems = fallbackItems.filter(item => checkedKeys.has(item.key));
   const selectedTotal = selectedItems.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
   const selectedMonths = [...new Set(selectedItems.map(item => item.month).filter(Boolean))];
   const payloadMonthLabel = selectedMonths.length === 1 ? fullMonthLabel(selectedMonths[0]) : monthLabel;
+  const memberName = row?.name || row?.memberName || 'Thành viên';
+  const hasProfileGroups = safeArray(row?.paymentGroups).length > 1;
+  const target = paymentTarget || {};
+  const qrBank = resolveVietQrBank(target);
+  const transferDescription = `${memberName} - Thanh toan ${paymentItemsPeriodLabel(selectedItems, monthLabel)}`.trim();
+  const qrUrl = selectedTotal > 0 && qrBank && target.account && target.holder ? generateQRUrl({
+    bankId: qrBank.id,
+    account: target.account,
+    accountName: target.holder,
+    amount: selectedTotal,
+    description: transferDescription,
+  }) : '';
+  let paymentDisplayGroups = row?.paymentGroups || [{
+    key: 'treasurer',
+    title: `Các khoản của ${memberName}`,
+    items: fallbackItems,
+  }];
+  paymentDisplayGroups = paymentDisplayGroups.map(group => ({
+    ...group,
+    checkedKeys,
+    onToggle: toggleItem,
+  }));
 
   function toggleItem(key) {
     setCheckedKeys(prev => {
@@ -1684,6 +1776,19 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
+    setCopiedField('');
+  }
+
+  async function copyPaymentSummary() {
+    if (!navigator?.clipboard) return;
+    await navigator.clipboard.writeText(buildPaymentShareText({
+      memberName,
+      amount: selectedTotal,
+      transferDescription,
+      paymentTarget: target,
+      items: selectedItems,
+    }));
+    setCopiedField('summary');
   }
 
   async function submit() {
@@ -1710,22 +1815,60 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
           <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750 }}>Đang chọn thu</div>
           <div style={{ marginTop: 3, color: '#f8fafc', fontWeight: 950, fontSize: 21, ...type.mono }}>{formatVND(selectedTotal)}</div>
           <div style={{ marginTop: 2, color: '#94a3b8', fontSize: 11 }}>Tick khoản đã thu đủ. Không tick thì chưa trừ nợ.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+            <button type="button" onClick={copyPaymentSummary} disabled={selectedTotal <= 0} style={{
+              minHeight: 36,
+              borderRadius: 10,
+              background: copiedField === 'summary' ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(129,140,248,0.34)',
+              color: copiedField === 'summary' ? colors.brandLight : colors.textSecondary,
+              fontSize: 12,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: selectedTotal > 0 ? 'pointer' : 'not-allowed',
+              opacity: selectedTotal > 0 ? 1 : 0.58,
+            }}>{copiedField === 'summary' ? 'Đã copy' : 'Copy nội dung'}</button>
+            <button type="button" onClick={() => setBillShareOpen(true)} disabled={selectedTotal <= 0} style={{
+              minHeight: 36,
+              borderRadius: 10,
+              background: 'rgba(251,191,36,0.12)',
+              border: '1px solid rgba(251,191,36,0.34)',
+              color: '#fde68a',
+              fontSize: 12,
+              fontWeight: 900,
+              fontFamily: 'inherit',
+              cursor: selectedTotal > 0 ? 'pointer' : 'not-allowed',
+              opacity: selectedTotal > 0 ? 1 : 0.58,
+            }}>Thẻ bill</button>
+          </div>
         </Card>
 
-        <PaymentItemSection
-          title={monthLabel || 'Tháng đang xem'}
-          items={currentItems}
-          checkedKeys={checkedKeys}
-          onToggle={toggleItem}
-        />
-
-        {previousItems.length > 0 && (
+        {hasProfileGroups ? paymentDisplayGroups.map(group => (
           <PaymentItemSection
-            title="Tháng trước"
-            items={previousItems}
+            key={group.key}
+            title={group.title}
+            items={group.items}
             checkedKeys={checkedKeys}
             onToggle={toggleItem}
           />
+        )) : (
+          <>
+            <PaymentItemSection
+              title={monthLabel || 'Tháng đang xem'}
+              items={currentItems}
+              checkedKeys={checkedKeys}
+              onToggle={toggleItem}
+            />
+
+            {previousItems.length > 0 && (
+              <PaymentItemSection
+                title="Tháng trước"
+                items={previousItems}
+                checkedKeys={checkedKeys}
+                onToggle={toggleItem}
+              />
+            )}
+          </>
         )}
 
         <button
@@ -1747,6 +1890,17 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, onClose, 
         >
           Xác nhận đã thu {formatVND(selectedTotal)}
         </button>
+
+        {billShareOpen && (
+          <PaymentBillCardSheet
+            memberName={memberName}
+            amount={selectedTotal}
+            transferDescription={transferDescription}
+            qrUrl={qrUrl}
+            paymentDisplayGroups={paymentDisplayGroups}
+            onClose={() => setBillShareOpen(false)}
+          />
+        )}
       </div>
     </BottomSheet>
   );
@@ -1771,7 +1925,10 @@ function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
   const [expanded, setExpanded] = useState(true);
   if (!items.length) return null;
   const groupedItems = groupPaymentItemsBySource(items);
-  const sectionTotal = items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+  const sectionTotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const sectionTotalColor = sectionTotal > 0 ? '#6ee7b7' : '#fca5a5';
+  const profileTitleMatch = /^Các khoản của\s+(.+)$/i.exec(title);
+  const profileName = profileTitleMatch?.[1] || '';
   return (
     <div style={{
       display: 'grid',
@@ -1802,23 +1959,43 @@ function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
           textAlign: 'left',
         }}
       >
-        <span style={{ minWidth: 0, fontSize: 10, color: '#a7b6cc', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.25 }}>{title}</span>
+        <span style={{ minWidth: 0, fontSize: 10, color: '#a7b6cc', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.5px', lineHeight: 1.25 }}>
+          {profileName ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
+              <span style={{ flexShrink: 0 }}>Các khoản của</span>
+              <span style={{
+                minWidth: 0,
+                maxWidth: '100%',
+                padding: '3px 7px',
+                borderRadius: 999,
+                background: 'rgba(96,165,250,0.16)',
+                border: '1px solid rgba(96,165,250,0.42)',
+                color: '#bfdbfe',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>{profileName}</span>
+            </span>
+          ) : title}
+        </span>
         <span style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 1 }}>{expanded ? '⌃' : '⌄'}</span>
-        <span style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>Tổng -{formatVND(sectionTotal)}</span>
+        <span style={{ gridColumn: '1 / -1', fontSize: 11, fontWeight: 950, color: sectionTotalColor, ...type.mono, whiteSpace: 'nowrap' }}>Tổng {signedVND(sectionTotal)}</span>
       </button>
       {expanded && (
         <div style={{ display: 'grid', gap: 11 }}>
           {groupedItems.map(group => {
-            const groupTotal = group.items.reduce((sum, item) => sum + Math.abs(Number(item.amount) || 0), 0);
+            const groupTotal = group.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            const groupTotalColor = groupTotal > 0 ? '#6ee7b7' : '#fca5a5';
             return (
               <div key={group.key} style={{ display: 'grid', gap: 7 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'center', gap: 8 }}>
                   <div style={{ minWidth: 0, fontSize: 13, color: '#f8fafc', fontWeight: 950, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
-                  <div style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>-{formatVND(groupTotal)}</div>
+                  <div style={{ fontSize: 12, fontWeight: 950, color: groupTotalColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(groupTotal)}</div>
                 </div>
                 <div style={{ display: 'grid', gap: 6, marginLeft: 7, paddingLeft: 12, borderLeft: '4px solid rgba(96,165,250,0.54)' }}>
                   {group.items.map(item => {
                     const checked = checkedKeys.has(item.key);
+                    const isCredit = Number(item.amount) > 0;
                     return (
                       <label key={item.key} style={{
                         display: 'grid',
@@ -1854,7 +2031,7 @@ function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
                           lineHeight: 1,
                         }}>✓</span>
                         <span style={{ minWidth: 0, fontSize: 12, color: colors.textSecondary, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
-                        <span style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>-{formatVND(Math.abs(Number(item.amount) || 0))}</span>
+                        <span style={{ fontSize: 12, fontWeight: 950, color: isCredit ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</span>
                       </label>
                     );
                   })}
@@ -1894,7 +2071,12 @@ function sourcePaymentItems(source, { prefix = 'source', memberId = '', profileI
       amount: Number(row.amount) || 0,
       defaultSelected: true,
     }))
-    .filter(item => Number(item.amount) < 0);
+    .filter(item => Number(item.amount) !== 0);
+}
+
+function paymentItemsAmountDue(items) {
+  const total = safeArray(items).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  return total < 0 ? Math.abs(total) : 0;
 }
 
 function paymentItemsPeriodLabel(items, fallback = '') {
@@ -1902,6 +2084,200 @@ function paymentItemsPeriodLabel(items, fallback = '') {
   if (months.length === 1) return months[0];
   if (months.length > 1) return months.join(', ');
   return fallback || 'Khoản cần thanh toán';
+}
+
+function buildPaymentShareText({ memberName, amount, transferDescription, paymentTarget, items }) {
+  const detailLines = safeArray(items).map(item => {
+    const owner = item.memberName ? `${item.memberName} · ` : '';
+    return `- ${owner}${item.sourceLabel || 'Nguồn tiền'} · ${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}: ${signedVND(item.amount)}`;
+  });
+  return `${memberName || 'Thành viên'} cần chuyển ${formatVND(amount)}
+Nội dung: ${transferDescription || ''}
+
+Chi tiết:
+${detailLines.length ? detailLines.join('\n') : '- Chưa chọn khoản'}
+
+STK: ${paymentTarget?.account || ''}
+Chủ TK: ${paymentTarget?.holder || ''}`.trim();
+}
+
+function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null }) {
+  const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
+  const groups = safeArray(paymentDisplayGroups)
+    .map(group => ({ ...group, items: group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
+    .filter(group => group.items.length > 0);
+
+  return (
+    <Card style={{ padding: 14, borderColor: 'rgba(96,165,250,0.30)', background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(30,41,59,0.92))' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, alignItems: 'start' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'inline-flex', maxWidth: '100%', padding: '4px 9px', borderRadius: 999, background: 'rgba(96,165,250,0.16)', border: '1px solid rgba(96,165,250,0.42)', color: '#bfdbfe', fontSize: 11, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</div>
+          <div style={{ marginTop: 7, fontSize: 26, fontWeight: 950, color: '#fca5a5', ...type.mono }}>{formatVND(amount)}</div>
+          <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>Cần chuyển cho thủ quỹ</div>
+        </div>
+        {qrUrl ? (
+          <button type="button" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 96, height: 96, padding: 0, border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
+            <img src={qrUrl} alt="QR thanh toán" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+          </button>
+        ) : (
+          <div style={{ width: 96, height: 96, borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800 }}>Chưa có QR</div>
+        )}
+      </div>
+
+      {actions && <div style={{ marginTop: 10 }}>{actions}</div>}
+
+      <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+        {groups.map(group => {
+          const selectedItems = group.items.filter(item => group.checkedKeys?.has?.(item.key));
+          const profileName = /^Các khoản của\s+(.+)$/i.exec(group.title)?.[1] || group.title;
+          return (
+            <div key={group.key} style={{ display: 'grid', gap: 8, padding: 10, borderRadius: 13, background: 'rgba(15,23,42,0.62)', border: '1px solid rgba(96,165,250,0.24)', boxShadow: 'inset 3px 0 0 rgba(96,165,250,0.52)' }}>
+              <div style={{ fontSize: 10, color: '#bfdbfe', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Các khoản của {profileName}</div>
+              {groupPaymentItemsBySource(selectedItems).map(sourceGroup => {
+                const sourceTotal = sourceGroup.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                return (
+                  <div key={sourceGroup.key} style={{ display: 'grid', gap: 6 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+                      <div style={{ minWidth: 0, fontSize: 12, fontWeight: 950, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sourceGroup.label}</div>
+                      <div style={{ fontSize: 12, fontWeight: 950, color: sourceTotal > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(sourceTotal)}</div>
+                    </div>
+                    <div style={{ display: 'grid', gap: 5, marginLeft: 7, paddingLeft: 10, borderLeft: '3px solid rgba(148,163,184,0.38)' }}>
+                      {sourceGroup.items.map(item => (
+                        <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+                          <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
+                          <div style={{ fontSize: 11, fontWeight: 950, color: Number(item.amount) > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {qrPreviewOpen && (
+        <BottomSheet title="QR thanh toán" onClose={() => setQrPreviewOpen(false)}>
+          <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
+            <img src={qrUrl} alt="QR thanh toán phóng to" style={{ width: '100%', maxWidth: 320, aspectRatio: '1 / 1', borderRadius: 18, background: '#fff', objectFit: 'cover' }} />
+            <div style={{ width: '100%', padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: colors.textSecondary, fontSize: 12, fontWeight: 800, textAlign: 'center', overflowWrap: 'anywhere' }}>{transferDescription}</div>
+          </div>
+        </BottomSheet>
+      )}
+    </Card>
+  );
+}
+
+function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, onClose }) {
+  const cardRef = useRef(null);
+  const [sharingImage, setSharingImage] = useState(false);
+  const billFilename = `${safeFilename(memberName || 'bill')}-bill.png`;
+  const fallbackBillFilename = `${safeFilename(memberName || 'bill')}-bill.svg`;
+
+  async function shareBillImage() {
+    if (!cardRef.current || sharingImage) return;
+    setSharingImage(true);
+    try {
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: colors.shellBg });
+      const response = await fetch(dataUrl);
+      const blob = await response.blob();
+      const file = new File([blob], billFilename, { type: 'image/png' });
+      if (navigator?.share && navigator?.canShare?.({ files: [file] })) {
+        await navigator.share({
+          title: `Thẻ bill ${memberName || ''}`.trim(),
+          text: transferDescription || 'Thẻ bill thanh toán',
+          files: [file],
+        });
+        return;
+      }
+      triggerDownload(dataUrl, billFilename);
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        const fallbackBlob = buildElementImageBlob(cardRef.current);
+        const fallbackUrl = URL.createObjectURL(fallbackBlob);
+        triggerDownload(fallbackUrl, fallbackBillFilename);
+        setTimeout(() => URL.revokeObjectURL(fallbackUrl), 1000);
+      }
+    } finally {
+      setSharingImage(false);
+    }
+  }
+
+  return (
+    <BottomSheet title="Thẻ bill" onClose={onClose}>
+      <div style={{ display: 'grid', gap: 12 }}>
+        <div ref={cardRef}>
+          <PaymentBillCardContent
+            memberName={memberName}
+            amount={amount}
+            transferDescription={transferDescription}
+            qrUrl={qrUrl}
+            paymentDisplayGroups={paymentDisplayGroups}
+          />
+        </div>
+        <button type="button" onClick={shareBillImage} disabled={sharingImage} style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          minHeight: 38,
+          borderRadius: 11,
+          border: '1px solid rgba(96,165,250,0.36)',
+          background: 'rgba(96,165,250,0.14)',
+          color: '#bfdbfe',
+          fontSize: 12,
+          fontWeight: 950,
+          fontFamily: 'inherit',
+          cursor: !sharingImage ? 'pointer' : 'default',
+          opacity: !sharingImage ? 1 : 0.7,
+        }}>{sharingImage ? 'Đang share...' : 'Share ảnh'}</button>
+        <div style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 1.45, textAlign: 'center' }}>Máy không hỗ trợ share ảnh thì app tự tải PNG.</div>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function buildElementImageBlob(element) {
+  const rect = element.getBoundingClientRect();
+  const width = Math.ceil(rect.width);
+  const height = Math.ceil(element.scrollHeight || rect.height);
+  const clone = element.cloneNode(true);
+  clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  Object.assign(clone.style, {
+    width: `${width}px`,
+    minHeight: `${height}px`,
+    boxSizing: 'border-box',
+    fontFamily: type.family,
+    color: colors.textPrimary,
+    background: colors.shellBg,
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${new XMLSerializer().serializeToString(clone)}</foreignObject></svg>`;
+  return new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+}
+
+function triggerDownload(url, filename) {
+  const link = document.createElement('a');
+  link.download = filename;
+  link.href = url;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function safeFilename(value) {
+  return String(value || 'bill')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'bill';
+}
+
+function signedVND(value) {
+  const amount = Number(value) || 0;
+  if (amount === 0) return formatVND(0);
+  return `${amount > 0 ? '+' : '-'}${formatVND(Math.abs(amount))}`;
 }
 
 function paymentItemToCoveredSource(item) {

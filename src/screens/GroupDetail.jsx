@@ -6,7 +6,7 @@ import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
   ModuleHero, ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
-  LoadingSpinner, loadingOverlayStyle,
+  LoadingSpinner, loadingOverlayStyle, MonthNav,
 } from '../primitives';
 
 const VN_BANKS = ['Vietcombank', 'Techcombank', 'BIDV', 'Vietinbank', 'MB Bank', 'VPBank', 'ACB', 'TPBank', 'Sacombank', 'MSB', 'Agribank', 'HDBank'];
@@ -178,10 +178,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{d.emoji || '👥'}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 1 }}>{d.monthLabel || ''}</div>
           </div>
           {canManageGroup ? <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton> : <div style={{ width: 44 }} />}
         </div>
+
+        <MonthNav label={d.monthLabel || ''} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
 
         <ModuleHero
           tone="groups"

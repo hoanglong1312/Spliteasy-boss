@@ -778,7 +778,6 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
   if (!settledMonths.size) return sourceBreakdown
   return safeArray(sourceBreakdown)
     .map(source => {
-      if (String(source?.sourceType || source?.source_type || '') !== 'pickleball') return source
       const monthBreakdown = safeArray(source.monthBreakdown || source.month_breakdown)
       if (!monthBreakdown.length) return source
       const sourceId = source.sourceId || source.source_id || ''
@@ -1079,7 +1078,7 @@ function paymentNoticeCoversMember(notification, memberIds, profileId, member = 
   if (
     notificationMemberId &&
     memberIds.has(String(notificationMemberId)) &&
-    String(notification?.type || '').toLowerCase() === 'payment_submitted' &&
+    String(notification?.type || '').toLowerCase().includes('payment') &&
     String(metadata.status || '').toLowerCase() === 'confirmed'
   ) return true
   const profileKey = String(profileId || '')
@@ -1882,11 +1881,23 @@ function groupDetailSettlementGroup(group, memberId, state, endDate) {
 
 function groupDetailSettlementBalance(group, memberId, state, endDate) {
   const checkpointGroup = groupDetailSettlementGroup(group, memberId, state, endDate)
+  const profileId = profileIdForMember(memberId, state?.members)
+  const memberIds = new Set(memberIdsForProfile(profileId, state?.members).map(String))
+  if (memberId) memberIds.add(String(memberId))
+  const settledMonths = new Set(safeArray(state?.monthSettlements)
+    .filter(row => String(row?.groupId || row?.group_id || '') === String(group?.id || ''))
+    .filter(row => memberIds.has(String(row?.memberId || row?.member_id || '')))
+    .map(row => row?.month)
+    .filter(Boolean))
+  const expenses = settledMonths.size
+    ? safeArray(checkpointGroup.expenses).filter(expense => !settledMonths.has(monthKey(expense.date || expense.expense_date)))
+    : safeArray(checkpointGroup.expenses)
+  const balanceGroup = { ...checkpointGroup, expenses }
   return {
-    amount: groupNet(checkpointGroup, memberId),
-    monthBreakdown: sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
+    amount: groupNet(balanceGroup, memberId),
+    monthBreakdown: sourceMonthBreakdown(expenses.map(expense => ({
       month: monthKey(expense.date || expense.expense_date),
-      amount: groupNet({ ...checkpointGroup, expenses: [expense] }, memberId),
+      amount: groupNet({ ...balanceGroup, expenses: [expense] }, memberId),
     }))),
   }
 }
@@ -4518,6 +4529,16 @@ function ticketBasePricePerPerson(state, ticket, date) {
   const yearMonth = ticketYearMonth(ticket, date)
   const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
   const isFlexBilling = isBillingModeFlexForMonth(state, yearMonth)
+  if (!isFlexBilling) {
+    const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? state?.pickle?.monthly_court_fee ?? 0)
+    const sessionsCount = Number(monthlyConfig?.sessionsCount ?? monthlyConfig?.sessions_count ?? 0)
+    const fixedMemberCount = currentGroupMembers(state)
+      .filter(member => isActiveMember(member) && isFixedForMonth(state, member, yearMonth))
+      .length
+    if (courtFeeTotal > 0 && sessionsCount > 0 && fixedMemberCount > 0) {
+      return courtFeeTotal / sessionsCount / fixedMemberCount
+    }
+  }
   const configured = isFlexBilling
     ? monthlyConfig?.perSessionTicketPrice ??
       monthlyConfig?.per_session_ticket_price ??
@@ -4698,7 +4719,7 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
   const combinedPerSessionTicketFee = perSessionTicketFee + ticketPerSessionFee
   const combinedWaterFee = waterFee + ticketWaterFee
   const extras = memberExtrasShare(sessions, memberId, state, [], [])
-  const ticketShare = ticketType ? 0 : memberTeamFundTicketShare(state, memberId, date)
+  const ticketShare = 0
   const p2pBalance = memberTicketBalance(state, memberId, date)
   const netBalance = Math.round(p2pBalance - monthlyTicketFee - combinedPerSessionTicketFee - combinedWaterFee - extras - ticketShare)
   const totalOwed = Math.max(-netBalance, 0)

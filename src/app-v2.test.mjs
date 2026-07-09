@@ -524,6 +524,15 @@ test('GroupDetail exposes an Excel export action', () => {
   assert.match(dataSource, /exportExpenses: monthlyExpenses/)
 })
 
+test('GroupDetail exposes month navigation', () => {
+  const groupDetailSource = readFileSync(new URL('./screens/GroupDetail.jsx', import.meta.url), 'utf8')
+
+  assert.match(groupDetailSource, /MonthNav/)
+  assert.match(groupDetailSource, /<MonthNav label=\{d\.monthLabel \|\| ''\}/)
+  assert.match(groupDetailSource, /onPrev=\{\(\) => onAction\?\.\('monthPrev'\)\}/)
+  assert.match(groupDetailSource, /onNext=\{\(\) => onAction\?\.\('monthNext'\)\}/)
+})
+
 test('AppV2 exports group detail CSV with Excel-safe BOM', () => {
   const exportBlock = appSource.slice(
     appSource.indexOf('function exportGroupCsv'),
