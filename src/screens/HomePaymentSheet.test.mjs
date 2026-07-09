@@ -96,17 +96,17 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
   assert.match(rowBuilderSource, /memberName: memberRow\.name/);
   assert.match(dashboardSource, /const \[refundBillItem, setRefundBillItem\] = useState\(null\)/);
   assert.match(dashboardSource, /const \[refundBankItem, setRefundBankItem\] = useState\(null\)/);
+  assert.match(dashboardSource, /const refundBillBankReady = refundBillItem \? Boolean\(resolveVietQrBank\(refundBillItem\.bank \|\| \{\}\) && refundBillItem\.bank\?\.account && refundBillItem\.bank\?\.holder\) : false/);
   assert.match(dashboardSource, /onRefundBill=\{\(item\) => setRefundBillItem\(item\)\}/);
-  assert.match(dashboardSource, /onEditRefundBank=\{\(item\) => setRefundBankItem\(item\)\}/);
   assert.match(dashboardSource, /onCancelRefund=\{\(item\) => onCancelRefund\?\.\(item\.refundRow\)\}/);
   assert.match(rowSource, /onRefundBill/);
-  assert.match(rowSource, /onEditRefundBank/);
   assert.match(rowSource, /onCancelRefund/);
-  assert.match(rowSource, /const refundBankReady = isRefund && Boolean\(resolveVietQrBank\(item\.bank \|\| \{\}\) && item\.bank\?\.account && item\.bank\?\.holder\)/);
   assert.match(rowSource, /Thẻ bill/);
-  assert.match(rowSource, /Bổ sung STK/);
-  assert.match(rowSource, /Sửa STK/);
-  assert.match(rowSource, /\{refundBankReady \? 'Sửa STK' : 'Bổ sung STK'\}/);
+  assert.doesNotMatch(rowSource, /Bổ sung STK/);
+  assert.doesNotMatch(rowSource, /Sửa STK/);
+  assert.match(dashboardSource, /footerActions=\{\(/);
+  assert.match(dashboardSource, /setRefundBankItem\(refundBillItem\)/);
+  assert.match(dashboardSource, /\{refundBillBankReady \? 'Sửa STK' : 'Bổ sung STK'\}/);
   assert.doesNotMatch(rowSource, /isRefund && !item\.paid && !refundBankReady/);
   assert.doesNotMatch(rowSource, /isRefund && !refundBankReady/);
   assert.match(rowSource, /if \(isRefund && item\.paid\) return onCancelRefund\?\.\(item\)/);
@@ -114,6 +114,10 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
   assert.match(dashboardSource, /<RefundBankSheet/);
   assert.match(homeSource, /function buildRefundBillData\(item\)/);
   assert.match(homeSource, /function RefundBankSheet\(\{ item, onAction, onClose \}\)/);
+  assert.match(rowBuilderSource, /profileId: row\.profileId \|\| row\.profile_id \|\| ''/);
+  assert.match(rowBuilderSource, /memberId: row\.memberId \|\| row\.member_id \|\| ''/);
+  assert.match(homeSource, /const profileId = item\?\.profileId \|\| item\?\.profile_id \|\| item\?\.refundRow\?\.profileId \|\| item\?\.refundRow\?\.profile_id \|\| ''/);
+  assert.match(homeSource, /const canSave = Boolean\(profileId && resolveVietQrBank\(\{ name: bankName \}\) && bankAccount\.trim\(\) && bankAccountName\.trim\(\)\)/);
   assert.match(homeSource, /onAction\?\.\('editMember'/);
   assert.match(billContentSource, /caption = 'Cần chuyển cho thủ quỹ'/);
 });
@@ -121,8 +125,8 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
 test('bill card only renders checked payment items grouped by profile source and month', () => {
   const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
   const billCardSource = sliceBetween('function PaymentBillCardSheet(', 'function signedVND');
-  assert.match(homeSource, /function PaymentBillCardContent\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' \}\)/);
-  assert.match(homeSource, /function PaymentBillCardSheet\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', onClose \}\)/);
+  assert.match(homeSource, /function PaymentBillCardContent\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' \}\)/);
+  assert.match(homeSource, /function PaymentBillCardSheet\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', footerActions = null, onClose \}\)/);
   assert.match(billCardSource, /<PaymentBillCardContent[\s\S]*paymentDisplayGroups=\{paymentDisplayGroups\}/);
   assert.match(homeSource, /group\.items\.filter\(item => group\.checkedKeys\?\.has\?\.\(item\.key\)\)/);
   assert.match(homeSource, /groupPaymentItemsBySource\(selectedItems\)/);
@@ -139,6 +143,9 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.match(billContentSource, /setQrPreviewOpen\(true\)/);
   assert.match(billContentSource, /BottomSheet title="QR thanh toán"/);
   assert.match(billCardSource, /Share ảnh/);
+  assert.match(billContentSource, /\{qrFallbackAction\}/);
+  assert.match(billContentSource, /data-bill-ui-only="true"/);
+  assert.match(billCardSource, /qrFallbackAction=\{footerActions\}/);
   assert.match(billCardSource, /Đang share\.\.\./);
   assert.match(homeSource, /import \{ toPng \} from 'html-to-image';/);
   assert.match(homeSource, /billFilename = `\$\{safeFilename\(memberName \|\| 'bill'\)\}-bill\.png`/);
@@ -149,6 +156,8 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.match(billCardSource, /await navigator\.share\(\{\s*files: \[file\],\s*\}\)/);
   assert.doesNotMatch(billCardSource, /text: transferDescription/);
   assert.match(homeSource, /function buildElementImageBlob/);
+  assert.match(homeSource, /filter: node => node\?\.getAttribute\?\.\('data-bill-ui-only'\) !== 'true'/);
+  assert.match(homeSource, /clone\.querySelectorAll\('\[data-bill-ui-only="true"\]'\)\.forEach\(node => node\.remove\(\)\)/);
   assert.match(homeSource, /function triggerDownload/);
   assert.match(billCardSource, /triggerDownload\(dataUrl, billFilename\)/);
   assert.doesNotMatch(billCardSource, /showSaveFilePicker/);

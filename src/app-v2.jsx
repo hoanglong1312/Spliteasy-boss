@@ -997,7 +997,6 @@ export default function AppV2() {
 
     if (type === 'editMember') {
       const memberId = payload?.memberId
-      if (!memberId) return
       const { token } = getStoredAuth()
       const sb = createSupabase(token)
       const member = safeArray(state?.members).find(item => String(item.id) === String(memberId))

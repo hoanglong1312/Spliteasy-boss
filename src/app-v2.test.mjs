@@ -327,6 +327,7 @@ test('AppV2 editMember falls back to membership update when profile RLS returns 
   )
 
   assert.match(editMemberBlock, /const profileId = payload\?\.profileId \|\| payload\?\.profile_id \|\| member\?\.profileId \|\| member\?\.profile_id/)
+  assert.doesNotMatch(editMemberBlock, /if \(!memberId\) return/)
   assert.match(editMemberBlock, /if \(!profileId\) throw new Error\('Member không có profile — không thể cập nhật\.'\)/)
   assert.match(editMemberBlock, /\.from\('profiles'\)\.update\(profileUpdate\)\.eq\('id', profileId\)/)
   assert.match(editMemberBlock, /\.rpc\('sync_member_names_for_profile', \{ p_profile_id: profileId, p_name: profileUpdate\.name \}\)/)

@@ -1294,6 +1294,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
   const selectedTreasurerTotal = paymentItemsAmountDue(selectedTreasurerItems);
   const refundBillData = refundBillItem ? buildRefundBillData(refundBillItem) : null;
+  const refundBillBankReady = refundBillItem ? Boolean(resolveVietQrBank(refundBillItem.bank || {}) && refundBillItem.bank?.account && refundBillItem.bank?.holder) : false;
   const isSearching = Boolean(searchQuery.trim());
 
   async function withLoading(action) {
@@ -1460,7 +1461,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
             onCancelRefund={(item) => onCancelRefund?.(item.refundRow)}
             onRefundBill={(item) => setRefundBillItem(item)}
-            onEditRefundBank={(item) => setRefundBankItem(item)}
           />
         )) : (
           <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{isSearching ? 'Không có member khớp tìm kiếm.' : 'Không còn dữ liệu cần xử lý.'}</div>
@@ -1514,6 +1514,11 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           paymentDisplayGroups={refundBillData.paymentDisplayGroups}
           caption="Cần hoàn cho member"
           amountColor="#6ee7b7"
+          footerActions={(
+            <button type="button" onClick={() => setRefundBankItem(refundBillItem)} style={miniDashButton('rgba(96,165,250,0.16)', '#bfdbfe')}>
+              {refundBillBankReady ? 'Sửa STK' : 'Bổ sung STK'}
+            </button>
+          )}
           onClose={() => setRefundBillItem(null)}
         />
       )}
@@ -1626,11 +1631,11 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
     const amount = Math.max(0, Number(row.amount) || 0);
     if (amount <= 0) return;
     const memberRow = ensureRow({
-      profileId: row.profileId || '',
-      memberId: row.memberId || '',
-      name: row.name || row.memberName,
+      profileId: row.profileId || row.profile_id || '',
+      memberId: row.memberId || row.member_id || '',
+      name: row.name || row.memberName || row.member_name,
     });
-    const refundKey = String(row.profileId || row.name || 'member');
+    const refundKey = String(row.profileId || row.profile_id || row.name || 'member');
     memberRow.amountRefund += amount;
     memberRow.items.push({
       key: `refund:${refundKey}`,
@@ -1639,8 +1644,8 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
       sourceType: 'refund',
       sourceId: refundKey,
       sourceLabel: 'Cần hoàn tiền',
-      memberId: row.memberId || '',
-      profileId: row.profileId || '',
+      memberId: row.memberId || row.member_id || '',
+      profileId: row.profileId || row.profile_id || '',
       memberName: memberRow.name,
       month: row.month || row.yearMonth || row.year_month || '',
       monthLabel: row.monthLabel || row.month_label || monthLabel,
@@ -1708,7 +1713,7 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill, onEditRefundBank }) {
+function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
   const unpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund');
@@ -1755,7 +1760,6 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
                   const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : isCredit ? 'Bù' : (item.paid ? 'Đã nhận' : 'TT');
                   const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
                   const selected = !item.paid && !isRefund && selectedKeys?.has?.(item.key);
-                  const refundBankReady = isRefund && Boolean(resolveVietQrBank(item.bank || {}) && item.bank?.account && item.bank?.holder);
                   return (
                     <div
                       key={item.key}
@@ -1775,7 +1779,6 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
-                        {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onEditRefundBank?.(item); }} style={miniDashButton('rgba(96,165,250,0.16)', '#bfdbfe')}>{refundBankReady ? 'Sửa STK' : 'Bổ sung STK'}</button>}
                         <button
                           type="button"
                           onClick={(event) => {
@@ -2211,15 +2214,16 @@ function buildRefundBillData(item) {
 function RefundBankSheet({ item, onAction, onClose }) {
   const bank = item?.bank || item?.refundRow?.bank || {};
   const resolvedBank = resolveVietQrBank(bank);
-  const memberName = item?.memberName || item?.refundRow?.name || item?.refundRow?.memberName || 'Thành viên';
-  const [bankName, setBankName] = useState(resolvedBank?.shortName || bank.name || bank.code || '');
+  const memberName = item?.memberName || item?.member_name || item?.refundRow?.name || item?.refundRow?.memberName || item?.refundRow?.member_name || 'Thành viên';
+  const bankNameSeed = resolvedBank?.shortName || (String(bank.name || '').trim() === '--' ? '' : bank.name) || (String(bank.code || '').trim() === '--' ? '' : bank.code) || '';
+  const [bankName, setBankName] = useState(bankNameSeed);
   const [bankAccount, setBankAccount] = useState(bank.account || '');
   const [bankAccountName, setBankAccountName] = useState(bank.holder || memberName);
   const [saving, setSaving] = useState(false);
-  const memberId = item?.memberId || item?.refundRow?.memberId || '';
-  const profileId = item?.profileId || item?.refundRow?.profileId || '';
+  const memberId = item?.memberId || item?.member_id || item?.refundRow?.memberId || item?.refundRow?.member_id || '';
+  const profileId = item?.profileId || item?.profile_id || item?.refundRow?.profileId || item?.refundRow?.profile_id || '';
   const knownBank = BANK_LIST.some(row => row.shortName === bankName || row.id === bankName || row.name === bankName);
-  const canSave = Boolean(memberId && profileId && bankName.trim() && bankAccount.trim() && bankAccountName.trim());
+  const canSave = Boolean(profileId && resolveVietQrBank({ name: bankName }) && bankAccount.trim() && bankAccountName.trim());
   const inputStyle = {
     minHeight: 38,
     width: '100%',
@@ -2286,7 +2290,7 @@ function RefundBankSheet({ item, onAction, onClose }) {
   );
 }
 
-function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
+function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const groups = safeArray(paymentDisplayGroups)
     .map(group => ({ ...group, items: group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
@@ -2305,7 +2309,10 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
             <img src={qrUrl} alt="QR thanh toán" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
           </button>
         ) : (
-          <div style={{ width: 96, height: 96, borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800 }}>Chưa có QR</div>
+          <div style={{ width: 96, minHeight: 96, padding: 7, boxSizing: 'border-box', borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'grid', gap: 6, alignContent: 'center', justifyItems: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800, textAlign: 'center' }}>
+            <div>Chưa có QR</div>
+            {qrFallbackAction && <div data-bill-ui-only="true">{qrFallbackAction}</div>}
+          </div>
         )}
       </div>
 
@@ -2417,7 +2424,7 @@ async function drawBillQrOnImage(dataUrl, cardElement, qrDataUrl) {
   return canvas.toDataURL('image/png');
 }
 
-function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', onClose }) {
+function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', footerActions = null, onClose }) {
   const cardRef = useRef(null);
   const [sharingImage, setSharingImage] = useState(false);
   const [billQrUrl, setBillQrUrl] = useState(qrUrl || '');
@@ -2463,7 +2470,7 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
     setSharingImage(true);
     try {
       await waitForElementImages(cardRef.current);
-      const capturedDataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: colors.shellBg });
+      const capturedDataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: colors.shellBg, filter: node => node?.getAttribute?.('data-bill-ui-only') !== 'true' });
       const dataUrl = await drawBillQrOnImage(capturedDataUrl, cardRef.current, billQrUrl);
       const response = await fetch(dataUrl);
       const blob = await response.blob();
@@ -2502,6 +2509,7 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
             paymentDisplayGroups={paymentDisplayGroups}
             caption={caption}
             amountColor={amountColor}
+            qrFallbackAction={footerActions}
           />
         </div>
         <button type="button" onClick={shareBillImage} disabled={shareDisabled} style={{
@@ -2532,6 +2540,7 @@ function buildElementImageBlob(element) {
   const height = Math.ceil(element.scrollHeight || rect.height);
   const clone = element.cloneNode(true);
   clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+  clone.querySelectorAll('[data-bill-ui-only="true"]').forEach(node => node.remove());
   Object.assign(clone.style, {
     width: `${width}px`,
     minHeight: `${height}px`,
