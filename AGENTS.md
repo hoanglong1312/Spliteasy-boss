@@ -45,20 +45,20 @@ Pick the lightest tool that can confirm the bug:
 |---|---|
 | Logic thuần / function / formatter / reducer | Unit test — nhanh nhất, run nhiều lần |
 | React component / interaction / state | Inspect code + `npm run build`, unit test nhỏ nếu cần |
-| UI visual / layout / navigation | `cmux browser snapshot` — đọc accessibility tree, verify bằng mắt |
-| Console error / network / DOM / JS | `cmux browser console list` / `cmux browser network requests` / `cmux browser eval <js>` |
-| Click, fill, interact | `cmux browser click/fill/type <selector>` |
-| Screenshot | `cmux browser screenshot` |
+| UI visual / layout / navigation | In-app browser snapshot hoặc Playwright — đọc accessibility tree, verify bằng mắt |
+| Console error / network / DOM / JS | In-app browser dev logs/evaluate hoặc Playwright |
+| Click, fill, interact | In-app browser controls hoặc Playwright |
+| Screenshot | In-app browser screenshot hoặc Playwright screenshot |
 | E2E flow quan trọng (login, payment, navigation nhiều màn) | Playwright — chỉ khi flow dễ regression |
 
 Default với React/Vite project:
 ```
-Đọc file liên quan → sửa scoped → npm run build → cmux browser verify → commit file cụ thể
+Đọc file liên quan → sửa scoped → npm run build → browser verify → commit file cụ thể
 ```
 
-## Rule 11 — claude-teams cho Multi-Agent
+## Rule 11 — Multi-Agent
 
-Dùng `cmux claude-teams` thay `claude` khi có 2+ việc độc lập chạy song song được (fix A + fix B, feature + test).
+Dùng multi-agent khi có 2+ việc độc lập chạy song song được (fix A + fix B, feature + test).
 
 ## Rule 12 — Subagent for Exploration
 When fixing bugs or investigating issues requiring 3+ file reads: spawn a subagent (Explore or general-purpose) to investigate, grep, and trace. Main context receives summary only — no raw file dumps. Edit/fix happens in main context after summary received.
@@ -193,19 +193,9 @@ args = ["gitnexus", "mcp"]
 
 ## Browser Automation (Codex)
 
-Codex dùng `cmux browser` qua bash cho UI verification và debugging:
+Codex dùng in-app browser connector hoặc Playwright cho UI verification và debugging.
 
-```bash
-cmux browser goto http://localhost:5173
-cmux browser snapshot          # đọc accessibility tree
-cmux browser screenshot        # capture visual
-cmux browser console list      # JS errors + logs
-cmux browser eval "<js>"       # execute JS in page
-cmux browser click "<selector>"
-cmux browser fill "<selector>" "<value>"
-```
-
-Dùng `cmux browser` khi: cần verify UI sau code change, debug DOM/console error, confirm layout. Không dùng cho E2E flow phức tạp (→ Playwright).
+Dùng browser verify khi: cần verify UI sau code change, debug DOM/console error, confirm layout. Không dùng cho E2E flow phức tạp (→ Playwright).
 
 ---
 
@@ -229,7 +219,7 @@ Dùng `cmux browser` khi: cần verify UI sau code change, debug DOM/console err
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Spliteasy-boss** (2869 symbols, 7468 relationships, 227 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Spliteasy-boss** (3075 symbols, 8223 relationships, 250 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

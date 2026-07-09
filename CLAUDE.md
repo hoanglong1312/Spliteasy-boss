@@ -44,10 +44,12 @@ Gọi Codex rà soát toàn bộ screens: prop match, `onAction` handler tồn t
 
 **Checklist bắt buộc:** khi task đụng `.jsx`/`.sql`/migration, `TaskCreate` ngay checklist gồm các bước Quality Gate liên quan (vd: apply migration, verify data, static audit, unit test, Playwright). Không báo "xong"/tạo commit khi `TaskList` còn task pending thuộc checklist này.
 
+@rules/gitnexus.md
+
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **Spliteasy-boss** (2869 symbols, 7468 relationships, 227 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **Spliteasy-boss** (3075 symbols, 8223 relationships, 250 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
