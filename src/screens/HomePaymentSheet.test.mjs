@@ -48,11 +48,24 @@ test('treasurer dashboard can create one bill from selected items across members
   const rowBuilderSource = sliceBetween('function paymentRowFromTreasurerItems(', 'function TreasurerMemberPaymentRow');
   assert.match(dashboardSource, /selectedTreasurerItems = memberRows\.flatMap/);
   assert.match(dashboardSource, /TT đã chọn/);
+  assert.match(dashboardSource, /const selectedTreasurerTotal = paymentItemsAmountDue\(selectedTreasurerItems\)/);
   assert.match(dashboardSource, /setPaymentRow\(paymentRowFromTreasurerItems\(selectedTreasurerItems, data\)\)/);
   assert.match(rowBuilderSource, /profileGroups/);
   assert.match(rowBuilderSource, /paymentGroups/);
   assert.match(rowBuilderSource, /defaultPaymentItemKeys: paymentItems\.map\(item => item\.key\)/);
+  assert.match(rowBuilderSource, /const amount = paymentItemsAmountDue\(paymentItems\)/);
   assert.match(homeSource, /paymentDisplayGroups = row\?\.paymentGroups \|\| \[/);
+});
+
+test('treasurer dashboard nets signed debt and credit items', () => {
+  const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
+  const confirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
+  assert.match(rowBuilderSource, /memberRow\.amountDue = paymentItemsAmountDue\(memberRow\.items\.filter\(item => !item\.paid && item\.kind !== 'refund'\)\)/);
+  assert.match(rowSource, /const selectedUnpaidTotal = paymentItemsAmountDue\(selectedUnpaidItems\)/);
+  assert.match(rowSource, /const isCredit = Number\(item\.amount\) > 0/);
+  assert.match(rowSource, /\{signedVND\(item\.amount\)\}/);
+  assert.match(confirmSource, /const selectedTotal = paymentItemsAmountDue\(selectedItems\)/);
 });
 
 test('bill card only renders checked payment items grouped by profile source and month', () => {

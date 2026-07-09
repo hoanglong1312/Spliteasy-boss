@@ -1326,6 +1326,41 @@ describe('buildPaymentProgressRows', () => {
       defaultSelected: true,
     })
   })
+
+  test('keeps positive month offsets in treasurer payment items', () => {
+    const rows = buildPaymentProgressRows(
+      [{
+        profileId: 'profile-hung',
+        memberIds: ['hung-life'],
+        memberId: 'hung-life',
+        name: 'Mạnh Hùng',
+        amount: -425816,
+        sources: [{
+          sourceType: 'group',
+          sourceId: 'life-1',
+          sourceLabel: 'Lấy vk để trưởng thành',
+          profileId: 'profile-hung',
+          memberId: 'hung-life',
+          amount: -425816,
+          monthBreakdown: [
+            { month: '2026-06', label: 'Tháng 6', amount: -658166 },
+            { month: '2026-07', label: 'Tháng 7', amount: 232350 },
+          ],
+        }],
+      }],
+      [{ id: 'hung-life', profile_id: 'profile-hung', name: 'Mạnh Hùng' }],
+      { notifications: [] },
+      'Tháng 6 · 2026',
+      [],
+      '2026-06',
+    )
+
+    expect(rows[0].amount).toBe(425816)
+    expect(rows[0].paymentItems).toMatchObject([
+      { month: '2026-06', amount: -658166 },
+      { month: '2026-07', amount: 232350 },
+    ])
+  })
 })
 
 describe('buildHomeData', () => {

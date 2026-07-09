@@ -807,7 +807,8 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       const paymentItems = buildTreasurerPaymentItems(row.sources, profileId, memberIds, selectedYearMonth)
       const defaultPaymentItemKeys = paymentItems.filter(item => item.defaultSelected).map(item => item.key)
       const payableSources = paymentItems.filter(item => item.defaultSelected).map(paymentItemToCoveredSource)
-      const payableAmount = payableSources.reduce((sum, source) => sum + Math.abs(Number(source.amount) || 0), 0)
+      const payableTotal = payableSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
+      const payableAmount = payableTotal < 0 ? Math.abs(payableTotal) : 0
       rowsByProfile.set(profileId, {
         profileId,
         memberIds,
@@ -903,7 +904,7 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
         ? monthRows
         : [{ month: source.month || source.yearMonth || source.year_month || selectedYearMonth, label: '', amount: source.amount }]
       return rows
-        .filter(row => Number(row?.amount) < 0)
+        .filter(row => Number(row?.amount) !== 0)
         .map(row => {
           const month = row.month || source.month || source.yearMonth || source.year_month || ''
           const amount = Number(row.amount) || 0
