@@ -104,11 +104,18 @@ test('bill card only renders checked payment items grouped by profile source and
 
 test('bill image export embeds QR before capturing card', () => {
   const billCardSource = sliceBetween('function PaymentBillCardSheet(', 'function buildElementImageBlob');
+  const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
   assert.match(homeSource, /function readBlobAsDataUrl\(blob\)/);
   assert.match(homeSource, /function waitForElementImages\(element\)/);
+  assert.match(homeSource, /function drawBillQrOnImage\(dataUrl, cardElement, qrDataUrl\)/);
+  assert.match(billContentSource, /data-bill-qr/);
   assert.match(billCardSource, /const \[billQrUrl, setBillQrUrl\] = useState\(qrUrl \|\| ''\)/);
   assert.match(billCardSource, /readBlobAsDataUrl\(blob\)/);
   assert.match(billCardSource, /qrUrl=\{billQrUrl\}/);
   assert.match(billCardSource, /await waitForElementImages\(cardRef\.current\)/);
-  assert.match(billCardSource, /await toPng\(cardRef\.current/);
+  assert.match(billCardSource, /const capturedDataUrl = await toPng\(cardRef\.current/);
+  assert.match(billCardSource, /const dataUrl = await drawBillQrOnImage\(capturedDataUrl, cardRef\.current, billQrUrl\)/);
+  assert.match(homeSource, /canvas\.getContext\('2d'\)/);
+  assert.match(homeSource, /context\.drawImage\(baseImage, 0, 0\)/);
+  assert.match(homeSource, /context\.drawImage\(qrImage, x, y, width, height\)/);
 });

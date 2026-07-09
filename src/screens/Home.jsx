@@ -2117,7 +2117,7 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
           <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>Cần chuyển cho thủ quỹ</div>
         </div>
         {qrUrl ? (
-          <button type="button" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 96, height: 96, padding: 0, border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
+          <button type="button" data-bill-qr="true" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 96, height: 96, padding: 0, border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
             <img src={qrUrl} alt="QR thanh toán" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
           </button>
         ) : (
@@ -2195,6 +2195,41 @@ function waitForElementImages(element) {
   }));
 }
 
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+}
+
+async function drawBillQrOnImage(dataUrl, cardElement, qrDataUrl) {
+  const qrElement = cardElement?.querySelector?.('[data-bill-qr]');
+  if (!qrElement || !String(qrDataUrl || '').startsWith('data:')) return dataUrl;
+
+  const cardRect = cardElement.getBoundingClientRect();
+  const qrRect = qrElement.getBoundingClientRect();
+  if (!cardRect.width || !cardRect.height || !qrRect.width || !qrRect.height) return dataUrl;
+
+  const [baseImage, qrImage] = await Promise.all([loadImage(dataUrl), loadImage(qrDataUrl)]);
+  const canvas = document.createElement('canvas');
+  canvas.width = baseImage.naturalWidth || baseImage.width;
+  canvas.height = baseImage.naturalHeight || baseImage.height;
+  const context = canvas.getContext('2d');
+  if (!context) return dataUrl;
+
+  context.drawImage(baseImage, 0, 0);
+  const scaleX = canvas.width / cardRect.width;
+  const scaleY = canvas.height / cardRect.height;
+  const x = (qrRect.left - cardRect.left) * scaleX;
+  const y = (qrRect.top - cardRect.top) * scaleY;
+  const width = qrRect.width * scaleX;
+  const height = qrRect.height * scaleY;
+  context.drawImage(qrImage, x, y, width, height);
+  return canvas.toDataURL('image/png');
+}
+
 function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, onClose }) {
   const cardRef = useRef(null);
   const [sharingImage, setSharingImage] = useState(false);
@@ -2236,11 +2271,13 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
   }, [qrUrl]);
 
   async function shareBillImage() {
-    if (!cardRef.current || sharingImage || preparingQr) return;
+    const billQrReady = !qrUrl || String(billQrUrl || '').startsWith('data:');
+    if (!cardRef.current || sharingImage || preparingQr || !billQrReady) return;
     setSharingImage(true);
     try {
       await waitForElementImages(cardRef.current);
-      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: colors.shellBg });
+      const capturedDataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: colors.shellBg });
+      const dataUrl = await drawBillQrOnImage(capturedDataUrl, cardRef.current, billQrUrl);
       const response = await fetch(dataUrl);
       const blob = await response.blob();
       const file = new File([blob], billFilename, { type: 'image/png' });
@@ -2263,6 +2300,9 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
     }
   }
 
+  const billQrReady = !qrUrl || String(billQrUrl || '').startsWith('data:');
+  const shareDisabled = sharingImage || preparingQr || !billQrReady;
+
   return (
     <BottomSheet title="Thẻ bill" onClose={onClose}>
       <div style={{ display: 'grid', gap: 12 }}>
@@ -2275,7 +2315,7 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
             paymentDisplayGroups={paymentDisplayGroups}
           />
         </div>
-        <button type="button" onClick={shareBillImage} disabled={sharingImage || preparingQr} style={{
+        <button type="button" onClick={shareBillImage} disabled={shareDisabled} style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2288,9 +2328,9 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
           fontSize: 12,
           fontWeight: 950,
           fontFamily: 'inherit',
-          cursor: !sharingImage && !preparingQr ? 'pointer' : 'default',
-          opacity: !sharingImage && !preparingQr ? 1 : 0.7,
-        }}>{preparingQr ? 'Đang chuẩn bị QR...' : sharingImage ? 'Đang share...' : 'Share ảnh'}</button>
+          cursor: !shareDisabled ? 'pointer' : 'default',
+          opacity: !shareDisabled ? 1 : 0.7,
+        }}>{preparingQr ? 'Đang chuẩn bị QR...' : !billQrReady ? 'Chưa chuẩn bị được QR' : sharingImage ? 'Đang share...' : 'Share ảnh'}</button>
         <div style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 1.45, textAlign: 'center' }}>Máy không hỗ trợ share ảnh thì app tự tải PNG.</div>
       </div>
     </BottomSheet>
