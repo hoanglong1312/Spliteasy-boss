@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
+const paymentSettlementsMigrationSource = readFileSync(new URL('../supabase/migrations/20260709000001_record_payment_settlements.sql', import.meta.url), 'utf8')
 
 test('store owns toast state and hide lifecycle', () => {
   assert.match(storeSource, /const TOAST_HIDE_DELAY_MS = 3000/)
@@ -88,6 +89,27 @@ test('store fetches payment notifications and persists treasurer review actions'
   assert.match(reviewBlock, /metadata: \{ \.\.\.notification\.metadata, status: action\.status \}/)
   assert.match(reviewBlock, /is_read: true/)
   assert.doesNotMatch(reviewBlock, /\.eq\('member_id', state\.currentUserId\)/)
+})
+
+test('treasurer payment confirmation records settled source months', () => {
+  const match = storeSource.match(/case 'TREASURER_CONFIRM_PAYMENT': \{[\s\S]*?\n      \}/)
+  assert.ok(match, 'TREASURER_CONFIRM_PAYMENT case is available')
+  const source = match[0]
+
+  assert.match(source, /const coveredSources = safeArray\(action\.coveredSources\)/)
+  assert.match(source, /\.rpc\('treasurer_confirm_payment'/)
+  assert.match(source, /p_covered_sources: coveredSources/)
+  assert.match(source, /\.rpc\('record_member_month_payment_settlements'/)
+  assert.match(source, /p_treasurer_member_id: state\.currentUserId/)
+  assert.match(source, /p_covered_sources: coveredSources/)
+})
+
+test('payment settlement migration records and backfills confirmed source months', () => {
+  assert.match(paymentSettlementsMigrationSource, /create or replace function public\.record_member_month_payment_settlements/)
+  assert.match(paymentSettlementsMigrationSource, /insert into public\.member_month_settlements/)
+  assert.match(paymentSettlementsMigrationSource, /jsonb_array_elements\(coalesce\(n\.metadata->'coveredSources'/)
+  assert.match(paymentSettlementsMigrationSource, /lower\(coalesce\(n\.metadata->>'status', ''\)\) = 'confirmed'/)
+  assert.match(paymentSettlementsMigrationSource, /on conflict \(member_id, month, group_id\) do nothing/)
 })
 
 test('monthly pickleball config save persists schedule time aliases', () => {

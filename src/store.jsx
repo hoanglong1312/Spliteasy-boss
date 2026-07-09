@@ -2049,17 +2049,33 @@ export function AppProvider({ children }) {
 
       case 'TREASURER_CONFIRM_PAYMENT': {
         if (!sb || !state.currentUserId) return null
+        const coveredSources = safeArray(action.coveredSources)
         const { data, error } = await sb.rpc('treasurer_confirm_payment', {
           p_from_member_id: action.memberId || action.fromMemberId || action.from_member_id || null,
           p_amount: Number(action.amount) || 0,
           p_month_label: action.monthLabel || '',
           p_member_name: action.memberName || '',
-          p_covered_sources: safeArray(action.coveredSources),
+          p_covered_sources: coveredSources,
           p_group_id: action.groupId || state.currentGroupId || null,
         })
         if (error) {
           console.error('[store] TREASURER_CONFIRM_PAYMENT:', error)
           throw error
+        }
+        const hasSourceMonths = coveredSources.some(source => (
+          (source.month || source.yearMonth || source.year_month) &&
+          (source.sourceId || source.source_id) &&
+          (source.memberId || source.member_id || source.profileId || source.profile_id)
+        ))
+        if (hasSourceMonths) {
+          const { error: settlementError } = await sb.rpc('record_member_month_payment_settlements', {
+            p_treasurer_member_id: state.currentUserId,
+            p_covered_sources: coveredSources,
+          })
+          if (settlementError) {
+            console.error('[store] RECORD_PAYMENT_SETTLEMENTS:', settlementError)
+            throw settlementError
+          }
         }
         await dispatch({ type: 'REFRESH' })
         return data
