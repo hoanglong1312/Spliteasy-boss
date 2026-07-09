@@ -113,13 +113,23 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
   assert.match(dashboardSource, /buildRefundBillData\(refundBillItem\)/);
   assert.match(dashboardSource, /<RefundBankSheet/);
   assert.match(homeSource, /function buildRefundBillData\(item\)/);
-  assert.match(homeSource, /function RefundBankSheet\(\{ item, onAction, onClose \}\)/);
+  assert.match(homeSource, /function RefundBankSheet\(\{ item, onAction, onClose, onSaved \}\)/);
   assert.match(rowBuilderSource, /profileId: row\.profileId \|\| row\.profile_id \|\| ''/);
   assert.match(rowBuilderSource, /memberId: row\.memberId \|\| row\.member_id \|\| ''/);
   assert.match(homeSource, /const profileId = item\?\.profileId \|\| item\?\.profile_id \|\| item\?\.refundRow\?\.profileId \|\| item\?\.refundRow\?\.profile_id \|\| ''/);
   assert.match(homeSource, /const canSave = Boolean\(profileId && resolveVietQrBank\(\{ name: bankName \}\) && bankAccount\.trim\(\) && bankAccountName\.trim\(\)\)/);
   assert.match(homeSource, /onAction\?\.\('editMember'/);
   assert.match(billContentSource, /caption = 'Cần chuyển cho thủ quỹ'/);
+});
+
+test('saving refund bank updates the open refund bill item so QR appears immediately', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+  const refundBankSource = sliceBetween('function RefundBankSheet(', 'function PaymentBillCardContent');
+  assert.match(homeSource, /function RefundBankSheet\(\{ item, onAction, onClose, onSaved \}\)/);
+  assert.match(refundBankSource, /const savedBank = \{[\s\S]*name: bankName\.trim\(\),[\s\S]*code: bankName\.trim\(\),[\s\S]*account: bankAccount\.trim\(\),[\s\S]*holder: bankAccountName\.trim\(\),[\s\S]*\}/);
+  assert.match(refundBankSource, /onSaved\?\.\(savedBank\)/);
+  assert.match(dashboardSource, /onSaved=\{\(bank\) => \{/);
+  assert.match(dashboardSource, /setRefundBillItem\(item => item \? \{[\s\S]*\.\.\.item,[\s\S]*bank,[\s\S]*refundRow: item\.refundRow \? \{ \.\.\.item\.refundRow, bank \} : item\.refundRow,[\s\S]*\} : item\)/);
 });
 
 test('bill card only renders checked payment items grouped by profile source and month', () => {

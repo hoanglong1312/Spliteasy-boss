@@ -1527,6 +1527,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <RefundBankSheet
           item={refundBankItem}
           onAction={onAction}
+          onSaved={(bank) => {
+            setRefundBillItem(item => item ? {
+              ...item,
+              bank,
+              refundRow: item.refundRow ? { ...item.refundRow, bank } : item.refundRow,
+            } : item);
+          }}
           onClose={() => setRefundBankItem(null)}
         />
       )}
@@ -2211,7 +2218,7 @@ function buildRefundBillData(item) {
   };
 }
 
-function RefundBankSheet({ item, onAction, onClose }) {
+function RefundBankSheet({ item, onAction, onClose, onSaved }) {
   const bank = item?.bank || item?.refundRow?.bank || {};
   const resolvedBank = resolveVietQrBank(bank);
   const memberName = item?.memberName || item?.member_name || item?.refundRow?.name || item?.refundRow?.memberName || item?.refundRow?.member_name || 'Thành viên';
@@ -2241,14 +2248,21 @@ function RefundBankSheet({ item, onAction, onClose }) {
   async function submit() {
     if (!canSave || saving) return;
     setSaving(true);
+    const savedBank = {
+      name: bankName.trim(),
+      code: bankName.trim(),
+      account: bankAccount.trim(),
+      holder: bankAccountName.trim(),
+    };
     try {
       await onAction?.('editMember', {
         memberId,
         profileId,
-        bankName: bankName.trim(),
-        bankAccount: bankAccount.trim(),
-        bankAccountName: bankAccountName.trim(),
+        bankName: savedBank.name,
+        bankAccount: savedBank.account,
+        bankAccountName: savedBank.holder,
       });
+      onSaved?.(savedBank);
       onClose?.();
     } finally {
       setSaving(false);
