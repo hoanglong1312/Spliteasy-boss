@@ -49,7 +49,7 @@ test('treasurer dashboard can create one bill from selected items across members
   assert.match(dashboardSource, /selectedTreasurerItems = memberRows\.flatMap/);
   assert.match(dashboardSource, /TT đã chọn/);
   assert.match(dashboardSource, /const selectedTreasurerTotal = paymentItemsAmountDue\(selectedTreasurerItems\)/);
-  assert.match(dashboardSource, /setPaymentRow\(paymentRowFromTreasurerItems\(selectedTreasurerItems, data\)\)/);
+  assert.match(dashboardSource, /setPaymentRow\(\{ \.\.\.paymentRowFromTreasurerItems\(selectedTreasurerItems, data\), collapseRowKeys: selectedTreasurerRowKeys \}\)/);
   assert.match(rowBuilderSource, /profileGroups/);
   assert.match(rowBuilderSource, /paymentGroups/);
   assert.match(rowBuilderSource, /defaultPaymentItemKeys: paymentItems\.map\(item => item\.key\)/);
@@ -68,15 +68,60 @@ test('treasurer dashboard nets signed debt and credit items', () => {
   assert.match(confirmSource, /const selectedTotal = paymentItemsAmountDue\(selectedItems\)/);
 });
 
+test('treasurer member cards can bulk select, clear all, and collapse after confirmed payment', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
+  assert.match(dashboardSource, /function setTreasurerRowSelection\(row, selected\)/);
+  assert.match(dashboardSource, /selected \? next\.add\(item\.key\) : next\.delete\(item\.key\)/);
+  assert.match(dashboardSource, /Bỏ chọn tất cả/);
+  assert.match(dashboardSource, /setSelectedTreasurerItemKeys\(new Set\(\)\)/);
+  assert.match(dashboardSource, /const selectedTreasurerRowKeys = memberRows\.filter/);
+  assert.match(dashboardSource, /collapseRowKeys: selectedTreasurerRowKeys/);
+  assert.match(dashboardSource, /setCollapsedTreasurerRows\(prev => \(\{ keys: safeArray\(paymentRow\?\.collapseRowKeys\), tick: prev\.tick \+ 1 \}\)\)/);
+  assert.match(dashboardSource, /onToggleRowSelection=\{\(selected\) => setTreasurerRowSelection\(row, selected\)\}/);
+  assert.match(rowSource, /collapseTick/);
+  assert.match(rowSource, /const rowAllSelected = unpaidItems\.length > 0 && unpaidItems\.every\(item => selectedKeys\?\.has\?\.\(item\.key\)\)/);
+  assert.match(rowSource, /onToggleRowSelection\?\.\(!rowAllSelected\)/);
+  assert.match(rowSource, /useEffect\(\(\) => \{ if \(collapseTick\) setExpanded\(false\); \}, \[collapseTick\]\)/);
+  assert.match(rowSource, /Chọn hết/);
+  assert.match(rowSource, /Bỏ chọn/);
+});
+
+test('treasurer refund rows can open bill card and add missing bank info', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+  const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
+  const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
+  assert.match(rowBuilderSource, /bank: row\.bank \|\| \{\}/);
+  assert.match(rowBuilderSource, /memberName: memberRow\.name/);
+  assert.match(dashboardSource, /const \[refundBillItem, setRefundBillItem\] = useState\(null\)/);
+  assert.match(dashboardSource, /const \[refundBankItem, setRefundBankItem\] = useState\(null\)/);
+  assert.match(dashboardSource, /onRefundBill=\{\(item\) => setRefundBillItem\(item\)\}/);
+  assert.match(dashboardSource, /onEditRefundBank=\{\(item\) => setRefundBankItem\(item\)\}/);
+  assert.match(rowSource, /onRefundBill/);
+  assert.match(rowSource, /onEditRefundBank/);
+  assert.match(rowSource, /const refundBankReady = isRefund && Boolean\(resolveVietQrBank\(item\.bank \|\| \{\}\) && item\.bank\?\.account && item\.bank\?\.holder\)/);
+  assert.match(rowSource, /Thẻ bill/);
+  assert.match(rowSource, /Bổ sung STK/);
+  assert.match(dashboardSource, /buildRefundBillData\(refundBillItem\)/);
+  assert.match(dashboardSource, /<RefundBankSheet/);
+  assert.match(homeSource, /function buildRefundBillData\(item\)/);
+  assert.match(homeSource, /function RefundBankSheet\(\{ item, onAction, onClose \}\)/);
+  assert.match(homeSource, /onAction\?\.\('editMember'/);
+  assert.match(billContentSource, /caption = 'Cần chuyển cho thủ quỹ'/);
+});
+
 test('bill card only renders checked payment items grouped by profile source and month', () => {
   const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
   const billCardSource = sliceBetween('function PaymentBillCardSheet(', 'function signedVND');
-  assert.match(homeSource, /function PaymentBillCardContent\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null \}\)/);
-  assert.match(homeSource, /function PaymentBillCardSheet\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, onClose \}\)/);
+  assert.match(homeSource, /function PaymentBillCardContent\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' \}\)/);
+  assert.match(homeSource, /function PaymentBillCardSheet\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', onClose \}\)/);
   assert.match(billCardSource, /<PaymentBillCardContent[\s\S]*paymentDisplayGroups=\{paymentDisplayGroups\}/);
   assert.match(homeSource, /group\.items\.filter\(item => group\.checkedKeys\?\.has\?\.\(item\.key\)\)/);
   assert.match(homeSource, /groupPaymentItemsBySource\(selectedItems\)/);
   assert.match(homeSource, /item\.monthLabel \|\| fullMonthLabel\(item\.month\)/);
+  assert.match(billContentSource, /Các khoản của<\/span>/);
+  assert.match(billContentSource, /border: '1px solid rgba\(147,197,253,0\.48\)'/);
   assert.doesNotMatch(billContentSource, /paymentTarget/);
   assert.doesNotMatch(billContentSource, /STK|Chủ TK|NH/);
   assert.doesNotMatch(billContentSource, /Nội dung CK/);

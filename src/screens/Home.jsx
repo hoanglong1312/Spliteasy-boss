@@ -1250,7 +1250,10 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const [paymentRow, setPaymentRow] = useState(null);
   const [loading, setLoading] = useState(false);
   const [qrSheetMembers, setQrSheetMembers] = useState(null);
+  const [refundBillItem, setRefundBillItem] = useState(null);
+  const [refundBankItem, setRefundBankItem] = useState(null);
   const [selectedTreasurerItemKeys, setSelectedTreasurerItemKeys] = useState(() => new Set());
+  const [collapsedTreasurerRows, setCollapsedTreasurerRows] = useState({ keys: [], tick: 0 });
   const rows = safeArray(progressRows);
   const pending = safeArray(pendingRecords);
   const pendingCheckpoints = safeArray(pendingCheckpointsForTreasurer);
@@ -1279,7 +1282,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const pendingMemberCount = new Set([...pendingRecordsRaw, ...pendingCheckpoints].map(treasurerProfileStatKey).filter(Boolean)).size;
   const unpaidMemberCount = profileStatRows.filter(row => row.amountDue > 0).length;
   const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
+  const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
   const selectedTreasurerTotal = paymentItemsAmountDue(selectedTreasurerItems);
+  const refundBillData = refundBillItem ? buildRefundBillData(refundBillItem) : null;
   const isSearching = Boolean(searchQuery.trim());
 
   async function withLoading(action) {
@@ -1299,6 +1304,21 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       next.has(item.key) ? next.delete(item.key) : next.add(item.key);
       return next;
     });
+  }
+
+  function setTreasurerRowSelection(row, selected) {
+    setSelectedTreasurerItemKeys(prev => {
+      const next = new Set(prev);
+      safeArray(row?.items).filter(item => !item.paid && item.kind !== 'refund').forEach(item => {
+        selected ? next.add(item.key) : next.delete(item.key);
+      });
+      return next;
+    });
+  }
+
+  function clearTreasurerSelection() {
+    setSelectedTreasurerItemKeys(new Set());
+    setCollapsedTreasurerRows(prev => ({ keys: memberRows.map(row => row.key), tick: prev.tick + 1 }));
   }
 
   return (
@@ -1400,11 +1420,18 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         onToggle={() => setMemberExpanded(value => !value)}
         listScroll
         headerRight={selectedTreasurerTotal > 0 ? (
-          <button
-            type="button"
-            onClick={() => setPaymentRow(paymentRowFromTreasurerItems(selectedTreasurerItems, data))}
-            style={miniDashButton('#22c55e', '#052e16')}
-          >TT đã chọn {formatVND(selectedTreasurerTotal)}</button>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={clearTreasurerSelection}
+              style={miniDashButton('rgba(148,163,184,0.14)', '#cbd5e1')}
+            >Bỏ chọn tất cả</button>
+            <button
+              type="button"
+              onClick={() => setPaymentRow({ ...paymentRowFromTreasurerItems(selectedTreasurerItems, data), collapseRowKeys: selectedTreasurerRowKeys })}
+              style={miniDashButton('#22c55e', '#052e16')}
+            >TT đã chọn {formatVND(selectedTreasurerTotal)}</button>
+          </div>
         ) : null}
       >
         {memberRows.length > 0 ? memberRows.map(row => (
@@ -1412,14 +1439,18 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             key={row.key}
             row={row}
             selectedKeys={selectedTreasurerItemKeys}
+            collapseTick={collapsedTreasurerRows.keys.includes(row.key) ? collapsedTreasurerRows.tick : 0}
             onShare={(member) => setShareMember(member)}
             onQr={(member) => setQrSheetMembers([member])}
-            onPayItem={(item) => setPaymentRow(paymentRowFromTreasurerItem(item, data))}
-            onPaySelected={(items) => setPaymentRow(paymentRowFromTreasurerItems(items, data))}
+            onPayItem={(item) => setPaymentRow({ ...paymentRowFromTreasurerItem(item, data), collapseRowKeys: [row.key] })}
+            onPaySelected={(items) => setPaymentRow({ ...paymentRowFromTreasurerItems(items, data), collapseRowKeys: [row.key] })}
             onToggleSelect={toggleTreasurerItemSelection}
+            onToggleRowSelection={(selected) => setTreasurerRowSelection(row, selected)}
             onCancelPaid={(record) => withLoading(() => onAction?.('cancelPaymentRecord', record))}
             onViewPaid={(record) => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }}
             onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
+            onRefundBill={(item) => setRefundBillItem(item)}
+            onEditRefundBank={(item) => setRefundBankItem(item)}
           />
         )) : (
           <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{isSearching ? 'Không có member khớp tìm kiếm.' : 'Không còn dữ liệu cần xử lý.'}</div>
@@ -1444,6 +1475,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           onClose={() => setPaymentRow(null)}
           onConfirm={(payload) => withLoading(async () => {
             await onAction?.('markMemberPaid', payload);
+            setCollapsedTreasurerRows(prev => ({ keys: safeArray(paymentRow?.collapseRowKeys), tick: prev.tick + 1 }));
             setSelectedTreasurerItemKeys(prev => {
               if (!selectedTreasurerTotal) return prev;
               const next = new Set(prev);
@@ -1460,6 +1492,27 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           members={qrSheetMembers}
           paymentTarget={data?.paymentTarget}
           onClose={() => setQrSheetMembers(null)}
+        />
+      )}
+
+      {refundBillData && (
+        <PaymentBillCardSheet
+          memberName={refundBillData.memberName}
+          amount={refundBillData.amount}
+          transferDescription={refundBillData.transferDescription}
+          qrUrl={refundBillData.qrUrl}
+          paymentDisplayGroups={refundBillData.paymentDisplayGroups}
+          caption="Cần hoàn cho member"
+          amountColor="#6ee7b7"
+          onClose={() => setRefundBillItem(null)}
+        />
+      )}
+
+      {refundBankItem && (
+        <RefundBankSheet
+          item={refundBankItem}
+          onAction={onAction}
+          onClose={() => setRefundBankItem(null)}
         />
       )}
     </div>
@@ -1576,8 +1629,13 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
       sourceType: 'refund',
       sourceId: refundKey,
       sourceLabel: 'Cần hoàn tiền',
-      monthLabel,
+      memberId: row.memberId || '',
+      profileId: row.profileId || '',
+      memberName: memberRow.name,
+      month: row.month || row.yearMonth || row.year_month || '',
+      monthLabel: row.monthLabel || row.month_label || monthLabel,
       amount,
+      bank: row.bank || {},
       refundRow: row,
     });
   });
@@ -1640,11 +1698,14 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, selectedKeys, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onCancelPaid, onViewPaid, onConfirmRefund }) {
+function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onRefundBill, onEditRefundBank }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
+  const unpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund');
   const selectedUnpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedKeys?.has?.(item.key));
   const selectedUnpaidTotal = paymentItemsAmountDue(selectedUnpaidItems);
+  const rowAllSelected = unpaidItems.length > 0 && unpaidItems.every(item => selectedKeys?.has?.(item.key));
+  useEffect(() => { if (collapseTick) setExpanded(false); }, [collapseTick]);
   return (
     <div style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
       <button type="button" onClick={() => setExpanded(value => !value)} style={{ width: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
@@ -1665,9 +1726,10 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, onShare, onQr, onPayItem
       </button>
       {expanded && (
         <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
-          <div style={{ display: 'flex', gap: 5 }}>
+          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
             {row.amountDue > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, amount: row.amountDue })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
+            {unpaidItems.length > 0 && <button type="button" onClick={() => onToggleRowSelection?.(!rowAllSelected)} style={miniDashButton(rowAllSelected ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.18)', rowAllSelected ? '#cbd5e1' : '#6ee7b7')}>{rowAllSelected ? 'Bỏ chọn' : 'Chọn hết'}</button>}
             {selectedUnpaidTotal > 0 && <button type="button" onClick={() => onPaySelected?.(selectedUnpaidItems)} style={miniDashButton('#22c55e', '#052e16')}>TT tổng {formatVND(selectedUnpaidTotal)}</button>}
           </div>
           {groupedItems.map(group => (
@@ -1683,6 +1745,7 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, onShare, onQr, onPayItem
                   const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : isCredit ? 'Bù' : (item.paid ? 'Đã nhận' : 'TT');
                   const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
                   const selected = !item.paid && !isRefund && selectedKeys?.has?.(item.key);
+                  const refundBankReady = isRefund && Boolean(resolveVietQrBank(item.bank || {}) && item.bank?.account && item.bank?.holder);
                   return (
                     <div
                       key={item.key}
@@ -1700,17 +1763,21 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, onShare, onQr, onPayItem
                       <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : ''}</div>
                       <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (isRefund) return onConfirmRefund?.(item);
-                          if (item.paid) return onCancelPaid?.(item.record);
-                          return onPayItem?.(item);
-                        }}
-                        onDoubleClick={() => item.paid && !isRefund ? onViewPaid?.(item.record) : undefined}
-                        style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
-                      >{label}</button>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
+                        {isRefund && !item.paid && !refundBankReady && <button type="button" onClick={(event) => { event.stopPropagation(); onEditRefundBank?.(item); }} style={miniDashButton('rgba(96,165,250,0.16)', '#bfdbfe')}>Bổ sung STK</button>}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (isRefund) return onConfirmRefund?.(item);
+                            if (item.paid) return onCancelPaid?.(item.record);
+                            return onPayItem?.(item);
+                          }}
+                          onDoubleClick={() => item.paid && !isRefund ? onViewPaid?.(item.record) : undefined}
+                          style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
+                        >{label}</button>
+                      </div>
                     </div>
                   );
                 })}
@@ -2102,7 +2169,113 @@ STK: ${paymentTarget?.account || ''}
 Chủ TK: ${paymentTarget?.holder || ''}`.trim();
 }
 
-function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null }) {
+function buildRefundBillData(item) {
+  const bank = item?.bank || item?.refundRow?.bank || {};
+  const qrBank = resolveVietQrBank(bank);
+  const amount = Math.abs(Number(item?.amount) || 0);
+  const memberName = item?.memberName || item?.refundRow?.name || item?.refundRow?.memberName || 'Thành viên';
+  const monthLabel = item?.monthLabel || fullMonthLabel(item?.month);
+  const transferDescription = `Hoan tien ${memberName}${monthLabel ? ` ${monthLabel}` : ''}`.trim();
+  const qrUrl = amount > 0 && qrBank && bank.account && bank.holder ? generateQRUrl({
+    bankId: qrBank.id,
+    account: bank.account,
+    accountName: bank.holder,
+    amount,
+    description: transferDescription,
+  }) : '';
+  return {
+    memberName,
+    amount,
+    transferDescription,
+    qrUrl,
+    paymentDisplayGroups: [{
+      key: 'refund',
+      title: `Các khoản của ${memberName}`,
+      items: [item],
+      checkedKeys: new Set([item?.key]),
+    }],
+  };
+}
+
+function RefundBankSheet({ item, onAction, onClose }) {
+  const bank = item?.bank || item?.refundRow?.bank || {};
+  const resolvedBank = resolveVietQrBank(bank);
+  const memberName = item?.memberName || item?.refundRow?.name || item?.refundRow?.memberName || 'Thành viên';
+  const [bankName, setBankName] = useState(resolvedBank?.shortName || bank.name || bank.code || '');
+  const [bankAccount, setBankAccount] = useState(bank.account || '');
+  const [bankAccountName, setBankAccountName] = useState(bank.holder || memberName);
+  const [saving, setSaving] = useState(false);
+  const memberId = item?.memberId || item?.refundRow?.memberId || '';
+  const profileId = item?.profileId || item?.refundRow?.profileId || '';
+  const knownBank = BANK_LIST.some(row => row.shortName === bankName || row.id === bankName || row.name === bankName);
+  const canSave = Boolean(memberId && profileId && bankName.trim() && bankAccount.trim() && bankAccountName.trim());
+  const inputStyle = {
+    minHeight: 38,
+    width: '100%',
+    boxSizing: 'border-box',
+    borderRadius: 10,
+    border: '1px solid rgba(148,163,184,0.22)',
+    background: colors.inputBg,
+    color: colors.textPrimary,
+    padding: '8px 10px',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    outline: 'none',
+  };
+
+  async function submit() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      await onAction?.('editMember', {
+        memberId,
+        profileId,
+        bankName: bankName.trim(),
+        bankAccount: bankAccount.trim(),
+        bankAccountName: bankAccountName.trim(),
+      });
+      onClose?.();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <BottomSheet title={`Bổ sung STK · ${memberName}`} onClose={onClose}>
+      <div style={{ display: 'grid', gap: 10 }}>
+        <label style={{ display: 'grid', gap: 5, fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>
+          Ngân hàng
+          <select value={bankName} onChange={(event) => setBankName(event.target.value)} style={inputStyle}>
+            <option value="">Chọn ngân hàng</option>
+            {bankName && !knownBank && <option value={bankName}>{bankName}</option>}
+            {BANK_LIST.map(row => <option key={row.id} value={row.shortName}>{row.shortName} · {row.name}</option>)}
+          </select>
+        </label>
+        <label style={{ display: 'grid', gap: 5, fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>
+          Số tài khoản
+          <input value={bankAccount} onChange={(event) => setBankAccount(event.target.value)} inputMode="numeric" style={inputStyle} />
+        </label>
+        <label style={{ display: 'grid', gap: 5, fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>
+          Chủ tài khoản
+          <input value={bankAccountName} onChange={(event) => setBankAccountName(event.target.value)} style={inputStyle} />
+        </label>
+        <button type="button" onClick={submit} disabled={!canSave || saving} style={{
+          minHeight: 40,
+          borderRadius: 11,
+          border: 'none',
+          background: canSave && !saving ? '#22c55e' : 'rgba(148,163,184,0.18)',
+          color: canSave && !saving ? '#052e16' : '#94a3b8',
+          fontSize: 13,
+          fontWeight: 950,
+          fontFamily: 'inherit',
+          cursor: canSave && !saving ? 'pointer' : 'not-allowed',
+        }}>{saving ? 'Đang lưu...' : 'Lưu STK nhận hoàn'}</button>
+      </div>
+    </BottomSheet>
+  );
+}
+
+function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const groups = safeArray(paymentDisplayGroups)
     .map(group => ({ ...group, items: group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
@@ -2113,8 +2286,8 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 10, alignItems: 'start' }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'inline-flex', maxWidth: '100%', padding: '4px 9px', borderRadius: 999, background: 'rgba(96,165,250,0.16)', border: '1px solid rgba(96,165,250,0.42)', color: '#bfdbfe', fontSize: 11, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</div>
-          <div style={{ marginTop: 7, fontSize: 26, fontWeight: 950, color: '#fca5a5', ...type.mono }}>{formatVND(amount)}</div>
-          <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>Cần chuyển cho thủ quỹ</div>
+          <div style={{ marginTop: 7, fontSize: 26, fontWeight: 950, color: amountColor, ...type.mono }}>{formatVND(amount)}</div>
+          <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>{caption}</div>
         </div>
         {qrUrl ? (
           <button type="button" data-bill-qr="true" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 96, height: 96, padding: 0, border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
@@ -2133,7 +2306,10 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
           const profileName = /^Các khoản của\s+(.+)$/i.exec(group.title)?.[1] || group.title;
           return (
             <div key={group.key} style={{ display: 'grid', gap: 8, padding: 10, borderRadius: 13, background: 'rgba(15,23,42,0.62)', border: '1px solid rgba(96,165,250,0.24)', boxShadow: 'inset 3px 0 0 rgba(96,165,250,0.52)' }}>
-              <div style={{ fontSize: 10, color: '#bfdbfe', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Các khoản của {profileName}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                <span style={{ fontSize: 10, color: '#bfdbfe', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap' }}>Các khoản của</span>
+                <span style={{ minWidth: 0, maxWidth: '100%', padding: '2px 7px', borderRadius: 999, background: 'rgba(96,165,250,0.22)', border: '1px solid rgba(147,197,253,0.48)', color: '#eff6ff', fontSize: 10, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName}</span>
+              </div>
               {groupPaymentItemsBySource(selectedItems).map(sourceGroup => {
                 const sourceTotal = sourceGroup.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
                 return (
@@ -2230,7 +2406,7 @@ async function drawBillQrOnImage(dataUrl, cardElement, qrDataUrl) {
   return canvas.toDataURL('image/png');
 }
 
-function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, onClose }) {
+function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', onClose }) {
   const cardRef = useRef(null);
   const [sharingImage, setSharingImage] = useState(false);
   const [billQrUrl, setBillQrUrl] = useState(qrUrl || '');
@@ -2313,6 +2489,8 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
             transferDescription={transferDescription}
             qrUrl={billQrUrl}
             paymentDisplayGroups={paymentDisplayGroups}
+            caption={caption}
+            amountColor={amountColor}
           />
         </div>
         <button type="button" onClick={shareBillImage} disabled={shareDisabled} style={{
