@@ -2186,8 +2186,6 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
       const file = new File([blob], billFilename, { type: 'image/png' });
       if (navigator?.share && navigator?.canShare?.({ files: [file] })) {
         await navigator.share({
-          title: `Thẻ bill ${memberName || ''}`.trim(),
-          text: transferDescription || 'Thẻ bill thanh toán',
           files: [file],
         });
         return;

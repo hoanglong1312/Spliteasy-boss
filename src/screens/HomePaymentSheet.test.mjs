@@ -94,7 +94,8 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.match(billCardSource, /new File\(\[blob\], billFilename, \{ type: 'image\/png' \}\)/);
   assert.match(billCardSource, /navigator\?\.share/);
   assert.match(billCardSource, /navigator\?\.canShare\?\.\(\{ files: \[file\] \}\)/);
-  assert.match(billCardSource, /await navigator\.share\(/);
+  assert.match(billCardSource, /await navigator\.share\(\{\s*files: \[file\],\s*\}\)/);
+  assert.doesNotMatch(billCardSource, /text: transferDescription/);
   assert.match(homeSource, /function buildElementImageBlob/);
   assert.match(homeSource, /function triggerDownload/);
   assert.match(billCardSource, /triggerDownload\(dataUrl, billFilename\)/);
