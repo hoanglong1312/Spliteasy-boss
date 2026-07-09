@@ -690,6 +690,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
   const paymentStatus = netBalance > 0 || (netBalance < 0 && coverage.pendingAmount <= 0) ? '' : paymentNotice?.status || ''
+  const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, state?.monthSettlements, members, state?.groups)
   return {
     monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
@@ -703,10 +704,10 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     paymentTarget: findAdminPaymentTarget(members, state),
     memberBank: bankData(me, true),
     paymentProgress: buildPaymentProgressRows(progressProfileBreakdown, members, state, monthLabel, safeArray(state?.monthSettlements), monthKey(monthDate)),
-    payForRows: safeArray(profileBreakdown)
+    payForRows: safeArray(proxyProfileBreakdown)
       .filter(row => Number(row.amount) < 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),
-    refundRows: safeArray(profileBreakdown)
+    refundRows: safeArray(proxyProfileBreakdown)
       .filter(row => Number(row.amount) > 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || ''))
       .map(row => ({
@@ -748,6 +749,16 @@ function appendProfileGroupSources(sourceBreakdown, state, members = [], member 
     })
     .filter(Boolean)
   return [...safeArray(sourceBreakdown), ...missingSources]
+}
+
+function profileRowsAfterSettledMonths(profileBreakdown, settlements, members = [], groups = []) {
+  return safeArray(profileBreakdown)
+    .map(row => {
+      const sources = suppressSettledSourceMonths(row.sources, settlements, members, groups)
+      const amount = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
+      return { ...row, amount, sources }
+    })
+    .filter(row => Number(row.amount) !== 0)
 }
 
 function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = []) {
@@ -1237,12 +1248,15 @@ function coveredMemberAmountForScope(metadata, scope = {}) {
 
 function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
   const coveredBySource = new Map()
+  const coveredSignedBySource = new Map()
   const coveredMonthsBySource = new Map()
   const paidOnlySources = new Map()
   safeArray(confirmedSources).forEach(source => {
     const key = sourceKey(source)
-    const amount = Math.abs(Number(source.amount) || 0)
+    const signedAmount = Number(source.amount) || 0
+    const amount = Math.abs(signedAmount)
     coveredBySource.set(key, (coveredBySource.get(key) || 0) + amount)
+    coveredSignedBySource.set(key, (coveredSignedBySource.get(key) || 0) + signedAmount)
     if ((source.sourceId || source.source_id || source.sourceLabel || source.source_label) && amount > 0) {
       const current = paidOnlySources.get(key)
       paidOnlySources.set(key, { ...(current || source), paidAmount: (Number(current?.paidAmount) || 0) + amount })
@@ -1251,14 +1265,14 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
     const months = safeArray(source.monthBreakdown || source.month_breakdown)
     if (sourceMonth) {
       const monthMap = coveredMonthsBySource.get(key) || new Map()
-      monthMap.set(sourceMonth, (monthMap.get(sourceMonth) || 0) + amount)
+      monthMap.set(sourceMonth, (monthMap.get(sourceMonth) || 0) + signedAmount)
       coveredMonthsBySource.set(key, monthMap)
     } else if (months.length) {
       months.forEach(item => {
         const month = item.month || monthKey(item.date)
         if (!month) return
         const monthMap = coveredMonthsBySource.get(key) || new Map()
-        monthMap.set(month, (monthMap.get(month) || 0) + Math.abs(Number(item.amount) || 0))
+        monthMap.set(month, (monthMap.get(month) || 0) + (Number(item.amount) || 0))
         coveredMonthsBySource.set(key, monthMap)
       })
     }
@@ -1268,7 +1282,8 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
       const amount = Number(source.amount) || 0
       const key = sourceKey(source)
       paidOnlySources.delete(key)
-      const paid = Math.min(Math.abs(amount), coveredBySource.get(key) || 0)
+      const coveredNet = coveredSignedBySource.get(key) || 0
+      const paid = Math.min(Math.abs(amount), Math.abs(coveredNet) || coveredBySource.get(key) || 0)
       coveredBySource.set(key, Math.max((coveredBySource.get(key) || 0) - paid, 0))
       const monthBreakdown = applyConfirmedPaymentCoverageToMonths(source.monthBreakdown, paid, amount, coveredMonthsBySource.get(key))
       const remainingFromMonths = safeArray(monthBreakdown).length
@@ -1302,10 +1317,11 @@ function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmoun
   return safeArray(monthBreakdown)
     .map(item => {
       const amount = Number(item.amount) || 0
-      const monthPaid = Math.min(Math.abs(amount), coveredMonths.get(item.month) || 0)
-      if (monthPaid > 0) {
+      const coveredMonthAmount = Number(coveredMonths.get(item.month) || 0)
+      const monthPaid = Math.min(Math.abs(amount), Math.abs(coveredMonthAmount))
+      if (monthPaid > 0 && Math.sign(coveredMonthAmount) === Math.sign(amount)) {
         remainingPaid = Math.max(remainingPaid - monthPaid, 0)
-        return { ...item, amount: amount - sign * monthPaid }
+        return { ...item, amount: amount - Math.sign(coveredMonthAmount) * monthPaid }
       }
       if (remainingPaid <= 0 || Math.sign(amount) !== sign) return item
       const covered = Math.min(Math.abs(amount), remainingPaid)
@@ -2333,7 +2349,7 @@ function buildTicketLedgerRows(ticket, state) {
   const status = ticketStatus(ticket)
   const members = safeArray(state?.members)
   const memberIds = ticketMemberIds(ticket)
-  const perPerson = ticketAmountPerPerson(ticket)
+  const perPerson = ticketPersonalShare(state, ticket)
   const advancerId = ticketAdvancerId(ticket)
   const rows = []
 
@@ -3376,7 +3392,7 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
       const billedMemberIds = isFlexBilling
         ? memberIds.filter(memberId => memberFlexTicketType(sourceState, memberId, yearMonth) === 'per_session')
         : memberIds
-      const amountPerPerson = isFlexBilling ? perSessionTicketPrice : ticketAmountPerPerson(ticket)
+      const amountPerPerson = isFlexBilling ? perSessionTicketPrice : ticketPersonalShare(sourceState, ticket, monthDate)
       if (billedMemberIds.length === 0) return null
       return {
         id: `ticket:${ticket?.id || ticketDate(ticket)}`,
@@ -3619,7 +3635,7 @@ function toPersonalTicketRow(ticket, memberId, state) {
   const advancerId = ticketAdvancerId(ticket)
   const members = safeArray(state?.members)
   const advancerName = advancerId ? memberName(advancerId, members) : ''
-  const personalAmount = personalTicketAdjustment(ticket, memberId)
+  const personalAmount = personalTicketAdjustment(ticket, memberId, state)
   const displayAmount = -personalAmount
   return {
     id: ticket?.id,
@@ -3633,10 +3649,10 @@ function toPersonalTicketRow(ticket, memberId, state) {
   }
 }
 
-function personalTicketAdjustment(ticket, memberId) {
+function personalTicketAdjustment(ticket, memberId, state) {
   const status = ticketStatus(ticket)
   const memberIds = ticketMemberIds(ticket)
-  const per = ticketAmountPerPerson(ticket)
+  const per = ticketPersonalShare(state, ticket)
   const advancerId = ticketAdvancerId(ticket)
   if (status === 'team_fund') {
     return memberIds.some(id => String(id) === String(memberId)) ? per : 0
@@ -4379,7 +4395,7 @@ function toTicketRow(ticket, index, state) {
   const attendees = ticketAttendees(ticket, state)
   const status = ticketStatus(ticket)
   const totalAmount = ticketTotalAmount(ticket)
-  const amountPerPerson = ticketAmountPerPerson(ticket)
+  const amountPerPerson = ticketPersonalShare(state, ticket)
   const waterAmount = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
   const flexDisplay = flexTicketDisplay(ticket, state)
   const advancerId = ticketAdvancerId(ticket)
@@ -4492,6 +4508,33 @@ function ticketWaterSharePerPerson(ticket) {
   const memberIds = ticketMemberIds(ticket)
   const water = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
   return memberIds.length > 0 ? Math.round(water / memberIds.length) : 0
+}
+
+function ticketYearMonth(ticket, date) {
+  return ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket)) || monthKey(date || new Date())
+}
+
+function ticketBasePricePerPerson(state, ticket, date) {
+  const yearMonth = ticketYearMonth(ticket, date)
+  const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const isFlexBilling = isBillingModeFlexForMonth(state, yearMonth)
+  const configured = isFlexBilling
+    ? monthlyConfig?.perSessionTicketPrice ??
+      monthlyConfig?.per_session_ticket_price ??
+      monthlyConfig?.ticketPrice ??
+      monthlyConfig?.ticket_price
+    : monthlyConfig?.ticketPrice ??
+      monthlyConfig?.ticket_price ??
+      monthlyConfig?.perSessionTicketPrice ??
+      monthlyConfig?.per_session_ticket_price
+  if (configured == null || configured === '') return isFlexBilling ? 50000 : null
+  return Number(configured) || 50000
+}
+
+function ticketPersonalShare(state, ticket, date) {
+  const basePrice = ticketBasePricePerPerson(state, ticket, date)
+  if (basePrice == null) return ticketAmountPerPerson(ticket)
+  return basePrice + ticketWaterSharePerPerson(ticket)
 }
 
 function ticketDate(ticket) {
@@ -4655,7 +4698,7 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
   const combinedPerSessionTicketFee = perSessionTicketFee + ticketPerSessionFee
   const combinedWaterFee = waterFee + ticketWaterFee
   const extras = memberExtrasShare(sessions, memberId, state, [], [])
-  const ticketShare = memberTeamFundTicketShare(state, memberId, date)
+  const ticketShare = ticketType ? 0 : memberTeamFundTicketShare(state, memberId, date)
   const p2pBalance = memberTicketBalance(state, memberId, date)
   const netBalance = Math.round(p2pBalance - monthlyTicketFee - combinedPerSessionTicketFee - combinedWaterFee - extras - ticketShare)
   const totalOwed = Math.max(-netBalance, 0)
@@ -5671,12 +5714,12 @@ function memberTicketBalance(state, memberId, date) {
     const memberIds = ticketMemberIds(ticket)
     if (!memberIds.some(id => String(id) === String(memberId))) {
       return String(ticketAdvancerId(ticket)) === String(memberId)
-        ? sum + ticketAmountPerPerson(ticket) * memberIds.length
+        ? sum + ticketPersonalShare(state, ticket, date) * memberIds.length
         : sum
     }
     const advancerId = ticketAdvancerId(ticket)
     if (!advancerId) return sum
-    const amountPerPerson = ticketAmountPerPerson(ticket)
+    const amountPerPerson = ticketPersonalShare(state, ticket, date)
     if (String(advancerId) === String(memberId)) {
       return sum + amountPerPerson * memberIds.filter(id => String(id) !== String(memberId)).length
     }
@@ -5689,7 +5732,7 @@ function memberTeamFundTicketShare(state, memberId, date) {
     if (ticketStatus(ticket) !== 'team_fund') return sum
     const memberIds = ticketMemberIds(ticket)
     if (!memberIds.some(id => String(id) === String(memberId))) return sum
-    return sum + ticketAmountPerPerson(ticket)
+    return sum + ticketPersonalShare(state, ticket, date)
   }, 0)
 }
 

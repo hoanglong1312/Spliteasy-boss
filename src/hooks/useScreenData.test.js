@@ -497,6 +497,86 @@ describe('flex billing helpers', () => {
     expect(result.waterFee).toBe(10714)
   })
 
+  test('buildMemberMonthBalanceFlex does not double charge team-fund ticket share for per-session member', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      per_session_ticket_price: 50000,
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    state.pickle.externalTickets = [{
+      id: 'ticket-dang-viet',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-06',
+      status: 'team_fund',
+      total_amount: 100000,
+      water_amount: 0,
+      member_ids: ['member-1', 'member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }]
+
+    const result = buildMemberMonthBalanceFlex(state, {}, [], 'member-2', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      ticketType: 'per_session',
+      attendedSessionsCount: 1,
+      perSessionTicketFee: 50000,
+      waterFee: 0,
+      ticketShare: 0,
+      netBalance: -50000,
+      totalOwed: 50000,
+    })
+  })
+
+  test('buildMemberMonthBalance uses configured ticket price for normal team-fund tickets', () => {
+    const state = makeFlexState({
+      ticket_price: 50000,
+      fixed_member_ids: ['member-1'],
+    })
+    state.pickle.externalTickets = [{
+      id: 'ticket-normal-fixed',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-06',
+      status: 'team_fund',
+      total_amount: 100000,
+      water_amount: 0,
+      member_ids: ['member-1', 'member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }]
+
+    const result = buildMemberMonthBalance(state, {}, [], 'member-2', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      ticketShare: 50000,
+      netBalance: -50000,
+      totalOwed: 50000,
+    })
+  })
+
+  test('buildMemberMonthBalance only divides water for normal team-fund tickets', () => {
+    const state = makeFlexState({
+      ticket_price: 50000,
+      fixed_member_ids: ['member-1'],
+    })
+    state.pickle.externalTickets = [{
+      id: 'ticket-normal-water',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-06',
+      status: 'team_fund',
+      total_amount: 100000,
+      water_amount: 70000,
+      member_ids: ['member-1', 'member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }]
+
+    const result = buildMemberMonthBalance(state, {}, [], 'member-2', new Date('2026-07-10'))
+
+    expect(result).toMatchObject({
+      ticketShare: 60000,
+      netBalance: -60000,
+      totalOwed: 60000,
+    })
+  })
+
   test('buildMemberMonthBalance delegates to flex mode', () => {
     const state = makeFlexState({
       billing_mode: 'flex',
@@ -2617,6 +2697,78 @@ describe('buildHomeData', () => {
     expect(progressRow).toMatchObject({ amount: 30000, status: 'unpaid' })
   })
 
+  test('clears confirmed mixed debt and credit month rows by signed coverage', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'member-2', profile_id: 'profile-2', group_id: 'group-1', name: 'Member Two' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'member-2'],
+      expenses: [
+        {
+          id: 'june-expense',
+          amount: 1316332,
+          expense_date: '2026-06-20T12:00:00.000Z',
+          paid_by_member_id: 'member-2',
+          participants: ['member-1', 'member-2'],
+        },
+        {
+          id: 'july-credit',
+          amount: 464700,
+          expense_date: '2026-07-02T12:00:00.000Z',
+          paid_by_member_id: 'member-1',
+          participants: ['member-1', 'member-2'],
+        },
+      ],
+    }]
+    const baseState = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+    }
+
+    const open = buildHomeData(baseState, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    expect(open.totalBalance).toBe(-425816)
+    expect(open.sourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({
+      amount: -425816,
+      monthBreakdown: [
+        { month: '2026-06', label: 'Tháng 6', amount: -658166 },
+        { month: '2026-07', label: 'Tháng 7', amount: 232350 },
+      ],
+    })
+
+    const confirmed = buildHomeData({
+      ...baseState,
+      notifications: [{
+        id: 'payment-confirmed-mixed',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 6, Tháng 7',
+          amount: 425816,
+          coveredSources: [
+            { sourceId: 'group-1', memberId: 'member-1', profileId: 'profile-1', month: '2026-06', amount: -658166 },
+            { sourceId: 'group-1', memberId: 'member-1', profileId: 'profile-1', month: '2026-07', amount: 232350 },
+          ],
+        },
+        created_at: '2026-07-05T12:00:00.000Z',
+      }],
+    }, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const progressRow = confirmed.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
+
+    expect(confirmed.totalBalance).toBe(0)
+    expect(confirmed.sourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({ amount: 0 })
+    expect(progressRow).toBeUndefined()
+  })
+
   test('keeps treasurer outstanding stable across month views after explicit confirmed payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
@@ -2730,6 +2882,64 @@ describe('buildHomeData', () => {
 
     expect(progressRow).toMatchObject({ amount: 100000, status: 'unpaid' })
     expect(progressRow.amount).not.toBe(994590)
+  })
+
+  test('pay-for rows hide settled months the target profile no longer owes', () => {
+    const members = [
+      { id: 'tuan-pickle', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'myt-pickle', profile_id: 'profile-myt', group_id: 'pickle-1', name: 'Mýt' },
+      { id: 'treasurer-pickle', profile_id: 'profile-treasurer', group_id: 'pickle-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['tuan-pickle', 'myt-pickle', 'treasurer-pickle'],
+    }]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      _allPickle: {
+        externalTickets: [
+          { id: 'myt-may-ticket', group_id: 'pickle-1', year_month: '2026-05', session_date: '2026-05-20', total_amount: 600000, member_ids: ['myt-pickle', 'treasurer-pickle', 'tuan-pickle'], advancer_id: 'treasurer-pickle', status: 'unpaid' },
+          { id: 'myt-june-ticket', group_id: 'pickle-1', year_month: '2026-06', session_date: '2026-06-20', total_amount: 600000, member_ids: ['myt-pickle', 'treasurer-pickle', 'tuan-pickle'], advancer_id: 'treasurer-pickle', status: 'unpaid' },
+        ],
+      },
+    }
+    const state = {
+      currentUserId: 'tuan-pickle',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      pickleballGroupId: 'pickle-1',
+      pickleballGroup: groups[0],
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'myt-settled-may',
+        member_id: 'myt-pickle',
+        group_id: 'pickle-1',
+        month: '2026-05',
+        expense_id: 'myt-may-settlement',
+        expenses: { amount: 200000 },
+      }],
+    }
+
+    const tuanHome = buildHomeData(state, 'tuan-pickle', members, groups, {}, pickleballState, '2026-06')
+    const mytHome = buildHomeData({ ...state, currentUserId: 'myt-pickle', currentProfileId: 'profile-myt', currentUserName: 'Mýt' }, 'myt-pickle', members, groups, {}, pickleballState, '2026-06')
+    const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
+
+    expect(mytHome.sourceBreakdown.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -200000 },
+    ])
+    expect(mytPayFor.amount).toBe(-200000)
+    expect(mytPayFor.sources.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
+      { month: '2026-06', label: 'Tháng 6', amount: -200000 },
+    ])
   })
 
   test('keeps pickleball month residual after partial confirmed payment', () => {
