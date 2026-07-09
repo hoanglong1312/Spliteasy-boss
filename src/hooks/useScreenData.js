@@ -989,7 +989,7 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     }
     if (isConfirmedPaymentSubmittedNotice(notification, status) && !hasExplicitCoverage) return
     const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
-    const scopedAmount = coveredSources.reduce((sum, row) => sum + Math.abs(Number(row.amount) || 0), 0) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
+    const scopedAmount = coveredSourcesAmountDue(coveredSources) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
     if (status === 'confirmed') {
       confirmedSources.push(...coveredSources)
       confirmedAmount += scopedAmount
@@ -999,6 +999,11 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   })
 
   return { confirmedSources, confirmedAmount, pendingAmount }
+}
+
+function coveredSourcesAmountDue(sources) {
+  const total = safeArray(sources).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
+  return total < 0 ? Math.abs(total) : 0
 }
 
 function isConfirmedPaymentSubmittedNotice(notification, status = '') {

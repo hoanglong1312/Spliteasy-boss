@@ -2857,6 +2857,7 @@ describe('buildHomeData', () => {
     const progressRow = confirmed.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
 
     expect(confirmed.totalBalance).toBe(0)
+    expect(confirmed.paymentSummary.paidAmount).toBe(425816)
     expect(confirmed.sourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({ amount: 0 })
     expect(progressRow).toBeUndefined()
   })
