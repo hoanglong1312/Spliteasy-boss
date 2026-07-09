@@ -218,6 +218,14 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
           setConfirmedRefunds(prev => new Set([...prev, key]));
           onAction?.('markRefundPaid', row);
         }}
+        onCancelRefund={(row) => {
+          const key = String(row.profileId || row.name || 'member');
+          setConfirmedRefunds(prev => {
+            const next = new Set(prev);
+            next.delete(key);
+            return next;
+          });
+        }}
         onClose={() => {
           setPaymentSheetOpen(false);
           onPaymentClose?.();
@@ -802,7 +810,7 @@ export function SourceBreakdown({ sources, totalBalance = 0, balanceLabel = '', 
   );
 }
 
-function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, savingAction, setSavingAction, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose }) {
+function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedRefunds, savingAction, setSavingAction, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onCancelRefund, onClose }) {
   const [copiedField, setCopiedField] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const debtSources = safeArray(data?.sourceBreakdown).filter(source => Number(source.amount) < 0);
@@ -959,6 +967,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             onAction={onAction}
             onViewPaymentRecord={onViewPaymentRecord}
             onConfirmRefund={onConfirmRefund}
+            onCancelRefund={onCancelRefund}
           />
         </>
       )}
@@ -1242,7 +1251,7 @@ function treasurerProfileStatKey(record = {}) {
   return '';
 }
 
-function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund }) {
+function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, onCancelRefund }) {
   const [memberExpanded, setMemberExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1449,6 +1458,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             onCancelPaid={(record) => withLoading(() => onAction?.('cancelPaymentRecord', record))}
             onViewPaid={(record) => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }}
             onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
+            onCancelRefund={(item) => onCancelRefund?.(item.refundRow)}
             onRefundBill={(item) => setRefundBillItem(item)}
             onEditRefundBank={(item) => setRefundBankItem(item)}
           />
@@ -1698,7 +1708,7 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onRefundBill, onEditRefundBank }) {
+function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill, onEditRefundBank }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
   const unpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund');
@@ -1765,11 +1775,12 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
-                        {isRefund && !item.paid && !refundBankReady && <button type="button" onClick={(event) => { event.stopPropagation(); onEditRefundBank?.(item); }} style={miniDashButton('rgba(96,165,250,0.16)', '#bfdbfe')}>Bổ sung STK</button>}
+                        {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onEditRefundBank?.(item); }} style={miniDashButton('rgba(96,165,250,0.16)', '#bfdbfe')}>{refundBankReady ? 'Sửa STK' : 'Bổ sung STK'}</button>}
                         <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
+                            if (isRefund && item.paid) return onCancelRefund?.(item);
                             if (isRefund) return onConfirmRefund?.(item);
                             if (item.paid) return onCancelPaid?.(item.record);
                             return onPayItem?.(item);

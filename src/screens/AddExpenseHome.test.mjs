@@ -652,7 +652,7 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.doesNotMatch(homeSource, />Chi tiết quỹ<\/Button>/);
   assert.match(homeSource, /paymentOpen = false/);
   assert.match(homeSource, /<PaymentSheet[\s\S]*open=\{paymentOpen \|\| paymentSheetOpen\}/);
-  assert.match(homeSource, /function PaymentSheet\(\{ open, data, paymentRecords = \[\], isTreasurer, confirmedRefunds, savingAction, setSavingAction, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onClose \}\)/);
+  assert.match(homeSource, /function PaymentSheet\(\{ open, data, paymentRecords = \[\], isTreasurer, confirmedRefunds, savingAction, setSavingAction, onAction, onViewPaymentRecord, onConfirmPayment, onConfirmRefund, onCancelRefund, onClose \}\)/);
   assert.match(homeSource, /Thanh toán về thủ quỹ/);
   assert.match(homeSource, /generateQRUrl\(/);
   assert.match(homeSource, /download=\"vietqr-thanh-toan\.png\"/);
@@ -676,7 +676,8 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /setPaymentDetailsExpanded\(value => !value\)/);
   assert.match(homeSource, /Đã thanh toán/);
   assert.match(homeSource, /onConfirmPayment\?\.\(\{[\s\S]*amount: amountToPay,[\s\S]*coveredMembers: selectedPayForRows/);
-  assert.match(homeSource, /const paymentPeriodLabel = paymentItemsPeriodLabel\(\[\.\.\.selectedOwnPaymentItems, \.\.\.selectedPayForPaymentItems\], data\?\.monthLabel\)/);
+  assert.match(homeSource, /const selectedPaymentItems = \[\.\.\.selectedOwnPaymentItems, \.\.\.selectedPayForPaymentItems\]/);
+  assert.match(homeSource, /const paymentPeriodLabel = paymentItemsPeriodLabel\(selectedPaymentItems, data\?\.monthLabel\)/);
   assert.match(homeSource, /const transferDescription = `\$\{paymentNames\.join\(', '\)\} - Thanh toan \$\{paymentPeriodLabel\}`\.trim\(\)/);
   assert.match(homeSource, /return months\.join\(', '\)/);
   assert.match(homeSource, /const groupedItems = groupPaymentItemsBySource\(items\)/);
@@ -721,7 +722,7 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /Cần hoàn tiền/);
   assert.match(homeSource, /onConfirmRefund\?\.\(item\)/);
   assert.match(homeSource, /onAction\?\.\('confirmPaymentSent', payload\)/);
-  assert.match(homeSource, /const coveredSources = \[\s*\.\.\.selectedOwnPaymentItems\.map\(paymentItemToCoveredSource\),\s*\.\.\.selectedPayForPaymentItems\.map\(paymentItemToCoveredSource\),\s*\]/);
+  assert.match(homeSource, /const coveredSources = selectedPaymentItems\.map\(paymentItemToCoveredSource\)/);
   assert.match(homeSource, /\.filter\(item => Number\(item\.amount\) !== 0\)/);
   assert.match(homeSource, /function paymentItemsAmountDue\(items\) \{[\s\S]*const total = safeArray\(items\)\.reduce\(\(sum, item\) => sum \+ \(Number\(item\.amount\) \|\| 0\), 0\);[\s\S]*return total < 0 \? Math\.abs\(total\) : 0;/);
   assert.match(homeSource, /function signedVND\(value\)/);
@@ -764,7 +765,7 @@ test('Home payment sheet gives treasurers a payment progress dashboard', () => {
   assert.match(screenDataSource, /value === 'pending'/);
   assert.match(screenDataSource, /status: Number\(row\.pendingAmount\) > 0 \? 'pending' : 'unpaid'/);
   assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*progressRows=\{\(data\?\.paymentProgress \|\| \[\]\)\.filter/);
-  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund \}\)/);
+  assert.match(homeSource, /function TreasurerPaymentDashboard\(\{ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, onCancelRefund \}\)/);
   assert.doesNotMatch(homeSource, /onDeferMonthBalance/);
   assert.doesNotMatch(homeSource, /onUndoDeferMonthBalance/);
   assert.doesNotMatch(homeSource, /Gộp →/);

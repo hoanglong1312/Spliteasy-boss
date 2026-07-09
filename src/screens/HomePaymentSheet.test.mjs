@@ -98,11 +98,18 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
   assert.match(dashboardSource, /const \[refundBankItem, setRefundBankItem\] = useState\(null\)/);
   assert.match(dashboardSource, /onRefundBill=\{\(item\) => setRefundBillItem\(item\)\}/);
   assert.match(dashboardSource, /onEditRefundBank=\{\(item\) => setRefundBankItem\(item\)\}/);
+  assert.match(dashboardSource, /onCancelRefund=\{\(item\) => onCancelRefund\?\.\(item\.refundRow\)\}/);
   assert.match(rowSource, /onRefundBill/);
   assert.match(rowSource, /onEditRefundBank/);
+  assert.match(rowSource, /onCancelRefund/);
   assert.match(rowSource, /const refundBankReady = isRefund && Boolean\(resolveVietQrBank\(item\.bank \|\| \{\}\) && item\.bank\?\.account && item\.bank\?\.holder\)/);
   assert.match(rowSource, /Thẻ bill/);
   assert.match(rowSource, /Bổ sung STK/);
+  assert.match(rowSource, /Sửa STK/);
+  assert.match(rowSource, /\{refundBankReady \? 'Sửa STK' : 'Bổ sung STK'\}/);
+  assert.doesNotMatch(rowSource, /isRefund && !item\.paid && !refundBankReady/);
+  assert.doesNotMatch(rowSource, /isRefund && !refundBankReady/);
+  assert.match(rowSource, /if \(isRefund && item\.paid\) return onCancelRefund\?\.\(item\)/);
   assert.match(dashboardSource, /buildRefundBillData\(refundBillItem\)/);
   assert.match(dashboardSource, /<RefundBankSheet/);
   assert.match(homeSource, /function buildRefundBillData\(item\)/);
