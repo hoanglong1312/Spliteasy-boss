@@ -2789,6 +2789,62 @@ describe('buildHomeData', () => {
     expect(progressRow).toMatchObject({ amount: 30000, status: 'unpaid' })
   })
 
+  test('does not spill explicit month coverage into later treasurer payment months', () => {
+    const members = [
+      { id: 'life-member-1', profile_id: 'profile-1', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'expense-member-1', profile_id: 'profile-1', group_id: 'expense-1', name: 'Lê Tuấn' },
+      { id: 'life-treasurer-1', profile_id: 'profile-2', group_id: 'life-1', name: 'Treasurer One', role: 'treasurer' },
+      { id: 'expense-treasurer-1', profile_id: 'profile-2', group_id: 'expense-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-member-1', 'life-treasurer-1'],
+      expenses: [
+        { id: 'life-june', amount: 812500, expense_date: '2026-06-20T12:00:00.000Z', paid_by_member_id: 'life-treasurer-1', participants: ['life-member-1', 'life-treasurer-1'] },
+        { id: 'life-july', amount: 400000, expense_date: '2026-07-05T12:00:00.000Z', paid_by_member_id: 'life-treasurer-1', participants: ['life-member-1', 'life-treasurer-1'] },
+      ],
+    }, {
+      id: 'expense-1',
+      name: 'Chi tiêu Virgo 246',
+      members: ['expense-member-1', 'expense-treasurer-1'],
+      expenses: [
+        { id: 'expense-june', amount: 81892, expense_date: '2026-06-15T12:00:00.000Z', paid_by_member_id: 'expense-treasurer-1', participants: ['expense-member-1', 'expense-treasurer-1'] },
+        { id: 'expense-july', amount: 1200000, expense_date: '2026-07-06T12:00:00.000Z', paid_by_member_id: 'expense-treasurer-1', participants: ['expense-member-1', 'expense-treasurer-1'] },
+      ],
+    }]
+    const state = {
+      currentUserId: 'life-treasurer-1',
+      currentUserName: 'Treasurer One',
+      currentGroupId: 'life-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-confirmed-life-june',
+        type: 'payment_submitted',
+        group_id: 'life-1',
+        actor_member_id: 'life-member-1',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 6 · 2026',
+          amount: 506250,
+          coveredSources: [{ sourceId: 'life-1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', memberId: 'life-member-1', profileId: 'profile-1', amount: -506250, month: '2026-06' }],
+        },
+        created_at: '2026-07-05T12:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const result = buildHomeData(state, 'life-treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const progressRow = result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
+    const lifeItems = progressRow.paymentItems.filter(item => item.sourceId === 'life-1')
+
+    expect(progressRow.amount).toBe(840946)
+    expect(lifeItems).toEqual([
+      expect.objectContaining({ month: '2026-07', amount: -200000 }),
+    ])
+  })
+
   test('clears confirmed mixed debt and credit month rows by signed coverage', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

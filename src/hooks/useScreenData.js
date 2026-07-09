@@ -1319,6 +1319,7 @@ function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmoun
   let remainingPaid = Math.abs(Number(paid) || 0)
   if (!remainingPaid || !safeArray(monthBreakdown).length) return monthBreakdown
   const sign = Number(sourceAmount) >= 0 ? 1 : -1
+  const hasCoveredMonths = Number(coveredMonths?.size || 0) > 0
   return safeArray(monthBreakdown)
     .map(item => {
       const amount = Number(item.amount) || 0
@@ -1328,7 +1329,7 @@ function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmoun
         remainingPaid = Math.max(remainingPaid - monthPaid, 0)
         return { ...item, amount: amount - Math.sign(coveredMonthAmount) * monthPaid }
       }
-      if (remainingPaid <= 0 || Math.sign(amount) !== sign) return item
+      if (hasCoveredMonths || remainingPaid <= 0 || Math.sign(amount) !== sign) return item
       const covered = Math.min(Math.abs(amount), remainingPaid)
       remainingPaid -= covered
       return { ...item, amount: amount - sign * covered }
