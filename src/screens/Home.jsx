@@ -2170,16 +2170,76 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
   );
 }
 
+function readBlobAsDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function waitForElementImages(element) {
+  const images = [...element.querySelectorAll('img')];
+  return Promise.all(images.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      const done = () => {
+        img.removeEventListener('load', done);
+        img.removeEventListener('error', done);
+        resolve();
+      };
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    });
+  }));
+}
+
 function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, onClose }) {
   const cardRef = useRef(null);
   const [sharingImage, setSharingImage] = useState(false);
+  const [billQrUrl, setBillQrUrl] = useState(qrUrl || '');
+  const [preparingQr, setPreparingQr] = useState(Boolean(qrUrl));
   const billFilename = `${safeFilename(memberName || 'bill')}-bill.png`;
   const fallbackBillFilename = `${safeFilename(memberName || 'bill')}-bill.svg`;
 
+  useEffect(() => {
+    let cancelled = false;
+    if (!qrUrl) {
+      setBillQrUrl('');
+      setPreparingQr(false);
+      return () => { cancelled = true; };
+    }
+    if (String(qrUrl).startsWith('data:')) {
+      setBillQrUrl(qrUrl);
+      setPreparingQr(false);
+      return () => { cancelled = true; };
+    }
+    setBillQrUrl(qrUrl);
+    setPreparingQr(true);
+    fetch(qrUrl)
+      .then(response => {
+        if (!response.ok) throw new Error('QR download failed');
+        return response.blob();
+      })
+      .then(blob => readBlobAsDataUrl(blob))
+      .then(dataUrl => {
+        if (!cancelled) setBillQrUrl(dataUrl || qrUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setBillQrUrl(qrUrl);
+      })
+      .finally(() => {
+        if (!cancelled) setPreparingQr(false);
+      });
+    return () => { cancelled = true; };
+  }, [qrUrl]);
+
   async function shareBillImage() {
-    if (!cardRef.current || sharingImage) return;
+    if (!cardRef.current || sharingImage || preparingQr) return;
     setSharingImage(true);
     try {
+      await waitForElementImages(cardRef.current);
       const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, cacheBust: true, backgroundColor: colors.shellBg });
       const response = await fetch(dataUrl);
       const blob = await response.blob();
@@ -2211,11 +2271,11 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
             memberName={memberName}
             amount={amount}
             transferDescription={transferDescription}
-            qrUrl={qrUrl}
+            qrUrl={billQrUrl}
             paymentDisplayGroups={paymentDisplayGroups}
           />
         </div>
-        <button type="button" onClick={shareBillImage} disabled={sharingImage} style={{
+        <button type="button" onClick={shareBillImage} disabled={sharingImage || preparingQr} style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -2228,9 +2288,9 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
           fontSize: 12,
           fontWeight: 950,
           fontFamily: 'inherit',
-          cursor: !sharingImage ? 'pointer' : 'default',
-          opacity: !sharingImage ? 1 : 0.7,
-        }}>{sharingImage ? 'Đang share...' : 'Share ảnh'}</button>
+          cursor: !sharingImage && !preparingQr ? 'pointer' : 'default',
+          opacity: !sharingImage && !preparingQr ? 1 : 0.7,
+        }}>{preparingQr ? 'Đang chuẩn bị QR...' : sharingImage ? 'Đang share...' : 'Share ảnh'}</button>
         <div style={{ fontSize: 11, color: colors.textSecondary, lineHeight: 1.45, textAlign: 'center' }}>Máy không hỗ trợ share ảnh thì app tự tải PNG.</div>
       </div>
     </BottomSheet>

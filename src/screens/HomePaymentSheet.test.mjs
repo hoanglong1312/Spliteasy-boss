@@ -101,3 +101,14 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.match(billCardSource, /triggerDownload\(dataUrl, billFilename\)/);
   assert.doesNotMatch(billCardSource, /showSaveFilePicker/);
 });
+
+test('bill image export embeds QR before capturing card', () => {
+  const billCardSource = sliceBetween('function PaymentBillCardSheet(', 'function buildElementImageBlob');
+  assert.match(homeSource, /function readBlobAsDataUrl\(blob\)/);
+  assert.match(homeSource, /function waitForElementImages\(element\)/);
+  assert.match(billCardSource, /const \[billQrUrl, setBillQrUrl\] = useState\(qrUrl \|\| ''\)/);
+  assert.match(billCardSource, /readBlobAsDataUrl\(blob\)/);
+  assert.match(billCardSource, /qrUrl=\{billQrUrl\}/);
+  assert.match(billCardSource, /await waitForElementImages\(cardRef\.current\)/);
+  assert.match(billCardSource, /await toPng\(cardRef\.current/);
+});
