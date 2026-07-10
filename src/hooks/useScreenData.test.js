@@ -3124,6 +3124,61 @@ describe('buildHomeData', () => {
     })
   })
 
+  test('does not fallback to stale capped profile total when settled sources sum to zero', () => {
+    const members = [
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'expense-1', name: 'Lê Tuấn' },
+      { id: 'life-treasurer', profile_id: 'profile-treasurer', group_id: 'life-1', name: 'Thủ quỹ', role: 'treasurer' },
+      { id: 'expense-treasurer', profile_id: 'profile-treasurer', group_id: 'expense-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'life-treasurer'],
+      expenses: [{
+        id: 'life-june',
+        amount: 1000000,
+        expense_date: '2026-06-20T12:00:00.000Z',
+        paid_by_member_id: 'life-treasurer',
+        participants: ['life-tuan', 'life-treasurer'],
+      }],
+    }, {
+      id: 'expense-1',
+      name: 'Chi tiêu Virgo 246',
+      members: ['expense-tuan', 'expense-treasurer'],
+      expenses: [{
+        id: 'expense-june',
+        amount: 4266164,
+        expense_date: '2026-06-21T12:00:00.000Z',
+        paid_by_member_id: 'expense-treasurer',
+        participants: ['expense-tuan', 'expense-treasurer'],
+      }],
+    }]
+    const state = {
+      currentUserId: 'life-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'life-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [],
+      monthSettlements: [
+        { id: 'life-june-settled', member_id: 'life-tuan', group_id: 'life-1', month: '2026-06' },
+        { id: 'expense-june-settled', member_id: 'expense-tuan', group_id: 'expense-1', month: '2026-06' },
+      ],
+    }
+
+    const result = buildHomeData(state, 'life-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.totalBalance).toBe(0)
+    expect(result.cappedSourceBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ sourceId: 'life-1', amount: 0 }),
+      expect.objectContaining({ sourceId: 'expense-1', amount: 0 }),
+    ]))
+    expect(result.cappedTotalBalance).toBe(0)
+  })
+
   test('pay-for rows hide settled months the target profile no longer owes', () => {
     const members = [
       { id: 'tuan-pickle', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },

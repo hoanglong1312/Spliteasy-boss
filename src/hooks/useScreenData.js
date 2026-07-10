@@ -634,7 +634,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     monthLabel: formatMonthLabel(today),
     currentGroupId: state?.currentGroupId || state?.currentGroup?.id || '',
     totalBalance,
-    cappedTotalBalance: displayCappedTotalBalance || cappedTotalBalance,
+    cappedTotalBalance: cappedSourceBreakdown.length ? displayCappedTotalBalance : cappedTotalBalance,
     owedTo: sourceBreakdown.filter(source => Number(source.amount) < 0).length,
     pickleball: {
       sessionsAttended: monthSessions.filter(s => sessionMemberIds(s).includes(currentUserId)).length,
