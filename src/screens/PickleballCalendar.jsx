@@ -314,9 +314,9 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 900 }}>
-                  {formatTimeLabel(ticket.timeLabel)} · {ticket.memberIds.length} người
+                  {ticket.memberIds.length} người đánh vé lẻ
                 </div>
-                <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, lineHeight: 1.45 }}>
                   {(ticket.memberLabels || []).join(', ')}
                 </div>
               </div>
@@ -424,7 +424,7 @@ function TicketDetailSheet({ ticket, onClose }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 900 }}>
-            {formatTimeLabel(ticket.timeLabel)} · {members.length} người
+            {members.length} người đánh vé lẻ
           </div>
           <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 700 }}>
             {ticket.status === 'pending_review'
