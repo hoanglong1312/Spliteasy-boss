@@ -15,7 +15,8 @@ function loadHomeBuilder() {
     .replace(/import \{ useEffect, useMemo, useRef, useState \} from 'react'\n/, '')
     .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
     .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
-    .replace('export function useScreenData', 'function useScreenData')
+    .replace(/import \{ getRecentInvites \} from '\.\.\/lib\/auth\.js'\n/, '')
+    .replace(/export function /g, 'function ')
   const context = {
     Date,
     Math,
@@ -36,7 +37,8 @@ function loadPaymentManagementBuilder() {
     .replace(/import \{ useEffect, useMemo, useRef, useState \} from 'react'\n/, '')
     .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
     .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
-    .replace('export function useScreenData', 'function useScreenData')
+    .replace(/import \{ getRecentInvites \} from '\.\.\/lib\/auth\.js'\n/, '')
+    .replace(/export function /g, 'function ')
   const context = {
     Date,
     Math,
@@ -57,7 +59,8 @@ function loadNotificationsBuilder() {
     .replace(/import \{ useEffect, useMemo, useRef, useState \} from 'react'\n/, '')
     .replace(/import \{ useApp \} from '\.\.\/store\.jsx'\n/, '')
     .replace(/import \{[\s\S]*?\} from '\.\.\/data\.jsx'\n/, '')
-    .replace('export function useScreenData', 'function useScreenData')
+    .replace(/import \{ getRecentInvites \} from '\.\.\/lib\/auth\.js'\n/, '')
+    .replace(/export function /g, 'function ')
   const context = {
     Date,
     Math,
@@ -126,7 +129,7 @@ test('home payment summary exposes member payment confirmation status', () => {
   assert.match(screenDataSource, /function latestPaymentNoticeForMember\(state, member, monthLabel\) \{/)
   assert.match(homeSource, /paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/)
   assert.match(homeSource, /paidConfirmed \? '✅ Đã thanh toán'/)
-  assert.match(homeSource, /paymentPending \? '⏳ Chờ xác nhận'/)
+  assert.match(homeSource, /paymentPending \? \(pendingSettlementCheckpoint \? '⏳ Chờ thủ quỹ duyệt' : '⏳ Chờ xác nhận'\)/)
   assert.match(homeSource, /if \(!paymentDisabled\) onOpenPayment\?\.\(\)/)
 })
 
@@ -144,10 +147,9 @@ test('confirmed payments only cover the sources included when the member paid', 
         id: 'g1',
         name: 'Lấy vk để trưởng thành',
         members: ['dai-member', 'long-member'],
-        netByMember: { 'dai-member': -894479, 'long-member': 894479 },
         expenses: [
-          { id: 'paid-before-28', date: '2026-05-26', title: 'Cuốn Phương Nam', amount: 1584000, paidBy: 'long-member', participants: ['dai-member', 'long-member'], status: 'approved' },
-          { id: 'new-after-28', date: '2026-05-29', title: 'Phát sinh mới', amount: 120000, paidBy: 'long-member', participants: ['dai-member'], status: 'approved' },
+          { id: 'paid-before-28', date: '2026-05-26', title: 'Cuốn Phương Nam', amount: 774479, paidBy: 'long-member', splits: [{ memberId: 'dai-member', amount: 774479 }], status: 'approved' },
+          { id: 'new-after-28', date: '2026-05-29', title: 'Phát sinh mới', amount: 120000, paidBy: 'long-member', splits: [{ memberId: 'dai-member', amount: 120000 }], status: 'approved' },
         ],
       },
     ],
@@ -195,8 +197,9 @@ test('confirmed payments cover members paid for by another member', () => {
         id: 'g1',
         name: 'Lấy vk để trưởng thành',
         members: ['dai-member', 'cuong-member', 'long-member'],
-        netByMember: { 'dai-member': -774479, 'cuong-member': -600000, 'long-member': 1374479 },
-        expenses: [],
+        expenses: [
+          { id: 'paid-for-dai', date: '2026-05-26', title: 'Khoản Đại', amount: 774479, paidBy: 'long-member', splits: [{ memberId: 'dai-member', amount: 774479 }], status: 'approved' },
+        ],
       },
     ],
     notifications: [
@@ -227,7 +230,8 @@ test('confirmed payments cover members paid for by another member', () => {
   const data = buildHomeData(state, 'dai-member', state.members, state.groups, state.pickle, state, '2026-05')
 
   assert.equal(data.totalBalance, 0)
-  assert.equal(data.sourceBreakdown.length, 0)
+  assert.equal(data.sourceBreakdown.length, 1)
+  assert.equal(data.sourceBreakdown[0].amount, 0)
   assert.equal(data.paymentSummary.paidAmount, 774479)
   assert.equal(data.paymentSummary.paymentStatus, 'confirmed')
 })
@@ -246,8 +250,9 @@ test('new positive balances are not hidden by an older confirmed payment notice'
         id: 'g1',
         name: 'Lấy vk để trưởng thành',
         members: ['dai-member', 'cuong-member'],
-        netByMember: { 'dai-member': 180000, 'cuong-member': -180000 },
-        expenses: [],
+        expenses: [
+          { id: 'later-credit', date: '2026-05-29', title: 'Đại ứng', amount: 180000, paidBy: 'dai-member', splits: [{ memberId: 'cuong-member', amount: 180000 }], status: 'approved' },
+        ],
       },
     ],
     notifications: [
@@ -431,23 +436,26 @@ test('treasurer refund rows use payment-adjusted member balances', () => {
 })
 
 test('payment sheet includes identity on the current payer covered sources', () => {
-  assert.match(homeSource, /debtSources\.map\(source => \(\{ \.\.\.source, memberName: data\?\.memberName \|\| 'Thành viên' \}\)\)/)
+  assert.match(homeSource, /const coveredSources = selectedPaymentItems\.map\(paymentItemToCoveredSource\)/)
+  assert.match(homeSource, /memberName: data\?\.memberName \|\| 'Thành viên'/)
+  assert.match(homeSource, /const coveredItems = selectedPaymentItems\.flatMap\(paymentItemToCoveredItems\)/)
   assert.match(screenDataSource, /profileId,/)
   assert.match(screenDataSource, /memberId: row\.memberId \|\| row\.member_id \|\| currentUserId/)
 })
 
 test('treasurer payment sheet can choose refund members and show their QR', () => {
-  assert.match(homeSource, /const \[selectedRefundKey, setSelectedRefundKey\] = useState\(''\)/)
-  assert.match(homeSource, /const \[refundExpanded, setRefundExpanded\] = useState\(false\)/)
-  assert.match(homeSource, /const selectedRefund = refundsFiltered\.find\(row => String\(row\.profileId \|\| row\.name \|\| 'member'\) === selectedRefundKey\) \|\| null/)
-  assert.doesNotMatch(homeSource, /\|\| refundRows\[0\] \|\| null/)
-  assert.match(homeSource, /const refundQrUrl = selectedRefund && refundQrBank && refundBank\.account && refundBank\.holder \? generateQRUrl/)
-  assert.match(homeSource, /aria-expanded=\{expanded\}/)
-  assert.match(homeSource, /setRefundExpanded\(value => !value\)/)
-  assert.match(homeSource, /width: 150, height: 150/)
-  assert.doesNotMatch(homeSource, /<PaymentInfoLine label="STK"/)
-  assert.match(homeSource, /alt=\{`QR nhận tiền của \$\{selectedRefund\.name\}`\}/)
-  assert.match(homeSource, /Xác nhận đã chuyển/)
+  assert.match(homeSource, /const \[refundBillItem, setRefundBillItem\] = useState\(null\)/)
+  assert.match(homeSource, /const \[refundBankItem, setRefundBankItem\] = useState\(null\)/)
+  assert.match(homeSource, /const refundBillData = refundBillItem \? buildRefundBillData\(refundBillItem\) : null/)
+  assert.match(homeSource, /const refundBillBankReady = refundBillItem \? Boolean\(resolveVietQrBank\(refundBillItem\.bank \|\| \{\}\) && refundBillItem\.bank\?\.account && refundBillItem\.bank\?\.holder\) : false/)
+  assert.match(homeSource, /caption="Cần hoàn cho member"/)
+  assert.match(homeSource, /qrFallbackAction=\{footerActions\}/)
+  assert.match(homeSource, /Chưa có QR/)
+  assert.match(homeSource, /Bổ sung STK/)
+  assert.match(homeSource, /Sửa STK/)
+  assert.match(homeSource, /function RefundBankSheet/)
+  assert.match(homeSource, /onAction\?\.\('editMember'/)
+  assert.match(homeSource, /Đã chuyển/)
 })
 
 test('positive-balance payment sheet links members to bank setup', () => {
@@ -468,7 +476,7 @@ test('payment sheet contains payment management records with view and delete act
   assert.doesNotMatch(homeSource, /<PaymentManagementZone records=\{d\.paymentRecords \|\| \[\]\} onAction=\{onAction\} \/>/)
   assert.match(homeSource, /paymentRecords=\{d\.paymentRecords \|\| \[\]\}/)
   assert.match(homeSource, /function PaymentManagementZone\(\{ records, onAction, onViewRecord \}\)/)
-  assert.match(homeSource, /<PaymentManagementZone[\s\S]*records=\{paymentRecords\}[\s\S]*onViewRecord=\{onViewPaymentRecord\}/)
+  assert.match(homeSource, /<TreasurerPaymentDashboard[\s\S]*pendingRecords=\{paymentRecords\}[\s\S]*onViewPaymentRecord=\{onViewPaymentRecord\}/)
   assert.match(homeSource, /onAction\?\.\('deletePaymentNotice', record\)/)
   assert.match(homeSource, /onAction\?\.\('viewPaymentNotice', record\)/)
 })
@@ -505,7 +513,7 @@ test('payment management detail sources fallback to payer name and hide technica
   const [record] = buildPaymentManagementRecords(state, state.members[0], '2026-05')
 
   assert.equal(record.coveredSources[0].memberName, 'Cường')
-  assert.doesNotMatch(homeSource, /sourceType \|\| source\.source_type \|\| 'group'/)
+  assert.equal(record.coveredSources[0].sourceLabel, 'Lấy vk để trưởng thành')
 })
 
 test('home pending payment approvals render only for Long or payment reviewers', () => {
@@ -524,8 +532,10 @@ test('payment notification migration allows payment_submitted inserts and review
 
 test('payment notification stores covered sources for partial-month settlement', () => {
   assert.match(homeSource, /coveredSources/)
+  assert.match(homeSource, /coveredItems/)
   assert.match(screenDataSource, /function paymentCoverageForMember\(state, member, monthLabel, sourceBreakdown\)/)
   assert.match(screenDataSource, /function applyConfirmedPaymentCoverage\(sourceBreakdown, confirmedSources\)/)
+  assert.match(screenDataSource, /metadata\?\.coveredItems \|\| metadata\?\.covered_items/)
   assert.match(screenDataSource, /metadata\?\.coveredSources \|\| metadata\?\.covered_sources/)
   assert.match(coveredSourcesMigrationSource, /p_covered_sources jsonb DEFAULT '\[\]'::jsonb/)
   assert.match(coveredSourcesMigrationSource, /'coveredSources', COALESCE\(p_covered_sources, '\[\]'::jsonb\)/)

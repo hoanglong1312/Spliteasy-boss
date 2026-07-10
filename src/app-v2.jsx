@@ -2408,6 +2408,7 @@ export default function AppV2() {
     if (type === 'confirmPaymentSent') {
       const covered = Array.isArray(payload?.coveredMembers) ? payload.coveredMembers : []
       const coveredSources = Array.isArray(payload?.coveredSources) ? payload.coveredSources : []
+      const coveredItems = Array.isArray(payload?.coveredItems) ? payload.coveredItems : []
       const names = [payload?.memberName, ...covered.map(row => row?.name)].filter(Boolean).join(', ')
       try {
         await dispatch({
@@ -2417,6 +2418,7 @@ export default function AppV2() {
           memberName: payload?.memberName,
           coveredMembers: covered,
           coveredSources,
+          coveredItems,
           transferDescription: payload?.transferDescription,
           paymentTarget: payload?.paymentTarget,
           monthLabel: payload?.monthLabel || homeData?.monthLabel,
@@ -2510,6 +2512,7 @@ export default function AppV2() {
         monthLabel: payload?.monthLabel,
         memberName: payload?.memberName,
         coveredSources: payload?.coveredSources,
+        coveredItems: payload?.coveredItems,
         groupId: payload?.groupId,
       })
       dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu ${payload?.memberName || 'thành viên'} đã thanh toán.` })

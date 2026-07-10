@@ -869,6 +869,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     })),
   ].filter(group => group.items.length > 0);
   const coveredSources = selectedPaymentItems.map(paymentItemToCoveredSource);
+  const coveredItems = selectedPaymentItems.flatMap(paymentItemToCoveredItems);
   const amountToPay = paymentItemsAmountDue(selectedOwnPaymentItems) + paymentItemsAmountDue(selectedPayForPaymentItems);
   const canShowQr = amountToPay > 0 && qrBank && target.account && target.holder;
   const memberBank = data?.memberBank || {};
@@ -903,6 +904,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         memberName: data?.memberName || 'Thành viên',
         coveredMembers: selectedPayForRows,
         coveredSources,
+        coveredItems,
         transferDescription,
         monthLabel: paymentPeriodLabel,
         paymentTarget: target,
@@ -1890,6 +1892,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
         monthLabel: payloadMonthLabel,
         memberName: row.name || row.memberName || 'Thành viên',
         coveredSources: selectedItems.map(paymentItemToCoveredSource),
+        coveredItems: selectedItems.flatMap(paymentItemToCoveredItems),
         groupId: row.linkGroupId || row.groupId || '',
       });
     } finally {
@@ -2144,22 +2147,42 @@ function sourcePaymentItems(source, { prefix = 'source', memberId = '', profileI
   const sourceLabel = source.sourceLabel || source.source_label || source.label || source.name || 'Nguồn tiền';
   const baseMemberId = source.memberId || source.member_id || memberId || '';
   const baseProfileId = source.profileId || source.profile_id || profileId || '';
+  const sourcePayableItems = safeArray(source.payableItems || source.payable_items).map(item => ({
+    ...item,
+    sourceType: item.sourceType || item.source_type || sourceType,
+    sourceId: item.sourceId || item.source_id || sourceId,
+    sourceLabel: item.sourceLabel || item.source_label || sourceLabel,
+    memberId: item.memberId || item.member_id || baseMemberId,
+    profileId: item.profileId || item.profile_id || baseProfileId,
+    month: item.month || item.yearMonth || item.year_month || '',
+    monthLabel: item.monthLabel || item.month_label || '',
+    amount: Number(item.amount) || 0,
+    payableItemKey: item.payableItemKey || item.payable_item_key || '',
+    expenseId: item.expenseId || item.expense_id || '',
+  }));
   const months = safeArray(source.monthBreakdown).length
     ? safeArray(source.monthBreakdown)
     : [{ month: source.month || source.yearMonth || source.year_month || '', label: source.monthLabel || source.month_label || '', amount: source.amount }];
   return months
-    .map((row, index) => ({
-      key: `${prefix}:${sourceType}:${sourceId}:${baseMemberId}:${baseProfileId}:${row.month || index}`,
-      sourceType,
-      sourceId,
-      sourceLabel,
-      memberId: baseMemberId,
-      profileId: baseProfileId,
-      month: row.month || row.yearMonth || row.year_month || '',
-      monthLabel: row.label || row.monthLabel || row.month_label || fullMonthLabel(row.month || row.yearMonth || row.year_month),
-      amount: Number(row.amount) || 0,
-      defaultSelected: true,
-    }))
+    .map((row, index) => {
+      const month = row.month || row.yearMonth || row.year_month || '';
+      const coveredItems = sourcePayableItems.filter(item => !month || String(item.month || '') === String(month));
+      return {
+        key: `${prefix}:${sourceType}:${sourceId}:${baseMemberId}:${baseProfileId}:${month || index}`,
+        sourceType,
+        sourceId,
+        sourceLabel,
+        memberId: baseMemberId,
+        profileId: baseProfileId,
+        month,
+        monthLabel: row.label || row.monthLabel || row.month_label || fullMonthLabel(month),
+        amount: Number(row.amount) || 0,
+        payableItemKey: coveredItems.length === 1 ? coveredItems[0].payableItemKey : source.payableItemKey || source.payable_item_key || '',
+        expenseId: coveredItems.length === 1 ? coveredItems[0].expenseId : source.expenseId || source.expense_id || '',
+        coveredItems,
+        defaultSelected: true,
+      };
+    })
     .filter(item => Number(item.amount) !== 0);
 }
 
@@ -2604,6 +2627,24 @@ function paymentItemToCoveredSource(item) {
     amount: item.amount,
     monthBreakdown: item.month ? [{ month: item.month, label: item.monthLabel, amount: item.amount }] : [],
   };
+}
+
+function paymentItemToCoveredItems(item) {
+  const items = safeArray(item.coveredItems || item.covered_items);
+  const rows = items.length ? items : [item];
+  return rows.map(row => ({
+    payableItemKey: row.payableItemKey || row.payable_item_key || item.payableItemKey || '',
+    sourceType: row.sourceType || row.source_type || item.sourceType,
+    sourceId: row.sourceId || row.source_id || item.sourceId,
+    sourceLabel: row.sourceLabel || row.source_label || item.sourceLabel,
+    expenseId: row.expenseId || row.expense_id || item.expenseId || '',
+    memberId: row.memberId || row.member_id || item.memberId,
+    profileId: row.profileId || row.profile_id || item.profileId,
+    memberName: row.memberName || row.member_name || item.memberName,
+    month: row.month || row.yearMonth || row.year_month || item.month,
+    monthLabel: row.monthLabel || row.month_label || item.monthLabel,
+    amount: Number(row.amount) || 0,
+  })).filter(row => row.payableItemKey || row.amount);
 }
 
 function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {

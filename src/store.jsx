@@ -13,6 +13,31 @@ function safeArray(value) {
   return Array.isArray(value) ? value : []
 }
 
+async function persistNotificationCoveredItems(sb, notificationResult, coveredItems) {
+  const items = safeArray(coveredItems)
+  const result = Array.isArray(notificationResult) ? notificationResult[0] : notificationResult
+  const notificationId = typeof result === 'string' ? result : (result?.id || result?.notificationId || result?.notification_id)
+  if (!sb || !notificationId || !items.length) return
+  const { data, error: fetchError } = await sb
+    .from('notifications')
+    .select('metadata')
+    .eq('id', notificationId)
+    .maybeSingle()
+  if (fetchError) {
+    console.error('[store] FETCH_PAYMENT_NOTIFICATION_METADATA:', fetchError)
+    throw fetchError
+  }
+  const metadata = data?.metadata && typeof data.metadata === 'object' ? data.metadata : {}
+  const { error } = await sb
+    .from('notifications')
+    .update({ metadata: { ...metadata, coveredItems: items } })
+    .eq('id', notificationId)
+  if (error) {
+    console.error('[store] PERSIST_PAYMENT_COVERED_ITEMS:', error)
+    throw error
+  }
+}
+
 function monthKey(value) {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return ''
@@ -2001,6 +2026,7 @@ export function AppProvider({ children }) {
           memberName: action.memberName || state.currentUserName || 'Thành viên',
           coveredMembers: safeArray(action.coveredMembers),
           coveredSources: safeArray(action.coveredSources),
+          coveredItems: safeArray(action.coveredItems),
           transferDescription: action.transferDescription || '',
           paymentTarget: action.paymentTarget || {},
           monthLabel: action.monthLabel || '',
@@ -2020,6 +2046,7 @@ export function AppProvider({ children }) {
           console.error('[store] SEND_PAYMENT_NOTIFICATION:', error)
           throw error
         }
+        await persistNotificationCoveredItems(sb, data, metadata.coveredItems)
         await refresh()
         return data
       }
@@ -2072,6 +2099,7 @@ export function AppProvider({ children }) {
       case 'TREASURER_CONFIRM_PAYMENT': {
         if (!sb || !state.currentUserId) return null
         const coveredSources = safeArray(action.coveredSources)
+        const coveredItems = safeArray(action.coveredItems)
         const { data, error } = await sb.rpc('treasurer_confirm_payment', {
           p_from_member_id: action.memberId || action.fromMemberId || action.from_member_id || null,
           p_amount: Number(action.amount) || 0,
@@ -2084,6 +2112,7 @@ export function AppProvider({ children }) {
           console.error('[store] TREASURER_CONFIRM_PAYMENT:', error)
           throw error
         }
+        await persistNotificationCoveredItems(sb, data, coveredItems)
         const hasSourceMonths = coveredSources.some(source => (
           (source.month || source.yearMonth || source.year_month) &&
           (source.sourceId || source.source_id) &&

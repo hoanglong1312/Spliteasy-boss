@@ -81,7 +81,9 @@ test('store fetches payment notifications and persists treasurer review actions'
   assert.match(storeSource, /case 'SEND_PAYMENT_NOTIFICATION': \{/)
   assert.match(storeSource, /\.rpc\('submit_payment_notification'/)
   assert.match(storeSource, /p_target_member_id: targetMemberId \|\| null/)
+  assert.match(storeSource, /coveredItems: safeArray\(action\.coveredItems\)/)
   assert.match(storeSource, /p_covered_sources: metadata\.coveredSources/)
+  assert.match(storeSource, /persistNotificationCoveredItems\(sb, data, metadata\.coveredItems\)/)
   const reviewBlock = storeSource.slice(
     storeSource.indexOf("case 'REVIEW_PAYMENT_NOTIFICATION':"),
     storeSource.indexOf("case 'MARK_NOTIFICATIONS_READ':")
@@ -104,8 +106,10 @@ test('treasurer payment confirmation records settled source months', () => {
   const source = match[0]
 
   assert.match(source, /const coveredSources = safeArray\(action\.coveredSources\)/)
+  assert.match(source, /const coveredItems = safeArray\(action\.coveredItems\)/)
   assert.match(source, /\.rpc\('treasurer_confirm_payment'/)
   assert.match(source, /p_covered_sources: coveredSources/)
+  assert.match(source, /persistNotificationCoveredItems\(sb, data, coveredItems\)/)
   assert.match(source, /\.rpc\('record_member_month_payment_settlements'/)
   assert.match(source, /p_treasurer_member_id: state\.currentUserId/)
   assert.match(source, /p_covered_sources: coveredSources/)

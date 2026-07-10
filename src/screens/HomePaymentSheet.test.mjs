@@ -43,6 +43,22 @@ test('treasurer confirm payment sheet can share selected payment items as text a
   assert.match(treasurerConfirmSource, /<PaymentBillCardSheet[\s\S]*qrUrl=\{qrUrl\}[\s\S]*paymentDisplayGroups=\{paymentDisplayGroups\}/);
 });
 
+test('payment confirm payloads preserve covered items for exact allocation', () => {
+  const paymentSheetSource = sliceBetween('function PaymentSheet(', 'function treasurerProfileStatKey');
+  const treasurerConfirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
+  const sourceItemsSource = sliceBetween('function sourcePaymentItems(', 'function paymentItemsAmountDue');
+  const coveredItemSource = sliceBetween('function paymentItemToCoveredSource(', 'function MemberShareLinkSheet');
+  assert.match(sourceItemsSource, /sourcePayableItems/);
+  assert.match(sourceItemsSource, /coveredItems/);
+  assert.match(paymentSheetSource, /const coveredItems = selectedPaymentItems\.flatMap\(paymentItemToCoveredItems\)/);
+  assert.match(paymentSheetSource, /coveredItems,/);
+  assert.match(treasurerConfirmSource, /coveredItems: selectedItems\.flatMap\(paymentItemToCoveredItems\)/);
+  assert.match(coveredItemSource, /function paymentItemToCoveredSource\(item\)/);
+  assert.match(coveredItemSource, /function paymentItemToCoveredItems\(item\)/);
+  assert.match(coveredItemSource, /payableItemKey/);
+  assert.match(coveredItemSource, /expenseId/);
+});
+
 test('treasurer dashboard can create one bill from selected items across members', () => {
   const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
   const rowBuilderSource = sliceBetween('function paymentRowFromTreasurerItems(', 'function TreasurerMemberPaymentRow');

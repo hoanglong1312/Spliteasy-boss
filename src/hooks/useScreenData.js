@@ -408,11 +408,62 @@ function sourceMonthBreakdown(rows) {
     .filter(row => row.amount !== 0)
 }
 
+function buildPayableItemKey(item) {
+  const expenseId = item?.expenseId || item?.expense_id || ''
+  const sourceType = item?.sourceType || item?.source_type || 'source'
+  const sourceId = item?.sourceId || item?.source_id || item?.sourceLabel || item?.source_label || ''
+  const itemId = expenseId ? `expense:${expenseId}` : `${sourceType}:${sourceId}`
+  const memberId = item?.memberId || item?.member_id || ''
+  const profileId = item?.profileId || item?.profile_id || ''
+  const month = item?.month || item?.yearMonth || item?.year_month || ''
+  const amount = Math.round(Number(item?.amount) || 0)
+  return `${itemId}|member:${memberId}|profile:${profileId}|month:${month}|amount:${amount}`
+}
+
+function withPayableItemKey(item) {
+  const amount = Math.round(Number(item?.amount) || 0)
+  return {
+    ...item,
+    sourceType: item?.sourceType || item?.source_type || 'group',
+    sourceId: item?.sourceId || item?.source_id || '',
+    sourceLabel: item?.sourceLabel || item?.source_label || 'Nguồn tiền',
+    expenseId: item?.expenseId || item?.expense_id || '',
+    memberId: item?.memberId || item?.member_id || '',
+    profileId: item?.profileId || item?.profile_id || '',
+    month: item?.month || item?.yearMonth || item?.year_month || '',
+    monthLabel: item?.monthLabel || item?.month_label || '',
+    amount,
+    payableItemKey: item?.payableItemKey || item?.payable_item_key || buildPayableItemKey({ ...item, amount }),
+  }
+}
+
+function groupExpensePayableItem(group, expense, member, members) {
+  const normalizedExpense = normalizeExpenseForBalance(expense)
+  const amount = expenseImpact(normalizedExpense, member?.id)
+  if (!amount) return null
+  const month = monthKey(normalizedExpense.date || normalizedExpense.expense_date)
+  return withPayableItemKey({
+    sourceId: group?.id || '',
+    sourceType: 'group',
+    sourceLabel: group?.name || 'Nhóm',
+    expenseId: normalizedExpense.id || '',
+    expenseTitle: normalizedExpense.title || '',
+    memberId: member?.id || '',
+    profileId: profileIdForMember(member?.id, members),
+    month,
+    monthLabel: month ? sourceMonthLabel(month) : '',
+    amount,
+  })
+}
+
 function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members, endDate = null) {
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
     balanceMembersForGroup(group, members).map(member => {
       const checkpoint = latestConfirmedSettlementCheckpoint(state, group.id, member.id)
       const checkpointGroup = groupWithExpensesAfterCheckpoint(group, checkpoint, endDate)
+      const payableItems = safeArray(checkpointGroup.expenses)
+        .map(expense => groupExpensePayableItem(group, expense, member, members))
+        .filter(Boolean)
       const monthBreakdown = sourceMonthBreakdown(safeArray(checkpointGroup.expenses).map(expense => ({
         month: monthKey(expense.date || expense.expense_date),
         amount: groupSourceNet({ ...checkpointGroup, expenses: [expense] }, member.id),
@@ -424,6 +475,7 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
         memberId: member.id,
         amount: groupSourceNet(checkpointGroup, member.id),
         monthBreakdown,
+        payableItems,
       }
     })
   ))
@@ -452,6 +504,16 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
         amount: balance.netBalance || 0,
         month,
         monthBreakdown: [{ month, label: sourceMonthLabel(month), amount: balance.netBalance || 0 }],
+        payableItems: balance.netBalance ? [withPayableItemKey({
+          sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
+          sourceType: 'pickleball',
+          sourceLabel: pickleState?.currentGroup?.name || 'Pickleball',
+          memberId: member.id,
+          profileId: profileIdForMember(member.id, members),
+          month,
+          monthLabel: sourceMonthLabel(month),
+          amount: balance.netBalance || 0,
+        })] : [],
         }
       })
     })
@@ -823,6 +885,7 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       const paymentItems = buildTreasurerPaymentItems(row.sources, profileId, memberIds, selectedYearMonth)
       const defaultPaymentItemKeys = paymentItems.filter(item => item.defaultSelected).map(item => item.key)
       const payableSources = paymentItems.filter(item => item.defaultSelected).map(paymentItemToCoveredSource)
+      const payableItems = paymentItems.filter(item => item.defaultSelected).flatMap(paymentItemToCoveredItems)
       const payableTotal = payableSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
       const payableAmount = payableTotal < 0 ? Math.abs(payableTotal) : 0
       rowsByProfile.set(profileId, {
@@ -836,9 +899,11 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
         status: nextStatus,
         sources: safeArray(row.sources),
         coveredSources: safeArray(row.coveredSources || row.covered_sources || row.sources),
+        coveredItems: payableItems,
         paymentItems,
         defaultPaymentItemKeys,
         payableSources,
+        payableItems,
         payableAmount,
         sourceSummary: row.sourceSummary || row.source_summary || `${safeArray(row.sources).length || 1} nguồn tiền`,
         prevMonthResidual: 0,
@@ -915,6 +980,14 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
       const sourceId = source.sourceId || source.source_id || ''
       const sourceLabel = source.sourceLabel || source.source_label || source.label || 'Nguồn tiền'
       const memberId = source.memberId || source.member_id || memberIds?.[0] || ''
+      const sourcePayableItems = safeArray(source.payableItems || source.payable_items).map(item => withPayableItemKey({
+        ...item,
+        sourceType: item.sourceType || item.source_type || sourceType,
+        sourceId: item.sourceId || item.source_id || sourceId,
+        sourceLabel: item.sourceLabel || item.source_label || sourceLabel,
+        memberId: item.memberId || item.member_id || memberId,
+        profileId: item.profileId || item.profile_id || profileId,
+      }))
       const monthRows = safeArray(source.monthBreakdown || source.month_breakdown)
       const rows = monthRows.length
         ? monthRows
@@ -925,6 +998,7 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
           const month = row.month || source.month || source.yearMonth || source.year_month || ''
           const amount = Number(row.amount) || 0
           const key = [sourceType, sourceId || sourceLabel, memberId, profileId, month, Math.abs(amount)].join(':')
+          const coveredItems = sourcePayableItems.filter(item => !month || String(item.month || '') === String(month))
           return {
             key,
             sourceType,
@@ -935,6 +1009,8 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
             month,
             monthLabel: row.label || (month ? sourceMonthLabel(month) : ''),
             amount,
+            payableItemKey: coveredItems.length === 1 ? coveredItems[0].payableItemKey : buildPayableItemKey({ sourceType, sourceId, sourceLabel, memberId, profileId, month, amount }),
+            coveredItems: coveredItems.length ? coveredItems : [withPayableItemKey({ sourceType, sourceId, sourceLabel, memberId, profileId, month, monthLabel: row.label || (month ? sourceMonthLabel(month) : ''), amount })],
             defaultSelected: Boolean(selectedYearMonth && month === selectedYearMonth),
           }
         })
@@ -951,8 +1027,16 @@ function paymentItemToCoveredSource(item) {
     month: item.month,
     monthLabel: item.monthLabel,
     amount: item.amount,
+    payableItemKey: item.payableItemKey,
+    expenseId: item.expenseId,
     monthBreakdown: item.month ? [{ month: item.month, label: item.monthLabel, amount: item.amount }] : [],
   }
+}
+
+function paymentItemToCoveredItems(item) {
+  const items = safeArray(item?.coveredItems || item?.covered_items)
+  if (items.length) return items.map(withPayableItemKey)
+  return [withPayableItemKey(item)]
 }
 
 function paymentProgressStatusRank(status) {
@@ -994,7 +1078,8 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     const amount = Math.abs(Number(metadata.amount) || 0)
     const actorMemberId = notification?.actorMemberId || notification?.actor_member_id || ''
     const recipientMemberId = notification?.memberId || notification?.member_id || ''
-    const hasExplicitCoverage = safeArray(metadata.coveredSources || metadata.covered_sources).length > 0 ||
+    const hasExplicitCoverage = safeArray(metadata.coveredItems || metadata.covered_items).length > 0 ||
+      safeArray(metadata.coveredSources || metadata.covered_sources).length > 0 ||
       safeArray(metadata.coveredMembers || metadata.covered_members).length > 0
     const noticeScope = {
       ...scope,
@@ -1004,7 +1089,8 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
       isLegacyNameMatch: isLegacyNamePaymentNotice(notification, member),
     }
     if (isConfirmedPaymentSubmittedNotice(notification, status) && !hasExplicitCoverage) return
-    const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
+    const coveredItems = coveredItemsForPayment(metadata, sourceBreakdown, noticeScope)
+    const coveredSources = coveredItems.length ? coveredItems : coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
     const activeCoveredSources = coveredSources.filter(source => !confirmedSourceCoveredByCheckpoint(state, source, noticeScope))
     const scopedAmount = coveredSources.length
       ? coveredSourcesAmountDue(activeCoveredSources)
@@ -1018,6 +1104,25 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   })
 
   return { confirmedSources, confirmedAmount, pendingAmount }
+}
+
+function coveredItemsForPayment(metadata, sourceBreakdown, scope = {}) {
+  const sourceProfileIds = new Set(safeArray(sourceBreakdown).map(source => String(source.profileId || source.profile_id || '')).filter(Boolean))
+  const sourceMemberIds = new Set(safeArray(sourceBreakdown).map(source => String(source.memberId || source.member_id || '')).filter(Boolean))
+  const sourceKeys = new Set(safeArray(sourceBreakdown).map(sourceKey).filter(Boolean))
+  return safeArray(metadata?.coveredItems || metadata?.covered_items)
+    .filter(item => {
+      const profileId = String(item?.profileId || item?.profile_id || '')
+      const memberId = String(item?.memberId || item?.member_id || '')
+      if (profileId && scope.profileId && profileId === String(scope.profileId)) return true
+      if (memberId && scope.memberIds?.has(String(memberId))) return true
+      if (profileId && sourceProfileIds.size > 0) return sourceProfileIds.has(profileId)
+      if (memberId && sourceMemberIds.size > 0) return sourceMemberIds.has(memberId)
+      if (sourceKeys.has(sourceKey(item))) return true
+      return !profileId && !memberId && scope.isActor === true
+    })
+    .map(withPayableItemKey)
+    .filter(item => item.amount !== 0)
 }
 
 function confirmedSourceCoveredByCheckpoint(state, source, scope = {}) {
@@ -1086,7 +1191,10 @@ function paymentNoticeMatchesMonth(metadata, monthLabel) {
   if (!monthLabel) return true
   const targetMonth = monthKeyFromPaymentLabel(monthLabel)
   const coveredMonths = new Set(
-    safeArray(metadata?.coveredSources || metadata?.covered_sources)
+    [
+      ...safeArray(metadata?.coveredItems || metadata?.covered_items),
+      ...safeArray(metadata?.coveredSources || metadata?.covered_sources),
+    ]
       .map(source => source?.month || source?.yearMonth || source?.year_month || monthKeyFromPaymentLabel(source?.monthLabel || source?.month_label))
       .filter(Boolean)
   )
@@ -1096,7 +1204,10 @@ function paymentNoticeMatchesMonth(metadata, monthLabel) {
 
 function paymentRecordMonths(metadata) {
   return [...new Set(
-    safeArray(metadata?.coveredSources || metadata?.covered_sources)
+    [
+      ...safeArray(metadata?.coveredItems || metadata?.covered_items),
+      ...safeArray(metadata?.coveredSources || metadata?.covered_sources),
+    ]
       .map(source => source?.month || source?.yearMonth || source?.year_month || monthKeyFromPaymentLabel(source?.monthLabel || source?.month_label))
       .filter(Boolean)
   )]
@@ -1126,6 +1237,9 @@ function paymentNoticeCoversMember(notification, memberIds, profileId, member = 
     (profileKey && String(row?.profileId || row?.profile_id || '') === profileKey) ||
     safeArray(row?.memberIds || row?.member_ids).some(id => memberIds.has(String(id))) ||
     memberIds.has(String(row?.memberId || row?.member_id || ''))
+  )) || safeArray(metadata.coveredItems || metadata.covered_items).some(item => (
+    (profileKey && String(item?.profileId || item?.profile_id || '') === profileKey) ||
+    memberIds.has(String(item?.memberId || item?.member_id || ''))
   )) || safeArray(metadata.coveredSources || metadata.covered_sources).some(source => (
     (profileKey && String(source?.profileId || source?.profile_id || '') === profileKey) ||
     memberIds.has(String(source?.memberId || source?.member_id || ''))
@@ -1139,6 +1253,7 @@ function isLegacyNamePaymentNotice(notification, member) {
   const noticeName = normalizeName(metadata.memberName || metadata.member_name || notification?.actorName || notification?.actor_name || '')
   return String(notification?.type || '').toLowerCase() === 'payment_submitted' &&
     String(metadata.status || '').toLowerCase() === 'confirmed' &&
+    !safeArray(metadata.coveredItems || metadata.covered_items).length &&
     !safeArray(metadata.coveredSources || metadata.covered_sources).length &&
     !safeArray(metadata.coveredMembers || metadata.covered_members).length &&
     !!targetName &&
@@ -1151,6 +1266,11 @@ function paymentNoticeDuplicateKey(notification) {
   if (status !== 'confirmed') return ''
   const coveredSources = safeArray(metadata.coveredSources || metadata.covered_sources)
   const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
+  const coveredItems = safeArray(metadata.coveredItems || metadata.covered_items)
+  const items = coveredItems.map(item => ({
+    payableItemKey: item.payableItemKey || item.payable_item_key || buildPayableItemKey(item),
+    amount: Math.round(Math.abs(Number(item.amount) || 0)),
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const sources = coveredSources.map(source => ({
     sourceType: source.sourceType || source.source_type || 'group',
     sourceId: source.sourceId || source.source_id || '',
@@ -1168,6 +1288,7 @@ function paymentNoticeDuplicateKey(notification) {
     memberName: normalizeName(metadata.memberName || metadata.member_name || notification?.actorName || notification?.actor_name || ''),
     monthLabel: metadata.monthLabel || metadata.month_label || '',
     amount: Math.round(Math.abs(Number(metadata.amount) || 0)),
+    items,
     sources,
     members,
   })
@@ -1288,11 +1409,18 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
   const coveredBySource = new Map()
   const coveredSignedBySource = new Map()
   const coveredMonthsBySource = new Map()
+  const coveredItemsBySource = new Map()
   const paidOnlySources = new Map()
   safeArray(confirmedSources).forEach(source => {
     const key = sourceKey(source)
     const signedAmount = Number(source.amount) || 0
     const amount = Math.abs(signedAmount)
+    const payableItemKey = source.payableItemKey || source.payable_item_key || ''
+    if (payableItemKey) {
+      const itemMap = coveredItemsBySource.get(key) || new Map()
+      itemMap.set(payableItemKey, (itemMap.get(payableItemKey) || 0) + signedAmount)
+      coveredItemsBySource.set(key, itemMap)
+    }
     coveredBySource.set(key, (coveredBySource.get(key) || 0) + amount)
     coveredSignedBySource.set(key, (coveredSignedBySource.get(key) || 0) + signedAmount)
     if ((source.sourceId || source.source_id || source.sourceLabel || source.source_label) && amount > 0) {
@@ -1320,8 +1448,17 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
       const amount = Number(source.amount) || 0
       const key = sourceKey(source)
       paidOnlySources.delete(key)
+      const coveredItems = coveredItemsBySource.get(key)
+      const sourcePayableItems = safeArray(source.payableItems || source.payable_items)
+      if (coveredItems?.size && sourcePayableItems.length) {
+        const { payableItems, paid } = applyConfirmedPaymentCoverageToItems(sourcePayableItems, coveredItems)
+        const monthBreakdown = sourceMonthBreakdown(payableItems)
+        const remaining = payableItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+        return { ...source, amount: remaining, monthBreakdown, payableItems, paidAmount: paid }
+      }
       const coveredNet = coveredSignedBySource.get(key) || 0
-      const paid = Math.min(Math.abs(amount), Math.abs(coveredNet) || coveredBySource.get(key) || 0)
+      const sameDirectionCoverage = amount && coveredNet && Math.sign(amount) === Math.sign(coveredNet)
+      const paid = sameDirectionCoverage ? Math.abs(coveredNet) : 0
       coveredBySource.set(key, Math.max((coveredBySource.get(key) || 0) - paid, 0))
       const monthBreakdown = applyConfirmedPaymentCoverageToMonths(source.monthBreakdown, paid, amount, coveredMonthsBySource.get(key))
       const remainingFromMonths = safeArray(monthBreakdown).length
@@ -1329,10 +1466,10 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
         : null
       if (amount >= 0) {
         if (!paid) return source
-        const newAmount = remainingFromMonths ?? amount - paid
-        return newAmount <= 0 ? null : { ...source, amount: newAmount, monthBreakdown, paidAmount: paid }
+        const newAmount = remainingFromMonths ?? (sameDirectionCoverage ? amount - coveredNet : amount - paid)
+        return newAmount === 0 ? null : { ...source, amount: newAmount, monthBreakdown, paidAmount: paid }
       }
-      const remaining = remainingFromMonths ?? amount + paid
+      const remaining = remainingFromMonths ?? (sameDirectionCoverage ? amount - coveredNet : amount + paid)
       return { ...source, amount: remaining, monthBreakdown, paidAmount: paid }
     })
     .filter(Boolean)
@@ -1348,6 +1485,23 @@ function applyConfirmedPaymentCoverage(sourceBreakdown, confirmedSources) {
   ]
 }
 
+function applyConfirmedPaymentCoverageToItems(payableItems, coveredItems) {
+  let paid = 0
+  const items = safeArray(payableItems)
+    .map(item => {
+      const normalized = withPayableItemKey(item)
+      const amount = Number(normalized.amount) || 0
+      const coveredAmount = Number(coveredItems.get(normalized.payableItemKey) || 0)
+      if (!amount || !coveredAmount || Math.sign(amount) !== Math.sign(coveredAmount)) return normalized
+      const applied = Math.min(Math.abs(amount), Math.abs(coveredAmount))
+      paid += applied
+      const remaining = amount - Math.sign(amount) * applied
+      return remaining ? { ...normalized, amount: remaining } : null
+    })
+    .filter(Boolean)
+  return { payableItems: items, paid }
+}
+
 function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmount, coveredMonths = new Map()) {
   let remainingPaid = Math.abs(Number(paid) || 0)
   if (!remainingPaid || !safeArray(monthBreakdown).length) return monthBreakdown
@@ -1357,10 +1511,10 @@ function applyConfirmedPaymentCoverageToMonths(monthBreakdown, paid, sourceAmoun
     .map(item => {
       const amount = Number(item.amount) || 0
       const coveredMonthAmount = Number(coveredMonths.get(item.month) || 0)
-      const monthPaid = Math.min(Math.abs(amount), Math.abs(coveredMonthAmount))
-      if (monthPaid > 0 && Math.sign(coveredMonthAmount) === Math.sign(amount)) {
-        remainingPaid = Math.max(remainingPaid - monthPaid, 0)
-        return { ...item, amount: amount - Math.sign(coveredMonthAmount) * monthPaid }
+      if (coveredMonthAmount && Math.sign(coveredMonthAmount) === Math.sign(amount)) {
+        const covered = Math.min(Math.abs(amount), Math.abs(coveredMonthAmount))
+        remainingPaid = Math.max(remainingPaid - covered, 0)
+        return { ...item, amount: amount - Math.sign(amount) * covered }
       }
       if (hasCoveredMonths || remainingPaid <= 0 || Math.sign(amount) !== sign) return item
       const covered = Math.min(Math.abs(amount), remainingPaid)
@@ -1389,24 +1543,44 @@ function latestPaymentNoticeForMember(state, member, monthLabel) {
 
 function buildHomeSourceBalances(state, expenseGroups, pickleballState, pickle, monthSessions, members, monthDate) {
   const expenseRows = safeArray(expenseGroups).flatMap(group => (
-    membersForGroup(group, members).map(member => ({
-      sourceId: group.id,
-      sourceType: 'group',
-      sourceLabel: group.name || 'Nhóm',
-      memberId: member.id,
-      amount: groupSourceNet(group, member.id),
-    }))
+    membersForGroup(group, members).map(member => {
+      const payableItems = safeArray(group?.expenses)
+        .map(expense => groupExpensePayableItem(group, expense, member, members))
+        .filter(Boolean)
+      return {
+        sourceId: group.id,
+        sourceType: 'group',
+        sourceLabel: group.name || 'Nhóm',
+        memberId: member.id,
+        amount: groupSourceNet(group, member.id),
+        payableItems,
+      }
+    })
   ))
   const pickleRows = currentGroupMembers(pickleballState)
     .filter(isActiveMember)
-    .map(member => ({
-      sourceId: pickleballState?.currentGroupId || pickleballState?.currentGroup?.id,
-      sourceType: 'pickleball',
-      sourceLabel: pickleballState?.currentGroup?.name || 'Pickleball',
-      memberId: member.id,
-      amount: buildMemberMonthBalance(pickleballState, pickle, monthSessions, member.id, monthDate).netBalance || 0,
-      month: monthKey(monthDate),
-    }))
+    .map(member => {
+      const amount = buildMemberMonthBalance(pickleballState, pickle, monthSessions, member.id, monthDate).netBalance || 0
+      const month = monthKey(monthDate)
+      return {
+        sourceId: pickleballState?.currentGroupId || pickleballState?.currentGroup?.id,
+        sourceType: 'pickleball',
+        sourceLabel: pickleballState?.currentGroup?.name || 'Pickleball',
+        memberId: member.id,
+        amount,
+        month,
+        payableItems: amount ? [withPayableItemKey({
+          sourceId: pickleballState?.currentGroupId || pickleballState?.currentGroup?.id,
+          sourceType: 'pickleball',
+          sourceLabel: pickleballState?.currentGroup?.name || 'Pickleball',
+          memberId: member.id,
+          profileId: profileIdForMember(member.id, members),
+          month,
+          monthLabel: sourceMonthLabel(month),
+          amount,
+        })] : [],
+      }
+    })
   return [...expenseRows, ...pickleRows].filter(row => row.memberId && row.amount !== 0)
 }
 
@@ -1561,6 +1735,12 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
         memberId: source.memberId || source.member_id || actorMemberId || '',
         memberName: source.memberName || source.member_name || memberName,
       }))
+      const coveredItems = safeArray(metadata.coveredItems || metadata.covered_items).map(item => withPayableItemKey({
+        ...item,
+        profileId: item.profileId || item.profile_id || actorProfileId || '',
+        memberId: item.memberId || item.member_id || actorMemberId || '',
+        memberName: item.memberName || item.member_name || memberName,
+      }))
       const recordMonths = paymentRecordMonths(metadata)
       const recordMonthLabel = recordMonths.length === 1 ? formatMonthLabel(dateFromYearMonth(recordMonths[0])) : (metadata.monthLabel || monthLabel)
       const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
@@ -1577,6 +1757,7 @@ function buildPaymentManagementRecords(state, currentMember, monthDate) {
         monthLabel: recordMonthLabel,
         transferDescription: metadata.transferDescription || metadata.transfer_description || '',
         coveredSources,
+        coveredItems,
         sourceSummary: groupName ? `${groupName} · ${recordMonthLabel}` : (coveredSources.length ? `${coveredSources.length} nguồn tiền` : 'Chưa rõ nguồn'),
       }
     })
@@ -5057,8 +5238,16 @@ function currentProfileSourceBreakdown(sourceBalances, currentUserId, members, c
         memberId: row.memberId || row.member_id || currentUserId,
         amount: 0,
         monthAmounts: new Map(),
+        payableItems: [],
       }
       existing.amount += Number(row.amount) || 0
+      safeArray(row.payableItems || row.payable_items).forEach(item => {
+        existing.payableItems.push(withPayableItemKey({
+          ...item,
+          profileId: item.profileId || item.profile_id || profileId,
+          memberId: item.memberId || item.member_id || row.memberId || row.member_id || currentUserId,
+        }))
+      })
       safeArray(row.monthBreakdown).forEach(item => {
         const month = item.month || monthKey(item.date)
         if (!month) return
@@ -5113,6 +5302,11 @@ function aggregateBalancesByProfile(sourceBalances, members) {
       amount,
       month: row.month || '',
       monthBreakdown: safeArray(row.monthBreakdown || row.month_breakdown),
+      payableItems: safeArray(row.payableItems || row.payable_items).map(item => withPayableItemKey({
+        ...item,
+        profileId: item.profileId || item.profile_id || profileId,
+        memberId: item.memberId || item.member_id || row.memberId || row.member_id || '',
+      })),
     })
   })
   return [...byProfile.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount) || a.name.localeCompare(b.name, 'vi'))

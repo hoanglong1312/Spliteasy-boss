@@ -2954,6 +2954,139 @@ describe('buildHomeData', () => {
     expect(progressRow).toBeUndefined()
   })
 
+  test('confirmed payment covers only selected payable item, not another member in same source month', () => {
+    const members = [
+      { id: 'member-tuan', profile_id: 'profile-tuan', group_id: 'group-vk', name: 'Lê Tuấn' },
+      { id: 'member-trang', profile_id: 'profile-trang', group_id: 'group-vk', name: 'Trang' },
+      { id: 'treasurer-1', profile_id: 'profile-treasurer', group_id: 'group-vk', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-vk',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-tuan', 'member-trang', 'treasurer-1'],
+      expenses: [{
+        id: 'expense-july-water',
+        amount: 100000,
+        expense_date: '2026-07-10T12:00:00.000Z',
+        paid_by_member_id: 'treasurer-1',
+        participants: ['member-tuan', 'member-trang'],
+      }],
+    }]
+    const state = {
+      currentGroupId: 'group-vk',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-tuan',
+        type: 'payment_submitted',
+        group_id: 'group-vk',
+        actor_member_id: 'member-tuan',
+        metadata: {
+          status: 'confirmed',
+          amount: 50000,
+          memberName: 'Lê Tuấn',
+          coveredItems: [{
+            payableItemKey: 'expense:expense-july-water|member:member-tuan|profile:profile-tuan|month:2026-07|amount:-50000',
+            sourceType: 'group',
+            sourceId: 'group-vk',
+            sourceLabel: 'Lấy vk để trưởng thành',
+            expenseId: 'expense-july-water',
+            memberId: 'member-tuan',
+            profileId: 'profile-tuan',
+            month: '2026-07',
+            amount: -50000,
+          }],
+          monthLabel: 'Tháng 7 · 2026',
+        },
+        created_at: '2026-07-10T13:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+    }
+
+    const tuan = buildHomeData({ ...state, currentUserId: 'member-tuan', currentProfileId: 'profile-tuan', currentUserName: 'Lê Tuấn' }, 'member-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const trang = buildHomeData({ ...state, currentUserId: 'member-trang', currentProfileId: 'profile-trang', currentUserName: 'Trang' }, 'member-trang', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(tuan.paymentSummary.netBalance).toBe(0)
+    expect(trang.paymentSummary.netBalance).toBe(-50000)
+  })
+
+  test('confirmed covered item does not hide later payable item in same source month', () => {
+    const members = [
+      { id: 'member-tuan', profile_id: 'profile-tuan', group_id: 'group-vk', name: 'Lê Tuấn' },
+      { id: 'treasurer-1', profile_id: 'profile-treasurer', group_id: 'group-vk', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'group-vk',
+      name: 'Lấy vk để trưởng thành',
+      members: ['member-tuan', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'expense-july-09',
+          amount: 50000,
+          expense_date: '2026-07-09T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-tuan'],
+        },
+        {
+          id: 'expense-july-10',
+          amount: 50000,
+          expense_date: '2026-07-10T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-tuan'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'member-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'group-vk',
+      members,
+      groups,
+      notifications: [{
+        id: 'payment-july-09',
+        type: 'payment_submitted',
+        group_id: 'group-vk',
+        actor_member_id: 'member-tuan',
+        metadata: {
+          status: 'confirmed',
+          amount: 50000,
+          memberName: 'Lê Tuấn',
+          coveredItems: [{
+            payableItemKey: 'expense:expense-july-09|member:member-tuan|profile:profile-tuan|month:2026-07|amount:-50000',
+            sourceType: 'group',
+            sourceId: 'group-vk',
+            sourceLabel: 'Lấy vk để trưởng thành',
+            expenseId: 'expense-july-09',
+            memberId: 'member-tuan',
+            profileId: 'profile-tuan',
+            month: '2026-07',
+            amount: -50000,
+          }],
+          monthLabel: 'Tháng 7 · 2026',
+        },
+        created_at: '2026-07-09T13:00:00.000Z',
+      }],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'settlement-aggregate-marker',
+        member_id: 'member-tuan',
+        profile_id: 'profile-tuan',
+        group_id: 'group-vk',
+        month: '2026-07',
+        expense_id: null,
+      }],
+    }
+
+    const home = buildHomeData(state, 'member-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(home.paymentSummary.netBalance).toBe(-50000)
+    expect(home.paymentSummary.sourceBreakdown.find(source => source.sourceId === 'group-vk')).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -50000 }],
+    })
+  })
+
   test('keeps treasurer outstanding stable across month views after explicit confirmed payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
