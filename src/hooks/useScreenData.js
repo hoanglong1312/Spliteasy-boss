@@ -2246,6 +2246,30 @@ export function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(
   }, 0)
   const ownerPayments = currentGroupOwnerPayments(state)
   const venueBank = venueBankForCurrentGroup(state)
+  const withDraftCoverage = item => {
+    const totalAmount = Math.max(Number(item.amount) || 0, 0)
+    const paidAmount = ownerPaymentPaidAmount(ownerPayments, item.key, item.yearMonth, totalAmount)
+    const unpaidAmount = Math.max(totalAmount - paidAmount, 0)
+    return {
+      ...item,
+      totalAmount,
+      paidAmount,
+      unpaidAmount,
+      amount: unpaidAmount,
+      paid: totalAmount > 0 && unpaidAmount <= 0,
+    }
+  }
+  const withCostCoverage = (row, paymentKey = row.key, paidByFlag = false) => {
+    const totalAmount = Math.max(Number(row.amount) || 0, 0)
+    const paidAmount = paidByFlag ? totalAmount : ownerPaymentPaidAmount(ownerPayments, paymentKey, currentYearMonth, totalAmount)
+    const unpaidAmount = Math.max(totalAmount - paidAmount, 0)
+    return {
+      ...row,
+      paidAmount,
+      unpaidAmount,
+      paidToOwner: totalAmount > 0 && unpaidAmount <= 0,
+    }
+  }
   const paymentDraftItems = [
     { key: 'water', label: 'Tiền nước', yearMonth: currentYearMonth, amount: waterTotal },
     { key: 'extras', label: 'Phát sinh', yearMonth: currentYearMonth, amount: extrasTotal },
@@ -2258,64 +2282,49 @@ export function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(
         { key: 'tickets', label: 'Vé lẻ team', yearMonth: currentYearMonth, amount: teamFundDirectTotal },
         { key: 'next_court', label: 'Tiền sân tháng này', yearMonth: currentYearMonth, amount: courtFeeTotal },
       ]),
-  ].map(item => ({
-    ...item,
-    paid: ownerPaymentCoversItem(ownerPayments, item.key, item.yearMonth),
-  }))
+  ].map(withDraftCoverage)
   const costRows = isFlexBilling ? [
-    {
+    withCostCoverage({
       key: 'water',
       label: 'Tiền nước',
       amount: waterTotal,
-      paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)) ||
-        ownerPaymentCoversItem(ownerPayments, 'water', currentYearMonth),
-    },
-    {
+    }, 'water', monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment))),
+    withCostCoverage({
       key: 'extras',
       label: 'Phát sinh',
       amount: extrasTotal,
-      paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)) ||
-        ownerPaymentCoversItem(ownerPayments, 'extras', currentYearMonth),
-    },
-    {
+    }, 'extras', monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner))),
+    withCostCoverage({
       key: 'flex_monthly',
       label: 'Vé tháng thu về',
       amount: flexMonthlyRevenue,
-      paidToOwner: ownerPaymentCoversItem(ownerPayments, 'flex_monthly', currentYearMonth),
-    },
-    {
+    }),
+    withCostCoverage({
       key: 'flex_per_session',
       label: 'Vé lẻ thu về',
       amount: flexPerSessionRevenue,
-      paidToOwner: ownerPaymentCoversItem(ownerPayments, 'flex_per_session', currentYearMonth),
-    },
+    }),
   ] : [
-    {
+    withCostCoverage({
       key: 'court',
       label: 'Tiền sân',
       amount: courtFeeTotal,
-      paidToOwner: isPaidToOwner(monthlyConfig) || ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth),
-    },
-    {
+    }, 'next_court', isPaidToOwner(monthlyConfig)),
+    withCostCoverage({
       key: 'water',
       label: 'Tiền nước',
       amount: waterTotal,
-      paidToOwner: monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment)) ||
-        ownerPaymentCoversItem(ownerPayments, 'water', currentYearMonth),
-    },
-    {
+    }, 'water', monthSessions.some(session => isPaidToOwner(session?.waterPayment || session?.water_payment))),
+    withCostCoverage({
       key: 'extras',
       label: 'Phát sinh',
       amount: extrasTotal,
-      paidToOwner: monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner)) ||
-        ownerPaymentCoversItem(ownerPayments, 'extras', currentYearMonth),
-    },
-    {
+    }, 'extras', monthSessions.some(session => sessionCostsForSession(state, session, currentFixedMembers).extras.some(isPaidToOwner))),
+    withCostCoverage({
       key: 'tickets',
       label: 'Vé lẻ team',
       amount: teamFundDirectTotal,
-      paidToOwner: ownerPaymentCoversItem(ownerPayments, 'tickets', currentYearMonth),
-    },
+    }),
   ]
 
   return {
@@ -2470,6 +2479,20 @@ function ownerPaymentCoversItem(payments, key, yearMonth) {
       String(item?.yearMonth || item?.year_month || payment?.yearMonth || payment?.year_month || '') === String(yearMonth)
     ))
   })
+}
+
+function ownerPaymentPaidAmount(payments, key, yearMonth, fallbackAmount = 0) {
+  const fallback = Math.max(Number(fallbackAmount) || 0, 0)
+  const paid = safeArray(payments).reduce((sum, payment) => {
+    return sum + safeArray(payment?.items).reduce((itemSum, item) => {
+      const matches = String(item?.key || item?.type || '') === String(key) &&
+        String(item?.yearMonth || item?.year_month || payment?.yearMonth || payment?.year_month || '') === String(yearMonth)
+      if (!matches) return itemSum
+      const amount = Number(item?.amount ?? item?.totalAmount ?? item?.total_amount)
+      return itemSum + (amount > 0 ? amount : fallback)
+    }, 0)
+  }, 0)
+  return Math.min(paid, fallback)
 }
 
 function isPaidToOwner(value) {

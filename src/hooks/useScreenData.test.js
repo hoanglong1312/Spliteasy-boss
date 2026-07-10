@@ -764,7 +764,7 @@ describe('flex billing helpers', () => {
       {
         group_id: 'group-1',
         year_month: '2026-07',
-        items: [{ key: 'flex_per_session', year_month: '2026-07' }],
+        items: [{ key: 'flex_per_session', year_month: '2026-07', amount: 120_000 }],
       },
     ]
 
@@ -780,17 +780,17 @@ describe('flex billing helpers', () => {
       flexPerSessionRevenue: 240_000,
       flexTotalDue: 940_000,
     })
-    expect(data.paymentDraft.items.map(item => [item.key, item.label, item.amount, item.paid])).toEqual([
-      ['water', 'Tiền nước', 60_000, false],
-      ['extras', 'Phát sinh', 80_000, false],
-      ['flex_monthly', 'Vé tháng thu về', 700_000, false],
-      ['flex_per_session', 'Vé lẻ thu về', 240_000, true],
+    expect(data.paymentDraft.items.map(item => [item.key, item.label, item.amount, item.paidAmount, item.unpaidAmount, item.paid])).toEqual([
+      ['water', 'Tiền nước', 60_000, 0, 60_000, false],
+      ['extras', 'Phát sinh', 80_000, 0, 80_000, false],
+      ['flex_monthly', 'Vé tháng thu về', 700_000, 0, 700_000, false],
+      ['flex_per_session', 'Vé lẻ thu về', 120_000, 120_000, 120_000, false],
     ])
-    expect(data.costRows.map(row => [row.key, row.label, row.amount, row.paidToOwner])).toEqual([
-      ['water', 'Tiền nước', 60_000, false],
-      ['extras', 'Phát sinh', 80_000, false],
-      ['flex_monthly', 'Vé tháng thu về', 700_000, false],
-      ['flex_per_session', 'Vé lẻ thu về', 240_000, true],
+    expect(data.costRows.map(row => [row.key, row.label, row.amount, row.paidAmount, row.unpaidAmount, row.paidToOwner])).toEqual([
+      ['water', 'Tiền nước', 60_000, 0, 60_000, false],
+      ['extras', 'Phát sinh', 80_000, 0, 80_000, false],
+      ['flex_monthly', 'Vé tháng thu về', 700_000, 0, 700_000, false],
+      ['flex_per_session', 'Vé lẻ thu về', 240_000, 120_000, 120_000, false],
     ])
   })
 

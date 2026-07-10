@@ -287,9 +287,12 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
             {paymentDraft.items.map(item => {
               const key = paymentItemKey(item);
               const selected = selectedPaymentKeys.includes(key);
-              const hasAmount = Number(item.amount) > 0;
+              const amountDue = Number(item.amount) || 0;
+              const totalAmount = Number(item.totalAmount ?? item.total_amount ?? item.amount) || 0;
+              const paidAmount = Number(item.paidAmount ?? item.paid_amount) || 0;
+              const hasAmount = amountDue > 0;
               const selectable = !item.paid && hasAmount;
-              const dimmed = !hasAmount && !item.paid;
+              const dimmed = totalAmount <= 0 && !item.paid;
               const payment = ownerPaymentForItem(ownerPayments, item);
               let borderColor = colors.borderSubtle;
               let bgColor = 'rgba(255,255,255,0.035)';
@@ -325,12 +328,17 @@ export default function PickleballTeamFund({ data, isTreasurer = true, onAction 
                       {item.label}
                     </div>
                     <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap' }}>
-                      {item.yearMonth} · {item.paid ? 'Đã chuyển khoản' : !hasAmount ? 'Chưa có khoản' : 'Đã có số liệu, chưa CK'}
+                      {item.yearMonth} · {item.paid ? 'Đã chuyển khoản' : !totalAmount ? 'Chưa có khoản' : paidAmount > 0 ? 'Chưa chuyển phần phát sinh' : 'Chưa chuyển'}
                     </div>
+                    {paidAmount > 0 && (
+                      <div style={{ fontSize: 10, color: '#93c5fd', marginTop: 3, whiteSpace: 'nowrap' }}>
+                        Tổng {formatVND(totalAmount)} · đã chuyển {formatVND(paidAmount)}
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0, marginLeft: 10 }}>
                     <div style={{ fontSize: 13, fontWeight: 900, color: item.paid ? '#6ee7b7' : (hasAmount ? colors.warning : colors.textSecondary), ...type.mono }}>
-                      {formatVND(item.amount || 0)}
+                      {formatVND(item.paid ? totalAmount : amountDue)}
                     </div>
                     {item.paid ? (
                       <div style={{ fontSize: 9, color: '#6ee7b7', fontWeight: 800 }}>

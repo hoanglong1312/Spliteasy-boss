@@ -550,9 +550,14 @@ function TicketFundStat({ label, value, tone, raw = false }) {
 
 function TeamCostStat({ row }) {
   const paid = Boolean(row?.paidToOwner);
+  const paidAmount = Number(row?.paidAmount ?? row?.paid_amount) || 0;
+  const unpaidAmount = Math.max(Number(row?.unpaidAmount ?? row?.unpaid_amount ?? (paid ? 0 : row?.amount)) || 0, 0);
+  const partial = !paid && paidAmount > 0;
   const palette = paid
-    ? { bg: 'rgba(16,185,129,0.14)', border: 'rgba(52,211,153,0.34)', color: '#6ee7b7', pillBg: 'rgba(52,211,153,0.16)' }
-    : { bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.20)', color: '#bfdbfe', pillBg: 'rgba(148,163,184,0.12)' };
+    ? { bg: 'rgba(16,185,129,0.14)', border: 'rgba(52,211,153,0.34)', color: '#6ee7b7', pillBg: 'rgba(52,211,153,0.16)', pillColor: '#a7f3d0' }
+    : partial
+      ? { bg: 'rgba(251,191,36,0.10)', border: 'rgba(251,191,36,0.28)', color: colors.warning, pillBg: 'rgba(251,191,36,0.12)', pillColor: '#fde68a' }
+      : { bg: 'rgba(96,165,250,0.08)', border: 'rgba(96,165,250,0.20)', color: '#bfdbfe', pillBg: 'rgba(148,163,184,0.12)', pillColor: colors.textMuted };
   return (
     <div style={{
       padding: '10px 10px',
@@ -573,13 +578,13 @@ function TeamCostStat({ row }) {
         padding: '4px 7px',
         borderRadius: 999,
         background: palette.pillBg,
-        color: paid ? '#a7f3d0' : colors.textMuted,
+        color: palette.pillColor,
         fontSize: 8,
         fontWeight: 900,
         textTransform: 'uppercase',
         letterSpacing: '0.5px',
       }}>
-        {paid ? 'Đã trả chủ sân' : 'Chưa đánh dấu trả'}
+        {paid ? 'Đã trả chủ sân' : partial ? `Đã trả ${formatVND(paidAmount)} · còn ${formatVND(unpaidAmount)}` : 'Chưa chuyển'}
       </div>
     </div>
   );
