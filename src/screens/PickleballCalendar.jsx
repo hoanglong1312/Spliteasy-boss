@@ -312,13 +312,8 @@ function TicketDayPanel({ date, tickets, isTreasurer, onAdd, onEdit, savingActio
             cursor: 'pointer',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 900 }}>
-                  {ticket.memberIds.length} người đánh vé lẻ
-                </div>
-                <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 3, lineHeight: 1.45 }}>
-                  {(ticket.memberLabels || []).join(', ')}
-                </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <TicketMemberGroups ticket={ticket} />
               </div>
               <div style={{ fontSize: 10, fontWeight: 900, color: '#fde68a', textTransform: 'uppercase', letterSpacing: '0.7px' }}>
                 Xem
@@ -424,7 +419,7 @@ function TicketDetailSheet({ ticket, onClose }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 900 }}>
-            {members.length} người đánh vé lẻ
+            {ticketMemberSummary(ticket)}
           </div>
           <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 700 }}>
             {ticket.status === 'pending_review'
@@ -458,28 +453,29 @@ function TicketDetailSheet({ ticket, onClose }) {
       <div style={{ marginTop: 14, fontSize: 10, color: colors.textSecondary, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.8px' }}>
         Người đánh ngày này
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-        {members.map(member => (
-          <div key={member.id} style={ticketMemberStyle}>
-            <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {member.name}
-            </span>
-            <span style={{
-              flexShrink: 0,
-              padding: '4px 8px',
-              borderRadius: 999,
-              background: 'rgba(251,191,36,0.12)',
-              border: '1px solid rgba(251,191,36,0.24)',
-              color: '#fde68a',
-              fontSize: 10,
-              fontWeight: 900,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}>vé lẻ</span>
-          </div>
-        ))}
-      </div>
+      <TicketMemberGroups ticket={ticket} style={{ marginTop: 8 }} />
     </BottomSheet>
+  );
+}
+
+function TicketMemberGroups({ ticket, style }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, ...style }}>
+      {ticketMemberGroups(ticket).map(group => (
+        <div key={group.key}>
+          <div style={{ fontSize: 11, fontWeight: 900, color: group.key === 'monthly' ? '#c7d2fe' : '#fde68a' }}>
+            {group.label} · {group.members.length} người
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 5 }}>
+            {group.members.map(member => (
+              <span key={member.id} style={ticketNameChipStyle(group.key)}>
+                {member.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -495,6 +491,23 @@ function ticketMembers(ticket) {
     id: ticket.memberIds?.[index] || `${name}-${index}`,
     name,
   }));
+}
+
+function ticketMemberGroups(ticket) {
+  const members = ticketMembers(ticket);
+  const billedIds = new Set((ticket.billedMemberIds || []).map(id => String(id)));
+  const amount = Number(ticket.totalAmount || ticket.amount || 0);
+  const waterOnly = billedIds.size === 0 && amount === 0 && Number(ticket.waterAmount || 0) > 0;
+  const perSession = waterOnly ? [] : members.filter(member => billedIds.size === 0 || billedIds.has(String(member.id)));
+  const monthly = waterOnly ? members : members.filter(member => billedIds.size > 0 && !billedIds.has(String(member.id)));
+  return [
+    perSession.length > 0 && { key: 'per_session', label: 'Vé ngày', members: perSession },
+    monthly.length > 0 && { key: 'monthly', label: 'Vé tháng', members: monthly },
+  ].filter(Boolean);
+}
+
+function ticketMemberSummary(ticket) {
+  return ticketMemberGroups(ticket).map(group => `${group.label} · ${group.members.length} người`).join(' · ');
 }
 
 function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onSave }) {
@@ -1482,18 +1495,22 @@ function ticketActionStyle(tone) {
   };
 }
 
-const ticketMemberStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: 10,
-  padding: '9px 10px',
-  borderRadius: 10,
-  background: 'rgba(255,255,255,0.035)',
-  border: `1px solid ${colors.borderSubtle}`,
-  fontSize: 13,
-  fontWeight: 850,
-};
+function ticketNameChipStyle(typeKey) {
+  const monthly = typeKey === 'monthly';
+  return {
+    maxWidth: '100%',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    padding: '5px 8px',
+    borderRadius: 999,
+    background: monthly ? 'rgba(99,102,241,0.14)' : 'rgba(251,191,36,0.12)',
+    border: `1px solid ${monthly ? 'rgba(99,102,241,0.28)' : 'rgba(251,191,36,0.24)'}`,
+    color: monthly ? '#c7d2fe' : '#fde68a',
+    fontSize: 11,
+    fontWeight: 850,
+  };
+}
 
 function paymentRowStyle(active) {
   return {
