@@ -2773,7 +2773,7 @@ describe('buildHomeData', () => {
     expect(june.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')).toMatchObject({ amount: 50000, status: 'unpaid' })
   })
 
-  test('uses explicit confirmed payment coverage across later months', () => {
+  test('uses legacy payment month label when covered source omits month', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
@@ -2806,28 +2806,37 @@ describe('buildHomeData', () => {
       members,
       groups,
       notifications: [{
-        id: 'payment-confirmed-june',
+        id: 'payment-confirmed-july',
         type: 'payment_submitted',
         group_id: 'group-1',
         actor_member_id: 'member-1',
         metadata: {
           status: 'confirmed',
-          monthLabel: 'Tháng 6 · 2026',
-          amount: 50000,
-          coveredSources: [{ sourceId: 'group-1', memberId: 'member-1', amount: -50000, month: '2026-06' }],
+          monthLabel: 'Tháng 7 · 2026',
+          amount: 30000,
+          coveredSources: [{ sourceId: 'group-1', memberId: 'member-1', amount: -30000 }],
         },
         created_at: '2026-06-30T12:00:00.000Z',
       }],
       settlementCheckpoints: [],
     }
 
+    const june = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
     const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
     const source = result.sourceBreakdown.find(row => row.sourceId === 'group-1')
     const progressRow = result.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
 
-    expect(result.totalBalance).toBe(-30000)
-    expect(source).toMatchObject({ amount: -30000 })
-    expect(progressRow).toMatchObject({ amount: 30000, status: 'unpaid' })
+    expect(june.cappedTotalBalance).toBe(-50000)
+    expect(june.paymentSummary.netBalance).toBe(-50000)
+    expect(june.paymentSummary.paymentStatus).toBe('')
+    expect(june.transactions.some(row => row.id === 'june-expense')).toBe(true)
+    expect(result.totalBalance).toBe(-50000)
+    expect(result.paymentSummary.paymentStatus).toBe('')
+    expect(source).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-06', label: 'Tháng 6', amount: -50000 }],
+    })
+    expect(progressRow).toMatchObject({ amount: 50000, status: 'unpaid' })
   })
 
   test('does not spill explicit month coverage into later treasurer payment months', () => {
@@ -2951,12 +2960,55 @@ describe('buildHomeData', () => {
         created_at: '2026-07-05T12:00:00.000Z',
       }],
     }, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+    const emptyMonth = buildHomeData({
+      ...baseState,
+      notifications: [{
+        id: 'payment-confirmed-mixed',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          monthLabel: 'Tháng 6, Tháng 7',
+          amount: 425816,
+          coveredSources: [
+            { sourceId: 'group-1', memberId: 'member-1', profileId: 'profile-1', month: '2026-06', amount: -658166 },
+            { sourceId: 'group-1', memberId: 'member-1', profileId: 'profile-1', month: '2026-07', amount: 232350 },
+          ],
+        },
+        created_at: '2026-07-05T12:00:00.000Z',
+      }],
+    }, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-08')
+    const ambiguousEmptyMonth = buildHomeData({
+      ...baseState,
+      notifications: [{
+        id: 'payment-confirmed-without-month',
+        type: 'payment_submitted',
+        group_id: 'group-1',
+        actor_member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          amount: 425816,
+          coveredSources: [{
+            sourceId: 'group-1',
+            memberId: 'member-1',
+            profileId: 'profile-1',
+            amount: -425816,
+          }],
+        },
+        created_at: '2026-07-05T12:00:00.000Z',
+      }],
+    }, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-08')
     const progressRow = confirmed.paymentSummary.paymentProgress.find(row => row.profileId === 'profile-1')
 
     expect(confirmed.totalBalance).toBe(0)
     expect(confirmed.paymentSummary.paidAmount).toBe(425816)
+    expect(confirmed.paymentSummary.paymentStatus).toBe('confirmed')
     expect(confirmed.sourceBreakdown.find(row => row.sourceId === 'group-1')).toMatchObject({ amount: 0 })
     expect(progressRow).toBeUndefined()
+    expect(emptyMonth.paymentSummary.netBalance).toBe(0)
+    expect(emptyMonth.paymentSummary.paymentStatus).toBe('')
+    expect(ambiguousEmptyMonth.paymentSummary.paymentStatus).toBe('')
   })
 
   test('confirmed payment covers only selected payable item, not another member in same source month', () => {
@@ -3012,6 +3064,8 @@ describe('buildHomeData', () => {
     const trang = buildHomeData({ ...state, currentUserId: 'member-trang', currentProfileId: 'profile-trang', currentUserName: 'Trang' }, 'member-trang', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
 
     expect(tuan.paymentSummary.netBalance).toBe(0)
+    expect(tuan.paymentSummary.paymentStatus).toBe('confirmed')
+    expect(tuan.transactions.some(row => row.id === 'expense-july-water')).toBe(true)
     expect(trang.paymentSummary.netBalance).toBe(-50000)
   })
 

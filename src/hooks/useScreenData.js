@@ -769,28 +769,12 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
         approveStatus: advancerId ? 'unpaid' : 'team_fund',
       }
     })
-  const transactionExpenseGroups = settlementExpenseGroups.map(group => {
-    const source = sourceBreakdown.find(row => row.sourceType === 'group' && String(row.sourceId) === String(group.id))
-    const sourceMonths = new Set(safeArray(source?.monthBreakdown).map(row => row.month).filter(Boolean))
-    if (!sourceMonths.size) {
-      const groupMemberId = memberIdForGroup(group, currentUserId, members, state?.currentUserName, currentProfileId)
-      const hasUnpaidSource = source && Number(source.amount) !== 0
-      return {
-        ...group,
-        expenses: hasUnpaidSource ? safeArray(group.expenses).filter(expense => {
-          const expenseMonth = monthKey(expense.date || expense.expense_date)
-          return expenseMonth === selectedYearMonth && expenseImpact(expense, groupMemberId) !== 0
-        }) : [],
-      }
-    }
-    return {
-      ...group,
-      expenses: safeArray(group.expenses).filter(expense => {
-        const expenseMonth = monthKey(expense.date || expense.expense_date)
-        return expenseMonth === selectedYearMonth && sourceMonths.has(expenseMonth)
-      }),
-    }
-  })
+  const transactionExpenseGroups = settlementExpenseGroups.map(group => ({
+    ...group,
+    expenses: safeArray(group.expenses).filter(expense => (
+      monthKey(expense.date || expense.expense_date) === selectedYearMonth
+    )),
+  }))
   const pendingTickets = {
     count: pendingTicketItems.length,
     totalAmount: pendingTicketItems.reduce((sum, t) => sum + t.totalAmount, 0),
@@ -863,7 +847,17 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
   ), state, members, me)
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
-  const paymentStatus = netBalance > 0 || (netBalance < 0 && coverage.pendingAmount <= 0) ? '' : paymentNotice?.status || ''
+  const selectedMonth = monthKey(monthDate)
+  const selectedMonthNetBalance = capSourceBreakdownByMonth(adjustedSources, selectedMonth)
+    .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
+  const hasConfirmedSelectedMonth = coverage.confirmedSources.some(source => (
+    String(source.month || source.yearMonth || source.year_month || '') === selectedMonth
+  )) || paymentNotice?.status === 'confirmed'
+  const paymentStatus = selectedMonthNetBalance === 0
+    ? (hasConfirmedSelectedMonth ? 'confirmed' : '')
+    : selectedMonthNetBalance > 0 || (selectedMonthNetBalance < 0 && coverage.pendingAmount <= 0)
+      ? ''
+      : paymentNotice?.status || ''
   const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, state?.monthSettlements, members, state?.groups)
   return {
     monthLabel,
@@ -1299,7 +1293,11 @@ function paymentNoticeMatchesMonth(metadata, monthLabel) {
       .filter(Boolean)
   )
   if (targetMonth && coveredMonths.size > 0) return coveredMonths.has(targetMonth)
-  return !metadata?.monthLabel || String(metadata.monthLabel) === String(monthLabel)
+  const noticeMonthLabel = metadata?.monthLabel || metadata?.month_label
+  if (!noticeMonthLabel) return false
+  return targetMonth
+    ? monthKeyFromPaymentLabel(noticeMonthLabel) === targetMonth
+    : String(noticeMonthLabel) === String(monthLabel)
 }
 
 function paymentRecordMonths(metadata) {
@@ -1411,7 +1409,16 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
     })
     .map(source => {
       const matchedSource = sourceForCoveredSource(source, sourceBreakdown, coveredMonth)
-      const hasSourceIdentity = !!(source.sourceId || source.source_id || source.sourceLabel || source.source_label || source.sourceType || source.source_type)
+      const sourceAmount = Number(source.amount) || 0
+      const coveredMonthAmount = Number(
+        safeArray(matchedSource?.monthBreakdown || matchedSource?.month_breakdown)
+          .find(row => String(row?.month || '') === String(coveredMonth))?.amount
+      ) || 0
+      const inferredMonth = coveredMonth &&
+        Math.sign(sourceAmount) === Math.sign(coveredMonthAmount) &&
+        Math.abs(sourceAmount) <= Math.abs(coveredMonthAmount)
+        ? coveredMonth
+        : ''
       return {
         sourceId: source.sourceId || source.source_id || matchedSource?.sourceId || matchedSource?.source_id,
         sourceType: source.sourceType || source.source_type || matchedSource?.sourceType || matchedSource?.source_type || 'group',
@@ -1419,8 +1426,8 @@ function coveredSourcesForPayment(metadata, sourceBreakdown, scope = {}) {
         profileId: source.profileId || source.profile_id || matchedSource?.profileId || matchedSource?.profile_id || '',
         memberId: source.memberId || source.member_id || matchedSource?.memberId || matchedSource?.member_id || '',
         memberName: source.memberName || source.member_name || '',
-        amount: Number(source.amount) || 0,
-        month: source.month || source.yearMonth || source.year_month || (hasSourceIdentity ? '' : coveredMonth) || '',
+        amount: sourceAmount,
+        month: source.month || source.yearMonth || source.year_month || inferredMonth,
         monthBreakdown: safeArray(source.monthBreakdown || source.month_breakdown),
       }
     })
@@ -1630,6 +1637,7 @@ function sourceKey(source) {
 
 function latestPaymentNoticeForMember(state, member, monthLabel) {
   const notices = paymentNoticesForMember(state, member, monthLabel)
+    .filter(notification => paymentNoticeMatchesMonth(notification?.metadata || {}, monthLabel))
   const notice = notices[0]
   if (!notice) return null
   const metadata = notice.metadata || {}

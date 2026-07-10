@@ -124,9 +124,12 @@ test('payment review actions render only for treasurer notification viewers', ()
 
 test('home payment summary exposes member payment confirmation status', () => {
   assert.match(screenDataSource, /const paymentNotice = latestPaymentNoticeForMember\(state, me, monthLabel\)/)
-  assert.match(screenDataSource, /const paymentStatus = netBalance > 0 \|\| \(netBalance < 0 && coverage\.pendingAmount <= 0\) \? '' : paymentNotice\?\.status \|\| ''/)
+  assert.match(screenDataSource, /const selectedMonthNetBalance = capSourceBreakdownByMonth\(adjustedSources, selectedMonth\)/)
+  assert.match(screenDataSource, /const hasConfirmedSelectedMonth = coverage\.confirmedSources\.some/)
+  assert.match(screenDataSource, /\|\| paymentNotice\?\.status === 'confirmed'/)
   assert.match(screenDataSource, /paymentStatus,/)
   assert.match(screenDataSource, /function latestPaymentNoticeForMember\(state, member, monthLabel\) \{/)
+  assert.match(screenDataSource, /\.filter\(notification => paymentNoticeMatchesMonth\(notification\?\.metadata \|\| \{\}, monthLabel\)\)/)
   assert.match(homeSource, /paymentStatus=\{d\.paymentSummary\?\.paymentStatus\}/)
   assert.match(homeSource, /paidConfirmed \? '✅ Đã thanh toán'/)
   assert.match(homeSource, /paymentPending \? \(pendingSettlementCheckpoint \? '⏳ Chờ thủ quỹ duyệt' : '⏳ Chờ xác nhận'\)/)
