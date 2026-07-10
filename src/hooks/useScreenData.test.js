@@ -3069,6 +3069,61 @@ describe('buildHomeData', () => {
     expect(progressRow.amount).not.toBe(994590)
   })
 
+  test('member home hides source months already confirmed by treasurer', () => {
+    const members = [
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'life-treasurer', profile_id: 'profile-treasurer', group_id: 'life-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'life-treasurer'],
+      expenses: [
+        { id: 'june-debt', amount: 2551984, expense_date: '2026-06-20T12:00:00.000Z', paid_by_member_id: 'life-treasurer', participants: ['life-tuan', 'life-treasurer'] },
+        { id: 'july-debt', amount: 100000, expense_date: '2026-07-10T12:00:00.000Z', paid_by_member_id: 'life-treasurer', participants: ['life-tuan', 'life-treasurer'] },
+      ],
+    }]
+    const state = {
+      currentUserId: 'life-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'life-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'treasurer-confirmed-tuan-june',
+        type: 'payment_confirmed',
+        actor_member_id: 'life-treasurer',
+        member_id: 'life-tuan',
+        group_id: 'life-1',
+        metadata: {
+          status: 'confirmed',
+          amount: 1275992,
+          memberName: 'Lê Tuấn',
+          coveredSources: [{ sourceId: 'life-1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', memberId: 'life-tuan', profileId: 'profile-tuan', month: '2026-06', amount: -1275992 }],
+          monthLabel: 'Tháng 6 · 2026',
+        },
+      }],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'life-tuan-june-settled',
+        member_id: 'life-tuan',
+        group_id: 'life-1',
+        month: '2026-06',
+      }],
+    }
+
+    const result = buildHomeData(state, 'life-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.totalBalance).toBe(-50000)
+    expect(result.cappedTotalBalance).toBe(-50000)
+    expect(result.sourceBreakdown.find(row => row.sourceId === 'life-1')).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -50000 }],
+      paidAmount: 1275992,
+    })
+  })
+
   test('pay-for rows hide settled months the target profile no longer owes', () => {
     const members = [
       { id: 'tuan-pickle', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },

@@ -87,8 +87,14 @@ test('store fetches payment notifications and persists treasurer review actions'
     storeSource.indexOf("case 'MARK_NOTIFICATIONS_READ':")
   )
   assert.match(reviewBlock, /case 'REVIEW_PAYMENT_NOTIFICATION': \{/)
-  assert.match(reviewBlock, /metadata: \{ \.\.\.notification\.metadata, status: action\.status \}/)
+  assert.match(reviewBlock, /confirmedBy: action\.status === 'confirmed' \? state\.currentUserId/)
+  assert.match(reviewBlock, /confirmedAt: action\.status === 'confirmed' \? reviewedAt/)
   assert.match(reviewBlock, /is_read: true/)
+  assert.match(reviewBlock, /action\.status === 'confirmed'/)
+  assert.match(reviewBlock, /const coveredSources = safeArray\(notification\.metadata\?\.coveredSources \|\| notification\.metadata\?\.covered_sources\)/)
+  assert.match(reviewBlock, /\.rpc\('record_member_month_payment_settlements'/)
+  assert.match(reviewBlock, /p_treasurer_member_id: state\.currentUserId/)
+  assert.match(reviewBlock, /p_covered_sources: coveredSources/)
   assert.doesNotMatch(reviewBlock, /\.eq\('member_id', state\.currentUserId\)/)
 })
 
@@ -121,6 +127,25 @@ test('payment settlement rpc resolves treasurer by profile for each source group
   assert.match(paymentSettlementsProfileMigrationSource, /v_settled_by_member_id/)
   assert.match(paymentSettlementsProfileMigrationSource, /left join public\.members actor_member/)
   assert.match(paymentSettlementsProfileMigrationSource, /treasurer_by_profile\.id as settled_by_member_id/)
+})
+
+test('payment settlement uuid parsing accepts full uuid values', () => {
+  const fullUuidRegex = '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+  assert.ok(paymentSettlementsProfileMigrationSource.includes(fullUuidRegex))
+  assert.ok(paymentSettlementsMigrationSource.includes(fullUuidRegex))
+})
+
+test('confirmed payment settlement backfill can be replayed after new approvals', () => {
+  const backfillSource = readFileSync(new URL('../supabase/migrations/20260710000001_backfill_confirmed_payment_settlements.sql', import.meta.url), 'utf8')
+
+  assert.match(backfillSource, /insert into public\.member_month_settlements/)
+  assert.match(backfillSource, /metadata->>'confirmedBy'/)
+  assert.match(backfillSource, /reviewer_member\.profile_id as treasurer_profile_id/)
+  assert.match(backfillSource, /jsonb_array_elements\(coalesce\(n\.metadata->'coveredSources'/)
+  assert.match(backfillSource, /lower\(coalesce\(n\.metadata->>'status', ''\)\) = 'confirmed'/)
+  assert.match(backfillSource, /treasurer_by_profile\.id as settled_by_member_id/)
+  assert.match(backfillSource, /on conflict \(member_id, month, group_id\) do nothing/)
 })
 
 test('monthly pickleball config save persists schedule time aliases', () => {

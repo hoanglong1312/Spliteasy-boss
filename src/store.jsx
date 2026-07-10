@@ -2029,12 +2029,18 @@ export function AppProvider({ children }) {
         const notificationId = action.notificationId || action.id
         if (!notificationId) return null
         const notification = safeArray(stateRef.current?.notifications).find(item => String(item.id) === String(notificationId)) || {}
+        const reviewedAt = new Date().toISOString()
         const { data, error } = await sb
           .from('notifications')
           .update({
-            metadata: { ...notification.metadata, status: action.status },
+            metadata: {
+              ...notification.metadata,
+              status: action.status,
+              confirmedBy: action.status === 'confirmed' ? state.currentUserId : notification.metadata?.confirmedBy,
+              confirmedAt: action.status === 'confirmed' ? reviewedAt : notification.metadata?.confirmedAt,
+            },
             is_read: true,
-            read_at: new Date().toISOString(),
+            read_at: reviewedAt,
           })
           .eq('id', notificationId)
           .select('id')
@@ -2042,6 +2048,22 @@ export function AppProvider({ children }) {
         if (error) {
           console.error('[store] REVIEW_PAYMENT_NOTIFICATION:', error)
           throw error
+        }
+        const coveredSources = safeArray(notification.metadata?.coveredSources || notification.metadata?.covered_sources)
+        const hasSourceMonths = action.status === 'confirmed' && coveredSources.some(source => (
+          (source.month || source.yearMonth || source.year_month) &&
+          (source.sourceId || source.source_id) &&
+          (source.memberId || source.member_id || source.profileId || source.profile_id)
+        ))
+        if (hasSourceMonths) {
+          const { error: settlementError } = await sb.rpc('record_member_month_payment_settlements', {
+            p_treasurer_member_id: state.currentUserId,
+            p_covered_sources: coveredSources,
+          })
+          if (settlementError) {
+            console.error('[store] RECORD_PAYMENT_SETTLEMENTS:', settlementError)
+            throw settlementError
+          }
         }
         await refresh()
         return data

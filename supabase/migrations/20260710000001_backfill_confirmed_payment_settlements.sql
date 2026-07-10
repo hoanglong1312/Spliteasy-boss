@@ -1,4 +1,4 @@
--- Allow treasurer confirmations to settle source months across groups for the same profile.
+-- Fix UUID parsing in source-month settlement RPC, then replay confirmed payment backfill.
 create or replace function public.record_member_month_payment_settlements(
   p_treasurer_member_id uuid,
   p_covered_sources jsonb
@@ -91,23 +91,36 @@ grant execute on function public.record_member_month_payment_settlements(uuid, j
 insert into public.member_month_settlements (
   member_id, group_id, month, expense_id, settled_by_member_id
 )
-with payment_sources as (
+with payment_notifications as (
   select
-    n.actor_member_id,
-    actor_member.profile_id as treasurer_profile_id,
-    nullif(source->>'sourceId', '') as group_id_text,
-    nullif(coalesce(source->>'memberId', source->>'member_id'), '') as member_id_text,
-    nullif(coalesce(source->>'profileId', source->>'profile_id'), '') as profile_id_text,
-    nullif(coalesce(source->>'month', source->>'yearMonth', source->>'year_month'), '') as month
+    n.*,
+    case
+      when lower(n.type) = 'payment_submitted' then nullif(coalesce(n.metadata->>'confirmedBy', n.member_id::text, n.actor_member_id::text), '')
+      else nullif(coalesce(n.metadata->>'confirmedBy', n.actor_member_id::text, n.member_id::text), '')
+    end as reviewer_member_id_text
   from public.notifications n
-  left join public.members actor_member on actor_member.id = n.actor_member_id
-  cross join lateral jsonb_array_elements(coalesce(n.metadata->'coveredSources', '[]'::jsonb)) source
   where lower(n.type) like '%payment%'
     and lower(coalesce(n.metadata->>'status', '')) = 'confirmed'
 ),
+payment_sources as (
+  select
+    reviewer_member.id as reviewer_member_id,
+    reviewer_member.profile_id as treasurer_profile_id,
+    nullif(coalesce(source->>'sourceId', source->>'source_id'), '') as group_id_text,
+    nullif(coalesce(source->>'memberId', source->>'member_id'), '') as member_id_text,
+    nullif(coalesce(source->>'profileId', source->>'profile_id'), '') as profile_id_text,
+    nullif(coalesce(source->>'month', source->>'yearMonth', source->>'year_month'), '') as month
+  from payment_notifications n
+  left join public.members reviewer_member on reviewer_member.id = case
+    when n.reviewer_member_id_text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      then n.reviewer_member_id_text::uuid
+      else null
+    end
+  cross join lateral jsonb_array_elements(coalesce(n.metadata->'coveredSources', n.metadata->'covered_sources', '[]'::jsonb)) source
+),
 valid_sources as (
   select
-    actor_member_id,
+    reviewer_member_id,
     treasurer_profile_id,
     group_id_text::uuid as group_id,
     case when member_id_text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
@@ -144,10 +157,10 @@ resolved_sources as (
     where group_id = valid_sources.group_id
       and role in ('treasurer', 'admin', 'owner')
       and (
-        id = valid_sources.actor_member_id
+        id = valid_sources.reviewer_member_id
         or (valid_sources.treasurer_profile_id is not null and profile_id = valid_sources.treasurer_profile_id)
       )
-    order by (case when id = valid_sources.actor_member_id then 0 else 1 end), created_at desc
+    order by (case when id = valid_sources.reviewer_member_id then 0 else 1 end), created_at desc
     limit 1
   ) treasurer_by_profile on true
 )
