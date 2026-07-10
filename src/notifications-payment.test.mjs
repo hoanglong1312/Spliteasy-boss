@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
 
@@ -560,4 +560,15 @@ test('payment notification policies are profile-aware for Long across groups', (
   assert.match(profileAwareMigrationSource, /DROP POLICY IF EXISTS notifications_update/)
   assert.match(profileAwareMigrationSource, /CREATE POLICY notifications_update[\s\S]*public\.is_payment_notification_reviewer\(type\)/)
   assert.match(profileAwareMigrationSource, /notifications_insert_payment_submitted/)
+})
+
+test('confirmed payments stay visible across member ids in the same profile', () => {
+  const migrationUrl = new URL('../supabase/migrations/20260711000001_profile_aware_payment_actor_visibility.sql', import.meta.url)
+  assert.ok(existsSync(migrationUrl), 'profile-aware actor visibility migration must exist')
+  const source = readFileSync(migrationUrl, 'utf8')
+
+  assert.match(source, /public\.is_same_profile_member\(notification\.actor_member_id\)/)
+  assert.match(source, /public\.is_same_profile_member\(actor_member_id\)/)
+  assert.match(source, /CREATE OR REPLACE FUNCTION public\.mark_all_notifications_read\(\)/)
+  assert.doesNotMatch(source, /actor_member_id\s*=\s*public\.get_current_member_id\(\)/)
 })
