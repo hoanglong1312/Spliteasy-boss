@@ -793,6 +793,42 @@ describe('flex billing helpers', () => {
       ['flex_per_session', 'Vé lẻ thu về', 240_000, true],
     ])
   })
+
+  test('buildPickleballTeamFundData counts flex external ticket per-session revenue', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700_000,
+      per_session_ticket_price: 120_000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2', 'member-3'],
+    })
+    state.pickle.externalTickets = [
+      {
+        id: 'ticket-1',
+        group_id: 'group-1',
+        year_month: '2026-07',
+        session_date: '2026-07-01',
+        status: 'team_fund',
+        member_ids: ['member-1', 'member-2', 'member-3'],
+      },
+      {
+        id: 'ticket-2',
+        group_id: 'group-1',
+        year_month: '2026-07',
+        session_date: '2026-07-03',
+        status: 'pending_review',
+        member_ids: ['member-2'],
+      },
+    ]
+
+    const data = buildPickleballTeamFundData(state, '2026-07')
+
+    expect(data.flexPerSessionRevenue).toBe(240_000)
+    expect(data.costRows.find(row => row.key === 'flex_per_session')).toMatchObject({
+      label: 'Vé lẻ thu về',
+      amount: 240_000,
+    })
+  })
 })
 
 describe('buildPickleballCalendarData', () => {

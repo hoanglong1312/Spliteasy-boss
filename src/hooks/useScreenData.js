@@ -2208,23 +2208,36 @@ export function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(
   const ticketParticipantRows = buildTeamFundTicketParticipantRows(state, today)
   const isFlexBilling = isBillingModeFlexForMonth(state, currentYearMonth)
   const flexMonthlyTicketPrice = Number(monthlyConfig?.monthlyTicketPrice ?? monthlyConfig?.monthly_ticket_price ?? 0)
-  const flexPerSessionTicketPrice = Number(monthlyConfig?.perSessionTicketPrice ?? monthlyConfig?.per_session_ticket_price ?? 0)
+  const flexPerSessionTicketPrice = Number(
+    monthlyConfig?.perSessionTicketPrice ??
+    monthlyConfig?.per_session_ticket_price ??
+    monthlyConfig?.ticketPrice ??
+    monthlyConfig?.ticket_price ??
+    50000
+  ) || 50000
   const flexMembers = currentGroupMembers(state).filter(isActiveMember)
   const flexMonthlyMembers = flexMembers.filter(member => memberFlexTicketType(state, member.id, currentYearMonth) === 'monthly')
   const flexPerSessionMembers = flexMembers.filter(member => memberFlexTicketType(state, member.id, currentYearMonth) === 'per_session')
   const flexMonthlyRevenue = flexMonthlyMembers.length * flexMonthlyTicketPrice
-  const flexPerSessionRevenue = monthSessions.reduce((sum, session) => {
+  const monthTickets = monthTicketsForState(state, today)
+  const flexPerSessionSessionRevenue = monthSessions.reduce((sum, session) => {
     const presentIds = new Set(effectiveSessionMemberIdsFlex(session).map(String))
     const attendeeCount = flexPerSessionMembers.filter(member => presentIds.has(String(member.id))).length
     return sum + attendeeCount * flexPerSessionTicketPrice
   }, 0)
+  const flexPerSessionTicketRevenue = monthTickets
+    .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+    .reduce((sum, ticket) => {
+      const display = flexTicketDisplay(ticket, state)
+      return sum + display.billedMemberIds.length * display.amountPerPerson
+    }, 0)
+  const flexPerSessionRevenue = flexPerSessionSessionRevenue + flexPerSessionTicketRevenue
   const flexTotalDue = flexMonthlyRevenue + flexPerSessionRevenue
   const currentFixedMembers = currentGroupMembers(state)
     .filter(member => isActiveMember(member) && isFixedForMonth(state, member, currentYearMonth))
   const courtFeeTotal = Number(monthlyConfig?.courtFee ?? monthlyConfig?.court_fee ?? state?.pickle?.monthlyCourtFee ?? 0) || 0
   const nextCourtFeeTotal = Number(nextMonthlyConfig?.courtFee ?? nextMonthlyConfig?.court_fee ?? courtFeeTotal) || 0
   const ticketPrice = Number(monthlyConfig?.ticketPrice ?? monthlyConfig?.ticket_price ?? 50000) || 50000
-  const monthTickets = monthTicketsForState(state, today)
   const ticketWaterForFund = monthTickets.reduce((sum, t) => sum + Number(t?.waterAmount ?? t?.water_amount ?? 0), 0)
   const waterTotal = monthSessions.reduce((sum, session) => sum + sessionWaterAmount(session), 0) + ticketWaterForFund
   const extrasTotal = monthSessions.reduce((sum, session) => {
