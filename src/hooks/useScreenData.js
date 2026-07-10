@@ -778,6 +778,8 @@ function profileRowsAfterSettledMonths(profileBreakdown, settlements, members = 
 function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = []) {
   const settledMonths = new Set()
   safeArray(settlements).forEach(row => {
+    const expenseId = row?.expenseId || row?.expense_id || ''
+    if (!expenseId) return
     const groupId = row?.groupId || row?.group_id || ''
     const memberId = row?.memberId || row?.member_id || ''
     const month = row?.month || ''

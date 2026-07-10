@@ -3124,7 +3124,7 @@ describe('buildHomeData', () => {
     })
   })
 
-  test('keeps same-month debt after confirmed checkpoint visible', () => {
+  test('keeps same-month debt after confirmed checkpoint and aggregate settlement visible', () => {
     const members = [
       { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
       { id: 'life-treasurer', profile_id: 'profile-treasurer', group_id: 'life-1', name: 'Thủ quỹ', role: 'treasurer' },
@@ -3169,7 +3169,13 @@ describe('buildHomeData', () => {
         confirmed_at: '2026-07-09T23:59:59.999Z',
         status: 'confirmed',
       }],
-      monthSettlements: [],
+      monthSettlements: [{
+        id: 'aggregate-month-marker',
+        member_id: 'life-tuan',
+        group_id: 'life-1',
+        month: '2026-07',
+        expense_id: null,
+      }],
     }
 
     const result = buildHomeData(state, 'life-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
@@ -3322,8 +3328,8 @@ describe('buildHomeData', () => {
       notifications: [],
       settlementCheckpoints: [],
       monthSettlements: [
-        { id: 'life-june-settled', member_id: 'life-tuan', group_id: 'life-1', month: '2026-06' },
-        { id: 'expense-june-settled', member_id: 'expense-tuan', group_id: 'expense-1', month: '2026-06' },
+        { id: 'life-june-settled', member_id: 'life-tuan', group_id: 'life-1', month: '2026-06', expense_id: 'life-june' },
+        { id: 'expense-june-settled', member_id: 'expense-tuan', group_id: 'expense-1', month: '2026-06', expense_id: 'expense-june' },
       ],
     }
 
