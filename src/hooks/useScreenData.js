@@ -329,11 +329,8 @@ function groupWithExpensesUpTo(group, endDate) {
 
 function settlementRelevantMonthDates(state, startDate, endDate = null) {
   const months = new Set()
-  const startMs = parseDateValue(startDate)
-  const endMs = parseDateValue(endDate)
   const add = value => {
-    const time = parseDateValue(value)
-    if (time && (!startMs || time > startMs) && (!endMs || time <= endMs)) months.add(monthKey(value))
+    if (valueInSettlementRange(value, startDate, endDate)) months.add(monthKey(value))
   }
   getAllSessions(state).forEach(session => add(sessionDate(session)))
   uniqueTickets([
@@ -346,13 +343,8 @@ function settlementRelevantMonthDates(state, startDate, endDate = null) {
 }
 
 function pickleStateAfter(state, startDate, endDate = null) {
-  const startMs = parseDateValue(startDate)
-  const endMs = parseDateValue(endDate)
-  if (!startMs && !endMs) return state
-  const inRange = value => {
-    const time = parseDateValue(value)
-    return time && (!startMs || time > startMs) && (!endMs || time <= endMs)
-  }
+  if (!parseDateValue(startDate) && !parseDateValue(endDate)) return state
+  const inRange = value => valueInSettlementRange(value, startDate, endDate)
   const filterTickets = tickets => safeArray(tickets).filter(ticket => inRange(ticketDate(ticket)))
   const filterSessions = sessions => safeArray(sessions).filter(session => inRange(sessionDate(session)))
   return {
@@ -371,6 +363,25 @@ function pickleStateAfter(state, startDate, endDate = null) {
     },
     tickets: filterTickets(state?.tickets),
   }
+}
+
+function inputDateKey(value) {
+  const match = String(value || '').match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : dateKey(value)
+}
+
+function valueInSettlementRange(value, startDate, endDate = null) {
+  const time = parseDateValue(value)
+  if (!time) return false
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) {
+    const key = inputDateKey(value)
+    const startKey = inputDateKey(startDate)
+    const endKey = inputDateKey(endDate)
+    return (!startKey || key > startKey) && (!endKey || key <= endKey)
+  }
+  const startMs = parseDateValue(startDate)
+  const endMs = parseDateValue(endDate)
+  return (!startMs || time > startMs) && (!endMs || time <= endMs)
 }
 
 function sourceMonthLabel(month) {
@@ -505,15 +516,18 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     .filter(source => source.sourceType === 'pickleball' && String(source.memberId) === String(pickleballMemberId))
     .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const sourceBalances = settlementSourceBalances
+  const paymentState = safeArray(pickleballState?.settlementCheckpoints).length
+    ? { ...state, settlementCheckpoints: [...safeArray(state?.settlementCheckpoints), ...safeArray(pickleballState?.settlementCheckpoints)] }
+    : state
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members, state?.currentUserName, currentProfileId)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)
-  const profileBreakdown = adjustedProfileBreakdownForPayments(state, rawProfileBreakdown, members, today)
+  const profileBreakdown = adjustedProfileBreakdownForPayments(paymentState, rawProfileBreakdown, members, today)
   const treasurerExpenseGroups = safeGroups
     .filter(group => groupKind(group) !== 'pickleball')
     .map(group => groupWithExpensesUpTo(group, endOfSelectedMonth))
   const treasurerSourceBalances = buildSettlementSourceBalances(state, treasurerExpenseGroups, pickleballState, pickle, members, endOfSelectedMonth)
   const treasurerProfileBreakdown = adjustedProfileBreakdownForPayments(
-    state,
+    paymentState,
     aggregateBalancesByProfile(treasurerSourceBalances, members),
     members,
     today,
@@ -529,7 +543,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const prevSessions = getStateMonthSessions(pickleballState, prevDate)
   const prevSourceBalances = buildHomeSourceBalances(state, prevExpenseGroups, pickleballState, pickle, prevSessions, members, prevDate)
   const prevProfileBreakdown = adjustedProfileBreakdownForPayments(
-    state,
+    paymentState,
     aggregateBalancesByProfile(prevSourceBalances, members),
     members,
     prevDate,
@@ -550,7 +564,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
       })
     }
   })
-  const stateWithPrevMonthResidual = { ...state, prevMonthResidualByMember }
+  const stateWithPrevMonthResidual = { ...paymentState, prevMonthResidualByMember }
   const paymentSummary = buildHomePaymentSummary(stateWithPrevMonthResidual, rawSourceBreakdown, profileBreakdown, members, me, today, treasurerProfileBreakdown)
   const sourceBreakdown = paymentSummary.sourceBreakdown
   const totalBalance = paymentSummary.netBalance
@@ -989,9 +1003,12 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     }
     if (isConfirmedPaymentSubmittedNotice(notification, status) && !hasExplicitCoverage) return
     const coveredSources = coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
-    const scopedAmount = coveredSourcesAmountDue(coveredSources) || coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
+    const activeCoveredSources = coveredSources.filter(source => !confirmedSourceCoveredByCheckpoint(state, source, noticeScope))
+    const scopedAmount = coveredSources.length
+      ? coveredSourcesAmountDue(activeCoveredSources)
+      : coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
     if (status === 'confirmed') {
-      confirmedSources.push(...coveredSources)
+      confirmedSources.push(...activeCoveredSources)
       confirmedAmount += scopedAmount
     } else if (status === 'pending') {
       pendingAmount += scopedAmount
@@ -999,6 +1016,20 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   })
 
   return { confirmedSources, confirmedAmount, pendingAmount }
+}
+
+function confirmedSourceCoveredByCheckpoint(state, source, scope = {}) {
+  const sourceId = source?.sourceId || source?.source_id || ''
+  const memberId = source?.memberId || source?.member_id || scope.memberId || ''
+  if (!sourceId || !memberId) return false
+  const checkpoint = latestConfirmedSettlementCheckpoint(state, sourceId, memberId)
+  const checkpointEnd = parseDateValue(checkpoint?.periodEnd || checkpoint?.period_end)
+  if (!checkpointEnd) return false
+  const sourceMonth = source?.month || source?.yearMonth || source?.year_month || monthKeyFromPaymentLabel(source?.monthLabel || source?.month_label)
+  const checkpointMonth = monthKey(checkpoint?.periodEnd || checkpoint?.period_end)
+  if (!sourceMonth || !checkpointMonth) return false
+  if (sourceMonth < checkpointMonth) return true
+  return sourceMonth === checkpointMonth
 }
 
 function coveredSourcesAmountDue(sources) {
@@ -4753,10 +4784,11 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
   }, 0)
   const monthTickets = monthTicketsForState(state, date || new Date()).filter(t => ticketStatus(t) !== 'pending_review')
   const myTickets = monthTickets.filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
-  const ticketWaterFee = myTickets.reduce((sum, t) => sum + ticketWaterSharePerPerson(t), 0)
+  const teamFundTickets = myTickets.filter(t => ticketStatus(t) === 'team_fund')
+  const ticketWaterFee = teamFundTickets.reduce((sum, t) => sum + ticketWaterSharePerPerson(t), 0)
   const ticketAttendedCount = myTickets.length
   const ticketPerSessionFee = ticketType === 'per_session'
-    ? myTickets.length * perSessionTicketPrice
+    ? teamFundTickets.length * perSessionTicketPrice
     : 0
   const combinedAttendedSessionsCount = attendedSessionsCount + ticketAttendedCount
   const combinedPerSessionTicketFee = perSessionTicketFee + ticketPerSessionFee

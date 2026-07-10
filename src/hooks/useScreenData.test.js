@@ -3124,6 +3124,164 @@ describe('buildHomeData', () => {
     })
   })
 
+  test('keeps same-month debt after confirmed checkpoint visible', () => {
+    const members = [
+      { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
+      { id: 'life-treasurer', profile_id: 'profile-treasurer', group_id: 'life-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'life-1',
+      name: 'Lấy vk để trưởng thành',
+      members: ['life-tuan', 'life-treasurer'],
+      expenses: [
+        { id: 'july-paid-before-checkpoint', amount: 1000000, expense_date: '2026-07-05T12:00:00.000Z', paid_by_member_id: 'life-treasurer', participants: ['life-tuan', 'life-treasurer'] },
+        { id: 'july-new-after-checkpoint', amount: 100000, expense_date: '2026-07-10T12:00:00.000Z', paid_by_member_id: 'life-treasurer', participants: ['life-tuan', 'life-treasurer'] },
+      ],
+    }]
+    const state = {
+      currentUserId: 'life-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'life-1',
+      members,
+      groups,
+      notifications: [{
+        id: 'treasurer-confirmed-tuan-july',
+        type: 'payment_confirmed',
+        actor_member_id: 'life-treasurer',
+        member_id: 'life-tuan',
+        group_id: 'life-1',
+        created_at: '2026-07-10T08:00:00.000Z',
+        metadata: {
+          status: 'confirmed',
+          amount: 500000,
+          confirmedAt: '2026-07-10T08:00:00.000Z',
+          memberName: 'Lê Tuấn',
+          coveredSources: [{ sourceId: 'life-1', sourceType: 'group', sourceLabel: 'Lấy vk để trưởng thành', memberId: 'life-tuan', profileId: 'profile-tuan', month: '2026-07', amount: -500000 }],
+          monthLabel: 'Tháng 7 · 2026',
+        },
+      }],
+      settlementCheckpoints: [{
+        id: 'checkpoint-tuan-july',
+        group_id: 'life-1',
+        member_id: 'life-tuan',
+        period_end: '2026-07-09T23:59:59.999Z',
+        confirmed_at: '2026-07-09T23:59:59.999Z',
+        status: 'confirmed',
+      }],
+      monthSettlements: [],
+    }
+
+    const result = buildHomeData(state, 'life-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.totalBalance).toBe(-50000)
+    expect(result.paymentSummary.netBalance).toBe(-50000)
+    expect(result.sourceBreakdown.find(row => row.sourceId === 'life-1')).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -50000 }],
+    })
+  })
+
+  test('keeps post-checkpoint pickleball ticket debt visible when checkpoint is in pickleball state', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'pickle-treasurer', profile_id: 'profile-treasurer', group_id: 'pickle-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan', 'pickle-treasurer'],
+    }]
+    const confirmedPayment = {
+      id: 'confirmed-before-checkpoint',
+      type: 'payment_confirmed',
+      actor_member_id: 'pickle-treasurer',
+      member_id: 'pickle-tuan',
+      group_id: 'pickle-1',
+      metadata: {
+        status: 'confirmed',
+        amount: 1275992,
+        memberName: 'Lê Tuấn',
+        coveredSources: [{
+          sourceId: 'pickle-1',
+          sourceType: 'pickleball',
+          sourceLabel: 'Virgo Pickleball 246',
+          memberId: 'pickle-tuan',
+          profileId: 'profile-tuan',
+          month: '2026-07',
+          amount: -1275992,
+        }],
+        monthLabel: 'Tháng 7 · 2026',
+      },
+      created_at: '2026-07-09T20:00:00.000Z',
+    }
+    const checkpoint = {
+      id: 'checkpoint-tuan-july',
+      group_id: 'pickle-1',
+      member_id: 'pickle-tuan',
+      period_end: '2026-07-09T23:59:59.999Z',
+      confirmed_at: '2026-07-09T23:59:59.999Z',
+      status: 'confirmed',
+    }
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      notifications: [confirmedPayment],
+      settlementCheckpoints: [checkpoint],
+      pickle: {
+        monthlyConfigs: [{
+          group_id: 'pickle-1',
+          year_month: '2026-07',
+          billing_mode: 'flex',
+          per_session_ticket_price: 50000,
+          per_session_ticket_member_ids: ['pickle-tuan'],
+        }],
+      },
+      _allPickle: {
+        monthlyConfigs: [{
+          group_id: 'pickle-1',
+          year_month: '2026-07',
+          billing_mode: 'flex',
+          per_session_ticket_price: 50000,
+          per_session_ticket_member_ids: ['pickle-tuan'],
+        }],
+        externalTickets: [{
+          id: 'ticket-after-checkpoint',
+          group_id: 'pickle-1',
+          year_month: '2026-07',
+          session_date: '2026-07-10',
+          member_ids: ['pickle-tuan'],
+          advancer_id: 'pickle-treasurer',
+          status: 'unpaid',
+        }],
+      },
+    }
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [confirmedPayment],
+      settlementCheckpoints: [],
+      monthSettlements: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, pickleballState, '2026-07')
+    const source = result.sourceBreakdown.find(row => row.sourceType === 'pickleball')
+
+    expect(result.totalBalance).toBe(-50000)
+    expect(result.paymentSummary.netBalance).toBe(-50000)
+    expect(source).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -50000 }],
+    })
+  })
+
   test('does not fallback to stale capped profile total when settled sources sum to zero', () => {
     const members = [
       { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
