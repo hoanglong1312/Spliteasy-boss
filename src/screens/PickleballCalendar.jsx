@@ -416,7 +416,7 @@ function TicketDetailSheet({ ticket, onClose }) {
   const waterPerPerson = ticket.waterAmountPerPerson || Math.round((Number(ticket.waterAmount) || 0) / Math.max(members.length, 1));
   return (
     <BottomSheet title={`Vé lẻ · ${formatDayLabel(ticket.date)}`} onClose={onClose} tone="pickleball">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginTop: 4 }}>
+      <div style={{ marginTop: 4 }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 900 }}>
             {ticketMemberSummary(ticket)}
@@ -425,12 +425,6 @@ function TicketDetailSheet({ ticket, onClose }) {
             {ticket.status === 'pending_review'
               ? 'Chờ thủ quỹ duyệt'
               : ticket.status === 'team_fund' ? 'Quỹ team trả' : `${ticket.advancerName || 'Người ứng'} ứng`}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 10, color: colors.textMuted, fontWeight: 800, textTransform: 'uppercase' }}>Tổng vé</div>
-          <div style={{ ...type.mono, fontSize: 16, color: '#fde68a', fontWeight: 900 }}>
-            {formatVNDShort(ticket.totalAmount || ticket.amount)}
           </div>
         </div>
       </div>
