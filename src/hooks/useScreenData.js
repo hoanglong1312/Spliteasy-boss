@@ -408,16 +408,20 @@ function sourceMonthBreakdown(rows) {
     .filter(row => row.amount !== 0)
 }
 
+function normalizePayableItemKey(value) {
+  return String(value || '').replace(/\|amount:-?\d+(?:\.\d+)?$/, '')
+}
+
 function buildPayableItemKey(item) {
+  const explicitItemId = item?.itemId || item?.item_id || ''
   const expenseId = item?.expenseId || item?.expense_id || ''
   const sourceType = item?.sourceType || item?.source_type || 'source'
   const sourceId = item?.sourceId || item?.source_id || item?.sourceLabel || item?.source_label || ''
-  const itemId = expenseId ? `expense:${expenseId}` : `${sourceType}:${sourceId}`
+  const itemId = explicitItemId ? `item:${explicitItemId}` : expenseId ? `expense:${expenseId}` : `${sourceType}:${sourceId}`
   const memberId = item?.memberId || item?.member_id || ''
   const profileId = item?.profileId || item?.profile_id || ''
   const month = item?.month || item?.yearMonth || item?.year_month || ''
-  const amount = Math.round(Number(item?.amount) || 0)
-  return `${itemId}|member:${memberId}|profile:${profileId}|month:${month}|amount:${amount}`
+  return `${itemId}|member:${memberId}|profile:${profileId}|month:${month}`
 }
 
 function withPayableItemKey(item) {
@@ -427,13 +431,14 @@ function withPayableItemKey(item) {
     sourceType: item?.sourceType || item?.source_type || 'group',
     sourceId: item?.sourceId || item?.source_id || '',
     sourceLabel: item?.sourceLabel || item?.source_label || 'Nguồn tiền',
+    itemId: item?.itemId || item?.item_id || '',
     expenseId: item?.expenseId || item?.expense_id || '',
     memberId: item?.memberId || item?.member_id || '',
     profileId: item?.profileId || item?.profile_id || '',
     month: item?.month || item?.yearMonth || item?.year_month || '',
     monthLabel: item?.monthLabel || item?.month_label || '',
     amount,
-    payableItemKey: item?.payableItemKey || item?.payable_item_key || buildPayableItemKey({ ...item, amount }),
+    payableItemKey: normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || buildPayableItemKey({ ...item, amount })),
   }
 }
 
@@ -454,6 +459,107 @@ function groupExpensePayableItem(group, expense, member, members) {
     monthLabel: month ? sourceMonthLabel(month) : '',
     amount,
   })
+}
+
+function pickleballTicketBalanceItem(state, ticket, memberId, date) {
+  if (ticketStatus(ticket) !== 'unpaid') return 0
+  const memberIds = ticketMemberIds(ticket)
+  const amountPerPerson = ticketPersonalShare(state, ticket, date)
+  if (!memberIds.some(id => String(id) === String(memberId))) {
+    return String(ticketAdvancerId(ticket)) === String(memberId) ? amountPerPerson * memberIds.length : 0
+  }
+  const advancerId = ticketAdvancerId(ticket)
+  if (!advancerId) return 0
+  if (String(advancerId) === String(memberId)) {
+    return amountPerPerson * memberIds.filter(id => String(id) !== String(memberId)).length
+  }
+  return -amountPerPerson
+}
+
+function buildPickleballPayableItems(state, pickle, sessions, member, members, monthDate, balance) {
+  const sourceId = state?.currentGroupId || state?.currentGroup?.id || ''
+  const sourceLabel = state?.currentGroup?.name || 'Pickleball'
+  const memberId = member?.id || ''
+  const profileId = profileIdForMember(memberId, members)
+  const month = monthKey(monthDate)
+  const monthLabel = sourceMonthLabel(month)
+  const items = []
+  const add = (itemId, amount, expenseTitle) => {
+    const rounded = Math.round(Number(amount) || 0)
+    if (!rounded) return
+    items.push(withPayableItemKey({
+      sourceId,
+      sourceType: 'pickleball',
+      sourceLabel,
+      itemId,
+      expenseTitle,
+      memberId,
+      profileId,
+      month,
+      monthLabel,
+      amount: rounded,
+    }))
+  }
+  const tickets = monthTicketsForState(state, monthDate)
+  const isFlexBilling = isBillingModeFlexForMonth(state, month)
+
+  if (isFlexBilling) {
+    const monthlyConfig = currentMonthlyPickleConfig(state, month)
+    const ticketType = memberFlexTicketType(state, memberId, month)
+    const perSessionTicketPrice = Number(
+      monthlyConfig?.perSessionTicketPrice ??
+      monthlyConfig?.per_session_ticket_price ??
+      monthlyConfig?.ticketPrice ??
+      monthlyConfig?.ticket_price ??
+      50000
+    ) || 50000
+    add(`pickleball-monthly-ticket:${sourceId}:${month}`, -balance.monthlyTicketFee, 'Vé tháng')
+    safeArray(sessions).forEach(session => {
+      const sessionId = session?.id || dateKey(sessionDate(session))
+      const presentIds = effectiveSessionMemberIdsFlex(session)
+      if (!presentIds.some(id => String(id) === String(memberId))) return
+      if (ticketType === 'per_session') {
+        add(`pickleball-session:${sessionId}:fee`, -perSessionTicketPrice, 'Vé buổi')
+      }
+      const splitCount = presentIds.length + sessionGuests(session).length
+      const waterShare = splitCount > 0 ? Math.round(sessionWaterAmount(session) / splitCount) : 0
+      add(`pickleball-session:${sessionId}:water`, -waterShare, 'Tiền nước')
+      add(`pickleball-session:${sessionId}:extras`, -memberExtrasShare([session], memberId, state, [], []), 'Khoản phụ')
+    })
+    tickets.forEach(ticket => {
+      const ticketId = ticket?.id || dateKey(ticketDate(ticket))
+      const includesMember = ticketMemberIds(ticket).some(id => String(id) === String(memberId))
+      if (ticketStatus(ticket) === 'team_fund' && includesMember) {
+        if (ticketType === 'per_session') {
+          add(`pickleball-ticket:${ticketId}:fee`, -perSessionTicketPrice, 'Vé buổi')
+        }
+        add(`pickleball-ticket:${ticketId}:water`, -ticketWaterSharePerPerson(ticket), 'Tiền nước')
+      }
+      add(`pickleball-ticket:${ticketId}:p2p`, pickleballTicketBalanceItem(state, ticket, memberId, monthDate), 'Vé trả hộ')
+    })
+  } else {
+    const activeMembers = currentGroupMembers(state).filter(isActiveMember)
+    const fixedMembers = activeMembers.filter(row => isFixedForMonth(state, row, month))
+    const casualMembers = activeMembers.filter(row => !isFixedForMonth(state, row, month))
+    add(`pickleball-court:${sourceId}:${month}`, -balance.courtFee, 'Tiền sân')
+    safeArray(sessions).forEach(session => {
+      const sessionId = session?.id || dateKey(sessionDate(session))
+      add(`pickleball-session:${sessionId}:water`, -memberWaterShare([session], memberId, fixedMembers, casualMembers), 'Tiền nước')
+      add(`pickleball-session:${sessionId}:extras`, -memberExtrasShare([session], memberId, state, fixedMembers, casualMembers), 'Khoản phụ')
+    })
+    tickets.forEach(ticket => {
+      const ticketId = ticket?.id || dateKey(ticketDate(ticket))
+      const includesMember = ticketMemberIds(ticket).some(id => String(id) === String(memberId))
+      if (ticketStatus(ticket) === 'team_fund' && includesMember) {
+        add(`pickleball-ticket:${ticketId}:team-fund`, -ticketPersonalShare(state, ticket, monthDate), 'Vé quỹ team')
+      }
+      add(`pickleball-ticket:${ticketId}:p2p`, pickleballTicketBalanceItem(state, ticket, memberId, monthDate), 'Vé trả hộ')
+    })
+  }
+
+  const itemTotal = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+  add(`pickleball-adjustment:${sourceId}:${month}`, (Number(balance.netBalance) || 0) - itemTotal, 'Điều chỉnh')
+  return items
 }
 
 function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pickle, members, endDate = null) {
@@ -496,6 +602,7 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
         const month = monthKey(monthDate)
         const monthSessions = getStateMonthSessions(pickleState, monthDate)
         const balance = buildMemberMonthBalance(pickleState, pickle, monthSessions, member.id, monthDate)
+        const payableItems = buildPickleballPayableItems(pickleState, pickle, monthSessions, member, members, monthDate, balance)
         return {
         sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
         sourceType: 'pickleball',
@@ -504,16 +611,7 @@ function buildSettlementSourceBalances(state, expenseGroups, pickleballState, pi
         amount: balance.netBalance || 0,
         month,
         monthBreakdown: [{ month, label: sourceMonthLabel(month), amount: balance.netBalance || 0 }],
-        payableItems: balance.netBalance ? [withPayableItemKey({
-          sourceId: pickleState?.currentGroupId || pickleState?.currentGroup?.id,
-          sourceType: 'pickleball',
-          sourceLabel: pickleState?.currentGroup?.name || 'Pickleball',
-          memberId: member.id,
-          profileId: profileIdForMember(member.id, members),
-          month,
-          monthLabel: sourceMonthLabel(month),
-          amount: balance.netBalance || 0,
-        })] : [],
+        payableItems,
         }
       })
     })
@@ -1091,7 +1189,9 @@ function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
     if (isConfirmedPaymentSubmittedNotice(notification, status) && !hasExplicitCoverage) return
     const coveredItems = coveredItemsForPayment(metadata, sourceBreakdown, noticeScope)
     const coveredSources = coveredItems.length ? coveredItems : coveredSourcesForPayment(metadata, sourceBreakdown, noticeScope)
-    const activeCoveredSources = coveredSources.filter(source => !confirmedSourceCoveredByCheckpoint(state, source, noticeScope))
+    const activeCoveredSources = coveredItems.length
+      ? coveredSources
+      : coveredSources.filter(source => !confirmedSourceCoveredByCheckpoint(state, source, noticeScope))
     const scopedAmount = coveredSources.length
       ? coveredSourcesAmountDue(activeCoveredSources)
       : coveredMemberAmountForScope(metadata, noticeScope) || (noticeScope.isActor ? amount : 0)
@@ -1268,7 +1368,7 @@ function paymentNoticeDuplicateKey(notification) {
   const coveredMembers = safeArray(metadata.coveredMembers || metadata.covered_members)
   const coveredItems = safeArray(metadata.coveredItems || metadata.covered_items)
   const items = coveredItems.map(item => ({
-    payableItemKey: item.payableItemKey || item.payable_item_key || buildPayableItemKey(item),
+    payableItemKey: normalizePayableItemKey(item.payableItemKey || item.payable_item_key || buildPayableItemKey(item)),
     amount: Math.round(Math.abs(Number(item.amount) || 0)),
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
   const sources = coveredSources.map(source => ({

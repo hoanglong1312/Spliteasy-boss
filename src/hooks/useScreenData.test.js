@@ -1770,6 +1770,11 @@ describe('buildHomeData', () => {
           amount: 100000,
           memberName: 'Phương Thảo',
           monthLabel: 'Tháng 6 · 2026',
+          coveredItems: [{
+            ...coveredSource,
+            expenseId: 'halong-june-expense',
+            payableItemKey: `expense:halong-june-expense|member:phuong-life|profile:profile-phuong|month:2026-06${index === 0 ? '|amount:-100000' : ''}`,
+          }],
           coveredSources: [coveredSource],
         },
       })),
@@ -3085,6 +3090,239 @@ describe('buildHomeData', () => {
       amount: -50000,
       monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -50000 }],
     })
+  })
+
+  test('confirmed pickleball ticket item does not hide later ticket in same month', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'pickle-treasurer', profile_id: 'profile-treasurer', group_id: 'pickle-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan', 'pickle-treasurer'],
+    }]
+    const confirmedPayment = {
+      id: 'payment-ticket-july-09',
+      type: 'payment_confirmed',
+      actor_member_id: 'pickle-treasurer',
+      member_id: 'pickle-tuan',
+      group_id: 'pickle-1',
+      metadata: {
+        status: 'confirmed',
+        amount: 50000,
+        memberName: 'Lê Tuấn',
+        coveredItems: [{
+          payableItemKey: 'item:pickleball-ticket:ticket-july-09:fee|member:pickle-tuan|profile:profile-tuan|month:2026-07',
+          itemId: 'pickleball-ticket:ticket-july-09:fee',
+          sourceType: 'pickleball',
+          sourceId: 'pickle-1',
+          sourceLabel: 'Virgo Pickleball 246',
+          memberId: 'pickle-tuan',
+          profileId: 'profile-tuan',
+          month: '2026-07',
+          amount: -50000,
+        }],
+        monthLabel: 'Tháng 7 · 2026',
+      },
+      created_at: '2026-07-09T20:00:00.000Z',
+    }
+    const monthlyConfig = {
+      group_id: 'pickle-1',
+      year_month: '2026-07',
+      billing_mode: 'flex',
+      per_session_ticket_price: 50000,
+      per_session_ticket_member_ids: ['pickle-tuan'],
+    }
+    const externalTickets = [
+      {
+        id: 'ticket-july-09',
+        group_id: 'pickle-1',
+        year_month: '2026-07',
+        session_date: '2026-07-09',
+        member_ids: ['pickle-tuan'],
+        advancer_id: 'pickle-treasurer',
+        payment_mode: 'team_fund',
+        status: 'team_fund',
+      },
+      {
+        id: 'ticket-july-10',
+        group_id: 'pickle-1',
+        year_month: '2026-07',
+        session_date: '2026-07-10',
+        member_ids: ['pickle-tuan'],
+        advancer_id: 'pickle-treasurer',
+        payment_mode: 'team_fund',
+        status: 'team_fund',
+      },
+    ]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      notifications: [confirmedPayment],
+      settlementCheckpoints: [],
+      pickle: {
+        monthlyConfigs: [monthlyConfig],
+        externalTickets,
+      },
+      _allPickle: {
+        monthlyConfigs: [monthlyConfig],
+        externalTickets,
+      },
+    }
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [confirmedPayment],
+      settlementCheckpoints: [],
+      monthSettlements: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, pickleballState, '2026-07')
+    const source = result.paymentSummary.sourceBreakdown.find(row => row.sourceType === 'pickleball')
+
+    expect(result.paymentSummary.netBalance).toBe(-50000)
+    expect(source).toMatchObject({
+      amount: -50000,
+      monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -50000 }],
+    })
+    expect(source.payableItems).toEqual([
+      expect.objectContaining({
+        itemId: 'pickleball-ticket:ticket-july-10:fee',
+        amount: -50000,
+      }),
+    ])
+  })
+
+  test('explicit pickleball covered items still apply after same-month checkpoint', () => {
+    const members = [
+      { id: 'pickle-tuan', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
+      { id: 'pickle-treasurer', profile_id: 'profile-treasurer', group_id: 'pickle-1', name: 'Thủ quỹ', role: 'treasurer' },
+    ]
+    const groups = [{
+      id: 'pickle-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: ['pickle-tuan', 'pickle-treasurer'],
+    }]
+    const confirmedPayment = {
+      id: 'payment-through-july-09',
+      type: 'payment_confirmed',
+      actor_member_id: 'pickle-treasurer',
+      member_id: 'pickle-tuan',
+      group_id: 'pickle-1',
+      metadata: {
+        status: 'confirmed',
+        amount: 560000,
+        memberName: 'Lê Tuấn',
+        coveredItems: [
+          {
+            payableItemKey: 'item:pickleball-monthly-ticket:pickle-1:2026-07|member:pickle-tuan|profile:profile-tuan|month:2026-07',
+            itemId: 'pickleball-monthly-ticket:pickle-1:2026-07',
+            sourceType: 'pickleball',
+            sourceId: 'pickle-1',
+            memberId: 'pickle-tuan',
+            profileId: 'profile-tuan',
+            month: '2026-07',
+            amount: -550000,
+          },
+          {
+            payableItemKey: 'item:pickleball-ticket:ticket-july-09:water|member:pickle-tuan|profile:profile-tuan|month:2026-07',
+            itemId: 'pickleball-ticket:ticket-july-09:water',
+            sourceType: 'pickleball',
+            sourceId: 'pickle-1',
+            memberId: 'pickle-tuan',
+            profileId: 'profile-tuan',
+            month: '2026-07',
+            amount: -10000,
+          },
+        ],
+        monthLabel: 'Tháng 7 · 2026',
+      },
+      created_at: '2026-07-09T20:00:00.000Z',
+    }
+    const checkpoint = {
+      id: 'checkpoint-through-july-09',
+      group_id: 'pickle-1',
+      member_id: 'pickle-tuan',
+      period_end: '2026-07-09T23:59:59.999Z',
+      confirmed_at: '2026-07-09T23:59:59.999Z',
+      status: 'confirmed',
+    }
+    const monthlyConfig = {
+      group_id: 'pickle-1',
+      year_month: '2026-07',
+      billing_mode: 'flex',
+      monthly_ticket_price: 550000,
+      monthly_ticket_member_ids: ['pickle-tuan'],
+    }
+    const externalTickets = [
+      {
+        id: 'ticket-july-09',
+        group_id: 'pickle-1',
+        year_month: '2026-07',
+        session_date: '2026-07-09',
+        member_ids: ['pickle-tuan'],
+        payment_mode: 'team_fund',
+        status: 'team_fund',
+        water_amount: 10000,
+      },
+      {
+        id: 'ticket-july-10',
+        group_id: 'pickle-1',
+        year_month: '2026-07',
+        session_date: '2026-07-10',
+        member_ids: ['pickle-tuan'],
+        payment_mode: 'team_fund',
+        status: 'team_fund',
+        water_amount: 10000,
+      },
+    ]
+    const pickleballState = {
+      currentGroupId: 'pickle-1',
+      currentGroup: groups[0],
+      members,
+      groups,
+      notifications: [confirmedPayment],
+      settlementCheckpoints: [checkpoint],
+      pickle: {
+        monthlyConfigs: [monthlyConfig],
+        externalTickets,
+      },
+      _allPickle: {
+        monthlyConfigs: [monthlyConfig],
+        externalTickets,
+      },
+    }
+    const state = {
+      currentUserId: 'pickle-tuan',
+      currentProfileId: 'profile-tuan',
+      currentUserName: 'Lê Tuấn',
+      currentGroupId: 'pickle-1',
+      members,
+      groups,
+      notifications: [confirmedPayment],
+      settlementCheckpoints: [checkpoint],
+      monthSettlements: [],
+    }
+
+    const result = buildHomeData(state, 'pickle-tuan', members, groups, {}, pickleballState, '2026-07')
+    const source = result.paymentSummary.sourceBreakdown.find(row => row.sourceType === 'pickleball')
+
+    expect(result.paymentSummary.netBalance).toBe(-10000)
+    expect(source.payableItems).toEqual([
+      expect.objectContaining({
+        itemId: 'pickleball-ticket:ticket-july-10:water',
+        amount: -10000,
+      }),
+    ])
   })
 
   test('keeps treasurer outstanding stable across month views after explicit confirmed payment', () => {
