@@ -6,8 +6,17 @@ const indexSource = readFileSync(new URL('../index.html', import.meta.url), 'utf
 const primitivesSource = readFileSync(new URL('./primitives.jsx', import.meta.url), 'utf8')
 const homeSource = readFileSync(new URL('./screens/Home.jsx', import.meta.url), 'utf8')
 
-test('small mobile safe-bottom keeps at least 28px for Safari tab bar clearance', () => {
-  assert.match(indexSource, /--safe-bottom: max\(env\(safe-area-inset-bottom\), 28px\)/)
+test('small mobile safe-bottom uses the device safe-area inset', () => {
+  assert.match(indexSource, /--safe-bottom: env\(safe-area-inset-bottom\);/)
+  assert.doesNotMatch(indexSource, /--safe-bottom: max\(env\(safe-area-inset-bottom\), 28px\)/)
+})
+
+test('approved activity rows show a completed badge outside pending review', () => {
+  assert.match(homeSource, /transactionStatus\(tx\) === 'approved' && tx\.status !== 'pending'/)
+  assert.match(homeSource, /fontSize: 10, fontWeight: 700, color: '#34d399'/)
+  assert.match(homeSource, /background: 'rgba\(52,211,153,0\.12\)', padding: '2px 6px'/)
+  assert.match(homeSource, /borderRadius: 8, marginTop: 3, display: 'block', textAlign: 'right'/)
+  assert.match(homeSource, />✓ Đã xong<\/span>/)
 })
 
 test('inactive tab labels use readable secondary contrast', () => {

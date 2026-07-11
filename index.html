@@ -56,7 +56,7 @@
   * { box-sizing: border-box; }
   :root { --screen-top: 44px; --safe-bottom: 0px; --tab-bar-height: 56px; }
 @media (max-width: 500px) {
-  :root { --screen-top: env(safe-area-inset-top); --safe-bottom: max(env(safe-area-inset-bottom), 28px); }
+  :root { --screen-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom); }
   [data-spliteasy-phone-frame] {
     width: 100% !important;
     height: 100svh !important;
