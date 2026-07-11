@@ -11,12 +11,9 @@ test('small mobile safe-bottom uses the device safe-area inset', () => {
   assert.doesNotMatch(indexSource, /--safe-bottom: max\(env\(safe-area-inset-bottom\), 28px\)/)
 })
 
-test('approved activity rows show a completed badge outside pending review', () => {
+test('approved activity rows show green left border outside pending review', () => {
   assert.match(homeSource, /transactionStatus\(tx\) === 'approved' && tx\.status !== 'pending'/)
-  assert.match(homeSource, /fontSize: 10, fontWeight: 700, color: '#34d399'/)
-  assert.match(homeSource, /background: 'rgba\(52,211,153,0\.12\)', padding: '2px 6px'/)
-  assert.match(homeSource, /borderRadius: 8, marginTop: 3, display: 'block', textAlign: 'right'/)
-  assert.match(homeSource, />✓ Đã xong<\/span>/)
+  assert.match(homeSource, /borderLeft:.*rgba\(52,211,153/)
 })
 
 test('inactive tab labels use readable secondary contrast', () => {

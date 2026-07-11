@@ -3001,7 +3001,8 @@ function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
         padding: '12px 0',
         borderBottom: last ? 'none' : `1px solid rgba(255,255,255,0.04)`,
         cursor: 'pointer',
-        opacity: transactionStatus(tx) === 'approved' && tx.status !== 'pending' ? 0.45 : 1,
+        borderLeft: transactionStatus(tx) === 'approved' && tx.status !== 'pending' ? '3px solid rgba(52,211,153,0.55)' : '3px solid transparent',
+        paddingLeft: 8,
       }}
     >
       <div style={{
