@@ -1,4 +1,4 @@
-// Spliteasy Boss — Tham gia nhóm (bước 2/2)
+// Spliteasy Boss — Tham gia nhóm
 // Props: data { code, group, existingNames[], selectedName }
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -260,22 +260,9 @@ const handleSessionPinSubmit = async (session) => {
         <div style={{ display: 'flex', alignItems: 'center', padding: '12px 0 14px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, letterSpacing: '1.2px',
-              color: colors.textMuted, textTransform: 'uppercase',
-            }}>Bước 2 / 2</div>
-            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>Tham gia nhóm</div>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Tham gia nhóm</div>
           </div>
           <div style={{ width: 38 }} />
-        </div>
-
-        {/* Stepper */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-          <div style={{ flex: 1, height: 4, borderRadius: 100, background: colors.pickleball }} />
-          <div style={{
-            flex: 1, height: 4, borderRadius: 100, background: colors.brand,
-            boxShadow: '0 0 8px rgba(99,102,241,0.4)',
-          }} />
         </div>
 
         {/* Admin section — hardcoded Long, uncontrolled input */}

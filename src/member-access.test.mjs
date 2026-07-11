@@ -115,6 +115,22 @@ test('JoinGroup supports invite-token links, recent sessions, and pending join r
   assert.doesNotMatch(joinGroupSource, /Vào lại tài khoản gần đây/)
 })
 
+test('JoinGroup uses one clear join screen instead of a fake two-step flow', () => {
+  assert.match(joinGroupSource, />Tham gia nhóm<\/div>/)
+  assert.doesNotMatch(joinGroupSource, /Bước 2 \/ 2/)
+  assert.doesNotMatch(joinGroupSource, /\{\/\* Stepper \*\/\}/)
+})
+
+test('pickleball memberships sync into linked expense groups', () => {
+  const linkedMemberMigration = readFileSync(new URL('../supabase/migrations/20260711000002_sync_linked_expense_memberships.sql', import.meta.url), 'utf8')
+
+  assert.match(linkedMemberMigration, /CREATE OR REPLACE FUNCTION public\.sync_linked_expense_membership\(\)/)
+  assert.match(linkedMemberMigration, /g\.linked_pickleball_group_id = NEW\.group_id/)
+  assert.match(linkedMemberMigration, /AFTER INSERT OR UPDATE OF profile_id, is_active ON public\.members/)
+  assert.match(linkedMemberMigration, /NOT EXISTS \(/)
+  assert.match(linkedMemberMigration, /source\.group_id = g\.linked_pickleball_group_id/)
+})
+
 test('invite-link login switches members cleanly and preserves group names', () => {
   assert.match(appSource, /if \(type === 'joinGroup_direct'\)[\s\S]*state\.currentUserId[\s\S]*String\(state\.currentUserId\) !== String\(payload\?\.memberId\)[\s\S]*type: 'LOGOUT'[\s\S]*keepRecent: true/)
   assert.match(appSource, /type: 'LOGIN'[\s\S]*token: payload\.token[\s\S]*groupName: payload\.groupName/)
