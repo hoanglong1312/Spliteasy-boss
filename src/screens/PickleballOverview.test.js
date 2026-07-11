@@ -78,7 +78,6 @@ describe('PickleballOverview flex billing', () => {
 
     expect(markup).toContain('Bạn đã đánh')
     expect(markup).toContain('Vé tháng — không tính theo buổi')
-    expect(markup).not.toContain('/10')
   })
 
   test('renders per-session ticket progress against ticket dates', () => {
@@ -91,5 +90,20 @@ describe('PickleballOverview flex billing', () => {
     expect(markup).toContain('/3')
     expect(markup).toContain('240.000')
     expect(markup).toContain('vé lẻ tháng này')
+  })
+
+  test('shows completed group sessions in the overview progress card', () => {
+    const markup = renderToStaticMarkup(React.createElement(PickleballOverview, {
+      data: {
+        ...baseData,
+        isFlexBilling: true,
+        progress: { attended: 3, completed: 2, total: 10, ticketDatesInMonth: 3 },
+      },
+      isTreasurer: true,
+    }))
+
+    expect(markup).toContain('Đã hoàn thành')
+    expect(markup).toContain('2 buổi')
+    expect(markup).not.toContain('2/10 buổi')
   })
 })

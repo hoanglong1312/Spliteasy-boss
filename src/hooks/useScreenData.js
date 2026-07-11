@@ -3024,10 +3024,13 @@ function calendarMonthDate(params, fallbackDate) {
   return Number.isNaN(date.getTime()) ? fallbackDate : date
 }
 
-function buildPickleballMembersData(state, selectedYearMonth) {
+export function buildPickleballMembersData(state, selectedYearMonth) {
   const today = dateFromYearMonth(selectedYearMonth)
   const yearMonth = monthKey(today)
   const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
+  const isFlexBilling = isBillingModeFlexForMonth(state, yearMonth)
+  const monthlyTicketMemberIds = safeArray(monthlyConfig?.monthlyTicketMemberIds ?? monthlyConfig?.monthly_ticket_member_ids)
+  const perSessionTicketMemberIds = safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids)
   const allMemberRows = currentGroupMembers(state).map(member => ({
     id: member.id,
     name: member.displayName || member.name || '',
@@ -3055,17 +3058,21 @@ function buildPickleballMembersData(state, selectedYearMonth) {
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
   const casualRows = casualMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'casual' }, confirmedSessions, sessions.length, []))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
+  const monthlyTicketIds = new Set(monthlyTicketMemberIds.map(String))
+  const monthlyTicketCount = activeMembers.filter(member => monthlyTicketIds.has(String(member.id))).length
 
   return {
     groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
     monthLabel: formatMonthLabel(today),
     currentYearMonth: yearMonth,
-    billingMode: isBillingModeFlexForMonth(state, yearMonth) ? 'flex' : 'fixed',
-    monthlyTicketMemberIds: safeArray(monthlyConfig?.monthlyTicketMemberIds ?? monthlyConfig?.monthly_ticket_member_ids),
-    perSessionTicketMemberIds: safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids),
+    billingMode: isFlexBilling ? 'flex' : 'fixed',
+    monthlyTicketMemberIds,
+    perSessionTicketMemberIds,
     stats: {
       active: activeMembers.length,
+      monthlyTickets: monthlyTicketCount,
+      perSessionTickets: activeMembers.length - monthlyTicketCount,
       permanent: fixedRows.length,
       fixed: fixedRows.length,
       guests: casualRows.length,

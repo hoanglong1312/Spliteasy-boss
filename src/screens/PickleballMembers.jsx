@@ -232,8 +232,8 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
         <MonthNav label={d.monthLabel} onPrev={() => onAction?.("monthPrev")} onNext={() => onAction?.("monthNext")} />
 
         <StatGrid>
-          <Stat value={d.stats?.permanent || fixedMembers.length} label="Cố định" accent="pickleball" />
-          <Stat value={d.stats?.casual || casualMembers.length} label="Vãng lai" color={colors.warning} />
+          <Stat value={isFlexBilling ? d.stats?.monthlyTickets ?? 0 : d.stats?.permanent ?? fixedMembers.length} label={isFlexBilling ? 'Vé tháng' : 'Cố định'} accent="pickleball" />
+          <Stat value={isFlexBilling ? d.stats?.perSessionTickets ?? 0 : d.stats?.casual ?? casualMembers.length} label={isFlexBilling ? 'Vé lượt' : 'Vãng lai'} color={colors.warning} />
           <Stat value={d.stats?.total || fixedMembers.length + casualMembers.length} label="Tổng" color={colors.textPrimary} />
         </StatGrid>
 
@@ -447,7 +447,7 @@ function MemberSection({
             onToggleExpand={onToggleExpand}
             onChangeType={onChangeType}
             isFlexBilling={isFlexBilling}
-            ticketType={monthlyTicketIds?.has(String(member.id)) ? 'monthly' : perSessionTicketIds?.has(String(member.id)) ? 'per_session' : ''}
+            ticketType={monthlyTicketIds?.has(String(member.id)) ? 'monthly' : perSessionTicketIds?.has(String(member.id)) ? 'per_session' : isFlexBilling ? 'per_session' : ''}
             onSetTicketType={onSetTicketType}
             onEdit={onEdit}
             onDelete={onDelete}
@@ -508,10 +508,30 @@ function MemberRow({ member, last, isTreasurer, isExpanded, onToggleExpand, onCh
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}>{member.name}</span>
-            {!isCasual && <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>}
+            {!isFlexBilling && !isCasual && <span style={{ fontSize: 13, flexShrink: 0 }}>{rank.icon || member.rankIcon}</span>}
             {member.isTreasurer && <Badge tone="warn" style={{ padding: '2px 6px', fontSize: 9 }}>THỦ QUỸ</Badge>}
           </div>
-          {isCasual ? (
+          {isFlexBilling ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{
+                height: 6,
+                flex: 1,
+                borderRadius: 100,
+                overflow: 'hidden',
+                background: colors.inputBg,
+              }}>
+                <div style={{
+                  width: `${Math.max(Math.min(pct, 100), 0)}%`,
+                  height: '100%',
+                  borderRadius: 100,
+                  background: barColor,
+                }} />
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 800, color: barColor, whiteSpace: 'nowrap', ...type.mono }}>
+                {member.sessionsAttended || 0}/{member.sessionsTotal || 0} buổi
+              </span>
+            </div>
+          ) : isCasual ? (
             <div style={{ marginTop: 6 }}>
               <span style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, ...type.mono }}>
                 {member.sessionsAttended || 0} buổi

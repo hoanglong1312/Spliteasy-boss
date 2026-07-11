@@ -4,6 +4,7 @@ import {
   buildMemberMonthBalance,
   buildMemberMonthBalanceFlex,
   buildPickleballOverviewData,
+  buildPickleballMembersData,
   buildPickleballTeamFundData,
   buildPickleballSettingsData,
   buildHomeData,
@@ -291,6 +292,27 @@ describe('flex billing helpers', () => {
     expect(memberFlexTicketType(state, 'member-1', '2026-07')).toBe('monthly')
     expect(memberFlexTicketType(state, 'member-2', '2026-07')).toBe('per_session')
     expect(memberFlexTicketType(state, 'member-3', '2026-07')).toBeNull()
+  })
+
+  test('buildPickleballMembersData counts missing ticket config as per-session', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+    state.members = [
+      { id: 'member-1', group_id: 'group-1', name: 'Monthly', is_active: true },
+      { id: 'member-2', group_id: 'group-1', name: 'Per Session', is_active: true },
+      { id: 'member-3', group_id: 'group-1', name: 'Unconfigured', is_active: true },
+    ]
+
+    const result = buildPickleballMembersData(state, '2026-07')
+
+    expect(result.stats).toMatchObject({
+      monthlyTickets: 1,
+      perSessionTickets: 2,
+      total: 3,
+    })
   })
 
   test('buildMemberMonthBalanceFlex charges monthly ticket for monthly member with no sessions', () => {

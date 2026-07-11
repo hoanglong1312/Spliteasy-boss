@@ -6,7 +6,8 @@ const dataSource = readFileSync(new URL('../hooks/useScreenData.js', import.meta
 
 describe('Pickleball members flex billing UI', () => {
   test('members data derives billing mode through the monthly flex helper', () => {
-    expect(dataSource).toMatch(/billingMode: isBillingModeFlexForMonth\(state, yearMonth\) \? 'flex' : 'fixed'/)
+    expect(dataSource).toMatch(/const isFlexBilling = isBillingModeFlexForMonth\(state, yearMonth\)/)
+    expect(dataSource).toMatch(/billingMode: isFlexBilling \? 'flex' : 'fixed'/)
   })
 
   test('members screen always renders one merged member section with one expander', () => {
@@ -28,5 +29,17 @@ describe('Pickleball members flex billing UI', () => {
     expect(memberSource).toMatch(/const memberType = isFlexBilling \? 'fixed' : newMemberType/)
     expect(memberSource).toMatch(/type: memberType/)
     expect(memberSource).toMatch(/\{!isFlexBilling && <TypeSwitch value=\{newMemberType\} onChange=\{setNewMemberType\} \/>\}/)
+  })
+
+  test('flex mode uses ticket stats and defaults missing ticket config to per-session', () => {
+    expect(memberSource).toMatch(/isFlexBilling \? d\.stats\?\.monthlyTickets/)
+    expect(memberSource).toMatch(/label=\{isFlexBilling \? 'Vé tháng' : 'Cố định'\}/)
+    expect(memberSource).toMatch(/label=\{isFlexBilling \? 'Vé lượt' : 'Vãng lai'\}/)
+    expect(memberSource).toMatch(/perSessionTicketIds\?\.has\(String\(member\.id\)\) \? 'per_session' : isFlexBilling \? 'per_session' : ''/)
+  })
+
+  test('flex member rows show attended over total sessions instead of rank text', () => {
+    expect(memberSource).toMatch(/\{isFlexBilling \? \([\s\S]*?\{member\.sessionsAttended \|\| 0\}\/\{member\.sessionsTotal \|\| 0\} buổi/)
+    expect(memberSource).toMatch(/\) : isCasual \? \(/)
   })
 })
