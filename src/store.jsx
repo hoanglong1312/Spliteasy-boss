@@ -557,9 +557,11 @@ function normalizeReceiptImages(value) {
 async function ensureProfileForMember(sb, member) {
   if (member?.profileId || member?.profile_id) return member.profileId || member.profile_id
   const parts = memberNameParts(member?.name)
-  const { data, error } = await sb
+  const profileId = globalThis.crypto.randomUUID()
+  const { error } = await sb
     .from('profiles')
     .insert({
+      id: profileId,
       name: String(member?.name || '').trim(),
       short: member?.short || parts.short,
       initials: member?.initials || parts.initials,
@@ -568,10 +570,8 @@ async function ensureProfileForMember(sb, member) {
       bank_account: member?.bankAccount ?? member?.bank_account ?? null,
       bank_account_name: member?.bankAccountName ?? member?.bank_account_name ?? null,
     })
-    .select('id')
-    .single()
   if (error) throw error
-  return data?.id
+  return profileId
 }
 
 function buildEmptyState() {
@@ -2397,26 +2397,15 @@ export function AppProvider({ children }) {
         if (!sb) return
         const { member } = action
         const groupId = action.groupId || action.group_id || state.currentGroupId
-        let profileId = member?.profileId || member?.profile_id
-        if (!profileId) {
-          const { short, initials } = memberNameParts(member?.name)
-          const { data: profileRow, error: profileError } = await sb
-            .from('profiles')
-            .insert({
-              name: String(member?.name || '').trim(),
-              short,
-              initials,
-              color: '#574EFA',
-              bank_name: member?.bankName ?? member?.bank_name ?? null,
-              bank_account: member?.bankAccount ?? member?.bank_account ?? null,
-              bank_account_name: member?.bankAccountName ?? member?.bank_account_name ?? null,
-            })
-            .select('id')
-            .single()
-          if (profileError) throw profileError
-          profileId = profileRow?.id
-        }
+        const profileId = await ensureProfileForMember(sb, member)
         const insertRow = memberInsertRow(groupId, { ...member, profileId }, member.role || 'member')
+        delete insertRow.name
+        delete insertRow.short
+        delete insertRow.initials
+        delete insertRow.color
+        delete insertRow.bank_name
+        delete insertRow.bank_account
+        delete insertRow.bank_account_name
         if (isUuid(member.id)) insertRow.id = member.id
         const { data: newMember, error } = await sb
           .from('members')

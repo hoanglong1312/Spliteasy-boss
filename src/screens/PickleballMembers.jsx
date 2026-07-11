@@ -90,12 +90,19 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
     setSavingAction('addMember');
     const memberType = isFlexBilling ? 'fixed' : newMemberType;
     try {
+      async function addMemberWithTicketType(member) {
+        const addedMember = await onAction?.('addPickleballMember', member);
+        if (isFlexBilling && addedMember?.id) {
+          await onAction?.('setMemberTicketType', { memberId: addedMember.id, groupId: d.groupId, yearMonth: d.currentYearMonth, ticketType: 'per_session' });
+        }
+      }
+
       for (const candidate of candidatesToAdd) {
         if (candidate.isInactive) {
           await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId: d.groupId });
           continue;
         }
-        await onAction?.('addPickleballMember', {
+        await addMemberWithTicketType({
           groupId: d.groupId,
           name: candidate.name,
           profileId: candidate?.profileId || candidate?.id || '',
@@ -106,12 +113,14 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
         });
       }
       if (candidatesToAdd.length === 0 && typedMemberName) {
-        await onAction?.('addPickleballMember', { groupId: d.groupId, name: typedMemberName, profileId: '', type: memberType });
+        await addMemberWithTicketType({ groupId: d.groupId, name: typedMemberName, profileId: '', type: memberType });
       }
       setNewMemberType('fixed');
       setCandidateQuery('');
       setSelectedCandidateIds([]);
       setShowAddMember(false);
+    } catch (error) {
+      setAddMemberError(`Không thể thêm thành viên: ${error?.message || 'Vui lòng thử lại'}`);
     } finally {
       setSavingAction('');
     }

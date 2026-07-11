@@ -110,7 +110,7 @@ test('Pickleball member add candidates use pickleball membership semantics', () 
 test('Pickleball plain member add uses search text instead of a separate new-name field', () => {
   assert.match(memberSource, /const typedMemberName = candidateQuery\.trim\(\)/);
   assert.match(memberSource, /const duplicateMember = findDuplicateMember\(typedMemberName, allMembers\)/);
-  assert.match(memberSource, /await onAction\?\.\('addPickleballMember', \{ groupId: d\.groupId, name: typedMemberName, profileId: '', type: newMemberType \}\)/);
+  assert.match(memberSource, /await addMemberWithTicketType\(\{ groupId: d\.groupId, name: typedMemberName, profileId: '', type: memberType \}\)/);
   assert.doesNotMatch(memberSource, /const \[newMemberName, setNewMemberName\]/);
   assert.doesNotMatch(memberSource, /label=\{memberCandidates\.length > 0 \? 'Hoặc nhập tên mới' : 'Tên'\}/);
 });
@@ -129,13 +129,40 @@ test('Store ADD_MEMBER creates a profile for plain pickleball members before ins
     storeSource.indexOf("case 'SAVE_PICKLEBALL_MONTHLY_CONFIG':")
   );
 
-  assert.match(addMemberBlock, /let profileId = member\?\.profileId \|\| member\?\.profile_id/);
-  assert.match(addMemberBlock, /if \(!profileId\) \{/);
-  assert.match(addMemberBlock, /const \{ short, initials \} = memberNameParts\(member\?\.name\)/);
-  assert.match(addMemberBlock, /\.from\('profiles'\)\s*\.insert\(\{[\s\S]*?name: String\(member\?\.name \|\| ''\)\.trim\(\),[\s\S]*?short,[\s\S]*?initials,[\s\S]*?color: '#574EFA',[\s\S]*?bank_name: member\?\.bankName \?\? member\?\.bank_name \?\? null,[\s\S]*?bank_account: member\?\.bankAccount \?\? member\?\.bank_account \?\? null,[\s\S]*?bank_account_name: member\?\.bankAccountName \?\? member\?\.bank_account_name \?\? null,[\s\S]*?\}\)\s*\.select\('id'\)\s*\.single\(\)/);
-  assert.match(addMemberBlock, /if \(profileError\) throw profileError/);
-  assert.match(addMemberBlock, /profileId = profileRow\?\.id/);
+  assert.match(addMemberBlock, /const profileId = await ensureProfileForMember\(sb, member\)/);
   assert.match(addMemberBlock, /memberInsertRow\(groupId, \{ \.\.\.member, profileId \}, member\.role \|\| 'member'\)/);
+  assert.match(addMemberBlock, /delete insertRow\.name/);
+  assert.match(addMemberBlock, /delete insertRow\.short/);
+  assert.match(addMemberBlock, /delete insertRow\.initials/);
+  assert.match(addMemberBlock, /delete insertRow\.color/);
+  assert.match(addMemberBlock, /delete insertRow\.bank_name/);
+  assert.match(addMemberBlock, /delete insertRow\.bank_account/);
+  assert.match(addMemberBlock, /delete insertRow\.bank_account_name/);
+});
+
+test('Plain flex member add defaults to per-session ticket and shows save errors', () => {
+  assert.match(memberSource, /async function addMemberWithTicketType\(member\)/);
+  assert.match(memberSource, /const addedMember = await onAction\?\.\('addPickleballMember', member\)/);
+  assert.match(memberSource, /if \(isFlexBilling && addedMember\?\.id\)/);
+  assert.match(memberSource, /await onAction\?\.\('setMemberTicketType', \{ memberId: addedMember\.id, groupId: d\.groupId, yearMonth: d\.currentYearMonth, ticketType: 'per_session' \}\)/);
+  assert.match(memberSource, /catch \(error\) \{[\s\S]*?setAddMemberError\(`Không thể thêm thành viên: \$\{error\?\.message \|\| 'Vui lòng thử lại'\}`\)/);
+});
+
+test('Store creates a profile with a known id without selecting the unlinked row through RLS', () => {
+  const ensureProfileBlock = storeSource.slice(
+    storeSource.indexOf('async function ensureProfileForMember'),
+    storeSource.indexOf('function buildEmptyState')
+  );
+  const addMemberBlock = storeSource.slice(
+    storeSource.indexOf("case 'ADD_MEMBER':"),
+    storeSource.indexOf("case 'SAVE_PICKLEBALL_MONTHLY_CONFIG':")
+  );
+
+  assert.match(ensureProfileBlock, /const profileId = globalThis\.crypto\.randomUUID\(\)/);
+  assert.match(ensureProfileBlock, /\.insert\(\{[\s\S]*?id: profileId,/);
+  assert.doesNotMatch(ensureProfileBlock, /\.select\('id'\)/);
+  assert.match(ensureProfileBlock, /return profileId/);
+  assert.match(addMemberBlock, /const profileId = await ensureProfileForMember\(sb, member\)/);
 });
 
 test('Member detail edit includes profile and group identity so bottom sheet save targets the same member row', () => {
