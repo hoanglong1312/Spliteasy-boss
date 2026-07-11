@@ -3041,6 +3041,13 @@ export function buildPickleballMembersData(state, selectedYearMonth) {
   const activeMembers = dedupeMemberRowsByProfileOrName(currentGroupMembers(state).filter(isActiveMember))
   const sessions = getStateMonthSessions(state, today).filter(session => !isMovedSession(session))
   const confirmedSessions = sessions.filter(s => isDoneStatus(s?.status))
+  const approvedFlexSessions = isFlexBilling
+    ? monthTicketsForState(state, today)
+      .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+      .map(ticket => ({ attendees: ticketMemberIds(ticket) }))
+    : null
+  const attendanceSessions = approvedFlexSessions || confirmedSessions
+  const attendanceSessionsTotal = approvedFlexSessions?.length ?? sessions.length
   const joinRequests = currentJoinRequests(state)
   const fixedMembers = activeMembers.filter(member => isFixedForMonth(state, member, selectedYearMonth))
   const casualMembers = dedupeMemberRowsByProfileOrName(activeMembers.filter(member => !isFixedForMonth(state, member, selectedYearMonth)))
@@ -3054,9 +3061,9 @@ export function buildPickleballMembersData(state, selectedYearMonth) {
     }
   })
 
-  const fixedRows = fixedMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'fixed' }, confirmedSessions, sessions.length, fixedMembers))
+  const fixedRows = fixedMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'fixed' }, attendanceSessions, attendanceSessionsTotal, fixedMembers))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
-  const casualRows = casualMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'casual' }, confirmedSessions, sessions.length, []))
+  const casualRows = casualMembers.map(member => toPickleballMemberRow({ ...member, memberType: 'casual' }, attendanceSessions, attendanceSessionsTotal, []))
     .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'vi'))
   const monthlyTicketIds = new Set(monthlyTicketMemberIds.map(String))
   const monthlyTicketCount = activeMembers.filter(member => monthlyTicketIds.has(String(member.id))).length

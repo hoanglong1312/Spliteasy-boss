@@ -315,6 +315,38 @@ describe('flex billing helpers', () => {
     })
   })
 
+  test('buildPickleballMembersData uses approved flex tickets for attendance progress', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2', 'member-3', 'member-4', 'member-5', 'member-6', 'member-7'],
+    }))
+    state.pickle.externalTickets.push({
+      id: 'ticket-pending',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-05',
+      status: 'pending_review',
+      member_ids: ['member-6'],
+    })
+
+    const result = buildPickleballMembersData(state, '2026-07')
+    const rows = [...result.members, ...result.guests]
+    const memberOne = rows.find(row => row.id === 'member-1')
+    const memberSix = rows.find(row => row.id === 'member-6')
+
+    expect(memberOne).toMatchObject({
+      sessionsAttended: 2,
+      sessionsTotal: 2,
+      progressPct: 100,
+    })
+    expect(memberSix).toMatchObject({
+      sessionsAttended: 1,
+      sessionsTotal: 2,
+      progressPct: 50,
+    })
+  })
+
   test('buildMemberMonthBalanceFlex charges monthly ticket for monthly member with no sessions', () => {
     const state = makeFlexState({
       billing_mode: 'flex',
