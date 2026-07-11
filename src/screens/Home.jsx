@@ -2998,11 +2998,14 @@ function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
       }}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        padding: '12px 0',
+        padding: '12px 8px',
         borderBottom: last ? 'none' : `1px solid rgba(255,255,255,0.04)`,
         cursor: 'pointer',
-        borderLeft: transactionStatus(tx) === 'approved' && tx.status !== 'pending' ? '3px solid rgba(52,211,153,0.55)' : '3px solid transparent',
-        paddingLeft: 8,
+        ...(transactionStatus(tx) === 'approved' && tx.status !== 'pending' ? {
+          background: 'rgba(52,211,153,0.07)',
+          borderRadius: 10,
+          margin: '0 -8px',
+        } : {}),
       }}
     >
       <div style={{
@@ -3016,6 +3019,9 @@ function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
         <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {tx.subtitle} · {tx.dateLabel}
         </div>
+        {transactionStatus(tx) === 'approved' && tx.status !== 'pending' && (
+          <span style={{ display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.15)', padding: '2px 7px', borderRadius: 20 }}>✓ Đã thanh toán</span>
+        )}
       </div>
       {isTreasurer && tx.status === 'pending' && (
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
