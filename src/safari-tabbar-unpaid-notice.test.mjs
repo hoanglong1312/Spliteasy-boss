@@ -12,7 +12,7 @@ test('small mobile safe-bottom uses the device safe-area inset', () => {
 })
 
 test('approved activity rows show green tint and paid chip outside pending review', () => {
-  assert.match(homeSource, /transactionStatus\(tx\) === 'approved' && tx\.status !== 'pending'/)
+  assert.match(homeSource, /transactionStatus\(tx\) === 'approved' && tx\.status !== 'pending' && !tx\.type/)
   assert.match(homeSource, /rgba\(52,211,153,0\.07\)/)
   assert.match(homeSource, /Đã thanh toán/)
 })
