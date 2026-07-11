@@ -164,7 +164,7 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.doesNotMatch(billContentSource, /Nội dung CK/);
   assert.match(billContentSource, /\{actions && <div style=\{\{ marginTop: 10 \}\}>\{actions\}<\/div>\}/);
   assert.doesNotMatch(billContentSource, /width: 230, height: 230/);
-  assert.match(billContentSource, /width: 96, height: 96/);
+  assert.match(billContentSource, /width: 120, height: 120, padding: 9/);
   assert.match(billContentSource, /aria-label="Phóng to QR thanh toán"/);
   assert.match(billContentSource, /setQrPreviewOpen\(true\)/);
   assert.match(billContentSource, /BottomSheet title="QR thanh toán"/);
@@ -192,11 +192,17 @@ test('bill card only renders checked payment items grouped by profile source and
 test('bill image export embeds QR before capturing card', () => {
   const billCardSource = sliceBetween('function PaymentBillCardSheet(', 'function buildElementImageBlob');
   const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
+  assert.match(homeSource, /function billQrOnlyUrl\(value\)/);
+  assert.match(homeSource, /\.replace\(\/-compact2\\\.\(png\|jpg\|jpeg\)\(\?=\(\?:\\\?\|\$\)\)\/i, '-qr_only\.\$1'\)/);
+  assert.match(billContentSource, /const displayQrUrl = billQrOnlyUrl\(qrUrl\)/);
+  assert.match(billContentSource, /width: 120, height: 120, padding: 9/);
+  assert.match(billContentSource, /<img data-bill-qr="true" src=\{displayQrUrl\}/);
+  assert.match(billContentSource, /src=\{displayQrUrl\} alt="QR thanh toán phóng to"/);
   assert.match(homeSource, /function readBlobAsDataUrl\(blob\)/);
   assert.match(homeSource, /function waitForElementImages\(element\)/);
   assert.match(homeSource, /function drawBillQrOnImage\(dataUrl, cardElement, qrDataUrl\)/);
-  assert.match(billContentSource, /data-bill-qr/);
-  assert.match(billCardSource, /const \[billQrUrl, setBillQrUrl\] = useState\(qrUrl \|\| ''\)/);
+  assert.match(billCardSource, /const sourceQrUrl = billQrOnlyUrl\(qrUrl\)/);
+  assert.match(billCardSource, /const \[billQrUrl, setBillQrUrl\] = useState\(sourceQrUrl\)/);
   assert.match(billCardSource, /readBlobAsDataUrl\(blob\)/);
   assert.match(billCardSource, /qrUrl=\{billQrUrl\}/);
   assert.match(billCardSource, /await waitForElementImages\(cardRef\.current\)/);

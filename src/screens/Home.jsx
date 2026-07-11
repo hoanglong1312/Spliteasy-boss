@@ -2327,8 +2327,13 @@ function RefundBankSheet({ item, onAction, onClose, onSaved }) {
   );
 }
 
+function billQrOnlyUrl(value) {
+  return String(value || '').replace(/-compact2\.(png|jpg|jpeg)(?=(?:\?|$))/i, '-qr_only.$1');
+}
+
 function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
+  const displayQrUrl = billQrOnlyUrl(qrUrl);
   const groups = safeArray(paymentDisplayGroups)
     .map(group => ({ ...group, items: group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
     .filter(group => group.items.length > 0);
@@ -2341,12 +2346,12 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
           <div style={{ marginTop: 7, fontSize: 26, fontWeight: 950, color: amountColor, ...type.mono }}>{formatVND(amount)}</div>
           <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>{caption}</div>
         </div>
-        {qrUrl ? (
-          <button type="button" data-bill-qr="true" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 96, height: 96, padding: 0, border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
-            <img src={qrUrl} alt="QR thanh toán" style={{ width: '100%', height: '100%', display: 'block', objectFit: 'cover' }} />
+        {displayQrUrl ? (
+          <button type="button" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 120, height: 120, padding: 9, boxSizing: 'border-box', border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
+            <img data-bill-qr="true" src={displayQrUrl} alt="QR thanh toán" style={{ width: '100%', height: '100%', display: 'block', borderRadius: 6, objectFit: 'contain' }} />
           </button>
         ) : (
-          <div style={{ width: 96, minHeight: 96, padding: 7, boxSizing: 'border-box', borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'grid', gap: 6, alignContent: 'center', justifyItems: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800, textAlign: 'center' }}>
+          <div style={{ width: 120, minHeight: 120, padding: 9, boxSizing: 'border-box', borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'grid', gap: 6, alignContent: 'center', justifyItems: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800, textAlign: 'center' }}>
             <div>Chưa có QR</div>
             {qrFallbackAction && <div data-bill-ui-only="true">{qrFallbackAction}</div>}
           </div>
@@ -2391,9 +2396,10 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
 
       {qrPreviewOpen && (
         <BottomSheet title="QR thanh toán" onClose={() => setQrPreviewOpen(false)}>
-          <div style={{ display: 'grid', gap: 12, justifyItems: 'center' }}>
-            <img src={qrUrl} alt="QR thanh toán phóng to" style={{ width: '100%', maxWidth: 320, aspectRatio: '1 / 1', borderRadius: 18, background: '#fff', objectFit: 'cover' }} />
-            <div style={{ width: '100%', padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: colors.textSecondary, fontSize: 12, fontWeight: 800, textAlign: 'center', overflowWrap: 'anywhere' }}>{transferDescription}</div>
+          <div style={{ display: 'grid', justifyItems: 'center' }}>
+            <div style={{ width: '100%', maxWidth: 360, padding: 18, boxSizing: 'border-box', borderRadius: 18, background: '#fff' }}>
+              <img src={displayQrUrl} alt="QR thanh toán phóng to" style={{ width: '100%', aspectRatio: '1 / 1', display: 'block', borderRadius: 8, objectFit: 'contain' }} />
+            </div>
           </div>
         </BottomSheet>
       )}
@@ -2464,45 +2470,46 @@ async function drawBillQrOnImage(dataUrl, cardElement, qrDataUrl) {
 function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', footerActions = null, onClose }) {
   const cardRef = useRef(null);
   const [sharingImage, setSharingImage] = useState(false);
-  const [billQrUrl, setBillQrUrl] = useState(qrUrl || '');
-  const [preparingQr, setPreparingQr] = useState(Boolean(qrUrl));
+  const sourceQrUrl = billQrOnlyUrl(qrUrl);
+  const [billQrUrl, setBillQrUrl] = useState(sourceQrUrl);
+  const [preparingQr, setPreparingQr] = useState(Boolean(sourceQrUrl));
   const billFilename = `${safeFilename(memberName || 'bill')}-bill.png`;
   const fallbackBillFilename = `${safeFilename(memberName || 'bill')}-bill.svg`;
 
   useEffect(() => {
     let cancelled = false;
-    if (!qrUrl) {
+    if (!sourceQrUrl) {
       setBillQrUrl('');
       setPreparingQr(false);
       return () => { cancelled = true; };
     }
-    if (String(qrUrl).startsWith('data:')) {
-      setBillQrUrl(qrUrl);
+    if (String(sourceQrUrl).startsWith('data:')) {
+      setBillQrUrl(sourceQrUrl);
       setPreparingQr(false);
       return () => { cancelled = true; };
     }
-    setBillQrUrl(qrUrl);
+    setBillQrUrl(sourceQrUrl);
     setPreparingQr(true);
-    fetch(qrUrl)
+    fetch(sourceQrUrl)
       .then(response => {
         if (!response.ok) throw new Error('QR download failed');
         return response.blob();
       })
       .then(blob => readBlobAsDataUrl(blob))
       .then(dataUrl => {
-        if (!cancelled) setBillQrUrl(dataUrl || qrUrl);
+        if (!cancelled) setBillQrUrl(dataUrl || sourceQrUrl);
       })
       .catch(() => {
-        if (!cancelled) setBillQrUrl(qrUrl);
+        if (!cancelled) setBillQrUrl(sourceQrUrl);
       })
       .finally(() => {
         if (!cancelled) setPreparingQr(false);
       });
     return () => { cancelled = true; };
-  }, [qrUrl]);
+  }, [sourceQrUrl]);
 
   async function shareBillImage() {
-    const billQrReady = !qrUrl || String(billQrUrl || '').startsWith('data:');
+    const billQrReady = !sourceQrUrl || String(billQrUrl || '').startsWith('data:');
     if (!cardRef.current || sharingImage || preparingQr || !billQrReady) return;
     setSharingImage(true);
     try {
@@ -2531,7 +2538,7 @@ function PaymentBillCardSheet({ memberName, amount, transferDescription, qrUrl, 
     }
   }
 
-  const billQrReady = !qrUrl || String(billQrUrl || '').startsWith('data:');
+  const billQrReady = !sourceQrUrl || String(billQrUrl || '').startsWith('data:');
   const shareDisabled = sharingImage || preparingQr || !billQrReady;
 
   return (
