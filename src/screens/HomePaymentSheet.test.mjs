@@ -164,7 +164,7 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.doesNotMatch(billContentSource, /Nội dung CK/);
   assert.match(billContentSource, /\{actions && <div style=\{\{ marginTop: 10 \}\}>\{actions\}<\/div>\}/);
   assert.doesNotMatch(billContentSource, /width: 230, height: 230/);
-  assert.match(billContentSource, /width: 120, height: 120, padding: 9/);
+  assert.match(billContentSource, /width: 128, height: 128, padding: 5/);
   assert.match(billContentSource, /aria-label="Phóng to QR thanh toán"/);
   assert.match(billContentSource, /setQrPreviewOpen\(true\)/);
   assert.match(billContentSource, /BottomSheet title="QR thanh toán"/);
@@ -195,7 +195,8 @@ test('bill image export embeds QR before capturing card', () => {
   assert.match(homeSource, /function billQrOnlyUrl\(value\)/);
   assert.match(homeSource, /\.replace\(\/-compact2\\\.\(png\|jpg\|jpeg\)\(\?=\(\?:\\\?\|\$\)\)\/i, '-qr_only\.\$1'\)/);
   assert.match(billContentSource, /const displayQrUrl = billQrOnlyUrl\(qrUrl\)/);
-  assert.match(billContentSource, /width: 120, height: 120, padding: 9/);
+  assert.match(billContentSource, /width: 128, height: 128, padding: 5/);
+  assert.match(billContentSource, /maxWidth: 380, padding: 10/);
   assert.match(billContentSource, /<img data-bill-qr="true" src=\{displayQrUrl\}/);
   assert.match(billContentSource, /src=\{displayQrUrl\} alt="QR thanh toán phóng to"/);
   assert.match(homeSource, /function readBlobAsDataUrl\(blob\)/);

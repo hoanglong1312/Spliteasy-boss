@@ -2347,11 +2347,11 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
           <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>{caption}</div>
         </div>
         {displayQrUrl ? (
-          <button type="button" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 120, height: 120, padding: 9, boxSizing: 'border-box', border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
+          <button type="button" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 128, height: 128, padding: 5, boxSizing: 'border-box', border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
             <img data-bill-qr="true" src={displayQrUrl} alt="QR thanh toán" style={{ width: '100%', height: '100%', display: 'block', borderRadius: 6, objectFit: 'contain' }} />
           </button>
         ) : (
-          <div style={{ width: 120, minHeight: 120, padding: 9, boxSizing: 'border-box', borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'grid', gap: 6, alignContent: 'center', justifyItems: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800, textAlign: 'center' }}>
+          <div style={{ width: 128, minHeight: 128, padding: 5, boxSizing: 'border-box', borderRadius: 14, background: 'rgba(255,255,255,0.06)', display: 'grid', gap: 6, alignContent: 'center', justifyItems: 'center', color: colors.textSecondary, fontSize: 11, fontWeight: 800, textAlign: 'center' }}>
             <div>Chưa có QR</div>
             {qrFallbackAction && <div data-bill-ui-only="true">{qrFallbackAction}</div>}
           </div>
@@ -2397,7 +2397,7 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
       {qrPreviewOpen && (
         <BottomSheet title="QR thanh toán" onClose={() => setQrPreviewOpen(false)}>
           <div style={{ display: 'grid', justifyItems: 'center' }}>
-            <div style={{ width: '100%', maxWidth: 360, padding: 18, boxSizing: 'border-box', borderRadius: 18, background: '#fff' }}>
+            <div style={{ width: '100%', maxWidth: 380, padding: 10, boxSizing: 'border-box', borderRadius: 18, background: '#fff' }}>
               <img src={displayQrUrl} alt="QR thanh toán phóng to" style={{ width: '100%', aspectRatio: '1 / 1', display: 'block', borderRadius: 8, objectFit: 'contain' }} />
             </div>
           </div>
