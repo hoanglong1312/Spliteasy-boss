@@ -3001,6 +3001,7 @@ function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
         padding: '12px 0',
         borderBottom: last ? 'none' : `1px solid rgba(255,255,255,0.04)`,
         cursor: 'pointer',
+        opacity: transactionStatus(tx) === 'approved' && tx.status !== 'pending' ? 0.45 : 1,
       }}
     >
       <div style={{
@@ -3026,13 +3027,6 @@ function ActivityRow({ tx, last, isTreasurer, onApprove, onReject, onView }) {
           fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px',
           color: tx.amount < 0 ? colors.danger : colors.success, ...type.mono,
         }}>{formatVND(tx.amount)}</div>
-        {transactionStatus(tx) === 'approved' && tx.status !== 'pending' && (
-          <span style={{
-            fontSize: 10, fontWeight: 700, color: '#34d399',
-            background: 'rgba(52,211,153,0.12)', padding: '2px 6px',
-            borderRadius: 8, marginTop: 3, display: 'block', textAlign: 'right',
-          }}>✓ Đã xong</span>
-        )}
       </div>
       <div style={{ color: colors.textMuted, fontSize: 18, flexShrink: 0 }}>›</div>
     </div>
