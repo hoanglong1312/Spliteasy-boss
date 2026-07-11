@@ -2479,7 +2479,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
     progress: {
       attended: myAttendedCount,
       total: monthSessions.filter(s => !isMovedSession(s)).length || 1,
-      completed: completedSessions,
+      completed: isFlexBilling ? approvedMonthTickets.length : completedSessions,
       ticketDatesInMonth: approvedMonthTickets.length,
     },
     monthCosts: {

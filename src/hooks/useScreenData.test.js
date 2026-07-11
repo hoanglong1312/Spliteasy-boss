@@ -1224,6 +1224,7 @@ describe('buildPickleballOverviewData flex attendance', () => {
 
     expect(data.isFlexBilling).toBe(true)
     expect(data.progress.attended).toBe(2)
+    expect(data.progress.completed).toBe(2)
     expect(data.progress.ticketDatesInMonth).toBe(2)
     expect(data.yourBalance.ticketType).toBe('monthly')
     expect(data.yourBalance.summaryCards[1]).toMatchObject({
