@@ -48,6 +48,29 @@ src/lib/auth.js             ← Token auth helpers
 supabase/migrations/        ← SQL migrations (đã chạy hết)
 ```
 
+## Payment coverage model
+
+Đơn vị thanh toán chuẩn là `payableItem`: phần tiền của một member/profile trong một expense, ticket hoặc nguồn tiền. Không gắn cờ `paid` trực tiếp vào expense vì một expense có thể chia cho nhiều người.
+
+`payableItemKey` định danh khoản theo `itemId` hoặc `expenseId`, cộng với `memberId`, `profileId` và tháng. Số tiền không phải định danh; một payment có thể cover một phần hoặc toàn bộ item.
+
+Luồng hiện tại:
+
+```
+expense/ticket/source
+  → payableItem theo từng member
+  → chọn khoản thanh toán
+  → metadata.coveredItems
+  → trừ đúng payableItemKey
+```
+
+- Payment mới vẫn lưu `coveredSources` để hiển thị tổng hợp và tương thích RPC cũ.
+- Khi tính số còn nợ, `src/hooks/useScreenData.js` ưu tiên `coveredItems`; chỉ fallback sang `coveredSources` cho record legacy chưa có item key.
+- `member_month_settlements` là marker/checkpoint lịch sử theo source và tháng, không phải cờ xóa toàn bộ khoản phát sinh trong tháng.
+- Khoản mới phát sinh sau checkpoint tạo `payableItemKey` mới và vẫn hiện chưa thanh toán.
+- Code chính: `src/hooks/useScreenData.js`, `src/screens/Home.jsx`, `src/store.jsx`.
+- Implementation: `ecb3d2f` (per-item coverage), `58a1a2b` (legacy migration), `380bb7a` (giữ nợ phát sinh sau checkpoint).
+
 ## Claude/Codex handoff
 
 - `CLAUDE.md` là entrypoint cho Claude Code.

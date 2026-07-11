@@ -1,5 +1,35 @@
 # Decisions — SpliteasyBoss
 
+## 2026-07-10 — Payment coverage theo phần tiền từng member
+
+### Decision: Không gắn trạng thái thanh toán vào expense
+
+- Một expense có thể chia cho nhiều member; thanh toán của một người không được làm expense hoặc phần tiền của người khác thành đã trả.
+- Đơn vị coverage chuẩn là `payableItem`, tức phần tiền của một member/profile trong một khoản.
+- `payableItemKey` dùng `itemId` hoặc `expenseId`, `memberId`, `profileId` và tháng. Amount dùng để trừ một phần/toàn bộ item, không dùng làm identity chính.
+
+### Compatibility
+
+- Payment mới lưu cả `coveredItems` và `coveredSources`.
+- `coveredItems` là source of truth cho coverage mới.
+- `coveredSources` chỉ dùng cho tổng hợp, RPC/checkpoint cũ và fallback record legacy.
+- Record legacy đã có công cụ chuyển sang `coveredItems`; fallback vẫn giữ để tránh mất lịch sử nếu còn record chưa map được chính xác.
+- Không tạo bảng `payment_allocations` trong v1. Metadata hiện tại đủ cho scope; chỉ thêm bảng khi cần audit server-side hoặc query allocation độc lập.
+
+### Checkpoint semantics
+
+- `member_month_settlements` không đại diện cho toàn bộ giao dịch tháng đã trả.
+- Checkpoint không được che khoản mới phát sinh sau thời điểm chốt.
+- Coverage chính xác dựa trên `payableItemKey`; source/month checkpoint chỉ phục vụ lịch sử và compatibility.
+
+### Implementation
+
+- `ecb3d2f` — track payment coverage by payable item.
+- `58a1a2b` — migrate legacy payment coverage to payable items.
+- `380bb7a` — keep post-checkpoint debts visible.
+
+---
+
 ## 2026-06-07 — Water + Home Banner + BatchEntry Feature
 
 ### ASSUMPTION: Test File Creation Skipped
