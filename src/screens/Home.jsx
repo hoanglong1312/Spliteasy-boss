@@ -1027,7 +1027,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                       fontFamily: 'inherit',
                       cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
                       opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
-                    }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ duyệt' : paymentConfirmed ? 'Đã báo' : 'Đã thanh toán'}</button>
+                    }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ duyệt' : paymentConfirmed ? 'Đã thanh toán' : 'Báo đã chuyển'}</button>
                   </div>
                 )}
               />

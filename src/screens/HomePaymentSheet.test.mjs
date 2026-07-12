@@ -32,7 +32,7 @@ test('member payment sheet uses bill card layout without share buttons', () => {
   assert.match(paymentSheetSource, /selectable/);
   assert.match(paymentSheetSource, /actions=\{\(/);
   assert.match(paymentSheetSource, /Lưu QR/);
-  assert.match(paymentSheetSource, /Đã thanh toán/);
+  assert.match(paymentSheetSource, /paymentConfirmed \? 'Đã thanh toán' : 'Báo đã chuyển'/);
   assert.match(paymentSheetSource, /\{!canShowQr && \([\s\S]*<PaymentItemSection/);
   assert.match(billContentSource, /selectable = false/);
   assert.match(billContentSource, /selectable && group\.onToggle/);
