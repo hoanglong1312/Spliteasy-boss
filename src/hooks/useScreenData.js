@@ -3909,6 +3909,8 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
         } else if (expType === 'pickleball_ticket_water') {
           const rawId = String(expense.id || '').replace(/^ticket-water:/, '')
           keyParams = { itemId: `pickleball-ticket:${rawId}:water`, memberId: meForGroup, profileId, month: yearMonth }
+        } else if (expType === 'pickleball_monthly_ticket') {
+          keyParams = { itemId: `pickleball-monthly-ticket:${expense.groupId || ''}:${yearMonth}`, memberId: meForGroup, profileId, month: yearMonth }
         } else {
           keyParams = { expenseId: expense.id, memberId: meForGroup, profileId, month: yearMonth }
         }
