@@ -424,15 +424,19 @@ function buildPayableItemKey(item) {
   return `${itemId}|member:${memberId}|profile:${profileId}|month:${month}`
 }
 
-function buildPaidItemKeySet(state, memberId) {
-  return new Set(
-    safeArray(state?.notifications)
-      .filter(n => String(n.type || '').toLowerCase().includes('payment'))
-      .filter(n => String((n.metadata || {}).status || '').toLowerCase() === 'confirmed')
-      .flatMap(n => safeArray(n.metadata?.coveredItems || n.metadata?.covered_items))
-      .map(item => normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || ''))
-      .filter(Boolean)
-  )
+function buildPaidItemCoverageMap(state) {
+  const coverage = new Map()
+  safeArray(state?.notifications)
+    .filter(n => String(n.type || '').toLowerCase().includes('payment'))
+    .filter(n => String((n.metadata || {}).status || '').toLowerCase() === 'confirmed')
+    .flatMap(n => safeArray(n.metadata?.coveredItems || n.metadata?.covered_items))
+    .forEach(item => {
+      const key = normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || '')
+      const amount = Math.round(Number(item?.amount) || 0)
+      if (!key || !amount) return
+      coverage.set(key, (coverage.get(key) || 0) + amount)
+    })
+  return coverage
 }
 
 function withPayableItemKey(item) {
@@ -828,7 +832,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
       currentUserId,
       members,
       state?.currentUserName,
-      buildPaidItemKeySet(state, currentUserId)
+      buildPaidItemCoverageMap(state)
     ),
     pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
     pendingPayments: buildPendingPaymentConfirmations(state),
@@ -3780,16 +3784,16 @@ export function buildAllExpensesData(state, currentUserId, members, currentUserN
   const pickleballState = scopedPickleballState(state)
   const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, currentUserName)
   const pickleballTicketGroup = buildPickleballTicketTransactionGroup(state, pickleballState, dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())), pickleballMemberId)
-  const paidItemKeys = buildPaidItemKeySet(state, currentUserId)
+  const paidItemCoverage = buildPaidItemCoverageMap(state)
   const allGroups = [...groups, pickleballTicketGroup].filter(Boolean)
   return {
-    transactions: buildTransactionRows(buildExpenseActivity(allGroups), allGroups, currentUserId, members, currentUserName, paidItemKeys),
+    transactions: buildTransactionRows(buildExpenseActivity(allGroups), allGroups, currentUserId, members, currentUserName, paidItemCoverage),
     currentUserId,
   }
 }
 
-function buildTransactions(groups, currentUserId, members, currentUserName, paidItemKeys = new Set()) {
-  return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName, paidItemKeys)
+function buildTransactions(groups, currentUserId, members, currentUserName, paidItemCoverage = new Map()) {
+  return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName, paidItemCoverage)
 }
 
 function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId) {
@@ -3914,7 +3918,32 @@ function buildExpenseActivity(groups) {
   })))
 }
 
-function buildTransactionRows(expenses, groups, currentUserId, members, currentUserName, paidItemKeys = new Set()) {
+function transactionPayableItemKey(expense, memberId, members, yearMonth) {
+  const profileId = profileIdForMember(memberId, members)
+  const expType = expense.type || ''
+  if (expType === 'pickleball_ticket') {
+    const rawId = String(expense.id || '').replace(/^ticket:/, '')
+    return buildPayableItemKey({ itemId: `pickleball-ticket:${rawId}:fee`, memberId, profileId, month: yearMonth })
+  }
+  if (expType === 'pickleball_ticket_water') {
+    const rawId = String(expense.id || '').replace(/^ticket-water:/, '')
+    return buildPayableItemKey({ itemId: `pickleball-ticket:${rawId}:water`, memberId, profileId, month: yearMonth })
+  }
+  if (expType === 'pickleball_monthly_ticket') {
+    return buildPayableItemKey({ itemId: `pickleball-monthly-ticket:${expense.groupId || ''}:${yearMonth}`, memberId, profileId, month: yearMonth })
+  }
+  return buildPayableItemKey({ expenseId: expense.id, memberId, profileId, month: yearMonth })
+}
+
+function isPayableItemCovered(coverage, key, requiredAmount) {
+  const coveredAmount = Number(coverage.get(key)) || 0
+  const amount = Math.round(Number(requiredAmount) || 0)
+  return amount !== 0 &&
+    Math.sign(coveredAmount) === Math.sign(amount) &&
+    Math.abs(coveredAmount) >= Math.abs(amount)
+}
+
+function buildTransactionRows(expenses, groups, currentUserId, members, currentUserName, paidItemCoverage = new Map()) {
   return safeArray(expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -3933,24 +3962,25 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
       const normalizedExpense = { ...expense, paidBy, participants, splits }
       const yearMonth = expense.yearMonth || expense.year_month || monthKey(expense.date)
 
-      let isPaid = false
-      if (amount < 0 && meForGroup && paidItemKeys.size) {
-        const profileId = profileIdForMember(meForGroup, members)
-        const expType = expense.type || ''
-        let keyParams
-        if (expType === 'pickleball_ticket') {
-          const rawId = String(expense.id || '').replace(/^ticket:/, '')
-          keyParams = { itemId: `pickleball-ticket:${rawId}:fee`, memberId: meForGroup, profileId, month: yearMonth }
-        } else if (expType === 'pickleball_ticket_water') {
-          const rawId = String(expense.id || '').replace(/^ticket-water:/, '')
-          keyParams = { itemId: `pickleball-ticket:${rawId}:water`, memberId: meForGroup, profileId, month: yearMonth }
-        } else if (expType === 'pickleball_monthly_ticket') {
-          keyParams = { itemId: `pickleball-monthly-ticket:${expense.groupId || ''}:${yearMonth}`, memberId: meForGroup, profileId, month: yearMonth }
-        } else {
-          keyParams = { expenseId: expense.id, memberId: meForGroup, profileId, month: yearMonth }
-        }
-        isPaid = paidItemKeys.has(buildPayableItemKey(keyParams))
-      }
+      const isPaid = amount < 0 && meForGroup
+        ? isPayableItemCovered(
+          paidItemCoverage,
+          transactionPayableItemKey(expense, meForGroup, members, yearMonth),
+          amount,
+        )
+        : false
+      const debtorItems = [...new Set([
+        ...participants,
+        ...splits.map(split => split.memberId),
+      ].filter(Boolean))]
+        .map(memberId => ({
+          amount: expenseImpact(normalizedExpense, memberId),
+          key: transactionPayableItemKey(expense, memberId, members, yearMonth),
+        }))
+        .filter(item => item.amount < 0)
+      const isComplete = debtorItems.length > 0 && debtorItems.every(item => (
+        isPayableItemCovered(paidItemCoverage, item.key, item.amount)
+      ))
 
       return {
         id: expense.id,
@@ -3973,6 +4003,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
         currentMemberId: meForGroup,
         isMine: isExpenseRelatedToMember(normalizedExpense, meForGroup),
         isPaid,
+        isComplete,
       }
     })
 }

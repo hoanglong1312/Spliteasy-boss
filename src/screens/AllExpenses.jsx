@@ -169,6 +169,9 @@ const STATUS_FILTERS = [
 ];
 
 function ActivityRow({ tx, isTreasurer, last, onView, onAction }) {
+  const paymentStatusLabel = tx.isComplete && (isTreasurer || !tx.isPaid)
+    ? '✓ Đã hoàn thành'
+    : tx.isPaid ? '✓ Đã thanh toán' : '';
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <div
@@ -180,10 +183,10 @@ function ActivityRow({ tx, isTreasurer, last, onView, onAction }) {
         }}
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
-          padding: tx.isPaid ? '12px 8px' : '12px 0',
+          padding: paymentStatusLabel ? '12px 8px' : '12px 0',
           borderBottom: last && !(isTreasurer && tx.status === 'pending') ? 'none' : '1px solid rgba(255,255,255,0.04)',
           cursor: 'pointer',
-          ...(tx.isPaid ? { background: 'rgba(52,211,153,0.07)', borderRadius: 10, margin: '0 -8px' } : {}),
+          ...(paymentStatusLabel ? { background: 'rgba(52,211,153,0.07)', borderRadius: 10, margin: '0 -8px' } : {}),
         }}
       >
         <div style={{
@@ -198,8 +201,8 @@ function ActivityRow({ tx, isTreasurer, last, onView, onAction }) {
           <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {tx.subtitle} · {tx.dateLabel}
           </div>
-          {tx.isPaid && (
-            <span style={{ display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.15)', padding: '2px 7px', borderRadius: 20 }}>✓ Đã thanh toán</span>
+          {paymentStatusLabel && (
+            <span style={{ display: 'inline-block', marginTop: 4, fontSize: 10, fontWeight: 700, color: '#34d399', background: 'rgba(52,211,153,0.15)', padding: '2px 7px', borderRadius: 20 }}>{paymentStatusLabel}</span>
           )}
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>

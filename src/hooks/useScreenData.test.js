@@ -78,6 +78,93 @@ describe('buildGroupsListData', () => {
   })
 })
 
+describe('transaction per-item payment status', () => {
+  const members = [
+    { id: 'payer-1', profile_id: 'profile-payer', group_id: 'group-1', name: 'Payer' },
+    { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+    { id: 'member-2', profile_id: 'profile-2', group_id: 'group-1', name: 'Member Two' },
+  ]
+  const groups = [{
+    id: 'group-1',
+    name: 'Dinner',
+    members: members.map(member => member.id),
+    expenses: [{
+      id: 'expense-1',
+      title: 'Pizza',
+      amount: 300000,
+      date: '2026-07-07T12:00:00.000Z',
+      expense_date: '2026-07-07T12:00:00.000Z',
+      paidBy: 'payer-1',
+      paid_by_member_id: 'payer-1',
+      participants: ['member-1', 'member-2'],
+    }],
+  }]
+  const coveredItem = (memberId, profileId, amount = -150000) => ({
+    payableItemKey: `expense:expense-1|member:${memberId}|profile:${profileId}|month:2026-07`,
+    expenseId: 'expense-1',
+    memberId,
+    profileId,
+    month: '2026-07',
+    amount,
+  })
+  const stateWithCoverage = coveredItems => ({
+    groups,
+    members,
+    notifications: [{
+      id: 'payment-1',
+      type: 'payment_confirmed',
+      metadata: { status: 'confirmed', coveredItems },
+    }],
+  })
+
+  test('marks only current member item paid while another member remains unpaid', () => {
+    const result = buildAllExpensesData(
+      stateWithCoverage([coveredItem('member-1', 'profile-1')]),
+      'member-1',
+      members,
+      'Member One',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      amount: -150000,
+      isPaid: true,
+      isComplete: false,
+    })
+  })
+
+  test('does not mark item paid when covered amount is short', () => {
+    const result = buildAllExpensesData(
+      stateWithCoverage([coveredItem('member-1', 'profile-1', -100000)]),
+      'member-1',
+      members,
+      'Member One',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      isPaid: false,
+      isComplete: false,
+    })
+  })
+
+  test('marks payer transaction complete when every debtor item is fully covered', () => {
+    const result = buildAllExpensesData(
+      stateWithCoverage([
+        coveredItem('member-1', 'profile-1'),
+        coveredItem('member-2', 'profile-2'),
+      ]),
+      'payer-1',
+      members,
+      'Payer',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      amount: 300000,
+      isPaid: false,
+      isComplete: true,
+    })
+  })
+})
+
 describe('effectiveSessionMemberIds', () => {
   test('counts member without a record as present when session has records and fallback is enabled', () => {
     const session = {
