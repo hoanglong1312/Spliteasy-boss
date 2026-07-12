@@ -426,8 +426,9 @@ function buildPayableItemKey(item) {
 
 function buildPaidItemKeySet(state, memberId) {
   return new Set(
-    safeArray(state?.paymentNotifications)
-      .filter(n => String(n.member_id || n.memberId) === String(memberId) && n.status === 'confirmed')
+    safeArray(state?.notifications)
+      .filter(n => String(n.type || '').toLowerCase().includes('payment'))
+      .filter(n => String((n.metadata || {}).status || '').toLowerCase() === 'confirmed')
       .flatMap(n => safeArray(n.metadata?.coveredItems || n.metadata?.covered_items))
       .map(item => normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || ''))
       .filter(Boolean)
