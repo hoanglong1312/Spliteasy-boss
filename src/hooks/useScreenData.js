@@ -426,10 +426,14 @@ function buildPayableItemKey(item) {
 
 function buildPaidItemCoverageMap(state) {
   const coverage = new Map()
-  safeArray(state?.notifications)
+  const notificationItems = safeArray(state?.notifications)
     .filter(n => String(n.type || '').toLowerCase().includes('payment'))
     .filter(n => String((n.metadata || {}).status || '').toLowerCase() === 'confirmed')
     .flatMap(n => safeArray(n.metadata?.coveredItems || n.metadata?.covered_items))
+  const items = safeArray(state?.paymentCoveredItems).length
+    ? safeArray(state?.paymentCoveredItems)
+    : notificationItems
+  items
     .forEach(item => {
       const key = normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || '')
       const amount = Math.round(Number(item?.amount) || 0)

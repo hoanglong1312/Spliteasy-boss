@@ -274,6 +274,45 @@ describe('pickleball transaction detail', () => {
       tag: 'paid',
     })
   })
+
+  test('uses group payment coverage for every paid ticket-water member', () => {
+    const members = [
+      { id: 'member-1', groupId: 'group-1', profileId: 'profile-1', name: 'An' },
+      { id: 'member-2', groupId: 'group-1', profileId: 'profile-2', name: 'Bình' },
+      { id: 'member-3', groupId: 'group-1', profileId: 'profile-3', name: 'Cường' },
+    ]
+    const state = {
+      currentUserId: 'member-1',
+      currentProfileId: 'profile-1',
+      currentUserName: 'An',
+      currentGroupId: 'group-1',
+      currentGroup: { id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball', members: members.map(member => member.id) },
+      members,
+      selectedYearMonth: '2026-07',
+      pickle: {
+        monthlyConfigs: [{ groupId: 'group-1', yearMonth: '2026-07', billingMode: 'flex' }],
+        externalTickets: [{
+          id: 'ticket-1',
+          groupId: 'group-1',
+          yearMonth: '2026-07',
+          sessionDate: '2026-07-01',
+          status: 'team_fund',
+          waterAmount: 30000,
+          memberIds: members.map(member => member.id),
+        }],
+      },
+      paymentCoveredItems: ['member-1', 'member-2'].map((memberId, index) => ({
+        payableItemKey: `item:pickleball-ticket:ticket-1:water|member:${memberId}|profile:profile-${index + 1}|month:2026-07`,
+        amount: -10000,
+      })),
+      notifications: [],
+    }
+
+    const result = buildExpenseDetailData(state, 'ticket-water:ticket-1')
+    const splitTags = Object.fromEntries(result.splits.map(split => [split.name, split.tag]))
+
+    expect(splitTags).toEqual({ An: 'paid', Bình: 'paid', Cường: 'owe' })
+  })
 })
 
 describe('effectiveSessionMemberIds', () => {

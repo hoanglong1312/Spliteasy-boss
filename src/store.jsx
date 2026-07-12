@@ -602,6 +602,7 @@ function buildEmptyState() {
       guestFeePerSession: 0,
     },
     notifications: [],
+    paymentCoveredItems: [],
     disputeCount: 0,
     homeMonth: null,
     homeMonthSessions: [],
@@ -629,7 +630,7 @@ function memberHasPin(member, profile = null) {
 
 async function fetchGroupData(token) {
   const sb = createSupabase(token)
-  const [mR, prR, gR, mtR, eR, pR, sR, spR, scR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, jR, msR] = await Promise.all([
+  const [mR, prR, gR, mtR, eR, pR, sR, spR, scR, ppR, pcR, pmcR, psR, paR, pbsR, pbaR, psiR, ptR, popR, dR, nR, pciR, jR, msR] = await Promise.all([
     sb.from('members').select('*'),
     sb.from('profiles').select('*'),
     sb.from('groups').select('*'),
@@ -651,6 +652,7 @@ async function fetchGroupData(token) {
     sb.from('pickleball_owner_payments').select('*').order('paid_at', { ascending: false }),
     sb.from('expense_disputes').select('id').eq('status', 'open'),
     sb.rpc('list_visible_notifications'),
+    sb.rpc('list_confirmed_payment_covered_items'),
     sb.from('join_requests').select('*').eq('status', 'pending'),
     sb.from('member_month_settlements').select('*, expenses(amount)'),
   ])
@@ -670,6 +672,7 @@ async function fetchGroupData(token) {
   if (popR.error) console.warn('[store] pickleball_owner_payments query failed:', popR.error)
   if (dR.error) console.warn('[store] dispute count query failed:', dR.error)
   if (nR.error) console.warn('[store] notifications query failed:', nR.error)
+  if (pciR.error) console.warn('[store] payment coverage query failed:', pciR.error)
   if (jR.error) console.warn('[store] join_requests query failed:', jR.error)
   if (msR.error) console.warn('[store] member_month_settlements query failed:', msR.error)
   return {
@@ -694,6 +697,7 @@ async function fetchGroupData(token) {
     pickleballOwnerPayments: popR.data || [],
     disputeCount:    (dR.data || []).length,
     notifications:   nR.data || [],
+    paymentCoveredItems: pciR.data || [],
     joinRequests:    jR.data || [],
     monthSettlements: msR.data || [],
   }
@@ -973,6 +977,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     pickleballOwnerPayments = [],
     disputeCount,
     notifications = [],
+    paymentCoveredItems = [],
     joinRequests = [],
     monthSettlements = [],
   } = raw
@@ -1453,6 +1458,7 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
       ownerPayments: normalOwnerPayments,
     },
     notifications: normalNotifications,
+    paymentCoveredItems: safeArray(paymentCoveredItems),
     disputeCount: disputeCount || 0,
     toast: { visible: false, message: '' },
     _loading: false,
