@@ -816,7 +816,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const debtSources = safeArray(data?.sourceBreakdown).filter(source => Number(source.amount) < 0);
   const ownPaymentItems = debtSources.flatMap((source, index) => sourcePaymentItems(source, {
     prefix: `own:${index}`,
-    memberId: data?.memberId || data?.currentMemberId || source.memberId || source.member_id || '',
+    memberId: data?.memberId || data?.currentMemberId || data?.currentUserId || source.memberId || source.member_id || '',
     profileId: data?.profileId || data?.currentProfileId || source.profileId || source.profile_id || '',
   }));
   const ownPaymentItemKeys = ownPaymentItems.map(item => item.key).join('|');
@@ -906,7 +906,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
       await onConfirmPayment?.({
         amount: amountToPay,
         memberName: data?.memberName || 'Thành viên',
-        memberId: data?.memberId || data?.currentMemberId || '',
+        memberId: data?.memberId || data?.currentMemberId || data?.currentUserId || '',
         profileId: data?.profileId || data?.currentProfileId || '',
         groupId: data?.currentGroupId || '',
         coveredMembers: selectedPayForRows,
@@ -963,30 +963,12 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 
   return (
     <BottomSheet title="Thanh toán" onClose={onClose}>
-      {isTreasurer && (
-        <>
-          <TreasurerPaymentDashboard
-            data={data}
-            progressRows={(data?.paymentProgress || []).filter(row => !data?.currentProfileId || String(row.profileId || '') !== String(data.currentProfileId))}
-            paymentRecords={paymentRecords}
-            pendingRecords={paymentRecords}
-            refundRows={refundRows}
-            pendingCheckpointsForTreasurer={data?.pendingCheckpointsForTreasurer || []}
-            confirmedRefunds={confirmedRefunds}
-            onAction={onAction}
-            onViewPaymentRecord={onViewPaymentRecord}
-            onConfirmRefund={onConfirmRefund}
-            onCancelRefund={onCancelRefund}
-          />
-        </>
-      )}
-
       {netBalance < 0 && (
         <Card style={{ padding: 14, borderColor: canShowQr ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)' }}>
           {!canShowQr && (
             <>
               <div style={{ fontSize: 10, fontWeight: 900, color: '#6ee7b7', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                Thanh toán về thủ quỹ
+                {isTreasurer ? 'Khoản của thủ quỹ' : 'Thanh toán về thủ quỹ'}
               </div>
               <div style={{ fontSize: 28, fontWeight: 950, color: '#fca5a5', marginTop: 6, ...type.mono }}>
                 {formatVND(amountToPay)}
@@ -1222,6 +1204,22 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
             </div>
           )}
         </Card>
+      )}
+
+      {isTreasurer && (
+        <TreasurerPaymentDashboard
+          data={data}
+          progressRows={(data?.paymentProgress || []).filter(row => !data?.currentProfileId || String(row.profileId || '') !== String(data.currentProfileId))}
+          paymentRecords={paymentRecords}
+          pendingRecords={paymentRecords}
+          refundRows={refundRows}
+          pendingCheckpointsForTreasurer={data?.pendingCheckpointsForTreasurer || []}
+          confirmedRefunds={confirmedRefunds}
+          onAction={onAction}
+          onViewPaymentRecord={onViewPaymentRecord}
+          onConfirmRefund={onConfirmRefund}
+          onCancelRefund={onCancelRefund}
+        />
       )}
 
       {!isTreasurer && netBalance >= 0 && (

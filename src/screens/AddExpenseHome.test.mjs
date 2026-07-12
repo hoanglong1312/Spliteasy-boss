@@ -733,7 +733,7 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /Chờ thủ quỹ hoàn tiền/);
   assert.match(homeSource, /Cần hoàn tiền/);
   assert.match(homeSource, /onConfirmRefund\?\.\(item\)/);
-  assert.match(homeSource, /onAction\?\.\('confirmPaymentSent', payload\)/);
+  assert.match(homeSource, /onAction\?\.\(isTreasurer \? 'markMemberPaid' : 'confirmPaymentSent', payload\)/);
   assert.match(homeSource, /const coveredSources = selectedPaymentItems\.map\(paymentItemToCoveredSource\)/);
   assert.match(homeSource, /\.filter\(item => Number\(item\.amount\) !== 0\)/);
   assert.match(homeSource, /function paymentItemsAmountDue\(items\) \{[\s\S]*const total = safeArray\(items\)\.reduce\(\(sum, item\) => sum \+ \(Number\(item\.amount\) \|\| 0\), 0\);[\s\S]*return total < 0 \? Math\.abs\(total\) : 0;/);
