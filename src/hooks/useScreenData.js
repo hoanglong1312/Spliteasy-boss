@@ -3838,6 +3838,47 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
     monthlyConfig?.ticket_price ??
     50000
   ) || 50000
+  const sessions = getStateMonthSessions(sourceState, monthDate)
+  const members = currentGroupMembers(sourceState)
+  const currentMember = members.find(member => String(member.id) === String(currentUserId))
+  const balance = buildMemberMonthBalance(sourceState, sourceState?.pickle || {}, sessions, currentUserId, monthDate)
+  const sessionDates = new Map(sessions.map(session => [
+    String(session?.id || dateKey(sessionDate(session))),
+    sessionDate(session),
+  ]))
+  const sessionCostRows = currentMember
+    ? buildPickleballPayableItems(sourceState, sourceState?.pickle || {}, sessions, currentMember, members, monthDate, balance)
+      .filter(item => Number(item.amount) < 0 && (
+        String(item.itemId).startsWith('pickleball-court:') ||
+        String(item.itemId).startsWith('pickleball-session:')
+      ))
+      .map(item => {
+        const itemId = String(item.itemId)
+        const sessionId = itemId.match(/^pickleball-session:(.+):(fee|water|extras)$/)?.[1] || ''
+        const type = itemId.startsWith('pickleball-court:')
+          ? 'pickleball_court'
+          : itemId.endsWith(':fee')
+            ? 'pickleball_session_fee'
+            : itemId.endsWith(':water')
+              ? 'pickleball_session_water'
+              : 'pickleball_session_extras'
+        const amount = Math.abs(Number(item.amount) || 0)
+        return {
+          id: itemId,
+          type,
+          groupId,
+          title: item.expenseTitle || 'Chi phí Pickleball',
+          amount,
+          paidBy: '',
+          participants: [currentUserId],
+          splits: [{ memberId: currentUserId, amount }],
+          date: sessionDates.get(sessionId) || `${yearMonth}-01`,
+          status: 'approved',
+          category: 'pickleball',
+          yearMonth,
+        }
+      })
+    : []
   const monthlyTicketRow = currentUserId && memberFlexTicketType(sourceState, currentUserId, yearMonth) === 'monthly' && monthlyTicketPrice > 0
     ? {
       id: `monthly-ticket:${groupId || sourceState?.currentGroupId || 'pickleball'}:${yearMonth}:${currentUserId}`,
@@ -3900,7 +3941,7 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
         yearMonth: ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket)),
       }
     }) : []
-  const rows = [monthlyTicketRow, ...ticketRows, ...waterRows].filter(Boolean)
+  const rows = [...sessionCostRows, monthlyTicketRow, ...ticketRows, ...waterRows].filter(Boolean)
   if (!rows.length) return null
   return {
     ...group,
@@ -3948,6 +3989,9 @@ function buildExpenseActivity(groups) {
 function transactionPayableItemKey(expense, memberId, members, yearMonth) {
   const profileId = profileIdForMember(memberId, members)
   const expType = expense.type || ''
+  if (expType === 'pickleball_court' || String(expType).startsWith('pickleball_session_')) {
+    return buildPayableItemKey({ itemId: expense.id, memberId, profileId, month: yearMonth })
+  }
   if (expType === 'pickleball_ticket') {
     const rawId = String(expense.id || '').replace(/^ticket:/, '')
     return buildPayableItemKey({ itemId: `pickleball-ticket:${rawId}:fee`, memberId, profileId, month: yearMonth })

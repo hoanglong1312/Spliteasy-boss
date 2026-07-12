@@ -676,6 +676,46 @@ describe('flex billing helpers', () => {
     })
   })
 
+  test('buildHomeData includes fixed-mode session costs for a casual pickleball member', () => {
+    const state = makeFlexState({
+      billing_mode: 'fixed',
+      court_fee: 650000,
+      fixed_member_ids: ['member-1', 'member-2'],
+    })
+    state.currentUserId = 'member-3'
+    state.currentUserName = 'Việt Hoàng'
+    state.members[2].name = 'Việt Hoàng'
+    state.groups = [{ id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball', members: state.members.map(member => member.id) }]
+    state.currentGroup = state.groups[0]
+    state.pickle.monthlyConfigs[0].year_month = '2026-06'
+    state.pickle.sessions = ['05', '12', '19'].map((day, index) => ({
+      id: `session-${index + 1}`,
+      group_id: 'group-1',
+      date: `2026-06-${day}`,
+      water_amount: 30000,
+      attendance_records: [
+        { member_id: 'member-1', status: 'present' },
+        { member_id: 'member-2', status: 'present' },
+        { member_id: 'member-3', status: 'present' },
+      ],
+    }))
+    state.pickle.ownerPayments = [{
+      group_id: 'group-1',
+      year_month: '2026-06',
+      items: [{ key: 'next_court', year_month: '2026-06' }],
+    }]
+
+    const result = buildHomeData(state, 'member-3', state.members, state.groups, {}, state, '2026-06')
+    const pickleballTransactions = result.transactions.filter(row => row.category === 'pickleball' && row.isMine)
+
+    expect(pickleballTransactions.map(row => [row.type, row.amount])).toEqual([
+      ['pickleball_session_water', -10000],
+      ['pickleball_session_water', -10000],
+      ['pickleball_session_water', -10000],
+      ['pickleball_court', -325000],
+    ])
+  })
+
   test('buildAllExpensesData includes monthly ticket and ticket water for mapped pickleball member', () => {
     const state = addJulyFlexTickets(makeFlexState({
       billing_mode: 'flex',
