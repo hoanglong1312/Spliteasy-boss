@@ -1286,7 +1286,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const matchSearch = makeMatcher(searchQuery);
   const pendingRecordsRaw = pending.filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
-  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
+  const pendingCheckpointMemberIds = new Set(pendingCheckpoints.map(row => String(row.memberId || '')));
+  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel })
+    .map(row => ({ ...row, paymentLocked: pendingCheckpointMemberIds.has(String(row.memberId || '')) }));
   const totalNeedCollect = memberRows.reduce((sum, row) => sum + row.amountDue, 0);
   const totalReceived = memberRows.reduce((sum, row) => sum + row.amountPaid, 0);
   const totalRefund = memberRows.reduce((sum, row) => sum + row.amountRefund, 0);
@@ -1305,7 +1307,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const paidMemberCount = profileStatRows.filter(row => row.amountPaid > 0 && row.amountDue <= 0).length;
   const pendingMemberCount = new Set([...pendingRecordsRaw, ...pendingCheckpoints].map(treasurerProfileStatKey).filter(Boolean)).size;
   const unpaidMemberCount = profileStatRows.filter(row => row.amountDue > 0).length;
-  const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
+  const selectedTreasurerItems = memberRows.flatMap(row => row.paymentLocked ? [] : row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
   const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
   const selectedTreasurerTotal = paymentItemsAmountDue(selectedTreasurerItems);
   const refundBillData = refundBillItem ? buildRefundBillData(refundBillItem) : null;
@@ -1332,6 +1334,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   }
 
   function setTreasurerRowSelection(row, selected) {
+    if (row?.paymentLocked) return;
     setSelectedTreasurerItemKeys(prev => {
       const next = new Set(prev);
       safeArray(row?.items).filter(item => !item.paid && item.kind !== 'refund').forEach(item => {
@@ -1463,6 +1466,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           <TreasurerMemberPaymentRow
             key={row.key}
             row={row}
+            paymentLocked={row.paymentLocked}
             selectedKeys={selectedTreasurerItemKeys}
             collapseTick={collapsedTreasurerRows.keys.includes(row.key) ? collapsedTreasurerRows.tick : 0}
             onShare={(member) => setShareMember(member)}
@@ -1516,6 +1520,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <MultiMemberQRSheet
           members={qrSheetMembers}
           paymentTarget={data?.paymentTarget}
+          onRequestSnapshot={(payload) => onAction?.('requestSettlementCheckpoint', payload)}
           onClose={() => setQrSheetMembers(null)}
         />
       )}
@@ -1735,7 +1740,7 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill }) {
+function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
   const unpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund');
@@ -1765,9 +1770,11 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
         <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
-            {row.amountDue > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, amount: row.amountDue })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
-            {unpaidItems.length > 0 && <button type="button" onClick={() => onToggleRowSelection?.(!rowAllSelected)} style={miniDashButton(rowAllSelected ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.18)', rowAllSelected ? '#cbd5e1' : '#6ee7b7')}>{rowAllSelected ? 'Bỏ chọn' : 'Chọn hết'}</button>}
-            {selectedUnpaidTotal > 0 && <button type="button" onClick={() => onPaySelected?.(selectedUnpaidItems)} style={miniDashButton('#22c55e', '#052e16')}>TT tổng {formatVND(selectedUnpaidTotal)}</button>}
+            {paymentLocked
+              ? <span style={{ padding: '6px 9px', borderRadius: 8, background: 'rgba(251,191,36,0.14)', color: '#fde68a', fontSize: 11, fontWeight: 850 }}>Chờ nhận tiền</span>
+              : row.amountDue > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, groupId: row.groupId, amount: row.amountDue })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
+            {!paymentLocked && unpaidItems.length > 0 && <button type="button" onClick={() => onToggleRowSelection?.(!rowAllSelected)} style={miniDashButton(rowAllSelected ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.18)', rowAllSelected ? '#cbd5e1' : '#6ee7b7')}>{rowAllSelected ? 'Bỏ chọn' : 'Chọn hết'}</button>}
+            {!paymentLocked && selectedUnpaidTotal > 0 && <button type="button" onClick={() => onPaySelected?.(selectedUnpaidItems)} style={miniDashButton('#22c55e', '#052e16')}>TT tổng {formatVND(selectedUnpaidTotal)}</button>}
           </div>
           {groupedItems.map(group => (
             <div key={group.key} style={{ display: 'grid', gap: 6 }}>
@@ -1785,11 +1792,11 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
                   return (
                     <div
                       key={item.key}
-                      role={!item.paid && !isRefund ? 'button' : undefined}
-                      tabIndex={!item.paid && !isRefund ? 0 : undefined}
-                      onClick={() => !item.paid && !isRefund ? onToggleSelect?.(item) : undefined}
+                      role={!paymentLocked && !item.paid && !isRefund ? 'button' : undefined}
+                      tabIndex={!paymentLocked && !item.paid && !isRefund ? 0 : undefined}
+                      onClick={() => !paymentLocked && !item.paid && !isRefund ? onToggleSelect?.(item) : undefined}
                       onKeyDown={(event) => {
-                        if ((event.key === 'Enter' || event.key === ' ') && !item.paid && !isRefund) {
+                        if ((event.key === 'Enter' || event.key === ' ') && !paymentLocked && !item.paid && !isRefund) {
                           event.preventDefault();
                           onToggleSelect?.(item);
                         }
@@ -1803,8 +1810,10 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
                         <button
                           type="button"
+                          disabled={paymentLocked && !item.paid && !isRefund}
                           onClick={(event) => {
                             event.stopPropagation();
+                            if (paymentLocked && !item.paid && !isRefund) return;
                             if (isRefund && item.paid) return onCancelRefund?.(item);
                             if (isRefund) return onConfirmRefund?.(item);
                             if (item.paid) return onCancelPaid?.(item.record);
@@ -2778,7 +2787,7 @@ function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {
   );
 }
 
-function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
+function MultiMemberQRSheet({ members, paymentTarget, onRequestSnapshot, onClose }) {
   // When multiple members: combine into 1 QR
   // When single member: show that member's QR
   
@@ -2823,9 +2832,18 @@ function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
     }
   }
 
+  const [saving, setSaving] = useState(false);
   const handleDownload = async () => {
     if (!qrUrl) return;
+    setSaving(true);
     try {
+      await onRequestSnapshot?.({
+        groups: members.map(member => ({
+          groupId: member.groupId,
+          memberId: member.memberId,
+          amount: Number(member.amount) || 0,
+        })),
+      });
       const response = await fetch(qrUrl);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -2836,8 +2854,11 @@ function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      onClose?.();
     } catch (err) {
       console.error('Download failed:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -2877,6 +2898,7 @@ function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
             
             <button
               onClick={handleDownload}
+              disabled={saving}
               style={{
                 background: 'rgba(255,255,255,0.08)',
                 border: 'none',
@@ -2884,12 +2906,13 @@ function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
                 padding: '8px 16px',
                 color: '#f8fafc',
                 fontSize: 13,
-                cursor: 'pointer',
+                cursor: saving ? 'default' : 'pointer',
                 fontFamily: 'inherit',
                 fontWeight: 600,
+                opacity: saving ? 0.7 : 1,
               }}
             >
-              Tải QR
+              {saving ? 'Đang chốt...' : 'Chốt & tải QR'}
             </button>
           </div>
         ) : (

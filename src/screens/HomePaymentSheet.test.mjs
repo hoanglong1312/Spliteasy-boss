@@ -98,6 +98,22 @@ test('treasurer dashboard can create one bill from selected items across members
   assert.match(homeSource, /paymentDisplayGroups = row\?\.paymentGroups \|\| \[/);
 });
 
+test('treasurer QR snapshots member debt before downloading', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+  const qrSource = sliceBetween('function MultiMemberQRSheet(', 'function ProgressStat');
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
+  assert.match(dashboardSource, /onRequestSnapshot=\{\(payload\) => onAction\?\.\('requestSettlementCheckpoint', payload\)\}/);
+  assert.match(dashboardSource, /paymentLocked=\{row\.paymentLocked\}/);
+  assert.match(dashboardSource, /pendingCheckpointMemberIds\.has\(String\(row\.memberId \|\| ''\)\)/);
+  assert.match(qrSource, /await onRequestSnapshot\?\.\(\{\s*groups: members\.map/);
+  assert.match(qrSource, /groupId: member\.groupId/);
+  assert.match(qrSource, /memberId: member\.memberId/);
+  assert.match(qrSource, /amount: Number\(member\.amount\) \|\| 0/);
+  assert.ok(qrSource.indexOf('await onRequestSnapshot') < qrSource.indexOf('await fetch(qrUrl)'));
+  assert.match(rowSource, /paymentLocked/);
+  assert.match(rowSource, /Chờ nhận tiền/);
+});
+
 test('treasurer dashboard nets signed debt and credit items', () => {
   const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
