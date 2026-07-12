@@ -65,6 +65,16 @@ test('IconButton meets the minimum touch target', () => {
   assert.match(iconButtonSource, /width: 44, height: 44/)
 })
 
+test('IconButton gives common symbols clear accessible names', () => {
+  const iconButtonSource = primitivesSource.slice(
+    primitivesSource.indexOf('export function IconButton'),
+    primitivesSource.indexOf('export function IconActionButton')
+  )
+  assert.match(iconButtonSource, /'‹': 'Quay lại'/)
+  assert.match(iconButtonSource, /'⋯': 'Tùy chọn'/)
+  assert.match(iconButtonSource, /rest\['aria-label'\] \|\| iconLabel/)
+})
+
 test('BottomSheet portals to the phone frame instead of the scrollable screen', () => {
   assert.match(primitivesSource, /import \{ createPortal \} from 'react-dom'/)
   assert.match(primitivesSource, /data-spliteasy-phone-frame/)

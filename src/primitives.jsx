@@ -462,8 +462,19 @@ export function ActionButton({ children, danger, tone = 'finance', icon, style, 
 
 export function IconButton({ children, dot, style, ...rest }) {
   const [pressed, setPressed] = useState(false);
+  const iconLabel = typeof children === 'string' ? ({
+    '‹': 'Quay lại',
+    '×': 'Đóng',
+    '?': 'Trợ giúp',
+    '⚲': 'Lọc',
+    '⋯': 'Tùy chọn',
+    '+': 'Thêm',
+    '✎': 'Chỉnh sửa',
+    '💳': 'Thanh toán',
+  }[children]) : undefined;
   return (
     <button
+      aria-label={rest['aria-label'] || iconLabel}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
