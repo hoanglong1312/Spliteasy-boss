@@ -21,6 +21,7 @@ const sliceBetween = (start, end) => {
 
 test('member payment sheet uses bill card layout without share buttons', () => {
   const paymentSheetSource = sliceBetween('function PaymentSheet(', 'function treasurerProfileStatKey');
+  const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
   assert.doesNotMatch(paymentSheetSource, /copyPaymentSummary/);
   assert.doesNotMatch(paymentSheetSource, /Thẻ bill/);
   assert.doesNotMatch(paymentSheetSource, /<PaymentBillCardSheet/);
@@ -28,9 +29,13 @@ test('member payment sheet uses bill card layout without share buttons', () => {
   assert.match(paymentSheetSource, /amount=\{amountToPay\}/);
   assert.match(paymentSheetSource, /qrUrl=\{qrUrl\}/);
   assert.match(paymentSheetSource, /paymentDisplayGroups=\{paymentDisplayGroups\}/);
+  assert.match(paymentSheetSource, /selectable/);
   assert.match(paymentSheetSource, /actions=\{\(/);
   assert.match(paymentSheetSource, /Lưu QR/);
   assert.match(paymentSheetSource, /Đã thanh toán/);
+  assert.match(paymentSheetSource, /\{!canShowQr && \([\s\S]*<PaymentItemSection/);
+  assert.match(billContentSource, /selectable = false/);
+  assert.match(billContentSource, /selectable && group\.onToggle/);
   assert.doesNotMatch(paymentSheetSource, /width: 210, height: 210/);
 });
 
@@ -151,11 +156,11 @@ test('saving refund bank updates the open refund bill item so QR appears immedia
 test('bill card only renders checked payment items grouped by profile source and month', () => {
   const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
   const billCardSource = sliceBetween('function PaymentBillCardSheet(', 'function signedVND');
-  assert.match(homeSource, /function PaymentBillCardContent\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' \}\)/);
+  assert.match(homeSource, /function PaymentBillCardContent\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, selectable = false, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' \}\)/);
   assert.match(homeSource, /function PaymentBillCardSheet\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', footerActions = null, onClose \}\)/);
   assert.match(billCardSource, /<PaymentBillCardContent[\s\S]*paymentDisplayGroups=\{paymentDisplayGroups\}/);
   assert.match(homeSource, /group\.items\.filter\(item => group\.checkedKeys\?\.has\?\.\(item\.key\)\)/);
-  assert.match(homeSource, /groupPaymentItemsBySource\(selectedItems\)/);
+  assert.match(billContentSource, /groupPaymentItemsBySource\(selectable \? group\.items : selectedItems\)/);
   assert.match(homeSource, /item\.monthLabel \|\| fullMonthLabel\(item\.month\)/);
   assert.match(billContentSource, /Các khoản của<\/span>/);
   assert.match(billContentSource, /border: '1px solid rgba\(147,197,253,0\.48\)'/);

@@ -994,6 +994,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                 transferDescription={transferDescription}
                 qrUrl={qrUrl}
                 paymentDisplayGroups={paymentDisplayGroups}
+                selectable
                 actions={(
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
                     <a
@@ -1186,17 +1187,19 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
               )}
             </div>
           )}
-          <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
-            {paymentDisplayGroups.map(group => (
-                <PaymentItemSection
-                  key={group.key}
-                  title={group.title}
-                  items={group.items}
-                  checkedKeys={group.checkedKeys}
-                  onToggle={group.onToggle}
-                />
-            ))}
-          </div>
+          {!canShowQr && (
+            <div style={{ display: 'grid', gap: 12, marginTop: 12 }}>
+              {paymentDisplayGroups.map(group => (
+                  <PaymentItemSection
+                    key={group.key}
+                    title={group.title}
+                    items={group.items}
+                    checkedKeys={group.checkedKeys}
+                    onToggle={group.onToggle}
+                  />
+              ))}
+            </div>
+          )}
           {!canShowQr && (
             <div style={{ fontSize: 12, color: '#fde68a', lineHeight: 1.45, fontWeight: 700, marginTop: 10 }}>
               Chưa có đủ thông tin ngân hàng của thủ quỹ. Nhờ Long cập nhật STK trong tab cá nhân.
@@ -2331,11 +2334,11 @@ function billQrOnlyUrl(value) {
   return String(value || '').replace(/-compact2\.(png|jpg|jpeg)(?=(?:\?|$))/i, '-qr_only.$1');
 }
 
-function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
+function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, selectable = false, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const displayQrUrl = billQrOnlyUrl(qrUrl);
   const groups = safeArray(paymentDisplayGroups)
-    .map(group => ({ ...group, items: group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
+    .map(group => ({ ...group, items: selectable ? group.items : group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
     .filter(group => group.items.length > 0);
 
   return (
@@ -2370,8 +2373,10 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
                 <span style={{ fontSize: 10, color: '#bfdbfe', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap' }}>Các khoản của</span>
                 <span style={{ minWidth: 0, maxWidth: '100%', padding: '2px 7px', borderRadius: 999, background: 'rgba(96,165,250,0.22)', border: '1px solid rgba(147,197,253,0.48)', color: '#eff6ff', fontSize: 10, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName}</span>
               </div>
-              {groupPaymentItemsBySource(selectedItems).map(sourceGroup => {
-                const sourceTotal = sourceGroup.items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+              {groupPaymentItemsBySource(selectable ? group.items : selectedItems).map(sourceGroup => {
+                const sourceTotal = sourceGroup.items
+                  .filter(item => !selectable || group.checkedKeys?.has?.(item.key))
+                  .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
                 return (
                   <div key={sourceGroup.key} style={{ display: 'grid', gap: 6 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
@@ -2379,12 +2384,46 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
                       <div style={{ fontSize: 12, fontWeight: 950, color: sourceTotal > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(sourceTotal)}</div>
                     </div>
                     <div style={{ display: 'grid', gap: 5, marginLeft: 7, paddingLeft: 10, borderLeft: '3px solid rgba(148,163,184,0.38)' }}>
-                      {sourceGroup.items.map(item => (
-                        <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
-                          <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
-                          <div style={{ fontSize: 11, fontWeight: 950, color: Number(item.amount) > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
-                        </div>
-                      ))}
+                      {sourceGroup.items.map(item => {
+                        const checked = group.checkedKeys?.has?.(item.key);
+                        const selectableItem = selectable && group.onToggle;
+                        const ItemRow = selectableItem ? 'label' : 'div';
+                        return (
+                          <ItemRow key={item.key} style={{
+                            display: 'grid',
+                            gridTemplateColumns: selectableItem ? '20px minmax(0,1fr) auto' : 'minmax(0,1fr) auto',
+                            gap: 8,
+                            alignItems: 'center',
+                            minHeight: selectableItem ? 36 : 'auto',
+                            padding: selectableItem ? '5px 7px' : 0,
+                            borderRadius: selectableItem ? 9 : 0,
+                            border: selectableItem ? `1px solid ${checked ? 'rgba(34,197,94,0.52)' : 'rgba(255,255,255,0.08)'}` : 'none',
+                            background: selectableItem && checked ? 'rgba(34,197,94,0.12)' : 'transparent',
+                            cursor: selectableItem ? 'pointer' : 'default',
+                          }}>
+                            {selectableItem && (
+                              <>
+                                <input type="checkbox" checked={checked} onChange={() => group.onToggle(item.key)} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }} />
+                                <span style={{
+                                  width: 16,
+                                  height: 16,
+                                  borderRadius: 5,
+                                  border: `1.5px solid ${checked ? '#22c55e' : 'rgba(148,163,184,0.48)'}`,
+                                  background: checked ? '#22c55e' : 'transparent',
+                                  color: checked ? '#052e16' : 'transparent',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 11,
+                                  fontWeight: 950,
+                                }}>✓</span>
+                              </>
+                            )}
+                            <span style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</span>
+                            <span style={{ fontSize: 11, fontWeight: 950, color: Number(item.amount) > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</span>
+                          </ItemRow>
+                        );
+                      })}
                     </div>
                   </div>
                 );
