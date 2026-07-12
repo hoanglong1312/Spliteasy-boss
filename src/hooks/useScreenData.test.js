@@ -1233,6 +1233,42 @@ describe('buildPickleballOverviewData flex attendance', () => {
       sub: '1 buổi có nước',
     })
   })
+
+  test('subtracts confirmed covered items from the displayed balance', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      monthly_ticket_member_ids: ['member-1'],
+    }))
+    state.currentUserId = 'member-1'
+    state.currentProfileId = 'member-1'
+    state.notifications = [{
+      id: 'payment-confirmed-1',
+      type: 'payment_confirmed',
+      actor_member_id: 'member-1',
+      group_id: 'group-1',
+      metadata: {
+        status: 'confirmed',
+        amount: 700000,
+        monthLabel: 'Tháng 7 · 2026',
+        coveredItems: [{
+          payableItemKey: 'item:pickleball-monthly-ticket:group-1:2026-07|member:member-1|profile:member-1|month:2026-07',
+          itemId: 'pickleball-monthly-ticket:group-1:2026-07',
+          sourceType: 'pickleball',
+          sourceId: 'group-1',
+          memberId: 'member-1',
+          profileId: 'member-1',
+          month: '2026-07',
+          amount: -700000,
+        }],
+      },
+    }]
+
+    const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'member-1', state.members, '2026-07')
+
+    expect(data.yourBalance.total).toBe(-10714)
+    expect(data.yourBalance.statusLabel).toBe('Cần nộp')
+  })
 })
 
 describe('buildPrevMonthUnpaid', () => {

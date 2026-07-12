@@ -2457,9 +2457,28 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
   const ticketStats = buildTicketMonthStats(state, today)
   const ticketFund = buildTicketFundSummary(state, today)
   const teamFundOverview = buildPickleballTeamFundData(state, currentYearMonth)
-  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentPickleballMemberId, today)
-  const breakdown = buildPickleBreakdown(pickle, monthSessions, currentPickleballMemberId, summary, ticketAmount, memberBalance)
   const currentMember = members.find(member => String(member.id || member.member_id) === String(currentPickleballMemberId))
+  const memberBalance = buildMemberMonthBalance(state, pickle, monthSessions, currentPickleballMemberId, today)
+  const payableItems = buildPickleballPayableItems(state, pickle, monthSessions, currentMember, members, today, memberBalance)
+  const balanceSource = {
+    sourceId: state?.currentGroupId || state?.currentGroup?.id || '',
+    sourceType: 'pickleball',
+    sourceLabel: state?.currentGroup?.name || 'Pickleball',
+    memberId: currentPickleballMemberId,
+    profileId: profileIdForMember(currentPickleballMemberId, members),
+    amount: memberBalance.netBalance,
+    month: currentYearMonth,
+    monthBreakdown: [{ month: currentYearMonth, label: sourceMonthLabel(currentYearMonth), amount: memberBalance.netBalance }],
+    payableItems,
+  }
+  const coverage = paymentCoverageForMember(
+    { ...state, members: safeArray(state?.members).length ? state.members : members },
+    currentMember || { id: currentPickleballMemberId },
+    formatMonthLabel(today),
+    [balanceSource],
+  )
+  const remainingBalance = Number(applyConfirmedPaymentCoverage([balanceSource], coverage.confirmedSources)[0]?.amount) || 0
+  const breakdown = buildPickleBreakdown(pickle, monthSessions, currentPickleballMemberId, summary, ticketAmount, memberBalance)
   const ticketAdjustment = -ticketAmount
   const scheduleWeekdays = normalizeWeekdays(
     monthlyConfig?.scheduleWeekdays ||
@@ -2505,11 +2524,11 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
       ticketTotal: ticketStats.totalAmount,
     },
     yourBalance: {
-      total: memberBalance.netBalance,
+      total: remainingBalance,
       name: currentMember?.displayName || currentMember?.name || 'Bạn',
       initial: initials(currentMember),
       color: currentMember?.color,
-      statusLabel: memberBalance.netBalance > 0 ? 'Được quỹ bù' : memberBalance.netBalance < 0 ? 'Cần nộp' : 'Đã cân bằng',
+      statusLabel: remainingBalance > 0 ? 'Được quỹ bù' : remainingBalance < 0 ? 'Cần nộp' : 'Đã thanh toán',
       ticketAdjustment,
       ticketType: memberBalance.ticketType ?? null,
       summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember), isFlexBilling, state, today),
