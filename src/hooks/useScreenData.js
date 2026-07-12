@@ -3901,8 +3901,18 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
       let isPaid = false
       if (amount < 0 && meForGroup && paidItemKeys.size) {
         const profileId = profileIdForMember(meForGroup, members)
-        const key = buildPayableItemKey({ expenseId: expense.id, memberId: meForGroup, profileId, month: yearMonth })
-        isPaid = paidItemKeys.has(key)
+        const expType = expense.type || ''
+        let keyParams
+        if (expType === 'pickleball_ticket') {
+          const rawId = String(expense.id || '').replace(/^ticket:/, '')
+          keyParams = { itemId: `pickleball-ticket:${rawId}:fee`, memberId: meForGroup, profileId, month: yearMonth }
+        } else if (expType === 'pickleball_ticket_water') {
+          const rawId = String(expense.id || '').replace(/^ticket-water:/, '')
+          keyParams = { itemId: `pickleball-ticket:${rawId}:water`, memberId: meForGroup, profileId, month: yearMonth }
+        } else {
+          keyParams = { expenseId: expense.id, memberId: meForGroup, profileId, month: yearMonth }
+        }
+        isPaid = paidItemKeys.has(buildPayableItemKey(keyParams))
       }
 
       return {
