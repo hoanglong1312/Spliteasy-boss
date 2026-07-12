@@ -16,6 +16,7 @@ import {
   buildPrevMonthUnpaid,
   buildAllExpensesData,
   buildExpenseDetailData,
+  buildSettlementPeriodData,
   buildPersonalPickleSummaryCards,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
@@ -714,6 +715,69 @@ describe('flex billing helpers', () => {
       ['pickleball_session_water', -10000],
       ['pickleball_court', -325000],
     ])
+  })
+
+  test('fixed-mode transaction rows support group-wide lists, detail, and reports', () => {
+    const state = makeFlexState({
+      billing_mode: 'fixed',
+      court_fee: 650000,
+      fixed_member_ids: ['member-1', 'member-2'],
+    })
+    state.currentUserId = 'member-1'
+    state.currentUserName = 'Member One'
+    state.selectedYearMonth = '2026-07'
+    state.groups = [{
+      id: 'group-1',
+      name: 'Virgo Pickleball 246',
+      kind: 'pickleball',
+      members: state.members.map(member => member.id),
+      expenses: [],
+    }]
+    state.currentGroup = state.groups[0]
+    state.pickle.sessions = [{
+      id: 'session-1',
+      group_id: 'group-1',
+      date: '2026-07-05',
+      water_amount: 30000,
+      attendance_records: state.members.map(member => ({ member_id: member.id, status: 'present' })),
+    }]
+    state.pickle.ownerPayments = [{
+      group_id: 'group-1',
+      year_month: '2026-07',
+      items: [{ key: 'next_court', year_month: '2026-07' }],
+    }]
+
+    const allExpenses = buildAllExpensesData(state, state.currentUserId, state.members, state.currentUserName)
+    const court = allExpenses.transactions.find(row => row.type === 'pickleball_court')
+    const water = allExpenses.transactions.find(row => row.type === 'pickleball_session_water')
+    const courtDetail = buildExpenseDetailData(state, court.id)
+    const groupDetail = buildGroupDetailData(
+      state.currentGroup,
+      state.currentUserId,
+      state.members,
+      state.currentUserName,
+      '2026-07',
+      [],
+      state,
+    )
+    const settlement = buildSettlementPeriodData(state, { yearMonth: '2026-07' })
+
+    expect(court).toMatchObject({ amount: -162500 })
+    expect(court.splits).toHaveLength(3)
+    expect(water).toMatchObject({ amount: -10000 })
+    expect(water.splits).toHaveLength(3)
+    expect(courtDetail).toMatchObject({
+      id: court.id,
+      amount: 650000,
+      detailLabel: 'Giao dịch Pickleball',
+      canEdit: false,
+      canDelete: false,
+    })
+    expect(courtDetail.splits).toHaveLength(3)
+    expect(groupDetail).toMatchObject({ expenseCount: 2, totalSpent: 680000 })
+    expect(groupDetail.exportExpenses.some(row => row.type === 'pickleball_court')).toBe(true)
+    expect(settlement).toMatchObject({ totalExpenses: 680000, expenseCount: 2 })
+    expect(settlement.categories.some(row => row.label.includes('Pickleball'))).toBe(true)
   })
 
   test('buildAllExpensesData includes monthly ticket and ticket water for mapped pickleball member', () => {

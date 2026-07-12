@@ -2119,19 +2119,28 @@ export function buildGroupDetailData(group, currentUserId, members, currentUserN
   const g = safeGroup(group)
   const monthDate = dateFromYearMonth(selectedYearMonth)
   const endOfSelectedMonth = endOfYearMonth(selectedYearMonth)
-  const monthlyGroup = groupWithMonthExpenses(g, monthDate)
-  const groupMembers = membersForGroup(g, members)
+  const pickleballState = groupKind(g) === 'pickleball'
+    ? { ...scopedPickleballState(appState), currentGroup: g, currentGroupId: g.id }
+    : null
+  const virtualGroup = pickleballState
+    ? buildPickleballTicketTransactionGroup(appState, pickleballState, monthDate, null, true)
+    : null
+  const detailGroup = virtualGroup
+    ? safeGroup({ ...g, expenses: [...safeArray(g.expenses), ...safeArray(virtualGroup.expenses)] })
+    : g
+  const monthlyGroup = groupWithMonthExpenses(detailGroup, monthDate)
+  const groupMembers = membersForGroup(detailGroup, members)
   const currentGroupMember = groupMembers.find(member => String(member.id) === String(memberIdForGroup(g, currentUserId, members, currentUserName)))
   const currentMember = safeArray(members).find(member => String(member.id) === String(currentUserId))
   const isGroupCreator = isMemberGroupCreator(g, currentGroupMember) || isMemberGroupCreator(g, currentMember)
   const isSoloExpenseGroup = groupMembers.length === 1 && groupKind(g) !== 'pickleball'
   const isGroupTreasurer = Boolean(isGroupCreator || isManagerRole(currentGroupMember?.role) || (Boolean(currentGroupMember) && isSoloExpenseGroup))
-  const currentBalanceGroup = groupDetailSettlementGroup(g, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
+  const currentBalanceGroup = groupDetailSettlementGroup(detailGroup, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
   const balanceMap = groupBalanceForMember(currentBalanceGroup, currentGroupMember?.id || currentUserId, members, currentUserName)
-  const currentBalance = groupDetailSettlementBalance(g, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
+  const currentBalance = groupDetailSettlementBalance(detailGroup, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
   const balance = currentBalance.amount
   const memberBalanceMap = Object.fromEntries(
-    groupMembers.map(member => [member.id, groupDetailSettlementBalance(g, member.id, appState, endOfSelectedMonth)])
+    groupMembers.map(member => [member.id, groupDetailSettlementBalance(detailGroup, member.id, appState, endOfSelectedMonth)])
   )
   const paymentTarget = buildGroupPaymentTarget(g, groupMembers)
   const activities = safeArray(monthlyGroup.expenses)
@@ -2180,7 +2189,7 @@ export function buildGroupDetailData(group, currentUserId, members, currentUserN
     memberCandidates: buildGroupMemberCandidates(g, members, profiles, { mode: 'expense', groups: appState?.groups }),
     paymentTarget,
     members: groupMembers.map(member => {
-      const memberTransactions = buildMemberTransactions(g, member.id, selectedYearMonth, groupMembers)
+      const memberTransactions = buildMemberTransactions(detailGroup, member.id, selectedYearMonth, groupMembers)
       return {
         id: member.id,
         profileId: member.profileId || member.profile_id || '',
@@ -3646,15 +3655,24 @@ function buildAccountSettingsData(state) {
   }
 }
 
-function buildSettlementPeriodData(state, params) {
-  const group = currentGroup(state)
+export function buildSettlementPeriodData(state, params) {
+  const baseGroup = currentGroup(state)
   const members = safeArray(state?.members)
-  const groupMembers = currentGroupMembers(state)
   const monthDate = periodDate(params)
   const month = monthKey(monthDate)
-  const expenses = allExpenses(state)
-    .filter(expense => String(expense.groupId || expense.group_id || '') === String(group.id || ''))
-    .filter(expense => !month || monthKey(expense.date || expense.expense_date) === month)
+  const pickleballState = groupKind(baseGroup) === 'pickleball'
+    ? { ...scopedPickleballState(state), currentGroup: baseGroup, currentGroupId: baseGroup.id }
+    : null
+  const virtualGroup = pickleballState
+    ? buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, null, true)
+    : null
+  const group = virtualGroup || baseGroup
+  const groupMembers = membersForGroup(group, members)
+  const expenses = virtualGroup
+    ? safeArray(virtualGroup.expenses)
+    : allExpenses(state)
+      .filter(expense => String(expense.groupId || expense.group_id || '') === String(group.id || ''))
+      .filter(expense => !month || monthKey(expense.date || expense.expense_date) === month)
   const totalExpenses = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
   const categories = buildExpenseCategories(expenses)
   const balances = groupMembers.map(member => {
@@ -3744,7 +3762,7 @@ function buildExpenseDetailData(state, params) {
   const id = normalizeId(params, 'expenseId')
   let expense = findExpense(state, id)
   let virtualGroup = null
-  if (!expense && /^(monthly-ticket|ticket|ticket-water):/.test(String(id || ''))) {
+  if (!expense && /^(monthly-ticket|ticket|ticket-water|pickleball-court|pickleball-session):/.test(String(id || ''))) {
     const pickleballState = scopedPickleballState(state)
     const currentUserId = state?.currentUserId
     const pickleballMemberId = memberIdForGroup(
@@ -3759,6 +3777,7 @@ function buildExpenseDetailData(state, params) {
       pickleballState,
       dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())),
       pickleballMemberId,
+      true,
     )
     expense = safeArray(virtualGroup?.expenses).find(row => String(row.id) === String(id))
   }
@@ -3810,7 +3829,7 @@ export function buildAllExpensesData(state, currentUserId, members, currentUserN
   const groups = safeArray(state?.groups)
   const pickleballState = scopedPickleballState(state)
   const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, currentUserName)
-  const pickleballTicketGroup = buildPickleballTicketTransactionGroup(state, pickleballState, dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())), pickleballMemberId)
+  const pickleballTicketGroup = buildPickleballTicketTransactionGroup(state, pickleballState, dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())), pickleballMemberId, true)
   const paidItemCoverage = buildPaidItemCoverageMap(state)
   const allGroups = [...groups, pickleballTicketGroup].filter(Boolean)
   return {
@@ -3823,7 +3842,7 @@ function buildTransactions(groups, currentUserId, members, currentUserName, paid
   return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName, paidItemCoverage)
 }
 
-function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId) {
+function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId, includeAllMembers = false) {
   const group = pickleballState?.currentGroup || state?.currentGroup || {}
   const sourceState = mergePickleballScreenState(state, pickleballState)
   const yearMonth = monthKey(monthDate)
@@ -3841,18 +3860,20 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
   const sessions = getStateMonthSessions(sourceState, monthDate)
   const members = currentGroupMembers(sourceState)
   const currentMember = members.find(member => String(member.id) === String(currentUserId))
-  const balance = buildMemberMonthBalance(sourceState, sourceState?.pickle || {}, sessions, currentUserId, monthDate)
+  const targetMembers = includeAllMembers ? members : currentMember ? [currentMember] : []
   const sessionDates = new Map(sessions.map(session => [
     String(session?.id || dateKey(sessionDate(session))),
     sessionDate(session),
   ]))
-  const sessionCostRows = currentMember
-    ? buildPickleballPayableItems(sourceState, sourceState?.pickle || {}, sessions, currentMember, members, monthDate, balance)
+  const sessionCostRowsById = new Map()
+  targetMembers.forEach(member => {
+    const balance = buildMemberMonthBalance(sourceState, sourceState?.pickle || {}, sessions, member.id, monthDate)
+    buildPickleballPayableItems(sourceState, sourceState?.pickle || {}, sessions, member, members, monthDate, balance)
       .filter(item => Number(item.amount) < 0 && (
         String(item.itemId).startsWith('pickleball-court:') ||
         String(item.itemId).startsWith('pickleball-session:')
       ))
-      .map(item => {
+      .forEach(item => {
         const itemId = String(item.itemId)
         const sessionId = itemId.match(/^pickleball-session:(.+):(fee|water|extras)$/)?.[1] || ''
         const type = itemId.startsWith('pickleball-court:')
@@ -3863,41 +3884,49 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
               ? 'pickleball_session_water'
               : 'pickleball_session_extras'
         const amount = Math.abs(Number(item.amount) || 0)
-        return {
+        const existing = sessionCostRowsById.get(itemId)
+        if (existing) {
+          existing.amount += amount
+          existing.participants.push(member.id)
+          existing.splits.push({ memberId: member.id, amount })
+          return
+        }
+        sessionCostRowsById.set(itemId, {
           id: itemId,
           type,
           groupId,
           title: item.expenseTitle || 'Chi phí Pickleball',
           amount,
           paidBy: '',
-          participants: [currentUserId],
-          splits: [{ memberId: currentUserId, amount }],
+          participants: [member.id],
+          splits: [{ memberId: member.id, amount }],
           date: sessionDates.get(sessionId) || `${yearMonth}-01`,
           status: 'approved',
           category: 'pickleball',
           yearMonth,
-        }
+        })
       })
-    : []
-  const monthlyTicketRow = currentUserId && memberFlexTicketType(sourceState, currentUserId, yearMonth) === 'monthly' && monthlyTicketPrice > 0
-    ? {
-      id: `monthly-ticket:${groupId || sourceState?.currentGroupId || 'pickleball'}:${yearMonth}:${currentUserId}`,
+  })
+  const sessionCostRows = [...sessionCostRowsById.values()]
+  const monthlyTicketRows = targetMembers
+    .filter(member => memberFlexTicketType(sourceState, member.id, yearMonth) === 'monthly' && monthlyTicketPrice > 0)
+    .map(member => ({
+      id: `monthly-ticket:${groupId || sourceState?.currentGroupId || 'pickleball'}:${yearMonth}:${member.id}`,
       type: 'pickleball_monthly_ticket',
       groupId,
       title: 'Trả tiền sân theo xé vé tháng',
       amount: monthlyTicketPrice,
       paidBy: '',
-      participants: [currentUserId],
-      splits: [{ memberId: currentUserId, amount: monthlyTicketPrice }],
+      participants: [member.id],
+      splits: [{ memberId: member.id, amount: monthlyTicketPrice }],
       date: `${yearMonth}-01`,
       status: 'approved',
       category: 'pickleball',
       yearMonth,
-    }
-    : null
+    }))
   const monthTickets = monthTicketsForState(sourceState, monthDate)
     .filter(ticket => ticketStatus(ticket) !== 'pending_review')
-  const ticketRows = monthlyTicketRow ? [] : monthTickets
+  const ticketRows = !includeAllMembers && monthlyTicketRows.length ? [] : monthTickets
     .map(ticket => {
       const memberIds = ticketMemberIds(ticket)
       const billedMemberIds = isFlexBilling
@@ -3941,7 +3970,7 @@ function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate
         yearMonth: ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket)),
       }
     }) : []
-  const rows = [...sessionCostRows, monthlyTicketRow, ...ticketRows, ...waterRows].filter(Boolean)
+  const rows = [...sessionCostRows, ...monthlyTicketRows, ...ticketRows, ...waterRows].filter(Boolean)
   if (!rows.length) return null
   return {
     ...group,
