@@ -154,13 +154,24 @@ function GroupCard({ g, onClick }) {
   const balanceLabel = g.balance === 0 ? 'Cân bằng' : formatVNDShort(g.balance);
 
   return (
-    <ListCard accent={isPickleballGroup ? 'pickleball' : accentMap[g.kind]} style={{
+    <ListCard
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick?.();
+        }
+      }}
+      accent={isPickleballGroup ? 'pickleball' : accentMap[g.kind]}
+      style={{
       padding: '14px 14px',
       cursor: 'pointer',
       background: isPickleballGroup ? 'linear-gradient(145deg, rgba(6,95,70,0.30), rgba(15,23,42,0.95))' : undefined,
       borderColor: isPickleballGroup ? 'rgba(52,211,153,0.72)' : undefined,
       boxShadow: isPickleballGroup ? '0 0 0 1px rgba(52,211,153,0.16), 0 16px 40px rgba(16,185,129,0.12)' : undefined,
-    }} onClick={onClick}>
+    }}>
       <div style={{ display: 'grid', gridTemplateColumns: '42px minmax(0, 1fr) auto', alignItems: 'center', gap: 10 }}>
         <div style={{
           width: 42, height: 42, borderRadius: 13,

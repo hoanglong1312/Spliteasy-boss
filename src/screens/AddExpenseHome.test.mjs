@@ -397,6 +397,19 @@ test('GroupsList separates group metadata from balance and labels balanced group
   assert.doesNotMatch(groupCardSource, /Danh bạ chung/);
 });
 
+test('GroupsList group cards support keyboard activation', () => {
+  const groupCardSource = readFileSync(new URL('./GroupsList.jsx', import.meta.url), 'utf8');
+  const groupCardBlock = groupCardSource.slice(
+    groupCardSource.indexOf('function GroupCard'),
+    groupCardSource.indexOf('function groupTypeLabelFor')
+  );
+  assert.match(groupCardBlock, /role="button"/);
+  assert.match(groupCardBlock, /tabIndex=\{0\}/);
+  assert.match(groupCardBlock, /event\.key === 'Enter' \|\| event\.key === ' '/);
+  assert.match(groupCardBlock, /event\.preventDefault\(\)/);
+  assert.match(groupCardBlock, /onClick\?\.\(\)/);
+});
+
 test('GroupDetail keeps bank fields in edit member sheet only', () => {
   assert.match(groupDetailSource, /function AddMemberEditor\(\{ title, groupId, candidates = \[\], isPickleball = false, onClose, onAction \}\)/);
   const addMemberEditorSource = groupDetailSource.slice(
