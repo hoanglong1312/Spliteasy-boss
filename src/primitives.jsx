@@ -681,9 +681,9 @@ export function MonthNav({ label, onPrev, onNext }) {
       gap: 16, padding: '2px 0 8px',
       fontSize: 13, fontWeight: 700, color: '#cbd5e1', letterSpacing: '-0.2px',
     }}>
-      <button style={arrow} onClick={onPrev}>‹</button>
+      <button aria-label="Tháng trước" style={arrow} onClick={onPrev}>‹</button>
       <span>{label}</span>
-      <button style={arrow} onClick={onNext}>›</button>
+      <button aria-label="Tháng sau" style={arrow} onClick={onNext}>›</button>
     </div>
   );
 }

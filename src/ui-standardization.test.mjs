@@ -40,6 +40,15 @@ test('shared visual primitives exist for Pickleball-style module screens', () =>
   assert.doesNotMatch(primitivesSource, /gridTemplateColumns: '1fr 1fr'[\s\S]*?>\s*Bỏ chọn\s*<\/button>/)
 })
 
+test('MonthNav gives month controls clear accessible names', () => {
+  const monthNavSource = primitivesSource.slice(
+    primitivesSource.indexOf('export function MonthNav'),
+    primitivesSource.indexOf('export function Stat({')
+  )
+  assert.match(monthNavSource, /aria-label="Tháng trước"/)
+  assert.match(monthNavSource, /aria-label="Tháng sau"/)
+})
+
 test('BottomSheet portals to the phone frame instead of the scrollable screen', () => {
   assert.match(primitivesSource, /import \{ createPortal \} from 'react-dom'/)
   assert.match(primitivesSource, /data-spliteasy-phone-frame/)
