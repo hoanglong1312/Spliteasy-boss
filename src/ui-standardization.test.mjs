@@ -57,6 +57,14 @@ test('MonthNav month controls meet the minimum touch target', () => {
   assert.match(monthNavSource, /width: 44, height: 44/)
 })
 
+test('IconButton meets the minimum touch target', () => {
+  const iconButtonSource = primitivesSource.slice(
+    primitivesSource.indexOf('export function IconButton'),
+    primitivesSource.indexOf('export function IconActionButton')
+  )
+  assert.match(iconButtonSource, /width: 44, height: 44/)
+})
+
 test('BottomSheet portals to the phone frame instead of the scrollable screen', () => {
   assert.match(primitivesSource, /import \{ createPortal \} from 'react-dom'/)
   assert.match(primitivesSource, /data-spliteasy-phone-frame/)

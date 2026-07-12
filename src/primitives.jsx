@@ -468,7 +468,7 @@ export function IconButton({ children, dot, style, ...rest }) {
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       style={{
-        width: 38, height: 38, borderRadius: 12,
+        width: 44, height: 44, borderRadius: 12,
         background: colors.inputBg,
         border: `1px solid ${colors.borderSubtle}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
