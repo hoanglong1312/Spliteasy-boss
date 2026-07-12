@@ -11,10 +11,11 @@ test('small mobile safe-bottom uses the device safe-area inset', () => {
   assert.doesNotMatch(indexSource, /--safe-bottom: max\(env\(safe-area-inset-bottom\), 28px\)/)
 })
 
-test('approved activity rows show green tint and paid chip outside pending review', () => {
-  assert.match(homeSource, /transactionStatus\(tx\) === 'approved' && tx\.status !== 'pending' && !tx\.type/)
+test('paid rows use isPaid flag not approval status', () => {
+  assert.match(homeSource, /tx\.isPaid/)
   assert.match(homeSource, /rgba\(52,211,153,0\.07\)/)
   assert.match(homeSource, /Đã thanh toán/)
+  assert.doesNotMatch(homeSource, /transactionStatus\(tx\) === 'approved' && tx\.status !== 'pending' && !tx\.type/)
 })
 
 test('inactive tab labels use readable secondary contrast', () => {

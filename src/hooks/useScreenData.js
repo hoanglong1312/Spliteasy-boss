@@ -424,6 +424,16 @@ function buildPayableItemKey(item) {
   return `${itemId}|member:${memberId}|profile:${profileId}|month:${month}`
 }
 
+function buildPaidItemKeySet(state, memberId) {
+  return new Set(
+    safeArray(state?.paymentNotifications)
+      .filter(n => String(n.member_id || n.memberId) === String(memberId) && n.status === 'confirmed')
+      .flatMap(n => safeArray(n.metadata?.coveredItems || n.metadata?.covered_items))
+      .map(item => normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || ''))
+      .filter(Boolean)
+  )
+}
+
 function withPayableItemKey(item) {
   const amount = Math.round(Number(item?.amount) || 0)
   return {
@@ -816,7 +826,8 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
       ].filter(Boolean),
       currentUserId,
       members,
-      state?.currentUserName
+      state?.currentUserName,
+      buildPaidItemKeySet(state, currentUserId)
     ),
     pendingExpenses: buildPendingExpenseApprovals(expenseGroups, members, currentUserId, state?.currentUserName),
     pendingPayments: buildPendingPaymentConfirmations(state),
@@ -3733,14 +3744,16 @@ export function buildAllExpensesData(state, currentUserId, members, currentUserN
   const pickleballState = scopedPickleballState(state)
   const pickleballMemberId = memberIdForGroup(pickleballState?.currentGroup, currentUserId, members, currentUserName)
   const pickleballTicketGroup = buildPickleballTicketTransactionGroup(state, pickleballState, dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())), pickleballMemberId)
+  const paidItemKeys = buildPaidItemKeySet(state, currentUserId)
+  const allGroups = [...groups, pickleballTicketGroup].filter(Boolean)
   return {
-    transactions: buildTransactionRows(buildExpenseActivity([...groups, pickleballTicketGroup].filter(Boolean)), [...groups, pickleballTicketGroup].filter(Boolean), currentUserId, members, currentUserName),
+    transactions: buildTransactionRows(buildExpenseActivity(allGroups), allGroups, currentUserId, members, currentUserName, paidItemKeys),
     currentUserId,
   }
 }
 
-function buildTransactions(groups, currentUserId, members, currentUserName) {
-  return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName)
+function buildTransactions(groups, currentUserId, members, currentUserName, paidItemKeys = new Set()) {
+  return buildTransactionRows(buildExpenseActivity(groups), groups, currentUserId, members, currentUserName, paidItemKeys)
 }
 
 function buildPickleballTicketTransactionGroup(state, pickleballState, monthDate, currentUserId) {
@@ -3865,7 +3878,7 @@ function buildExpenseActivity(groups) {
   })))
 }
 
-function buildTransactionRows(expenses, groups, currentUserId, members, currentUserName) {
+function buildTransactionRows(expenses, groups, currentUserId, members, currentUserName, paidItemKeys = new Set()) {
   return safeArray(expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -3882,6 +3895,14 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
       const participants = safeArray(expense.participants)
       const splits = safeArray(expense.splits).map(normalizeHomeSplit).filter(split => split.memberId)
       const normalizedExpense = { ...expense, paidBy, participants, splits }
+      const yearMonth = expense.yearMonth || expense.year_month || monthKey(expense.date)
+
+      let isPaid = false
+      if (amount < 0 && meForGroup && paidItemKeys.size) {
+        const profileId = profileIdForMember(meForGroup, members)
+        const key = buildPayableItemKey({ expenseId: expense.id, memberId: meForGroup, profileId, month: yearMonth })
+        isPaid = paidItemKeys.has(key)
+      }
 
       return {
         id: expense.id,
@@ -3895,7 +3916,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
         dateLabel: relativeDateLabel(expense.date),
         amount,
         status: expense.status,
-        yearMonth: expense.yearMonth || expense.year_month || monthKey(expense.date),
+        yearMonth,
         paidBy,
         payerName: memberName(paidBy, members) || '',
         participants,
@@ -3903,6 +3924,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
         participantNames: safeArray(splits).map(s => memberName(s.memberId || s.member_id, members)).filter(Boolean).join(' '),
         currentMemberId: meForGroup,
         isMine: isExpenseRelatedToMember(normalizedExpense, meForGroup),
+        isPaid,
       }
     })
 }
