@@ -15,6 +15,7 @@ import {
   buildPickleballTicketsData,
   buildPrevMonthUnpaid,
   buildAllExpensesData,
+  buildExpenseDetailData,
   buildPersonalPickleSummaryCards,
   buildPersonalWaterSessionRows,
   effectiveSessionMemberIds,
@@ -162,6 +163,54 @@ describe('transaction per-item payment status', () => {
       isPaid: false,
       isComplete: true,
     })
+  })
+})
+
+describe('expense detail per-item payment status', () => {
+  test('marks covered split rows paid while leaving uncovered member owing', () => {
+    const members = [
+      { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Hùng', role: 'treasurer' },
+      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Long' },
+      { id: 'minh-1', profile_id: 'profile-minh-1', group_id: 'group-1', name: 'Minh' },
+      { id: 'minh-2', profile_id: 'profile-minh-2', group_id: 'group-1', name: 'Minh' },
+      { id: 'cuong', profile_id: 'profile-cuong', group_id: 'group-1', name: 'Cường' },
+    ]
+    const expense = {
+      id: 'pizza',
+      groupId: 'group-1',
+      title: 'Pizza',
+      amount: 500000,
+      date: '2026-07-12T12:00:00.000Z',
+      paidBy: 'hung',
+      participants: members.map(member => member.id),
+      splits: members.map(member => ({ memberId: member.id, amount: 100000 })),
+      status: 'approved',
+    }
+    const coveredItems = ['long', 'minh-1', 'minh-2'].map(memberId => {
+      const member = members.find(row => row.id === memberId)
+      return {
+        payableItemKey: `expense:pizza|member:${memberId}|profile:${member.profile_id}|month:2026-07`,
+        amount: -100000,
+      }
+    })
+    const state = {
+      currentUserId: 'hung',
+      currentGroup: { id: 'group-1', name: 'Ăn uống', members: members.map(member => member.id), expenses: [expense] },
+      groups: [{ id: 'group-1', name: 'Ăn uống', members: members.map(member => member.id), expenses: [expense] }],
+      members,
+      notifications: [{
+        type: 'payment_confirmed',
+        metadata: { status: 'confirmed', coveredItems },
+      }],
+    }
+
+    const result = buildExpenseDetailData(state, 'pizza')
+    const splitTags = Object.fromEntries(result.splits.map(split => [split.name, split.tag]))
+
+    expect(result.splits.filter(split => split.name.startsWith('Minh')).map(split => split.tag)).toEqual(['paid', 'paid'])
+    expect(splitTags.Long).toBe('paid')
+    expect(splitTags.Cường).toBe('owe')
+    expect(splitTags.Hùng).toBe('mine')
   })
 })
 

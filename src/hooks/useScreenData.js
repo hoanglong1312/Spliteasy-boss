@@ -3750,7 +3750,7 @@ function buildExpenseDetailData(state, params) {
   const canSubmitterRevise = isCurrentSubmitter && ['pending', 'rejected', 'declined'].includes(reviewStatus)
   const canEdit = role === 'treasurer' || canSubmitterRevise
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
-  const splits = expenseSplits(expense, members, payer, currentUserId)
+  const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state))
 
   return {
     id: expense.id,
@@ -3778,6 +3778,8 @@ function buildExpenseDetailData(state, params) {
     expense,
   }
 }
+
+export { buildExpenseDetailData }
 
 export function buildAllExpensesData(state, currentUserId, members, currentUserName) {
   const groups = safeArray(state?.groups)
@@ -5765,7 +5767,7 @@ function groupForExpense(state, expense) {
   return safeArray(state?.groups).find(group => String(group.id) === String(groupId)) || null
 }
 
-function expenseSplits(expense, members, payer, currentUserId) {
+function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage = new Map()) {
   const amount = Number(expense?.amount) || 0
   const participants = safeArray(expense?.participants)
   const rows = safeArray(expense?.splits).length > 0
@@ -5785,14 +5787,19 @@ function expenseSplits(expense, members, payer, currentUserId) {
     const member = members.find(row => String(row.id) === String(split.memberId))
     const isPayer = String(split.memberId) === String(payer?.id)
     const isMe = String(split.memberId) === String(currentUserId)
-    const settled = String(expense?.status || '').toLowerCase() === 'settled'
+    const yearMonth = expense.yearMonth || expense.year_month || monthKey(expense.date || expense.expense_date)
+    const isPaid = !isPayer && isPayableItemCovered(
+      paidItemCoverage,
+      transactionPayableItemKey(expense, split.memberId, members, yearMonth),
+      -Math.abs(split.amount),
+    )
     return {
       initial: initials(member),
       name: member?.displayName || member?.name || 'Thành viên',
       isMe,
-      sub: isPayer ? 'Người ứng tiền' : `Còn nợ ${firstName(payer?.name)}`,
+      sub: isPayer ? 'Người ứng tiền' : isPaid ? 'Đã thanh toán' : `Còn nợ ${firstName(payer?.name)}`,
       amount: isPayer ? Math.abs(split.amount) : -Math.abs(split.amount),
-      tag: isPayer ? 'mine' : settled ? 'paid' : 'owe',
+      tag: isPayer ? 'mine' : isPaid ? 'paid' : 'owe',
     }
   })
 }
