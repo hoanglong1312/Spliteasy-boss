@@ -38,9 +38,11 @@ export default function ExpenseDetail({ data, onAction }) {
               fontSize: 9, fontWeight: 700, letterSpacing: '1.2px',
               color: colors.textMuted, textTransform: 'uppercase',
             }}>Nhóm {d.groupName}</div>
-            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>Chi tiêu #{d.id}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, marginTop: 2 }}>{d.detailLabel || `Chi tiêu #${d.id}`}</div>
           </div>
-          <IconButton onClick={() => onAction?.('more')}>⋯</IconButton>
+          {d.canEdit === true || d.canDelete === true
+            ? <IconButton onClick={() => onAction?.('more')}>⋯</IconButton>
+            : <div style={{ width: 38 }} />}
         </div>
 
         {/* Hero */}

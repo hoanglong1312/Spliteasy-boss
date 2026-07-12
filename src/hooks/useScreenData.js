@@ -3738,10 +3738,29 @@ function buildGlobalMonthlySourceBalances(state, monthDate) {
 
 function buildExpenseDetailData(state, params) {
   const id = normalizeId(params, 'expenseId')
-  const expense = findExpense(state, id)
+  let expense = findExpense(state, id)
+  let virtualGroup = null
+  if (!expense && /^(monthly-ticket|ticket|ticket-water):/.test(String(id || ''))) {
+    const pickleballState = scopedPickleballState(state)
+    const currentUserId = state?.currentUserId
+    const pickleballMemberId = memberIdForGroup(
+      pickleballState?.currentGroup,
+      currentUserId,
+      safeArray(state?.members),
+      state?.currentUserName,
+      state?.currentProfileId,
+    )
+    virtualGroup = buildPickleballTicketTransactionGroup(
+      state,
+      pickleballState,
+      dateFromYearMonth(state?.selectedYearMonth || monthKey(new Date())),
+      pickleballMemberId,
+    )
+    expense = safeArray(virtualGroup?.expenses).find(row => String(row.id) === String(id))
+  }
   if (!expense) return null
 
-  const group = groupForExpense(state, expense) || currentGroup(state)
+  const group = virtualGroup || groupForExpense(state, expense) || currentGroup(state)
   const members = currentGroupMembers({ ...state, currentGroup: group })
   const currentUserId = state?.currentUserId
   const role = safeArray(state?.members).find(member => String(member.id) === String(currentUserId))?.role
@@ -3750,11 +3769,13 @@ function buildExpenseDetailData(state, params) {
   const canSubmitterRevise = isCurrentSubmitter && ['pending', 'rejected', 'declined'].includes(reviewStatus)
   const canEdit = role === 'treasurer' || canSubmitterRevise
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
+    || (virtualGroup ? { id: '', name: 'Quỹ team' } : null)
   const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state))
 
   return {
     id: expense.id,
     expenseId: expense.id,
+    detailLabel: virtualGroup ? 'Giao dịch Pickleball' : `Chi tiêu #${expense.id}`,
     groupId: group.id,
     groupName: group.name || 'Nhóm',
     category: {
@@ -3773,8 +3794,8 @@ function buildExpenseDetailData(state, params) {
     splits,
     note: expense.note || expense.description || expense.declineReason || '',
     receiptImages: safeArray(expense.receiptImages || expense.receipt_images),
-    canEdit,
-    canDelete: role === 'treasurer' || canSubmitterRevise,
+    canEdit: virtualGroup ? false : canEdit,
+    canDelete: virtualGroup ? false : role === 'treasurer' || canSubmitterRevise,
     expense,
   }
 }

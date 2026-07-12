@@ -214,6 +214,68 @@ describe('expense detail per-item payment status', () => {
   })
 })
 
+describe('pickleball transaction detail', () => {
+  test('builds detail for a virtual monthly ticket transaction', () => {
+    const state = {
+      currentUserId: 'member-1',
+      currentProfileId: 'profile-1',
+      currentUserName: 'An',
+      currentGroupId: 'group-1',
+      currentGroup: { id: 'group-1', name: 'Virgo Pickleball 246', kind: 'pickleball' },
+      members: [
+        { id: 'member-1', groupId: 'group-1', profileId: 'profile-1', name: 'An', memberType: 'flex' },
+      ],
+      selectedYearMonth: '2026-07',
+      pickle: {
+        monthlyConfigs: [{
+          groupId: 'group-1',
+          yearMonth: '2026-07',
+          billingMode: 'flex',
+          monthlyTicketPrice: 550000,
+          monthlyTicketMemberIds: ['member-1'],
+        }],
+        externalTickets: [],
+        sessions: [],
+      },
+      _allPickle: { monthlyConfigs: [], externalTickets: [], sessions: [], sessionItems: [] },
+      notifications: [{
+        type: 'payment_confirmed',
+        metadata: {
+          status: 'confirmed',
+          coveredItems: [{
+            payableItemKey: 'item:pickleball-monthly-ticket:group-1:2026-07|member:member-1|profile:profile-1|month:2026-07',
+            amount: -550000,
+          }],
+        },
+      }],
+    }
+
+    const result = buildExpenseDetailData(
+      state,
+      'monthly-ticket:group-1:2026-07:member-1',
+    )
+
+    expect(result).toMatchObject({
+      id: 'monthly-ticket:group-1:2026-07:member-1',
+      groupName: 'Virgo Pickleball 246',
+      title: 'Trả tiền sân theo xé vé tháng',
+      amount: 550000,
+      status: 'settled',
+      detailLabel: 'Giao dịch Pickleball',
+      payer: { name: 'Quỹ team' },
+      canEdit: false,
+      canDelete: false,
+    })
+    expect(result.splits).toHaveLength(1)
+    expect(result.splits[0]).toMatchObject({
+      name: 'An',
+      sub: 'Đã thanh toán',
+      amount: -550000,
+      tag: 'paid',
+    })
+  })
+})
+
 describe('effectiveSessionMemberIds', () => {
   test('counts member without a record as present when session has records and fallback is enabled', () => {
     const session = {

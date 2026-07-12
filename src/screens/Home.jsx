@@ -186,13 +186,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
               isTreasurer={isTreasurer}
               onApprove={() => onAction?.('approveExpense', { expenseId: tx.id, groupId: tx.groupId })}
               onReject={() => onAction?.('rejectExpense', { expenseId: tx.id, groupId: tx.groupId })}
-              onView={() => {
-                if (tx.type === 'pickleball_ticket') {
-                  onAction?.('push', { screen: 'pickleball-calendar', params: { yearMonth: tx.yearMonth, selectedDate: tx.date } });
-                  return;
-                }
-                onAction?.('viewExpense', { expenseId: tx.id });
-              }}
+              onView={() => onAction?.('viewExpense', { expenseId: tx.id })}
             />
           )) : (
             <div style={{ padding: '14px 0', fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>

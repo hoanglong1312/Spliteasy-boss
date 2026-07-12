@@ -57,6 +57,11 @@ test('home recent transactions include approved pickleball ticket payments for s
   ])
 })
 
+test('home opens pickleball transactions as transaction details', () => {
+  assert.doesNotMatch(homeSource, /tx\.type === 'pickleball_ticket'/)
+  assert.match(homeSource, /onAction\?\.\('viewExpense', \{ expenseId: tx\.id \}\)/)
+})
+
 test('home recent transactions include every selected-month group debt for current profile', () => {
   const buildHomeData = loadBuildHomeData()
   const members = [
