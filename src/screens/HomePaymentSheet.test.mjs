@@ -42,11 +42,14 @@ test('member payment sheet uses bill card layout without share buttons', () => {
 test('treasurer can confirm own selected payable items directly', () => {
   const homeTopLevel = sliceBetween('export default function Home(', 'function PaymentManagementZone');
   const paymentSheetSource = sliceBetween('function PaymentSheet(', 'function treasurerProfileStatKey');
-  const treasurerCardIndex = paymentSheetSource.indexOf("{netBalance < 0 && (");
+  const treasurerCardIndex = paymentSheetSource.indexOf("{showOwnPaymentCard && (");
   const dashboardIndex = paymentSheetSource.indexOf("{isTreasurer && (");
 
   assert.match(homeTopLevel, /onConfirmPayment=\{\(payload\) => onAction\?\.\(isTreasurer \? 'markMemberPaid' : 'confirmPaymentSent', payload\)\}/);
-  assert.match(paymentSheetSource, /\{netBalance < 0 && \(/);
+  assert.match(paymentSheetSource, /const hasOwnPaymentItems = ownPaymentItems\.length > 0/);
+  assert.match(paymentSheetSource, /const showOwnPaymentCard = hasOwnPaymentItems && \(isTreasurer \|\| netBalance < 0\)/);
+  assert.match(paymentSheetSource, /\{showOwnPaymentCard && \(/);
+  assert.doesNotMatch(paymentSheetSource, /\{netBalance < 0 && \(/);
   assert.match(paymentSheetSource, /caption=\{isTreasurer \? 'Khoản của thủ quỹ' : undefined\}/);
   assert.match(paymentSheetSource, /isTreasurer[\s\S]*\? 'Xác nhận đã nộp'[\s\S]*: 'Báo đã chuyển'/);
   assert.match(paymentSheetSource, /memberId: data\?\.memberId \|\| data\?\.currentMemberId \|\| data\?\.currentUserId/);

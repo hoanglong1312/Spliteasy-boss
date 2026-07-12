@@ -819,6 +819,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
     memberId: data?.memberId || data?.currentMemberId || data?.currentUserId || source.memberId || source.member_id || '',
     profileId: data?.profileId || data?.currentProfileId || source.profileId || source.profile_id || '',
   }));
+  const hasOwnPaymentItems = ownPaymentItems.length > 0;
   const ownPaymentItemKeys = ownPaymentItems.map(item => item.key).join('|');
   const [selectedPayForIds, setSelectedPayForIds] = useState(() => new Set());
   const [selectedPaymentSourceKeys, setSelectedPaymentSourceKeys] = useState(() => new Set());
@@ -834,6 +835,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   }, [open, ownPaymentItemKeys]);
   if (!open) return null;
   const netBalance = Number(data?.netBalance) || 0;
+  const showOwnPaymentCard = hasOwnPaymentItems && (isTreasurer || netBalance < 0);
   const target = data?.paymentTarget || {};
   const qrBank = resolveVietQrBank(target);
   const payForRows = safeArray(data?.payForRows);
@@ -963,7 +965,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
 
   return (
     <BottomSheet title="Thanh toán" onClose={onClose}>
-      {netBalance < 0 && (
+      {showOwnPaymentCard && (
         <Card style={{ padding: 14, borderColor: canShowQr ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)' }}>
           {!canShowQr && (
             <>
