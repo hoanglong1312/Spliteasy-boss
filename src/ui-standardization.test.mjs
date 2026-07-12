@@ -136,10 +136,10 @@ test('primary money screens share summary, search, section, and list primitives'
 test('group detail data receives profile directory and app state explicitly', () => {
   assert.match(screenDataSource, /function buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = \[\], appState = \{\}\)/)
   assert.match(screenDataSource, /buildGroupDetailData\(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles, state\)/)
-  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles, \{ mode: 'expense' \}\)/)
+  assert.match(screenDataSource, /memberCandidates: buildGroupMemberCandidates\(g, members, profiles, \{ mode: 'expense', groups: appState\?\.groups \}\)/)
   const buildGroupDetailBlock = screenDataSource.slice(
     screenDataSource.indexOf('function buildGroupDetailData'),
-    screenDataSource.indexOf('function buildGroupMemberCandidates')
+    screenDataSource.indexOf('function groupDetailSettlementGroup')
   )
   assert.doesNotMatch(buildGroupDetailBlock, /[^p]state\?\./)
 })
