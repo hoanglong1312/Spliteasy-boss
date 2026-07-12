@@ -32,11 +32,24 @@ test('member payment sheet uses bill card layout without share buttons', () => {
   assert.match(paymentSheetSource, /selectable/);
   assert.match(paymentSheetSource, /actions=\{\(/);
   assert.match(paymentSheetSource, /Lưu QR/);
-  assert.match(paymentSheetSource, /paymentConfirmed \? 'Đã thanh toán' : 'Báo đã chuyển'/);
+  assert.match(paymentSheetSource, /paymentConfirmed[\s\S]*\? 'Đã thanh toán'[\s\S]*: isTreasurer[\s\S]*\? 'Xác nhận đã nộp'[\s\S]*: 'Báo đã chuyển'/);
   assert.match(paymentSheetSource, /\{!canShowQr && \([\s\S]*<PaymentItemSection/);
   assert.match(billContentSource, /selectable = false/);
   assert.match(billContentSource, /selectable && group\.onToggle/);
   assert.doesNotMatch(paymentSheetSource, /width: 210, height: 210/);
+});
+
+test('treasurer can confirm own selected payable items directly', () => {
+  const homeTopLevel = sliceBetween('export default function Home(', 'function PaymentManagementZone');
+  const paymentSheetSource = sliceBetween('function PaymentSheet(', 'function treasurerProfileStatKey');
+
+  assert.match(homeTopLevel, /onConfirmPayment=\{\(payload\) => onAction\?\.\(isTreasurer \? 'markMemberPaid' : 'confirmPaymentSent', payload\)\}/);
+  assert.match(paymentSheetSource, /\{netBalance < 0 && \(/);
+  assert.match(paymentSheetSource, /caption=\{isTreasurer \? 'Khoản của thủ quỹ' : undefined\}/);
+  assert.match(paymentSheetSource, /isTreasurer[\s\S]*\? 'Xác nhận đã nộp'[\s\S]*: 'Báo đã chuyển'/);
+  assert.match(paymentSheetSource, /memberId: data\?\.memberId \|\| data\?\.currentMemberId/);
+  assert.match(paymentSheetSource, /groupId: data\?\.currentGroupId/);
+  assert.match(paymentSheetSource, /\{canShowQr && !isTreasurer && payForRows\.length > 0 && \(/);
 });
 
 test('treasurer confirm payment sheet can share selected payment items as text and bill card', () => {

@@ -212,7 +212,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         setSavingAction={setSavingAction}
         onAction={onAction}
         onViewPaymentRecord={setPaymentRecordDetail}
-        onConfirmPayment={(payload) => onAction?.('confirmPaymentSent', payload)}
+        onConfirmPayment={(payload) => onAction?.(isTreasurer ? 'markMemberPaid' : 'confirmPaymentSent', payload)}
         onConfirmRefund={(row) => {
           const key = String(row.profileId || row.name || 'member');
           setConfirmedRefunds(prev => new Set([...prev, key]));
@@ -871,6 +871,10 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const coveredSources = selectedPaymentItems.map(paymentItemToCoveredSource);
   const coveredItems = selectedPaymentItems.flatMap(paymentItemToCoveredItems);
   const amountToPay = paymentItemsAmountDue(selectedOwnPaymentItems) + paymentItemsAmountDue(selectedPayForPaymentItems);
+  const paymentConfirmationDisabled = savingAction === 'confirmPayment'
+    || paymentConfirmed
+    || amountToPay <= 0
+    || (!isTreasurer && Boolean(data?.pendingSettlementCheckpoint));
   const canShowQr = amountToPay > 0 && qrBank && target.account && target.holder;
   const memberBank = data?.memberBank || {};
   const memberBankReady = Boolean(resolveVietQrBank(memberBank) && memberBank.account && memberBank.holder);
@@ -902,6 +906,9 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
       await onConfirmPayment?.({
         amount: amountToPay,
         memberName: data?.memberName || 'Thành viên',
+        memberId: data?.memberId || data?.currentMemberId || '',
+        profileId: data?.profileId || data?.currentProfileId || '',
+        groupId: data?.currentGroupId || '',
         coveredMembers: selectedPayForRows,
         coveredSources,
         coveredItems,
@@ -974,7 +981,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
         </>
       )}
 
-      {!isTreasurer && netBalance < 0 && (
+      {netBalance < 0 && (
         <Card style={{ padding: 14, borderColor: canShowQr ? 'rgba(52,211,153,0.28)' : 'rgba(251,191,36,0.28)' }}>
           {!canShowQr && (
             <>
@@ -995,6 +1002,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                 qrUrl={qrUrl}
                 paymentDisplayGroups={paymentDisplayGroups}
                 selectable
+                caption={isTreasurer ? 'Khoản của thủ quỹ' : undefined}
                 actions={(
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
                     <a
@@ -1016,7 +1024,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                         textDecoration: 'none',
                       }}
                     >Lưu QR</a>
-                    <button type="button" onClick={confirmPayment} disabled={savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || Boolean(data?.pendingSettlementCheckpoint)} style={{
+                    <button type="button" onClick={confirmPayment} disabled={paymentConfirmationDisabled} style={{
                       minHeight: 38,
                       borderRadius: 10,
                       background: paymentConfirmed ? 'rgba(16,185,129,0.20)' : '#10b981',
@@ -1025,9 +1033,17 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
                       fontSize: 12,
                       fontWeight: 900,
                       fontFamily: 'inherit',
-                      cursor: savingAction === 'confirmPayment' || paymentConfirmed || amountToPay <= 0 || data?.pendingSettlementCheckpoint ? 'default' : 'pointer',
+                      cursor: paymentConfirmationDisabled ? 'default' : 'pointer',
                       opacity: savingAction === 'confirmPayment' ? 0.72 : 1,
-                    }}>{savingAction === 'confirmPayment' ? 'Đang xử lý…' : data?.pendingSettlementCheckpoint ? 'Chờ duyệt' : paymentConfirmed ? 'Đã thanh toán' : 'Báo đã chuyển'}</button>
+                    }}>{savingAction === 'confirmPayment'
+                      ? 'Đang xử lý…'
+                      : !isTreasurer && data?.pendingSettlementCheckpoint
+                        ? 'Chờ duyệt'
+                        : paymentConfirmed
+                          ? 'Đã thanh toán'
+                          : isTreasurer
+                            ? 'Xác nhận đã nộp'
+                            : 'Báo đã chuyển'}</button>
                   </div>
                 )}
               />
@@ -1116,7 +1132,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
               </div>
             </div>
           )}
-          {canShowQr && payForRows.length > 0 && (
+          {canShowQr && !isTreasurer && payForRows.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <button
                 type="button"
