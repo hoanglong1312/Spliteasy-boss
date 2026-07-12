@@ -2448,8 +2448,24 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
   const activeMemberIds = currentFixedMembers.map(member => member.id || member.member_id).filter(Boolean)
   const currentPickleballMemberId = memberIdForGroup(state?.currentGroup, currentUserId, members, state?.currentUserName)
   const isFlexBilling = isBillingModeFlexForMonth(state, currentYearMonth)
+  const flexCompletedDates = new Set([
+    ...completedMonthSessions.map(session => dateKey(sessionDate(session))),
+    ...approvedMonthTickets.map(ticket => dateKey(ticketDate(ticket))),
+  ].filter(Boolean))
+  const flexAttendedDates = new Set([
+    ...completedMonthSessions
+      .filter(session => [
+        ...effectiveSessionMemberIdsFlex(session),
+        ...effectiveSessionMemberIds(session, members, false),
+      ].some(id => String(id) === String(currentPickleballMemberId)))
+      .map(session => dateKey(sessionDate(session))),
+    ...approvedMonthTickets
+      .filter(ticket => ticketMemberIds(ticket)
+        .some(id => String(id) === String(currentPickleballMemberId)))
+      .map(ticket => dateKey(ticketDate(ticket))),
+  ].filter(Boolean))
   const myAttendedCount = isFlexBilling
-    ? approvedMonthTickets.filter(t => ticketMemberIds(t).some(id => String(id) === String(currentPickleballMemberId))).length
+    ? flexAttendedDates.size
     : attendanceByMemberId(completedMonthSessions, currentPickleballMemberId, members, true)
   const p2pTicketBalance = memberTicketBalance(state, currentPickleballMemberId, today)
   const teamFundTicketShare = memberTeamFundTicketShare(state, currentPickleballMemberId, today)
@@ -2510,7 +2526,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
     progress: {
       attended: myAttendedCount,
       total: monthSessions.filter(s => !isMovedSession(s)).length || 1,
-      completed: isFlexBilling ? approvedMonthTickets.length : completedSessions,
+      completed: isFlexBilling ? flexCompletedDates.size : completedSessions,
       ticketDatesInMonth: approvedMonthTickets.length,
     },
     monthCosts: {

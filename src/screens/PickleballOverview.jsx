@@ -184,20 +184,20 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
               border: '1px solid rgba(52,211,153,0.24)',
               color: '#a7f3d0',
             }}>
-              <span style={{ fontSize: 10, fontWeight: 800 }}>Đã hoàn thành</span>
+              <span style={{ fontSize: 10, fontWeight: 800 }}>Buổi CLB đã hoàn thành</span>
               <span style={{ fontSize: 12, fontWeight: 900, ...type.mono }}>
                 {d.progress.completed} buổi
               </span>
             </div>
             {!isFlexMonthlyTicket && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
-                <ProgressDonut value={isFlexPerSessionTicket ? d.progress.attended : d.progress.completed} max={isFlexPerSessionTicket ? (d.progress.ticketDatesInMonth || 1) : d.progress.total} size={80} />
+                <ProgressDonut value={isFlexPerSessionTicket ? d.progress.attended : d.progress.completed} max={isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total} size={80} />
                 <div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
-                    {Math.round((isFlexPerSessionTicket ? d.progress.attended : d.progress.completed) / (isFlexPerSessionTicket ? (d.progress.ticketDatesInMonth || 1) : d.progress.total) * 100)}%
+                    {Math.round((isFlexPerSessionTicket ? d.progress.attended : d.progress.completed) / (isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total) * 100)}%
                   </div>
                   <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, marginTop: 5, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-                    buổi<br/>hoàn thành
+                    Tỷ lệ tham gia
                   </div>
                 </div>
               </div>

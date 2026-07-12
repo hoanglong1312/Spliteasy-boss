@@ -1234,6 +1234,43 @@ describe('buildPickleballOverviewData flex attendance', () => {
     })
   })
 
+  test('deduplicates flex progress by session date across tickets and completed sessions', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      monthly_ticket_member_ids: ['member-1'],
+    }))
+    state.currentUserId = 'member-1'
+    state.pickle.sessions = [
+      {
+        id: 'session-same-day',
+        group_id: 'group-1',
+        date: '2026-07-01',
+        status: 'done',
+        attendance_records: [{ member_id: 'member-1', status: 'present' }],
+      },
+      {
+        id: 'session-new-day',
+        group_id: 'group-1',
+        date: '2026-07-05',
+        status: 'done',
+        attendance_records: [{ member_id: 'member-1', status: 'present' }],
+      },
+      {
+        id: 'session-not-done',
+        group_id: 'group-1',
+        date: '2026-07-07',
+        status: 'planned',
+        attendance_records: [{ member_id: 'member-1', status: 'present' }],
+      },
+    ]
+
+    const data = buildPickleballOverviewData(state, state.pickle, state._allPickle, 'member-1', state.members, '2026-07')
+
+    expect(data.progress.completed).toBe(3)
+    expect(data.progress.attended).toBe(3)
+  })
+
   test('subtracts confirmed covered items from the displayed balance', () => {
     const state = addJulyFlexTickets(makeFlexState({
       billing_mode: 'flex',
