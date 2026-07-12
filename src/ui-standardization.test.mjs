@@ -133,6 +133,17 @@ test('primary money screens share summary, search, section, and list primitives'
   assert.match(groupDetailSource, /ListCard/)
 })
 
+test('group detail keeps header and member list in one screen scroll flow', () => {
+  const groupDetailLayout = groupDetailSource.slice(
+    groupDetailSource.indexOf('return ('),
+    groupDetailSource.indexOf('{exportMenuOpen &&')
+  )
+
+  assert.match(groupDetailLayout, /<Screen tabBar style=\{\{ padding: 0 \}\}>/)
+  assert.doesNotMatch(groupDetailLayout, /flex: 1, overflowY: 'auto'/)
+  assert.doesNotMatch(groupDetailLayout, /overflow: 'hidden', display: 'flex', flexDirection: 'column'/)
+})
+
 test('group detail data receives profile directory and app state explicitly', () => {
   assert.match(screenDataSource, /function buildGroupDetailData\(group, currentUserId, members, currentUserName, selectedYearMonth, profiles = \[\], appState = \{\}\)/)
   assert.match(screenDataSource, /buildGroupDetailData\(currentGroup, currentUserId, members, currentUserName, selectedYearMonth, state\?\.profiles, state\)/)

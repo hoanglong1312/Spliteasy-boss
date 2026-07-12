@@ -169,9 +169,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
 
   return (
     <PhoneFrame>
-      <Screen tabBar style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
-        {/* FIXED TOP: compact nav + group info */}
-        <div style={{ flexShrink: 0, padding: '0 16px' }}>
+      <Screen tabBar style={{ padding: 0 }}>
+        <div style={{ padding: '0 16px' }}>
         {/* Compact nav: back | emoji + name | edit */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 8px' }}>
           <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
@@ -238,9 +237,8 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
         />
         </div>
 
-        {/* FIXED: Search for members tab */}
         {activeTab === 'members' && (
-          <div style={{ flexShrink: 0, padding: '4px 16px 6px' }}>
+          <div style={{ padding: '4px 16px 6px' }}>
             <SearchInput
               value={memberSearch}
               onChange={event => setMemberSearch(event.target.value)}
@@ -249,8 +247,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
 
-        {/* SCROLLABLE MIDDLE: tab content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 8px', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+        <div style={{ padding: '0 16px 8px' }}>
 
         {activeTab === 'activity' && (
           <>
@@ -309,10 +306,9 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
           </div>
         )}
 
-        </div>{/* end scrollable middle */}
+        </div>
 
-        {/* FIXED BOTTOM: collapsible invite panel */}
-        <div style={{ flexShrink: 0, padding: '0 16px 8px' }}>
+        <div style={{ padding: '0 16px 8px' }}>
           {inviteExpanded ? (
             <>
               <button
