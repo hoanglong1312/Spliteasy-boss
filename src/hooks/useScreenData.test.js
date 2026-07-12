@@ -74,6 +74,7 @@ describe('buildGroupsListData', () => {
       name: 'Hạ Long thả gió',
       balance: -100000,
     })
+    expect(result.filters.find(filter => filter.key === 'balanced')?.label).toBe('Cân bằng · 1')
   })
 })
 

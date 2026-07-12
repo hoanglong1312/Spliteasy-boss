@@ -375,12 +375,11 @@ test('GroupDetail member rows are compact and visually distinct from pickleball 
   assert.doesNotMatch(memberRowSource, /rgba\(96,165,250,0\.35\)/);
 });
 
-test('GroupsList separates group metadata from balance and renders zero balance as 0', () => {
+test('GroupsList separates group metadata from balance and labels balanced groups clearly', () => {
   const groupCardSource = groupDetailSource && homeSource
     ? readFileSync(new URL('./GroupsList.jsx', import.meta.url), 'utf8')
     : '';
-  assert.match(groupCardSource, /const balanceLabel = g\.balance === 0 \? '0' : formatVNDShort\(g\.balance\)/);
-  assert.doesNotMatch(groupCardSource, /\{g\.balance === 0 \? 'Cân bằng' : formatVNDShort\(g\.balance\)\}/);
+  assert.match(groupCardSource, /const balanceLabel = g\.balance === 0 \? 'Cân bằng' : formatVNDShort\(g\.balance\)/);
   assert.match(groupCardSource, /const pickleballGroups = visibleGroups\.filter\(isPickleballLikeGroup\)/);
   assert.match(groupCardSource, /const expenseGroups = visibleGroups\.filter\(g => !isPickleballLikeGroup\(g\)\)/);
   assert.match(groupCardSource, /function GroupsDivider\(\)/);

@@ -2071,7 +2071,7 @@ export function buildGroupsListData(groups, currentUserId, members, currentUserN
     filters: [
       { key: 'all', label: `Tất cả · ${activeRows.length}` },
       { key: 'owed', label: `Còn nợ · ${owed}` },
-      { key: 'balanced', label: `0 · ${balanced}` },
+      { key: 'balanced', label: `Cân bằng · ${balanced}` },
       { key: 'closed', label: `Đã chốt · ${archivedRows.length}` },
     ],
     groups: activeRows,

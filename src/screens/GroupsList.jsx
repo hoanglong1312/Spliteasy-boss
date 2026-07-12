@@ -151,7 +151,7 @@ function GroupCard({ g, onClick }) {
     food:       { bg: 'rgba(245,158,11,0.12)',  border: 'rgba(245,158,11,0.25)' },
     cafe:       { bg: 'rgba(99,102,241,0.12)',  border: 'rgba(99,102,241,0.25)' },
   }[isPickleballGroup ? 'pickleball' : g.kind] || { bg: 'rgba(255,255,255,0.04)', border: colors.borderSubtle };
-  const balanceLabel = g.balance === 0 ? '0' : formatVNDShort(g.balance);
+  const balanceLabel = g.balance === 0 ? 'Cân bằng' : formatVNDShort(g.balance);
 
   return (
     <ListCard accent={isPickleballGroup ? 'pickleball' : accentMap[g.kind]} style={{
@@ -270,7 +270,7 @@ const DEMO = {
   filters: [
     { key: 'all',     label: 'Tất cả · 3' },
     { key: 'owed',    label: 'Còn nợ · 2' },
-    { key: 'balanced',label: '0 · 1' },
+    { key: 'balanced',label: 'Cân bằng · 1' },
     { key: 'closed',  label: 'Đã chốt' },
   ],
   groups: [
