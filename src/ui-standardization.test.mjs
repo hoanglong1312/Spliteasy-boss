@@ -49,6 +49,14 @@ test('MonthNav gives month controls clear accessible names', () => {
   assert.match(monthNavSource, /aria-label="Tháng sau"/)
 })
 
+test('MonthNav month controls meet the minimum touch target', () => {
+  const monthNavSource = primitivesSource.slice(
+    primitivesSource.indexOf('export function MonthNav'),
+    primitivesSource.indexOf('export function Stat({')
+  )
+  assert.match(monthNavSource, /width: 44, height: 44/)
+})
+
 test('BottomSheet portals to the phone frame instead of the scrollable screen', () => {
   assert.match(primitivesSource, /import \{ createPortal \} from 'react-dom'/)
   assert.match(primitivesSource, /data-spliteasy-phone-frame/)

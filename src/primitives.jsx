@@ -669,7 +669,7 @@ export function SectionHeader({ children, action, onAction, style }) {
 
 export function MonthNav({ label, onPrev, onNext }) {
   const arrow = {
-    width: 28, height: 28, borderRadius: 8,
+    width: 44, height: 44, borderRadius: 8,
     background: 'rgba(255,255,255,0.04)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     color: colors.textSecondary, fontSize: 14,
