@@ -42,7 +42,7 @@ npm run build
 
 Expected: PASS.
 
-- [ ] **Step 5: Scope audit và commit**
+- [x] **Step 5: Scope audit và commit**
 
 Run:
 

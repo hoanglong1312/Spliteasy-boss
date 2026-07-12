@@ -13,3 +13,13 @@ Steps:
 ```
 
 Khi không có task nào đang chạy, file này để trống (không cần task giả). Claude tạo task ở đây thay vì (hoặc thêm vào cùng) `TaskCreate` nội bộ khi công việc có thể cần Codex tiếp tục độc lập qua nhiều turn/session.
+
+### Task 1: Khóa khoản thanh toán khi tải QR
+**Status:** done
+**Commit:** 6523afe
+Steps:
+- [x] Điều tra root cause và impact
+- [x] Viết regression test
+- [x] Nối QR với settlement checkpoint
+- [x] Chạy test, build và browser smoke test
+- [x] Commit và push
