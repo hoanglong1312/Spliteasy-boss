@@ -153,14 +153,20 @@ test('treasurer dashboard derives pending state per payable item', () => {
 test('treasurer dashboard keeps confirmed checkpoint members as paid history', () => {
   const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
   const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
 
   assert.match(dashboardSource, /confirmedCheckpointsForTreasurer/);
   assert.match(dashboardSource, /buildTreasurerMemberRows\(\{[\s\S]*confirmedCheckpoints/);
   assert.match(rowBuilderSource, /safeArray\(confirmedCheckpoints\)\.forEach/);
-  assert.match(rowBuilderSource, /safeArray\(checkpoint\.coveredItems \|\| checkpoint\.covered_items\)/);
+  assert.match(rowBuilderSource, /const checkpointItems = safeArray\(checkpoint\.coveredItems \|\| checkpoint\.covered_items\)/);
   assert.match(rowBuilderSource, /paidPayableItemKeys/);
+  assert.match(rowBuilderSource, /coveredItems: checkpointItems/);
+  assert.match(rowBuilderSource, /itemCount: checkpointItems\.length/);
+  assert.match(rowBuilderSource, /amount: checkpointItems\.reduce/);
   assert.match(rowBuilderSource, /paid: true/);
   assert.match(rowBuilderSource, /memberRow\.amountPaid = paymentItemsAmountDue/);
+  assert.match(rowSource, /group\.items\.reduce\(\(sum, item\) => sum \+ \(Number\(item\.itemCount\) \|\| 1\), 0\)/);
+  assert.match(rowSource, /Đã chốt \$\{item\.itemCount\} khoản/);
 });
 
 test('treasurer dashboard nets signed debt and credit items', () => {

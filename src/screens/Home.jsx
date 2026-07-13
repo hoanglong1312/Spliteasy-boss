@@ -1674,36 +1674,39 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedChe
   });
 
   safeArray(confirmedCheckpoints).forEach(checkpoint => {
-    safeArray(checkpoint.coveredItems || checkpoint.covered_items).forEach((item, index) => {
-      const payableItemKey = item.payableItemKey || item.payable_item_key || '';
-      if (payableItemKey && paidPayableItemKeys.has(payableItemKey)) return;
-      const amount = Number(item.amount) || 0;
-      if (amount === 0) return;
-      const memberRow = ensureRow({
-        profileId: item.profileId || item.profile_id || '',
-        memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
-        groupId: checkpoint.groupId || checkpoint.group_id || item.sourceId || item.source_id || '',
-        name: item.memberName || item.member_name || checkpoint.memberName,
+    const checkpointItems = safeArray(checkpoint.coveredItems || checkpoint.covered_items)
+      .filter(item => {
+        const payableItemKey = item.payableItemKey || item.payable_item_key || '';
+        return (!payableItemKey || !paidPayableItemKeys.has(payableItemKey)) && Number(item.amount);
       });
-      memberRow.items.push({
-        ...item,
-        key: `checkpoint:${checkpoint.id}:${payableItemKey || index}`,
-        sourceType: item.sourceType || item.source_type || 'group',
-        sourceId: item.sourceId || item.source_id || checkpoint.groupId || checkpoint.group_id || '',
-        sourceLabel: item.sourceLabel || item.source_label || 'Đã nhận',
-        memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
-        profileId: item.profileId || item.profile_id || '',
-        memberName: item.memberName || item.member_name || checkpoint.memberName,
-        month: item.month || item.yearMonth || item.year_month || '',
-        monthLabel: item.monthLabel || item.month_label || monthLabel,
-        amount,
-        payableItemKey,
-        paid: true,
-        kind: 'collect',
-        checkpoint,
-      });
-      memberRow.amountPaid = paymentItemsAmountDue(memberRow.items.filter(row => row.paid && row.kind !== 'refund'));
+    if (checkpointItems.length === 0) return;
+    const item = checkpointItems[0];
+    const memberRow = ensureRow({
+      profileId: item.profileId || item.profile_id || '',
+      memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
+      groupId: checkpoint.groupId || checkpoint.group_id || item.sourceId || item.source_id || '',
+      name: item.memberName || item.member_name || checkpoint.memberName,
     });
+    memberRow.items.push({
+      ...item,
+      key: `checkpoint:${checkpoint.id}`,
+      sourceType: item.sourceType || item.source_type || 'group',
+      sourceId: item.sourceId || item.source_id || checkpoint.groupId || checkpoint.group_id || '',
+      sourceLabel: item.sourceLabel || item.source_label || 'Đã nhận',
+      memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
+      profileId: item.profileId || item.profile_id || '',
+      memberName: item.memberName || item.member_name || checkpoint.memberName,
+      month: '',
+      monthLabel,
+      amount: checkpointItems.reduce((sum, coveredItem) => sum + (Number(coveredItem.amount) || 0), 0),
+      coveredItems: checkpointItems,
+      itemCount: checkpointItems.length,
+      payableItemKey: '',
+      paid: true,
+      kind: 'collect',
+      checkpoint,
+    });
+    memberRow.amountPaid = paymentItemsAmountDue(memberRow.items.filter(row => row.paid && row.kind !== 'refund'));
   });
 
   safeArray(refundRows).forEach(row => {
@@ -1838,7 +1841,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
             <div key={group.key} style={{ display: 'grid', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                 <div style={{ minWidth: 0, fontSize: 12, color: '#e2e8f0', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
-                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>{group.items.length} khoản</div>
+                <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>{group.items.reduce((sum, item) => sum + (Number(item.itemCount) || 1), 0)} khoản</div>
               </div>
               <div style={{ display: 'grid', gap: 6, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(147,197,253,0.34)' }}>
                 {group.items.map(item => {
@@ -1863,7 +1866,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                       style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: selectable ? 'pointer' : 'default' }}
                     >
                       <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : item.pending ? '#fbbf24' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: item.pending ? '#fde68a' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : item.pending ? '·' : ''}</div>
-                      <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
+                      <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `Đã chốt ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
