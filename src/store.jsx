@@ -2159,7 +2159,7 @@ export function AppProvider({ children }) {
         if (!sb || !state.currentUserId) return null
         const { data, error } = await sb.rpc('confirm_settlement_checkpoint', {
           p_checkpoint_id: action.checkpointId,
-          p_treasurer_member_id: String(state.currentUserId),
+          p_treasurer_member_id: String(action.treasurerMemberId || state.currentUserId),
         })
         if (error) {
           console.error('[store] CONFIRM_SETTLEMENT_CHECKPOINT:', error)
@@ -2173,7 +2173,7 @@ export function AppProvider({ children }) {
         if (!sb || !state.currentUserId) return null
         const { data, error } = await sb.rpc('reject_settlement_checkpoint', {
           p_checkpoint_id: action.checkpointId,
-          p_treasurer_member_id: String(state.currentUserId),
+          p_treasurer_member_id: String(action.treasurerMemberId || state.currentUserId),
         })
         if (error) {
           console.error('[store] REJECT_SETTLEMENT_CHECKPOINT:', error)

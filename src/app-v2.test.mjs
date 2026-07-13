@@ -277,6 +277,27 @@ test('AppV2 forwards exact covered items when requesting settlement checkpoints'
   assert.doesNotMatch(storeBlock, /await refresh\(\)/)
 })
 
+test('AppV2 reviews checkpoint batches with the treasurer member from each checkpoint group', () => {
+  const confirmBlock = appSource.slice(
+    appSource.indexOf("if (type === 'confirmSettlementCheckpoint')"),
+    appSource.indexOf("if (type === 'confirmPaymentNotice'"),
+  )
+  const storeBlock = storeSource.slice(
+    storeSource.indexOf("case 'CONFIRM_SETTLEMENT_CHECKPOINT'"),
+    storeSource.indexOf("case 'DELETE_PAYMENT_NOTIFICATION'"),
+  )
+
+  assert.match(appSource, /function treasurerMemberIdForCheckpoint\(state, checkpointId\)/)
+  assert.match(appSource, /safeArray\(state\?\.settlementCheckpoints\)\.find/)
+  assert.match(appSource, /String\(member\?\.groupId \|\| member\?\.group_id \|\| ''\) === String\(groupId\)/)
+  assert.match(appSource, /String\(member\?\.profileId \|\| member\?\.profile_id \|\| ''\) === String\(profileId\)/)
+  assert.match(appSource, /String\(member\?\.role \|\| ''\)\.toLowerCase\(\) === 'treasurer'/)
+  assert.match(confirmBlock, /const checkpointIds = \[\.\.\.new Set\(safeArray\(payload\?\.checkpointIds\)\.concat\(payload\?\.checkpointId \|\| \[\]\)\.filter\(Boolean\)\)\]/)
+  assert.match(confirmBlock, /checkpointIds\.map\(checkpointId => dispatch\(\{[\s\S]*type: 'CONFIRM_SETTLEMENT_CHECKPOINT',[\s\S]*treasurerMemberId: treasurerMemberIdForCheckpoint\(state, checkpointId\)/)
+  assert.match(confirmBlock, /checkpointIds\.map\(checkpointId => dispatch\(\{[\s\S]*type: 'REJECT_SETTLEMENT_CHECKPOINT',[\s\S]*treasurerMemberId: treasurerMemberIdForCheckpoint\(state, checkpointId\)/)
+  assert.match(storeBlock, /p_treasurer_member_id: String\(action\.treasurerMemberId \|\| state\.currentUserId\)/)
+})
+
 test('AppV2 trusts resumed session identity before cached recent-session identity', () => {
   const block = appSource.slice(
     appSource.indexOf("if (type === 'resumeRecentSession')"),

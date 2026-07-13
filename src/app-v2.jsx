@@ -84,6 +84,17 @@ function currentProfileId(state) {
   return me?.profileId || me?.profile_id || ''
 }
 
+function treasurerMemberIdForCheckpoint(state, checkpointId) {
+  const checkpoint = safeArray(state?.settlementCheckpoints).find(row => String(row?.id) === String(checkpointId))
+  const groupId = checkpoint?.groupId || checkpoint?.group_id || ''
+  const profileId = currentProfileId(state)
+  return safeArray(state?.members).find(member => (
+    String(member?.groupId || member?.group_id || '') === String(groupId) &&
+    String(member?.profileId || member?.profile_id || '') === String(profileId) &&
+    String(member?.role || '').toLowerCase() === 'treasurer'
+  ))?.id || state?.currentUserId
+}
+
 function paymentNotificationTargetMemberId(state) {
   const rows = safeArray(state?.members)
   const moneyManagers = rows.filter(member => ['treasurer', 'admin', 'owner'].includes(String(member?.role || '').toLowerCase()))
@@ -2466,10 +2477,13 @@ export default function AppV2() {
 
     if (type === 'confirmSettlementCheckpoint') {
       try {
-        await dispatch({
+        const checkpointIds = [...new Set(safeArray(payload?.checkpointIds).concat(payload?.checkpointId || []).filter(Boolean))]
+        if (checkpointIds.length === 0) throw new Error('Không có yêu cầu thanh toán để duyệt.')
+        await Promise.all(checkpointIds.map(checkpointId => dispatch({
           type: 'CONFIRM_SETTLEMENT_CHECKPOINT',
-          checkpointId: payload?.checkpointId,
-        })
+          checkpointId,
+          treasurerMemberId: treasurerMemberIdForCheckpoint(state, checkpointId),
+        })))
         dispatch({ type: 'SHOW_TOAST', message: 'Đã xác nhận thanh toán.' })
       } catch (error) {
         console.error('[app] confirmSettlementCheckpoint:', error)
@@ -2481,10 +2495,13 @@ export default function AppV2() {
 
     if (type === 'rejectSettlementCheckpoint') {
       try {
-        await dispatch({
+        const checkpointIds = [...new Set(safeArray(payload?.checkpointIds).concat(payload?.checkpointId || []).filter(Boolean))]
+        if (checkpointIds.length === 0) throw new Error('Không có yêu cầu thanh toán để từ chối.')
+        await Promise.all(checkpointIds.map(checkpointId => dispatch({
           type: 'REJECT_SETTLEMENT_CHECKPOINT',
-          checkpointId: payload?.checkpointId,
-        })
+          checkpointId,
+          treasurerMemberId: treasurerMemberIdForCheckpoint(state, checkpointId),
+        })))
         dispatch({ type: 'SHOW_TOAST', message: 'Đã từ chối yêu cầu thanh toán.' })
       } catch (error) {
         console.error('[app] rejectSettlementCheckpoint:', error)

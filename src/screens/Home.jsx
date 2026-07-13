@@ -1300,6 +1300,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
       return !currentItem || Math.round(Number(currentItem.amount) || 0) !== Math.round(Number(snapshotItem.amount) || 0);
     }),
   }));
+  const pendingCheckpointById = new Map(pendingCheckpointsWithState.map(row => [String(row.id), row]));
   const totalNeedCollect = memberRows.reduce((sum, row) => sum + row.amountDue, 0);
   const totalReceived = memberRows.reduce((sum, row) => sum + row.amountPaid, 0);
   const totalRefund = memberRows.reduce((sum, row) => sum + row.amountRefund, 0);
@@ -1387,34 +1388,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         placeholder="Tìm thành viên trong danh sách"
       />
 
-      {pendingCheckpointsWithState.length > 0 && (
-        <DashboardSection
-          title={`Checkpoint chờ duyệt · ${pendingCheckpointsWithState.length}`}
-          subtitle="Member đã bấm xác nhận thanh toán"
-          amount={pendingCheckpointsWithState.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)}
-          icon="⏳"
-          color="#fcd34d"
-          expanded={pendingExpanded}
-          onToggle={() => setPendingExpanded(value => !value)}
-          listScroll
-        >
-          {pendingCheckpointsWithState.map(row => (
-            <PaymentDashboardRow
-              key={row.id}
-              row={{
-                ...row,
-                name: row.memberName || row.name,
-                sourceSummary: row.stale ? 'Có khoản đã thay đổi hoặc bị xóa' : row.periodEnd ? `Đến ${row.periodEnd}` : 'Chờ xác nhận',
-              }}
-              tone="pending"
-            >
-              <button type="button" disabled={row.stale} onClick={() => withLoading(() => onAction?.('confirmSettlementCheckpoint', { checkpointId: row.id }))} style={{ ...miniDashButton('#22c55e', '#052e16'), opacity: row.stale ? 0.45 : 1, cursor: row.stale ? 'not-allowed' : 'pointer' }}>Duyệt</button>
-              <button type="button" onClick={() => withLoading(() => onAction?.('rejectSettlementCheckpoint', { checkpointId: row.id }))} style={miniDashButton(colors.danger, '#fff')}>Từ chối</button>
-            </PaymentDashboardRow>
-          ))}
-        </DashboardSection>
-      )}
-
       {pendingRecordsRaw.length > 0 && (
         <DashboardSection
           title={`Chờ duyệt · ${pendingRecordsFiltered.length}${isSearching ? `/${pendingRecordsRaw.length}` : ''}`}
@@ -1476,6 +1449,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           <TreasurerMemberPaymentRow
             key={row.key}
             row={row}
+            pendingCheckpoints={[...new Set(row.items.map(item => item.pendingCheckpointId).filter(Boolean))]
+              .map(id => pendingCheckpointById.get(String(id)))
+              .filter(Boolean)}
             selectedKeys={selectedTreasurerItemKeys}
             collapseTick={collapsedTreasurerRows.keys.includes(row.key) ? collapsedTreasurerRows.tick : 0}
             onShare={(member) => setShareMember(member)}
@@ -1489,6 +1465,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
             onCancelRefund={(item) => onCancelRefund?.(item.refundRow)}
             onRefundBill={(item) => setRefundBillItem(item)}
+            onConfirmPending={(checkpointIds) => withLoading(() => onAction?.('confirmSettlementCheckpoint', { checkpointIds }))}
+            onRejectPending={(checkpointIds) => withLoading(() => onAction?.('rejectSettlementCheckpoint', { checkpointIds }))}
           />
         )) : (
           <div style={{ padding: 10, fontSize: 12, color: colors.textSecondary, textAlign: 'center' }}>{isSearching ? 'Không có member khớp tìm kiếm.' : 'Không còn dữ liệu cần xử lý.'}</div>
@@ -1776,13 +1754,15 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill }) {
+function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill, onConfirmPending, onRejectPending }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
   const unpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund');
   const selectedUnpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedKeys?.has?.(item.key));
   const selectedUnpaidTotal = paymentItemsAmountDue(selectedUnpaidItems);
   const rowAllSelected = unpaidItems.length > 0 && unpaidItems.every(item => selectedKeys?.has?.(item.key));
+  const pendingCheckpointIds = [...new Set(safeArray(pendingCheckpoints).map(checkpoint => checkpoint.id).filter(Boolean))];
+  const pendingApprovalDisabled = safeArray(pendingCheckpoints).some(checkpoint => checkpoint.stale);
   useEffect(() => { if (collapseTick) setExpanded(false); }, [collapseTick]);
   return (
     <div style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
@@ -1807,6 +1787,8 @@ function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, o
       {expanded && (
         <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+            {pendingCheckpointIds.length > 0 && <button type="button" disabled={pendingApprovalDisabled} title={pendingApprovalDisabled ? 'Có khoản đã thay đổi hoặc bị xóa' : undefined} onClick={() => onConfirmPending?.(pendingCheckpointIds)} style={{ ...miniDashButton('#22c55e', '#052e16'), opacity: pendingApprovalDisabled ? 0.45 : 1, cursor: pendingApprovalDisabled ? 'not-allowed' : 'pointer' }}>Duyệt tất cả</button>}
+            {pendingCheckpointIds.length > 0 && <button type="button" onClick={() => onRejectPending?.(pendingCheckpointIds)} style={miniDashButton(colors.danger, '#fff')}>Từ chối tất cả</button>}
             <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
             {row.unsettledAmount > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, groupId: row.groupId, amount: row.unsettledAmount })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
             {unpaidItems.length > 0 && <button type="button" onClick={() => onToggleRowSelection?.(!rowAllSelected)} style={miniDashButton(rowAllSelected ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.18)', rowAllSelected ? '#cbd5e1' : '#6ee7b7')}>{rowAllSelected ? 'Bỏ chọn' : 'Chọn hết'}</button>}

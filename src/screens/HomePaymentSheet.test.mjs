@@ -124,8 +124,11 @@ test('treasurer dashboard derives pending state per payable item', () => {
   assert.match(dashboardSource, /flatMap\(item => paymentItemToCoveredItems\(item\)\)/);
   assert.doesNotMatch(dashboardSource, /pendingCheckpointMemberIds/);
   assert.match(dashboardSource, /const pendingCheckpointsWithState = pendingCheckpoints\.map/);
-  assert.match(dashboardSource, /disabled=\{row\.stale\}/);
-  assert.match(dashboardSource, /Có khoản đã thay đổi hoặc bị xóa/);
+  assert.match(dashboardSource, /const pendingCheckpointById = new Map\(pendingCheckpointsWithState\.map/);
+  assert.doesNotMatch(dashboardSource, /Checkpoint chờ duyệt/);
+  assert.match(dashboardSource, /pendingCheckpoints=\{\[\.\.\.new Set\(row\.items\.map\(item => item\.pendingCheckpointId\)\.filter\(Boolean\)\)\]/);
+  assert.match(dashboardSource, /onConfirmPending=\{\(checkpointIds\) => withLoading\(\(\) => onAction\?\.\('confirmSettlementCheckpoint', \{ checkpointIds \}\)\)\}/);
+  assert.match(dashboardSource, /onRejectPending=\{\(checkpointIds\) => withLoading\(\(\) => onAction\?\.\('rejectSettlementCheckpoint', \{ checkpointIds \}\)\)\}/);
   assert.match(homeSource, /groupName: item\.sourceLabel/);
 
   assert.doesNotMatch(rowBuilderSource, /items\.flatMap\(item => paymentItemToCoveredItems\(item\)/);
@@ -141,6 +144,10 @@ test('treasurer dashboard derives pending state per payable item', () => {
   assert.match(rowSource, /item\.pending \? 'Đang chờ nhận' : 'Chưa chốt'/);
   assert.match(rowSource, /Đang chờ \$\{formatVND\(row\.pendingAmount\)\}/);
   assert.match(rowSource, /Chưa chốt \$\{formatVND\(row\.unsettledAmount\)\}/);
+  assert.match(rowSource, /const pendingCheckpointIds = \[\.\.\.new Set\(safeArray\(pendingCheckpoints\)\.map\(checkpoint => checkpoint\.id\)\.filter\(Boolean\)\)\]/);
+  assert.match(rowSource, /const pendingApprovalDisabled = safeArray\(pendingCheckpoints\)\.some\(checkpoint => checkpoint\.stale\)/);
+  assert.match(rowSource, /disabled=\{pendingApprovalDisabled\}[\s\S]*Duyệt tất cả/);
+  assert.match(rowSource, /onRejectPending\?\.\(pendingCheckpointIds\)[\s\S]*Từ chối tất cả/);
 });
 
 test('treasurer dashboard nets signed debt and credit items', () => {
