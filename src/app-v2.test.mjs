@@ -267,6 +267,8 @@ test('AppV2 forwards exact covered items when requesting settlement checkpoints'
   )
   assert.match(block, /coveredItems: payload\?\.coveredItems/)
   assert.match(block, /coveredItems: row\.coveredItems/)
+  assert.match(block, /const failedGroups = results\.flatMap/)
+  assert.match(block, /if \(failedGroups\.length > 0\) throw new Error\(`Chưa gửi được yêu cầu thanh toán: \$\{failedGroups\.join\(', '\)\}\.`\)/)
 })
 
 test('AppV2 trusts resumed session identity before cached recent-session identity', () => {

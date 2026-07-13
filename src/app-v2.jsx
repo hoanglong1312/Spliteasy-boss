@@ -2437,7 +2437,7 @@ export default function AppV2() {
       try {
         const groups = Array.isArray(payload?.groups) && payload.groups.length > 0
           ? payload.groups
-          : [{ groupId: payload?.groupId, memberId: payload?.memberId, amount: payload?.amount, coveredItems: payload?.coveredItems }]
+          : [{ groupId: payload?.groupId, groupName: payload?.groupName, memberId: payload?.memberId, amount: payload?.amount, coveredItems: payload?.coveredItems }]
         const requests = groups.filter(row => row?.groupId && row?.memberId)
         if (requests.length === 0) throw new Error('Không có nhóm cần gửi yêu cầu thanh toán.')
         const results = await Promise.allSettled(requests.map(row => dispatch({
@@ -2448,15 +2448,14 @@ export default function AppV2() {
           coveredItems: row.coveredItems,
         })))
         const successCount = results.filter(result => result.status === 'fulfilled').length
-        const failureCount = results.length - successCount
+        const failedGroups = results.flatMap((result, index) => result.status === 'rejected'
+          ? [requests[index]?.groupName || requests[index]?.groupId]
+          : [])
         if (successCount > 0) {
           await dispatch({ type: 'REFRESH' })
           dispatch({ type: 'SHOW_TOAST', message: `Đã gửi yêu cầu thanh toán cho ${successCount} nhóm, chờ thủ quỹ xác nhận.` })
         }
-        if (failureCount > 0) {
-          if (successCount > 0) dispatch({ type: 'SHOW_TOAST', message: `${failureCount} nhóm chưa gửi được yêu cầu thanh toán.` })
-        }
-        if (successCount === 0 && failureCount > 0) throw results.find(result => result.status === 'rejected')?.reason
+        if (failedGroups.length > 0) throw new Error(`Chưa gửi được yêu cầu thanh toán: ${failedGroups.join(', ')}.`)
       } catch (error) {
         console.error('[app] requestSettlementCheckpoint:', error)
         dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa gửi được yêu cầu thanh toán.' })

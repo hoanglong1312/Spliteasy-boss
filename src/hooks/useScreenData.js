@@ -291,11 +291,15 @@ function pendingSettlementCheckpointsForProfile(state, memberId, members = [], g
     .sort((a, b) => parseDateValue(a.createdAt) - parseDateValue(b.createdAt))
 }
 
-function pendingSettlementCheckpointsForTreasurer(state, members = []) {
-  const groupId = settlementCheckpointGroupId(state)
+function pendingSettlementCheckpointsForTreasurer(state, members = [], currentProfileId = '') {
+  const profileId = currentProfileId || state?.currentProfileId || state?.currentProfile_id || profileIdForMember(state?.currentUserId, members)
+  const managedGroupIds = new Set(safeArray(members)
+    .filter(member => String(member.profileId || member.profile_id || '') === String(profileId || '') && isManagerRole(member.role))
+    .map(member => String(member.groupId || member.group_id || '')))
+  if (managedGroupIds.size === 0) managedGroupIds.add(String(settlementCheckpointGroupId(state) || ''))
   return safeArray(state?.settlementCheckpoints)
     .map(row => normalizeSettlementCheckpoint(row, members))
-    .filter(row => String(row.groupId || '') === String(groupId || ''))
+    .filter(row => managedGroupIds.has(String(row.groupId || '')))
     .filter(row => String(row.status || '').toLowerCase() === 'pending')
     .sort((a, b) => parseDateValue(a.createdAt) - parseDateValue(b.createdAt))
 }
@@ -776,7 +780,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const prevMonthUnpaid = checkpointNotice || buildPrevMonthUnpaid(state, currentUserId, members, safeGroups, pickle, pickleballState, pickleballMemberId, selectedYearMonth)
   const pendingSettlementCheckpoints = pendingSettlementCheckpointsForProfile(state, currentUserId, members, safeGroups)
   const pendingSettlementCheckpoint = pendingSettlementCheckpoints[0] || null
-  const pendingCheckpointsForTreasurer = pendingSettlementCheckpointsForTreasurer(state, members)
+  const pendingCheckpointsForTreasurer = pendingSettlementCheckpointsForTreasurer(paymentState, members, currentProfileId)
   const allTickets = [
     ...safeArray(pickleballState?._allPickle?.externalTickets),
   ]

@@ -5329,6 +5329,56 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('exposes pending checkpoints from every group managed by current profile', () => {
+    const members = [
+      { id: 'treasurer-1', profile_id: 'profile-treasurer', group_id: 'group-1', name: 'Treasurer', role: 'treasurer' },
+      { id: 'treasurer-2', profile_id: 'profile-treasurer', group_id: 'group-2', name: 'Treasurer', role: 'treasurer' },
+      { id: 'member-1', profile_id: 'profile-member-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'member-2', profile_id: 'profile-member-2', group_id: 'group-2', name: 'Member Two' },
+    ]
+    const groups = [
+      { id: 'group-1', name: 'Group One', members: ['treasurer-1', 'member-1'], expenses: [] },
+      { id: 'group-2', name: 'Group Two', members: ['treasurer-2', 'member-2'], expenses: [] },
+    ]
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentProfileId: 'profile-treasurer',
+      currentUserName: 'Treasurer',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-1',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        amount: 40000,
+        status: 'pending',
+        covered_items: [{ payable_item_key: 'expense:one', amount: -40000 }],
+        created_at: '2026-07-02T00:00:00.000Z',
+      }, {
+        id: 'checkpoint-2',
+        group_id: 'group-2',
+        member_id: 'member-2',
+        amount: 60000,
+        status: 'pending',
+        covered_items: [{ payable_item_key: 'expense:two', amount: -60000 }],
+        created_at: '2026-07-03T00:00:00.000Z',
+      }],
+    }
+
+    const result = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.pendingCheckpointsForTreasurer).toEqual([
+      expect.objectContaining({ id: 'checkpoint-1', groupId: 'group-1' }),
+      expect.objectContaining({
+        id: 'checkpoint-2',
+        groupId: 'group-2',
+        coveredItems: [expect.objectContaining({ payableItemKey: 'expense:two', amount: -60000 })],
+      }),
+    ])
+  })
+
   test('returns current month residual for confirmed members who still owe after payment', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

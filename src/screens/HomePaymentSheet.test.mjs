@@ -111,8 +111,32 @@ test('treasurer QR download does not change payment status', () => {
   assert.doesNotMatch(qrSource, /onRequestSnapshot/);
   assert.match(qrSource, /await fetch\(qrUrl\)/);
   assert.match(qrSource, /Tải QR/);
-  assert.match(rowSource, /paymentLocked/);
-  assert.match(rowSource, /Chờ nhận tiền/);
+  assert.match(rowSource, /Đang chờ nhận/);
+  assert.match(rowSource, /Chưa chốt/);
+});
+
+test('treasurer dashboard derives pending state per payable item', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+  const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
+
+  assert.match(dashboardSource, /buildTreasurerMemberRows\(\{[\s\S]*pendingCheckpoints/);
+  assert.doesNotMatch(dashboardSource, /pendingCheckpointMemberIds/);
+  assert.match(dashboardSource, /const pendingCheckpointsWithState = pendingCheckpoints\.map/);
+  assert.match(dashboardSource, /disabled=\{row\.stale\}/);
+  assert.match(dashboardSource, /Có khoản đã thay đổi hoặc bị xóa/);
+  assert.match(homeSource, /groupName: item\.sourceLabel/);
+
+  assert.match(rowBuilderSource, /flatMap\(item => paymentItemToCoveredItems\(item\)/);
+  assert.match(rowBuilderSource, /pendingCheckpointId/);
+  assert.match(rowBuilderSource, /pendingAmount/);
+  assert.match(rowBuilderSource, /unsettledAmount/);
+
+  assert.match(rowSource, /const unpaidItems = row\.items\.filter\(item => !item\.paid && !item\.pending/);
+  assert.match(rowSource, /const selected = !item\.paid && !item\.pending/);
+  assert.match(rowSource, /item\.pending \? 'Đang chờ nhận' : 'Chưa chốt'/);
+  assert.match(rowSource, /Đang chờ \$\{formatVND\(row\.pendingAmount\)\}/);
+  assert.match(rowSource, /Chưa chốt \$\{formatVND\(row\.unsettledAmount\)\}/);
 });
 
 test('treasurer dashboard nets signed debt and credit items', () => {

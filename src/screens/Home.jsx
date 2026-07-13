@@ -1286,9 +1286,18 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const matchSearch = makeMatcher(searchQuery);
   const pendingRecordsRaw = pending.filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
-  const pendingCheckpointMemberIds = new Set(pendingCheckpoints.map(row => String(row.memberId || '')));
-  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel })
-    .map(row => ({ ...row, paymentLocked: pendingCheckpointMemberIds.has(String(row.memberId || '')) }));
+  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
+  const currentPayableItems = new Map(memberRows.flatMap(row => row.items)
+    .filter(item => !item.paid && item.kind !== 'refund' && item.payableItemKey)
+    .map(item => [item.payableItemKey, item]));
+  const pendingCheckpointsWithState = pendingCheckpoints.map(row => ({
+    ...row,
+    stale: safeArray(row.coveredItems || row.covered_items).some(snapshotItem => {
+      const key = snapshotItem.payableItemKey || snapshotItem.payable_item_key || '';
+      const currentItem = currentPayableItems.get(key);
+      return !currentItem || Math.round(Number(currentItem.amount) || 0) !== Math.round(Number(snapshotItem.amount) || 0);
+    }),
+  }));
   const totalNeedCollect = memberRows.reduce((sum, row) => sum + row.amountDue, 0);
   const totalReceived = memberRows.reduce((sum, row) => sum + row.amountPaid, 0);
   const totalRefund = memberRows.reduce((sum, row) => sum + row.amountRefund, 0);
@@ -1307,8 +1316,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const paidMemberCount = profileStatRows.filter(row => row.amountPaid > 0 && row.amountDue <= 0).length;
   const pendingMemberCount = new Set([...pendingRecordsRaw, ...pendingCheckpoints].map(treasurerProfileStatKey).filter(Boolean)).size;
   const unpaidMemberCount = profileStatRows.filter(row => row.amountDue > 0).length;
-  const selectedTreasurerItems = memberRows.flatMap(row => row.paymentLocked ? [] : row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
-  const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
+  const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
+  const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
   const selectedTreasurerTotal = paymentItemsAmountDue(selectedTreasurerItems);
   const refundBillData = refundBillItem ? buildRefundBillData(refundBillItem) : null;
   const refundBillBankReady = refundBillItem ? Boolean(resolveVietQrBank(refundBillItem.bank || {}) && refundBillItem.bank?.account && refundBillItem.bank?.holder) : false;
@@ -1325,7 +1334,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   }
 
   function toggleTreasurerItemSelection(item) {
-    if (!item || item.paid || item.kind === 'refund') return;
+    if (!item || item.paid || item.pending || item.kind === 'refund') return;
     setSelectedTreasurerItemKeys(prev => {
       const next = new Set(prev);
       next.has(item.key) ? next.delete(item.key) : next.add(item.key);
@@ -1334,10 +1343,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   }
 
   function setTreasurerRowSelection(row, selected) {
-    if (row?.paymentLocked) return;
     setSelectedTreasurerItemKeys(prev => {
       const next = new Set(prev);
-      safeArray(row?.items).filter(item => !item.paid && item.kind !== 'refund').forEach(item => {
+      safeArray(row?.items).filter(item => !item.paid && !item.pending && item.kind !== 'refund').forEach(item => {
         selected ? next.add(item.key) : next.delete(item.key);
       });
       return next;
@@ -1377,28 +1385,28 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         placeholder="Tìm thành viên trong danh sách"
       />
 
-      {pendingCheckpoints.length > 0 && (
+      {pendingCheckpointsWithState.length > 0 && (
         <DashboardSection
-          title={`Checkpoint chờ duyệt · ${pendingCheckpoints.length}`}
+          title={`Checkpoint chờ duyệt · ${pendingCheckpointsWithState.length}`}
           subtitle="Member đã bấm xác nhận thanh toán"
-          amount={pendingCheckpoints.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)}
+          amount={pendingCheckpointsWithState.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)}
           icon="⏳"
           color="#fcd34d"
           expanded={pendingExpanded}
           onToggle={() => setPendingExpanded(value => !value)}
           listScroll
         >
-          {pendingCheckpoints.map(row => (
+          {pendingCheckpointsWithState.map(row => (
             <PaymentDashboardRow
               key={row.id}
               row={{
                 ...row,
                 name: row.memberName || row.name,
-                sourceSummary: row.periodEnd ? `Đến ${row.periodEnd}` : 'Chờ xác nhận',
+                sourceSummary: row.stale ? 'Có khoản đã thay đổi hoặc bị xóa' : row.periodEnd ? `Đến ${row.periodEnd}` : 'Chờ xác nhận',
               }}
               tone="pending"
             >
-              <button type="button" onClick={() => withLoading(() => onAction?.('confirmSettlementCheckpoint', { checkpointId: row.id }))} style={miniDashButton('#22c55e', '#052e16')}>Duyệt</button>
+              <button type="button" disabled={row.stale} onClick={() => withLoading(() => onAction?.('confirmSettlementCheckpoint', { checkpointId: row.id }))} style={{ ...miniDashButton('#22c55e', '#052e16'), opacity: row.stale ? 0.45 : 1, cursor: row.stale ? 'not-allowed' : 'pointer' }}>Duyệt</button>
               <button type="button" onClick={() => withLoading(() => onAction?.('rejectSettlementCheckpoint', { checkpointId: row.id }))} style={miniDashButton(colors.danger, '#fff')}>Từ chối</button>
             </PaymentDashboardRow>
           ))}
@@ -1466,7 +1474,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           <TreasurerMemberPaymentRow
             key={row.key}
             row={row}
-            paymentLocked={row.paymentLocked}
             selectedKeys={selectedTreasurerItemKeys}
             collapseTick={collapsedTreasurerRows.keys.includes(row.key) ? collapsedTreasurerRows.tick : 0}
             onShare={(member) => setShareMember(member)}
@@ -1561,8 +1568,15 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   );
 }
 
-function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, matchSearch, confirmedRefunds, monthLabel }) {
+function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel }) {
   const byMember = new Map();
+  const pendingItems = new Map();
+  safeArray(pendingCheckpoints).forEach(checkpoint => {
+    safeArray(checkpoint.coveredItems || checkpoint.covered_items).forEach(item => {
+      const payableItemKey = item.payableItemKey || item.payable_item_key || '';
+      if (payableItemKey) pendingItems.set(payableItemKey, checkpoint.id);
+    });
+  });
   const ensureRow = (seed = {}) => {
     const key = treasurerProfileStatKey(seed) || String(seed.memberId || seed.name || 'member');
     const existing = byMember.get(key) || {
@@ -1599,16 +1613,24 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
       const items = safeArray(row.paymentItems).length
         ? safeArray(row.paymentItems)
         : safeArray(row.payableSources || row.coveredSources || row.sources).flatMap((source, index) => sourcePaymentItems(source, { prefix: `member:${memberRow.key}:${index}`, memberId, profileId }));
-      items.forEach((item, index) => {
+      items.flatMap(item => paymentItemToCoveredItems(item).map(coveredItem => ({
+        ...item,
+        ...coveredItem,
+        coveredItems: [coveredItem],
+      }))).forEach((item, index) => {
         const amount = Number(item.amount) || 0;
         if (amount === 0) return;
+        const payableItemKey = item.payableItemKey || item.payable_item_key || '';
         memberRow.items.push({
           ...item,
-          key: item.key || `due:${memberRow.key}:${index}`,
+          key: payableItemKey || item.key || `due:${memberRow.key}:${index}`,
+          payableItemKey,
+          pendingCheckpointId: pendingItems.get(payableItemKey) || '',
+          pending: pendingItems.has(payableItemKey),
           paid: false,
           kind: 'collect',
           memberName: memberRow.name,
-          groupId: row.linkGroupId || row.groupId || '',
+          groupId: item.groupId || item.group_id || item.sourceId || row.linkGroupId || row.groupId || '',
           row,
         });
       });
@@ -1686,6 +1708,8 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
     .filter(row => matchSearch(row.name))
     .map(row => ({
       ...row,
+      pendingAmount: paymentItemsAmountDue(row.items.filter(item => !item.paid && item.pending && item.kind !== 'refund')),
+      unsettledAmount: paymentItemsAmountDue(row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund')),
       items: row.items.sort((a, b) => String(a.sourceLabel || '').localeCompare(String(b.sourceLabel || ''), 'vi') || String(a.month || a.monthLabel || '').localeCompare(String(b.month || b.monthLabel || '')) || Number(a.paid) - Number(b.paid)),
     }))
     .filter(row => row.items.length > 0)
@@ -1740,11 +1764,11 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill }) {
+function TreasurerMemberPaymentRow({ row, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
-  const unpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund');
-  const selectedUnpaidItems = row.items.filter(item => !item.paid && item.kind !== 'refund' && selectedKeys?.has?.(item.key));
+  const unpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund');
+  const selectedUnpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedKeys?.has?.(item.key));
   const selectedUnpaidTotal = paymentItemsAmountDue(selectedUnpaidItems);
   const rowAllSelected = unpaidItems.length > 0 && unpaidItems.every(item => selectedKeys?.has?.(item.key));
   useEffect(() => { if (collapseTick) setExpanded(false); }, [collapseTick]);
@@ -1755,7 +1779,9 @@ function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseT
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 950, color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.name}</div>
             <div style={{ marginTop: 2, fontSize: 10, color: colors.textSecondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {row.amountDue > 0 ? `Chưa thu ${formatVND(row.amountDue)}` : 'Không còn nợ'}
+              {row.pendingAmount > 0 ? `Đang chờ ${formatVND(row.pendingAmount)}` : ''}
+              {row.pendingAmount > 0 && row.unsettledAmount > 0 ? ' · ' : ''}
+              {row.unsettledAmount > 0 ? `Chưa chốt ${formatVND(row.unsettledAmount)}` : row.pendingAmount > 0 ? '' : 'Không còn nợ'}
               {row.amountPaid > 0 ? ` · đã nhận ${formatVND(row.amountPaid)}` : ''}
               {row.amountRefund > 0 ? ` · hoàn ${formatVND(row.amountRefund)}` : ''}
             </div>
@@ -1770,11 +1796,9 @@ function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseT
         <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
-            {paymentLocked
-              ? <span style={{ padding: '6px 9px', borderRadius: 8, background: 'rgba(251,191,36,0.14)', color: '#fde68a', fontSize: 11, fontWeight: 850 }}>Chờ nhận tiền</span>
-              : row.amountDue > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, groupId: row.groupId, amount: row.amountDue })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
-            {!paymentLocked && unpaidItems.length > 0 && <button type="button" onClick={() => onToggleRowSelection?.(!rowAllSelected)} style={miniDashButton(rowAllSelected ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.18)', rowAllSelected ? '#cbd5e1' : '#6ee7b7')}>{rowAllSelected ? 'Bỏ chọn' : 'Chọn hết'}</button>}
-            {!paymentLocked && selectedUnpaidTotal > 0 && <button type="button" onClick={() => onPaySelected?.(selectedUnpaidItems)} style={miniDashButton('#22c55e', '#052e16')}>TT tổng {formatVND(selectedUnpaidTotal)}</button>}
+            {row.unsettledAmount > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, groupId: row.groupId, amount: row.unsettledAmount })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
+            {unpaidItems.length > 0 && <button type="button" onClick={() => onToggleRowSelection?.(!rowAllSelected)} style={miniDashButton(rowAllSelected ? 'rgba(148,163,184,0.14)' : 'rgba(34,197,94,0.18)', rowAllSelected ? '#cbd5e1' : '#6ee7b7')}>{rowAllSelected ? 'Bỏ chọn' : 'Chọn hết'}</button>}
+            {selectedUnpaidTotal > 0 && <button type="button" onClick={() => onPaySelected?.(selectedUnpaidItems)} style={miniDashButton('#22c55e', '#052e16')}>TT tổng {formatVND(selectedUnpaidTotal)}</button>}
           </div>
           {groupedItems.map(group => (
             <div key={group.key} style={{ display: 'grid', gap: 6 }}>
@@ -1788,32 +1812,32 @@ function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseT
                   const isCredit = Number(item.amount) > 0;
                   const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : isCredit ? 'Bù' : (item.paid ? 'Đã nhận' : 'TT');
                   const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
-                  const selected = !item.paid && !isRefund && selectedKeys?.has?.(item.key);
+                  const selected = !item.paid && !item.pending && !isRefund && selectedKeys?.has?.(item.key);
+                  const selectable = !item.paid && !item.pending && !isRefund;
                   return (
                     <div
                       key={item.key}
-                      role={!paymentLocked && !item.paid && !isRefund ? 'button' : undefined}
-                      tabIndex={!paymentLocked && !item.paid && !isRefund ? 0 : undefined}
-                      onClick={() => !paymentLocked && !item.paid && !isRefund ? onToggleSelect?.(item) : undefined}
+                      role={selectable ? 'button' : undefined}
+                      tabIndex={selectable ? 0 : undefined}
+                      onClick={() => selectable ? onToggleSelect?.(item) : undefined}
                       onKeyDown={(event) => {
-                        if ((event.key === 'Enter' || event.key === ' ') && !paymentLocked && !item.paid && !isRefund) {
+                        if ((event.key === 'Enter' || event.key === ' ') && selectable) {
                           event.preventDefault();
                           onToggleSelect?.(item);
                         }
                       }}
-                      style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: !item.paid && !isRefund ? 'pointer' : 'default' }}
+                      style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: selectable ? 'pointer' : 'default' }}
                     >
-                      <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : ''}</div>
+                      <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : item.pending ? '#fbbf24' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: item.pending ? '#fde68a' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : item.pending ? '·' : ''}</div>
                       <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
-                        <button
+                        {!item.paid && !isRefund && <span style={{ padding: '5px 7px', borderRadius: 7, background: item.pending ? 'rgba(251,191,36,0.14)' : 'rgba(148,163,184,0.12)', color: item.pending ? '#fde68a' : '#cbd5e1', fontSize: 10, fontWeight: 850 }}>{item.pending ? 'Đang chờ nhận' : 'Chưa chốt'}</span>}
+                        {!item.pending && <button
                           type="button"
-                          disabled={paymentLocked && !item.paid && !isRefund}
                           onClick={(event) => {
                             event.stopPropagation();
-                            if (paymentLocked && !item.paid && !isRefund) return;
                             if (isRefund && item.paid) return onCancelRefund?.(item);
                             if (isRefund) return onConfirmRefund?.(item);
                             if (item.paid) return onCancelPaid?.(item.record);
@@ -1821,7 +1845,7 @@ function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseT
                           }}
                           onDoubleClick={() => item.paid && !isRefund ? onViewPaid?.(item.record) : undefined}
                           style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
-                        >{label}</button>
+                        >{label}</button>}
                       </div>
                     </div>
                   );
@@ -1899,7 +1923,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
       const memberId = item.memberId || item.row?.linkMemberId || item.row?.memberId || row.linkMemberId || row.memberId || '';
       if (!groupId || !memberId) return;
       const key = `${groupId}:${memberId}`;
-      const group = snapshotGroups.get(key) || { groupId, memberId, items: [] };
+      const group = snapshotGroups.get(key) || { groupId, groupName: item.sourceLabel || groupId, memberId, items: [] };
       group.items.push(item);
       snapshotGroups.set(key, group);
     });
@@ -1908,6 +1932,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
       await onRequestSnapshot?.({
         groups: [...snapshotGroups.values()].map(group => ({
           groupId: group.groupId,
+          groupName: group.groupName,
           memberId: group.memberId,
           amount: paymentItemsAmountDue(group.items),
           coveredItems: group.items.flatMap(paymentItemToCoveredItems),
