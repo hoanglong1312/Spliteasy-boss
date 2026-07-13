@@ -1075,6 +1075,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     periodEnd: p.period_end,
     period_end: p.period_end,
     amount: Number(p.amount) || 0,
+    coveredItems: safeArray(p.covered_items),
+    covered_items: safeArray(p.covered_items),
     status: p.status || 'pending',
     createdByMemberId: p.created_by_member_id,
     created_by_member_id: p.created_by_member_id,
@@ -2144,6 +2146,7 @@ export function AppProvider({ children }) {
           p_group_id: action.groupId || state.currentGroupId,
           p_member_id: action.memberId,
           p_amount: Number(action.amount) || 0,
+          p_covered_items: safeArray(action.coveredItems),
         })
         if (error) {
           console.error('[store] REQUEST_SETTLEMENT_CHECKPOINT:', error)

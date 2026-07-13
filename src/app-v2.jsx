@@ -2437,7 +2437,7 @@ export default function AppV2() {
       try {
         const groups = Array.isArray(payload?.groups) && payload.groups.length > 0
           ? payload.groups
-          : [{ groupId: payload?.groupId, memberId: payload?.memberId, amount: payload?.amount }]
+          : [{ groupId: payload?.groupId, memberId: payload?.memberId, amount: payload?.amount, coveredItems: payload?.coveredItems }]
         const requests = groups.filter(row => row?.groupId && row?.memberId)
         if (requests.length === 0) throw new Error('Không có nhóm cần gửi yêu cầu thanh toán.')
         const results = await Promise.allSettled(requests.map(row => dispatch({
@@ -2445,6 +2445,7 @@ export default function AppV2() {
           groupId: row.groupId,
           memberId: row.memberId,
           amount: row.amount,
+          coveredItems: row.coveredItems,
         })))
         const successCount = results.filter(result => result.status === 'fulfilled').length
         const failureCount = results.length - successCount

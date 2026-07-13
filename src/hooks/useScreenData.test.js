@@ -3072,6 +3072,67 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('exact checkpoint covers only selected item when another expense exists in same month', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'payer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Payer One' },
+    ]
+    const groups = [{
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'payer-1'],
+      expenses: [
+        {
+          id: 'expense-paid',
+          amount: 100000,
+          expense_date: '2026-07-10',
+          paid_by_member_id: 'payer-1',
+          participants: ['member-1', 'payer-1'],
+        },
+        {
+          id: 'expense-open',
+          amount: 80000,
+          expense_date: '2026-07-09',
+          paid_by_member_id: 'payer-1',
+          participants: ['member-1', 'payer-1'],
+        },
+      ],
+    }]
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-1',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        period_end: '2026-07-10T23:59:59.999Z',
+        confirmed_at: '2026-07-13T00:00:00.000Z',
+        status: 'confirmed',
+        covered_items: [{
+          payableItemKey: 'expense:expense-paid|member:member-1|profile:profile-1|month:2026-07',
+          sourceType: 'group',
+          sourceId: 'group-1',
+          expenseId: 'expense-paid',
+          memberId: 'member-1',
+          profileId: 'profile-1',
+          month: '2026-07',
+          amount: -50000,
+        }],
+      }],
+    }
+
+    const result = buildHomeData(state, 'member-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.totalBalance).toBe(-40000)
+    expect(result.sourceBreakdown[0].payableItems).toEqual([
+      expect.objectContaining({ expenseId: 'expense-open', amount: -40000 }),
+    ])
+  })
+
   test('does not apply same-name checkpoint from another profile to pickleball debt', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'pickle-1', name: 'Lê Tuấn' },

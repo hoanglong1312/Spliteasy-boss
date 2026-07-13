@@ -59,11 +59,18 @@ test('treasurer can confirm own selected payable items directly', () => {
   assert.match(paymentSheetSource, /!canShowQr[\s\S]*\{isTreasurer \? 'Khoản của thủ quỹ' : 'Thanh toán về thủ quỹ'\}/);
 });
 
-test('treasurer confirm payment sheet can share selected payment items as text and bill card', () => {
+test('treasurer confirm payment sheet can snapshot selected items and share bill card', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
   const treasurerConfirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
-  assert.match(homeSource, /function buildPaymentShareText\(\{ memberName, amount, transferDescription, paymentTarget, items \}\)/);
-  assert.match(treasurerConfirmSource, /navigator\.clipboard\.writeText\(buildPaymentShareText\(\{[\s\S]*items: selectedItems/);
-  assert.match(treasurerConfirmSource, /Copy nội dung/);
+  assert.match(dashboardSource, /onRequestSnapshot=\{\(payload\) => onAction\?\.\('requestSettlementCheckpoint', payload\)\}/);
+  assert.match(treasurerConfirmSource, /async function requestPaymentSnapshot\(\)/);
+  assert.match(treasurerConfirmSource, /groups: \[\.\.\.snapshotGroups\.values\(\)\]/);
+  assert.match(treasurerConfirmSource, /const groupId = item\.groupId \|\| item\.row\?\.linkGroupId \|\| item\.row\?\.groupId/);
+  assert.match(treasurerConfirmSource, /const memberId = item\.memberId \|\| item\.row\?\.linkMemberId \|\| item\.row\?\.memberId/);
+  assert.match(treasurerConfirmSource, /amount: paymentItemsAmountDue\(group\.items\)/);
+  assert.match(treasurerConfirmSource, /coveredItems: group\.items\.flatMap\(paymentItemToCoveredItems\)/);
+  assert.match(treasurerConfirmSource, /Chờ nhận tiền/);
+  assert.doesNotMatch(treasurerConfirmSource, /Copy nội dung/);
   assert.match(treasurerConfirmSource, /Thẻ bill/);
   assert.match(treasurerConfirmSource, /<PaymentBillCardSheet[\s\S]*qrUrl=\{qrUrl\}[\s\S]*paymentDisplayGroups=\{paymentDisplayGroups\}/);
 });
@@ -98,18 +105,12 @@ test('treasurer dashboard can create one bill from selected items across members
   assert.match(homeSource, /paymentDisplayGroups = row\?\.paymentGroups \|\| \[/);
 });
 
-test('treasurer QR snapshots member debt before downloading', () => {
-  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+test('treasurer QR download does not change payment status', () => {
   const qrSource = sliceBetween('function MultiMemberQRSheet(', 'function ProgressStat');
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
-  assert.match(dashboardSource, /onRequestSnapshot=\{\(payload\) => onAction\?\.\('requestSettlementCheckpoint', payload\)\}/);
-  assert.match(dashboardSource, /paymentLocked=\{row\.paymentLocked\}/);
-  assert.match(dashboardSource, /pendingCheckpointMemberIds\.has\(String\(row\.memberId \|\| ''\)\)/);
-  assert.match(qrSource, /await onRequestSnapshot\?\.\(\{\s*groups: members\.map/);
-  assert.match(qrSource, /groupId: member\.groupId/);
-  assert.match(qrSource, /memberId: member\.memberId/);
-  assert.match(qrSource, /amount: Number\(member\.amount\) \|\| 0/);
-  assert.ok(qrSource.indexOf('await onRequestSnapshot') < qrSource.indexOf('await fetch(qrUrl)'));
+  assert.doesNotMatch(qrSource, /onRequestSnapshot/);
+  assert.match(qrSource, /await fetch\(qrUrl\)/);
+  assert.match(qrSource, /Tải QR/);
   assert.match(rowSource, /paymentLocked/);
   assert.match(rowSource, /Chờ nhận tiền/);
 });

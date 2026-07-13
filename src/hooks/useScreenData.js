@@ -242,6 +242,8 @@ function normalizeSettlementCheckpoint(row, members = []) {
     periodEnd: row?.periodEnd || row?.period_end || null,
     period_end: row?.period_end || row?.periodEnd || null,
     amount: Number(row?.amount) || 0,
+    coveredItems: safeArray(row?.coveredItems || row?.covered_items).map(withPayableItemKey),
+    covered_items: safeArray(row?.covered_items || row?.coveredItems).map(withPayableItemKey),
     status: row?.status || 'pending',
     confirmedAt: row?.confirmedAt || row?.confirmed_at || null,
     confirmed_at: row?.confirmed_at || row?.confirmedAt || null,
@@ -260,7 +262,19 @@ function latestConfirmedSettlementCheckpoint(state, groupId, memberId) {
     .filter(row => String(row.groupId || '') === String(groupId || ''))
     .filter(row => memberIds.has(String(row.memberId || '')))
     .filter(row => String(row.status || '').toLowerCase() === 'confirmed')
+    .filter(row => row.coveredItems.length === 0)
     .sort((a, b) => parseDateValue(b.confirmedAt || b.periodEnd) - parseDateValue(a.confirmedAt || a.periodEnd))[0] || null
+}
+
+function confirmedSettlementCheckpointItems(state, memberId) {
+  const profileId = profileIdForMember(memberId, state?.members)
+  const memberIds = new Set(memberIdsForProfile(profileId, state?.members).map(String))
+  if (memberId) memberIds.add(String(memberId))
+  return safeArray(state?.settlementCheckpoints)
+    .map(row => normalizeSettlementCheckpoint(row, state?.members))
+    .filter(row => memberIds.has(String(row.memberId || '')))
+    .filter(row => String(row.status || '').toLowerCase() === 'confirmed')
+    .flatMap(row => row.coveredItems)
 }
 
 function pendingSettlementCheckpointsForProfile(state, memberId, members = [], groups = []) {
@@ -1180,8 +1194,13 @@ function adjustedProfileBreakdownForPayments(state, profileBreakdown, members, m
 function paymentCoverageForMember(state, member, monthLabel, sourceBreakdown) {
   const notices = paymentNoticesForMember(state, member, monthLabel)
   const scope = paymentScopeForMember(state, member)
-  const confirmedSources = []
-  let confirmedAmount = 0
+  const checkpointItems = coveredItemsForPayment(
+    { coveredItems: confirmedSettlementCheckpointItems(state, member?.id || state?.currentUserId) },
+    sourceBreakdown,
+    scope,
+  )
+  const confirmedSources = [...checkpointItems]
+  let confirmedAmount = coveredSourcesAmountDue(checkpointItems)
   let pendingAmount = 0
 
   notices.forEach(notification => {

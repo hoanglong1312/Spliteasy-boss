@@ -260,6 +260,15 @@ test('AppV2 sends payment confirmations to treasurer notifications', () => {
   assert.match(appSource, /status: type === 'confirmPaymentNotice' \? 'confirmed' : 'rejected'/)
 })
 
+test('AppV2 forwards exact covered items when requesting settlement checkpoints', () => {
+  const block = appSource.slice(
+    appSource.indexOf("if (type === 'requestSettlementCheckpoint')"),
+    appSource.indexOf("if (type === 'confirmSettlementCheckpoint')"),
+  )
+  assert.match(block, /coveredItems: payload\?\.coveredItems/)
+  assert.match(block, /coveredItems: row\.coveredItems/)
+})
+
 test('AppV2 trusts resumed session identity before cached recent-session identity', () => {
   const block = appSource.slice(
     appSource.indexOf("if (type === 'resumeRecentSession')"),

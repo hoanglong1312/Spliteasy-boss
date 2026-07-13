@@ -1502,6 +1502,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           currentMonth={data?.yearMonth || ''}
           paymentTarget={data?.paymentTarget}
           onClose={() => setPaymentRow(null)}
+          onRequestSnapshot={(payload) => onAction?.('requestSettlementCheckpoint', payload)}
           onConfirm={(payload) => withLoading(async () => {
             await onAction?.('markMemberPaid', payload);
             setCollapsedTreasurerRows(prev => ({ keys: safeArray(paymentRow?.collapseRowKeys), tick: prev.tick + 1 }));
@@ -1520,7 +1521,6 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
         <MultiMemberQRSheet
           members={qrSheetMembers}
           paymentTarget={data?.paymentTarget}
-          onRequestSnapshot={(payload) => onAction?.('requestSettlementCheckpoint', payload)}
           onClose={() => setQrSheetMembers(null)}
         />
       )}
@@ -1835,7 +1835,7 @@ function TreasurerMemberPaymentRow({ row, paymentLocked, selectedKeys, collapseT
   );
 }
 
-function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTarget, onClose, onConfirm }) {
+function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTarget, onClose, onRequestSnapshot, onConfirm }) {
   const items = safeArray(row?.paymentItems);
   const fallbackItems = items.length ? items : safeArray(row?.coveredSources).map((source, index) => ({
     key: `fallback:${index}`,
@@ -1852,7 +1852,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
   const defaultKeys = safeArray(row?.defaultPaymentItemKeys);
   const [checkedKeys, setCheckedKeys] = useState(() => new Set(defaultKeys.length ? defaultKeys : fallbackItems.filter(item => item.defaultSelected).map(item => item.key)));
   const [submitting, setSubmitting] = useState(false);
-  const [copiedField, setCopiedField] = useState('');
+  const [snapshotting, setSnapshotting] = useState(false);
   const [billShareOpen, setBillShareOpen] = useState(false);
   const currentItems = fallbackItems.filter(item => !currentMonth || String(item.month || '') === String(currentMonth));
   const previousItems = fallbackItems.filter(item => currentMonth && String(item.month || '') !== String(currentMonth));
@@ -1889,19 +1889,34 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
-    setCopiedField('');
   }
 
-  async function copyPaymentSummary() {
-    if (!navigator?.clipboard) return;
-    await navigator.clipboard.writeText(buildPaymentShareText({
-      memberName,
-      amount: selectedTotal,
-      transferDescription,
-      paymentTarget: target,
-      items: selectedItems,
-    }));
-    setCopiedField('summary');
+  async function requestPaymentSnapshot() {
+    if (snapshotting || selectedTotal <= 0) return;
+    const snapshotGroups = new Map();
+    selectedItems.forEach(item => {
+      const groupId = item.groupId || item.row?.linkGroupId || item.row?.groupId || row.linkGroupId || row.groupId || '';
+      const memberId = item.memberId || item.row?.linkMemberId || item.row?.memberId || row.linkMemberId || row.memberId || '';
+      if (!groupId || !memberId) return;
+      const key = `${groupId}:${memberId}`;
+      const group = snapshotGroups.get(key) || { groupId, memberId, items: [] };
+      group.items.push(item);
+      snapshotGroups.set(key, group);
+    });
+    setSnapshotting(true);
+    try {
+      await onRequestSnapshot?.({
+        groups: [...snapshotGroups.values()].map(group => ({
+          groupId: group.groupId,
+          memberId: group.memberId,
+          amount: paymentItemsAmountDue(group.items),
+          coveredItems: group.items.flatMap(paymentItemToCoveredItems),
+        })),
+      });
+      onClose?.();
+    } finally {
+      setSnapshotting(false);
+    }
   }
 
   async function submit() {
@@ -1930,18 +1945,18 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
           <div style={{ marginTop: 3, color: '#f8fafc', fontWeight: 950, fontSize: 21, ...type.mono }}>{formatVND(selectedTotal)}</div>
           <div style={{ marginTop: 2, color: '#94a3b8', fontSize: 11 }}>Tick khoản đã thu đủ. Không tick thì chưa trừ nợ.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-            <button type="button" onClick={copyPaymentSummary} disabled={selectedTotal <= 0} style={{
+            <button type="button" onClick={requestPaymentSnapshot} disabled={selectedTotal <= 0 || snapshotting} style={{
               minHeight: 36,
               borderRadius: 10,
-              background: copiedField === 'summary' ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.07)',
-              border: '1px solid rgba(129,140,248,0.34)',
-              color: copiedField === 'summary' ? colors.brandLight : colors.textSecondary,
+              background: 'rgba(99,102,241,0.18)',
+              border: '1px solid rgba(129,140,248,0.38)',
+              color: colors.brandLight,
               fontSize: 12,
               fontWeight: 900,
               fontFamily: 'inherit',
-              cursor: selectedTotal > 0 ? 'pointer' : 'not-allowed',
-              opacity: selectedTotal > 0 ? 1 : 0.58,
-            }}>{copiedField === 'summary' ? 'Đã copy' : 'Copy nội dung'}</button>
+              cursor: selectedTotal > 0 && !snapshotting ? 'pointer' : 'not-allowed',
+              opacity: selectedTotal > 0 && !snapshotting ? 1 : 0.58,
+            }}>{snapshotting ? 'Đang chốt...' : 'Chờ nhận tiền'}</button>
             <button type="button" onClick={() => setBillShareOpen(true)} disabled={selectedTotal <= 0} style={{
               minHeight: 36,
               borderRadius: 10,
@@ -2218,21 +2233,6 @@ function paymentItemsPeriodLabel(items, fallback = '') {
   if (months.length === 1) return months[0];
   if (months.length > 1) return months.join(', ');
   return fallback || 'Khoản cần thanh toán';
-}
-
-function buildPaymentShareText({ memberName, amount, transferDescription, paymentTarget, items }) {
-  const detailLines = safeArray(items).map(item => {
-    const owner = item.memberName ? `${item.memberName} · ` : '';
-    return `- ${owner}${item.sourceLabel || 'Nguồn tiền'} · ${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}: ${signedVND(item.amount)}`;
-  });
-  return `${memberName || 'Thành viên'} cần chuyển ${formatVND(amount)}
-Nội dung: ${transferDescription || ''}
-
-Chi tiết:
-${detailLines.length ? detailLines.join('\n') : '- Chưa chọn khoản'}
-
-STK: ${paymentTarget?.account || ''}
-Chủ TK: ${paymentTarget?.holder || ''}`.trim();
 }
 
 function buildRefundBillData(item) {
@@ -2787,7 +2787,7 @@ function MemberShareLinkSheet({ member, monthLabel, onAction, onClose }) {
   );
 }
 
-function MultiMemberQRSheet({ members, paymentTarget, onRequestSnapshot, onClose }) {
+function MultiMemberQRSheet({ members, paymentTarget, onClose }) {
   // When multiple members: combine into 1 QR
   // When single member: show that member's QR
   
@@ -2837,13 +2837,6 @@ function MultiMemberQRSheet({ members, paymentTarget, onRequestSnapshot, onClose
     if (!qrUrl) return;
     setSaving(true);
     try {
-      await onRequestSnapshot?.({
-        groups: members.map(member => ({
-          groupId: member.groupId,
-          memberId: member.memberId,
-          amount: Number(member.amount) || 0,
-        })),
-      });
       const response = await fetch(qrUrl);
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
@@ -2912,7 +2905,7 @@ function MultiMemberQRSheet({ members, paymentTarget, onRequestSnapshot, onClose
                 opacity: saving ? 0.7 : 1,
               }}
             >
-              {saving ? 'Đang chốt...' : 'Chốt & tải QR'}
+              {saving ? 'Đang tải...' : 'Tải QR'}
             </button>
           </div>
         ) : (
