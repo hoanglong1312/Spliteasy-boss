@@ -1288,7 +1288,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
   const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
   const currentPayableItems = new Map(memberRows.flatMap(row => row.items)
-    .filter(item => !item.paid && item.kind !== 'refund' && item.payableItemKey)
+    .filter(item => !item.paid && item.kind !== 'refund')
+    .flatMap(item => paymentItemToCoveredItems(item))
+    .filter(item => item.payableItemKey)
     .map(item => [item.payableItemKey, item]));
   const pendingCheckpointsWithState = pendingCheckpoints.map(row => ({
     ...row,
@@ -1613,25 +1615,35 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
       const items = safeArray(row.paymentItems).length
         ? safeArray(row.paymentItems)
         : safeArray(row.payableSources || row.coveredSources || row.sources).flatMap((source, index) => sourcePaymentItems(source, { prefix: `member:${memberRow.key}:${index}`, memberId, profileId }));
-      items.flatMap(item => paymentItemToCoveredItems(item).map(coveredItem => ({
-        ...item,
-        ...coveredItem,
-        coveredItems: [coveredItem],
-      }))).forEach((item, index) => {
-        const amount = Number(item.amount) || 0;
-        if (amount === 0) return;
-        const payableItemKey = item.payableItemKey || item.payable_item_key || '';
-        memberRow.items.push({
-          ...item,
-          key: payableItemKey || item.key || `due:${memberRow.key}:${index}`,
-          payableItemKey,
-          pendingCheckpointId: pendingItems.get(payableItemKey) || '',
-          pending: pendingItems.has(payableItemKey),
-          paid: false,
-          kind: 'collect',
-          memberName: memberRow.name,
-          groupId: item.groupId || item.group_id || item.sourceId || row.linkGroupId || row.groupId || '',
-          row,
+      items.forEach((item, index) => {
+        const coveredItems = paymentItemToCoveredItems(item);
+        const itemBuckets = new Map();
+        coveredItems.forEach(coveredItem => {
+          const payableItemKey = coveredItem.payableItemKey || coveredItem.payable_item_key || '';
+          const pendingCheckpointId = pendingItems.get(payableItemKey) || '';
+          const bucketKey = pendingCheckpointId ? 'pending' : 'unsettled';
+          const bucket = itemBuckets.get(bucketKey) || { pending: Boolean(pendingCheckpointId), pendingCheckpointId, coveredItems: [] };
+          bucket.coveredItems.push(coveredItem);
+          itemBuckets.set(bucketKey, bucket);
+        });
+        itemBuckets.forEach((bucket, bucketKey) => {
+          const amount = bucket.coveredItems.reduce((sum, coveredItem) => sum + (Number(coveredItem.amount) || 0), 0);
+          if (amount === 0) return;
+          const payableItemKey = bucket.coveredItems.length === 1 ? bucket.coveredItems[0].payableItemKey || '' : '';
+          memberRow.items.push({
+            ...item,
+            key: `${item.key || `due:${memberRow.key}:${index}`}:${bucketKey}`,
+            amount,
+            coveredItems: bucket.coveredItems,
+            payableItemKey,
+            pendingCheckpointId: bucket.pendingCheckpointId,
+            pending: bucket.pending,
+            paid: false,
+            kind: 'collect',
+            memberName: memberRow.name,
+            groupId: item.groupId || item.group_id || item.sourceId || row.linkGroupId || row.groupId || '',
+            row,
+          });
         });
       });
       memberRow.amountDue = paymentItemsAmountDue(memberRow.items.filter(item => !item.paid && item.kind !== 'refund'));

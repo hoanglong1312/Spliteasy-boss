@@ -121,13 +121,17 @@ test('treasurer dashboard derives pending state per payable item', () => {
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
 
   assert.match(dashboardSource, /buildTreasurerMemberRows\(\{[\s\S]*pendingCheckpoints/);
+  assert.match(dashboardSource, /flatMap\(item => paymentItemToCoveredItems\(item\)\)/);
   assert.doesNotMatch(dashboardSource, /pendingCheckpointMemberIds/);
   assert.match(dashboardSource, /const pendingCheckpointsWithState = pendingCheckpoints\.map/);
   assert.match(dashboardSource, /disabled=\{row\.stale\}/);
   assert.match(dashboardSource, /Có khoản đã thay đổi hoặc bị xóa/);
   assert.match(homeSource, /groupName: item\.sourceLabel/);
 
-  assert.match(rowBuilderSource, /flatMap\(item => paymentItemToCoveredItems\(item\)/);
+  assert.doesNotMatch(rowBuilderSource, /items\.flatMap\(item => paymentItemToCoveredItems\(item\)/);
+  assert.match(rowBuilderSource, /const coveredItems = paymentItemToCoveredItems\(item\)/);
+  assert.match(rowBuilderSource, /const itemBuckets = new Map\(\)/);
+  assert.match(rowBuilderSource, /coveredItems: bucket\.coveredItems/);
   assert.match(rowBuilderSource, /pendingCheckpointId/);
   assert.match(rowBuilderSource, /pendingAmount/);
   assert.match(rowBuilderSource, /unsettledAmount/);
