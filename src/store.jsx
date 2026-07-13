@@ -2152,7 +2152,6 @@ export function AppProvider({ children }) {
           console.error('[store] REQUEST_SETTLEMENT_CHECKPOINT:', error)
           throw error
         }
-        await refresh()
         return data
       }
 

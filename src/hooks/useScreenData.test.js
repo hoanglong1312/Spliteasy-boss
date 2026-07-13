@@ -5329,6 +5329,41 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('does not duplicate settlement checkpoints shared by app and pickleball state', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{ id: 'group-1', name: 'Group', members: ['member-1', 'treasurer-1'], expenses: [] }]
+    const checkpoint = {
+      id: 'checkpoint-1',
+      group_id: 'group-1',
+      member_id: 'member-1',
+      amount: 40000,
+      status: 'pending',
+      created_at: '2026-07-02T00:00:00.000Z',
+    }
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentUserName: 'Treasurer One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [checkpoint],
+    }
+    const pickleballState = {
+      currentGroup: null,
+      sessions: [],
+      configs: [],
+      settlementCheckpoints: [checkpoint],
+    }
+
+    const result = buildHomeData(state, 'treasurer-1', members, groups, {}, pickleballState, '2026-07')
+
+    expect(result.pendingCheckpointsForTreasurer).toHaveLength(1)
+  })
+
   test('exposes pending checkpoints from every group managed by current profile', () => {
     const members = [
       { id: 'treasurer-1', profile_id: 'profile-treasurer', group_id: 'group-1', name: 'Treasurer', role: 'treasurer' },

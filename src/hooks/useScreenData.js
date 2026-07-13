@@ -714,7 +714,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
     .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const sourceBalances = settlementSourceBalances
   const paymentState = safeArray(pickleballState?.settlementCheckpoints).length
-    ? { ...state, settlementCheckpoints: [...safeArray(state?.settlementCheckpoints), ...safeArray(pickleballState?.settlementCheckpoints)] }
+    ? { ...state, settlementCheckpoints: [...new Map([...safeArray(state?.settlementCheckpoints), ...safeArray(pickleballState?.settlementCheckpoints)].map(row => [row.id, row])).values()] }
     : state
   const rawSourceBreakdown = currentProfileSourceBreakdown(sourceBalances, currentUserId, members, state?.currentUserName, currentProfileId)
   const rawProfileBreakdown = aggregateBalancesByProfile(sourceBalances, members)

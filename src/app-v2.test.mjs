@@ -265,10 +265,16 @@ test('AppV2 forwards exact covered items when requesting settlement checkpoints'
     appSource.indexOf("if (type === 'requestSettlementCheckpoint')"),
     appSource.indexOf("if (type === 'confirmSettlementCheckpoint')"),
   )
+  const storeBlock = storeSource.slice(
+    storeSource.indexOf("case 'REQUEST_SETTLEMENT_CHECKPOINT'"),
+    storeSource.indexOf("case 'CONFIRM_SETTLEMENT_CHECKPOINT'"),
+  )
   assert.match(block, /coveredItems: payload\?\.coveredItems/)
   assert.match(block, /coveredItems: row\.coveredItems/)
   assert.match(block, /const failedGroups = results\.flatMap/)
+  assert.match(block, /if \(successCount > 0\) \{\s*await dispatch\(\{ type: 'REFRESH' \}\)/)
   assert.match(block, /if \(failedGroups\.length > 0\) throw new Error\(`Chưa gửi được yêu cầu thanh toán: \$\{failedGroups\.join\(', '\)\}\.`\)/)
+  assert.doesNotMatch(storeBlock, /await refresh\(\)/)
 })
 
 test('AppV2 trusts resumed session identity before cached recent-session identity', () => {
