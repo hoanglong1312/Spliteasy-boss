@@ -150,6 +150,19 @@ test('treasurer dashboard derives pending state per payable item', () => {
   assert.match(rowSource, /onRejectPending\?\.\(pendingCheckpointIds\)[\s\S]*Từ chối tất cả/);
 });
 
+test('treasurer dashboard keeps confirmed checkpoint members as paid history', () => {
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+  const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
+
+  assert.match(dashboardSource, /confirmedCheckpointsForTreasurer/);
+  assert.match(dashboardSource, /buildTreasurerMemberRows\(\{[\s\S]*confirmedCheckpoints/);
+  assert.match(rowBuilderSource, /safeArray\(confirmedCheckpoints\)\.forEach/);
+  assert.match(rowBuilderSource, /safeArray\(checkpoint\.coveredItems \|\| checkpoint\.covered_items\)/);
+  assert.match(rowBuilderSource, /paidPayableItemKeys/);
+  assert.match(rowBuilderSource, /paid: true/);
+  assert.match(rowBuilderSource, /memberRow\.amountPaid = paymentItemsAmountDue/);
+});
+
 test('treasurer dashboard nets signed debt and credit items', () => {
   const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');

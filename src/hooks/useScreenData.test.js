@@ -5329,6 +5329,72 @@ describe('buildHomeData', () => {
     ])
   })
 
+  test('exposes confirmed checkpoint snapshots to treasurer payment history', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const groups = [{ id: 'group-1', name: 'Group', members: ['member-1', 'treasurer-1'], expenses: [] }]
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentProfileId: 'profile-2',
+      currentUserName: 'Treasurer One',
+      currentGroupId: 'group-1',
+      members,
+      groups,
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-confirmed',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        amount: 40000,
+        status: 'confirmed',
+        confirmed_at: '2026-07-13T00:00:00.000Z',
+        covered_items: [{
+          payable_item_key: 'expense:one',
+          source_type: 'group',
+          source_id: 'group-1',
+          source_label: 'Group',
+          member_id: 'member-1',
+          profile_id: 'profile-1',
+          month: '2026-07',
+          amount: -40000,
+        }],
+      }, {
+        id: 'checkpoint-old',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        amount: 30000,
+        status: 'confirmed',
+        confirmed_at: '2026-06-13T00:00:00.000Z',
+        covered_items: [{
+          payable_item_key: 'expense:old',
+          source_type: 'group',
+          source_id: 'group-1',
+          member_id: 'member-1',
+          month: '2026-06',
+          amount: -30000,
+        }],
+      }],
+    }
+
+    const result = buildHomeData(state, 'treasurer-1', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
+
+    expect(result.pendingCheckpointsForTreasurer).toEqual([])
+    expect(result.confirmedCheckpointsForTreasurer).toEqual([
+      expect.objectContaining({
+        id: 'checkpoint-confirmed',
+        memberName: 'Member One',
+        confirmedAt: '2026-07-13T00:00:00.000Z',
+        coveredItems: [expect.objectContaining({
+          payableItemKey: 'expense:one',
+          profileId: 'profile-1',
+          amount: -40000,
+        })],
+      }),
+    ])
+  })
+
   test('does not duplicate settlement checkpoints shared by app and pickleball state', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },

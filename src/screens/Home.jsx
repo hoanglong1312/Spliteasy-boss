@@ -71,6 +71,7 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
     pendingSettlementCheckpoint: d.pendingSettlementCheckpoint || null,
     pendingSettlementCheckpoints: d.pendingSettlementCheckpoints || [],
     pendingCheckpointsForTreasurer: d.pendingCheckpointsForTreasurer || [],
+    confirmedCheckpointsForTreasurer: d.confirmedCheckpointsForTreasurer || [],
   };
   const normalizedFilter = filterText.trim().toLowerCase();
   const pendingExpenses = d.pendingExpenses || [];
@@ -1210,6 +1211,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
           pendingRecords={paymentRecords}
           refundRows={refundRows}
           pendingCheckpointsForTreasurer={data?.pendingCheckpointsForTreasurer || []}
+          confirmedCheckpointsForTreasurer={data?.confirmedCheckpointsForTreasurer || []}
           confirmedRefunds={confirmedRefunds}
           onAction={onAction}
           onViewPaymentRecord={onViewPaymentRecord}
@@ -1266,7 +1268,7 @@ function treasurerProfileStatKey(record = {}) {
   return '';
 }
 
-function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, onCancelRefund }) {
+function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundRows, pendingCheckpointsForTreasurer, confirmedCheckpointsForTreasurer, confirmedRefunds, onAction, onViewPaymentRecord, onConfirmRefund, onCancelRefund }) {
   const [memberExpanded, setMemberExpanded] = useState(true);
   const [pendingExpanded, setPendingExpanded] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1281,12 +1283,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const rows = safeArray(progressRows);
   const pending = safeArray(pendingRecords);
   const pendingCheckpoints = safeArray(pendingCheckpointsForTreasurer);
+  const confirmedCheckpoints = safeArray(confirmedCheckpointsForTreasurer);
   const refunds = safeArray(refundRows);
   const confirmedRecords = pending.filter(record => String(record.status || '').toLowerCase() === 'confirmed');
   const matchSearch = makeMatcher(searchQuery);
   const pendingRecordsRaw = pending.filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
-  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, refundRows: refunds, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
+  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, confirmedCheckpoints, refundRows: refunds, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
   const currentPayableItems = new Map(memberRows.flatMap(row => row.items)
     .filter(item => !item.paid && item.kind !== 'refund')
     .flatMap(item => paymentItemToCoveredItems(item))
@@ -1548,9 +1551,13 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   );
 }
 
-function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel }) {
+function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedCheckpoints, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel }) {
   const byMember = new Map();
   const pendingItems = new Map();
+  const paidPayableItemKeys = new Set(safeArray(confirmedRecords)
+    .flatMap(record => safeArray(record.coveredItems || record.covered_items))
+    .map(item => item.payableItemKey || item.payable_item_key || '')
+    .filter(Boolean));
   safeArray(pendingCheckpoints).forEach(checkpoint => {
     safeArray(checkpoint.coveredItems || checkpoint.covered_items).forEach(item => {
       const payableItemKey = item.payableItemKey || item.payable_item_key || '';
@@ -1663,6 +1670,39 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, refundRows, 
       });
       memberRow.items.push({ ...item, paid: true, kind: 'collect', record });
       memberRow.amountPaid = paymentItemsAmountDue(memberRow.items.filter(item => item.paid && item.kind !== 'refund'));
+    });
+  });
+
+  safeArray(confirmedCheckpoints).forEach(checkpoint => {
+    safeArray(checkpoint.coveredItems || checkpoint.covered_items).forEach((item, index) => {
+      const payableItemKey = item.payableItemKey || item.payable_item_key || '';
+      if (payableItemKey && paidPayableItemKeys.has(payableItemKey)) return;
+      const amount = Number(item.amount) || 0;
+      if (amount === 0) return;
+      const memberRow = ensureRow({
+        profileId: item.profileId || item.profile_id || '',
+        memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
+        groupId: checkpoint.groupId || checkpoint.group_id || item.sourceId || item.source_id || '',
+        name: item.memberName || item.member_name || checkpoint.memberName,
+      });
+      memberRow.items.push({
+        ...item,
+        key: `checkpoint:${checkpoint.id}:${payableItemKey || index}`,
+        sourceType: item.sourceType || item.source_type || 'group',
+        sourceId: item.sourceId || item.source_id || checkpoint.groupId || checkpoint.group_id || '',
+        sourceLabel: item.sourceLabel || item.source_label || 'Đã nhận',
+        memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
+        profileId: item.profileId || item.profile_id || '',
+        memberName: item.memberName || item.member_name || checkpoint.memberName,
+        month: item.month || item.yearMonth || item.year_month || '',
+        monthLabel: item.monthLabel || item.month_label || monthLabel,
+        amount,
+        payableItemKey,
+        paid: true,
+        kind: 'collect',
+        checkpoint,
+      });
+      memberRow.amountPaid = paymentItemsAmountDue(memberRow.items.filter(row => row.paid && row.kind !== 'refund'));
     });
   });
 
@@ -1828,7 +1868,8 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
                         {!item.paid && !isRefund && <span style={{ padding: '5px 7px', borderRadius: 7, background: item.pending ? 'rgba(251,191,36,0.14)' : 'rgba(148,163,184,0.12)', color: item.pending ? '#fde68a' : '#cbd5e1', fontSize: 10, fontWeight: 850 }}>{item.pending ? 'Đang chờ nhận' : 'Chưa chốt'}</span>}
-                        {!item.pending && <button
+                        {!item.pending && item.checkpoint && <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>}
+                        {!item.pending && !item.checkpoint && <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
