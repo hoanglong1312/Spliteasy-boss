@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const storeSource = readFileSync(new URL('./store.jsx', import.meta.url), 'utf8')
 const paymentSettlementsMigrationSource = readFileSync(new URL('../supabase/migrations/20260709000001_record_payment_settlements.sql', import.meta.url), 'utf8')
 const paymentSettlementsProfileMigrationSource = readFileSync(new URL('../supabase/migrations/20260709000002_fix_payment_settlement_treasurer_profile.sql', import.meta.url), 'utf8')
+const undoCheckpointMigrationUrl = new URL('../supabase/migrations/20260714000001_undo_settlement_checkpoint.sql', import.meta.url)
+const undoCheckpointMigrationSource = existsSync(undoCheckpointMigrationUrl) ? readFileSync(undoCheckpointMigrationUrl, 'utf8') : ''
 
 test('store owns toast state and hide lifecycle', () => {
   assert.match(storeSource, /const TOAST_HIDE_DELAY_MS = 3000/)
@@ -113,6 +115,18 @@ test('treasurer payment confirmation records settled source months', () => {
   assert.match(source, /\.rpc\('record_member_month_payment_settlements'/)
   assert.match(source, /p_treasurer_member_id: state\.currentUserId/)
   assert.match(source, /p_covered_sources: coveredSources/)
+})
+
+test('confirmed settlement checkpoints can only be reopened safely by their group treasurer', () => {
+  assert.match(undoCheckpointMigrationSource, /create or replace function public\.undo_settlement_checkpoint/)
+  assert.match(undoCheckpointMigrationSource, /role = 'treasurer'/)
+  assert.match(undoCheckpointMigrationSource, /status = 'pending'/)
+  assert.match(undoCheckpointMigrationSource, /confirmed_by_member_id = null/)
+  assert.match(undoCheckpointMigrationSource, /confirmed_at = null/)
+  assert.match(undoCheckpointMigrationSource, /status = 'confirmed'/)
+  assert.match(undoCheckpointMigrationSource, /Already has a pending settlement checkpoint/)
+  assert.match(undoCheckpointMigrationSource, /A newer confirmed settlement checkpoint exists/)
+  assert.match(undoCheckpointMigrationSource, /grant execute on function public\.undo_settlement_checkpoint\(uuid, uuid\) to anon, authenticated/)
 })
 
 test('payment settlement migration records and backfills confirmed source months', () => {

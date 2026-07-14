@@ -1463,8 +1463,10 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
             onPaySelected={(items) => setPaymentRow({ ...paymentRowFromTreasurerItems(items, data), collapseRowKeys: [row.key] })}
             onToggleSelect={toggleTreasurerItemSelection}
             onToggleRowSelection={(selected) => setTreasurerRowSelection(row, selected)}
-            onCancelPaid={(record) => withLoading(() => onAction?.('cancelPaymentRecord', record))}
-            onViewPaid={(record) => { onViewPaymentRecord?.(record); onAction?.('viewPaymentNotice', record); }}
+            onUndoPaid={(item) => withLoading(() => {
+              if (!window.confirm('Hoàn tác lần nhận tiền này? Các khoản đã chốt sẽ quay lại trạng thái chờ duyệt.')) return;
+              return item.checkpoint ? onAction?.('undoSettlementCheckpoint', { checkpointId: item.checkpoint.id }) : onAction?.('cancelPaymentRecord', item.record);
+            })}
             onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
             onCancelRefund={(item) => onCancelRefund?.(item.refundRow)}
             onRefundBill={(item) => setRefundBillItem(item)}
@@ -1811,7 +1813,7 @@ function paymentRowFromTreasurerItems(items, data) {
   };
 }
 
-function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onCancelPaid, onViewPaid, onConfirmRefund, onCancelRefund, onRefundBill, onConfirmPending, onRejectPending }) {
+function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onUndoPaid, onConfirmRefund, onCancelRefund, onRefundBill, onConfirmPending, onRejectPending }) {
   const [expanded, setExpanded] = useState(false);
   const groupedItems = groupPaymentItemsBySource(row.items);
   const unpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund');
@@ -1885,17 +1887,18 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
                         {!item.paid && !isRefund && <span style={{ padding: '5px 7px', borderRadius: 7, background: item.pending ? 'rgba(251,191,36,0.14)' : 'rgba(148,163,184,0.12)', color: item.pending ? '#fde68a' : '#cbd5e1', fontSize: 10, fontWeight: 850 }}>{item.pending ? 'Đang chờ nhận' : 'Chưa chốt'}</span>}
-                        {!item.pending && item.checkpoint && <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>}
-                        {!item.pending && !item.checkpoint && <button
+                        {!item.pending && item.paid && !isRefund && <>
+                          <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>
+                          <button type="button" onClick={(event) => { event.stopPropagation(); onUndoPaid?.(item); }} style={miniDashButton('rgba(248,113,113,0.14)', '#fca5a5')}>Hoàn tác</button>
+                        </>}
+                        {!item.pending && (!item.paid || isRefund) && <button
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             if (isRefund && item.paid) return onCancelRefund?.(item);
                             if (isRefund) return onConfirmRefund?.(item);
-                            if (item.paid) return onCancelPaid?.(item.record);
                             return onPayItem?.(item);
                           }}
-                          onDoubleClick={() => item.paid && !isRefund ? onViewPaid?.(item.record) : undefined}
                           style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
                         >{label}</button>}
                       </div>

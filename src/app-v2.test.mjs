@@ -298,6 +298,26 @@ test('AppV2 reviews checkpoint batches with the treasurer member from each check
   assert.match(storeBlock, /p_treasurer_member_id: String\(action\.treasurerMemberId \|\| state\.currentUserId\)/)
 })
 
+test('AppV2 reopens confirmed settlement checkpoints for treasurer review', () => {
+  const appBlock = appSource.slice(
+    appSource.indexOf("if (type === 'undoSettlementCheckpoint')"),
+    appSource.indexOf("if (type === 'confirmPaymentNotice'"),
+  )
+  const storeBlock = storeSource.slice(
+    storeSource.indexOf("case 'UNDO_SETTLEMENT_CHECKPOINT'"),
+    storeSource.indexOf("case 'DELETE_PAYMENT_NOTIFICATION'"),
+  )
+
+  assert.match(appBlock, /type: 'UNDO_SETTLEMENT_CHECKPOINT'/)
+  assert.match(appBlock, /checkpointId: payload\?\.checkpointId/)
+  assert.match(appBlock, /treasurerMemberId: treasurerMemberIdForCheckpoint\(state, payload\?\.checkpointId\)/)
+  assert.match(appBlock, /Đã hoàn tác lần nhận tiền\. Các khoản đã quay lại chờ duyệt\./)
+  assert.match(storeBlock, /\.rpc\('undo_settlement_checkpoint'/)
+  assert.match(storeBlock, /p_checkpoint_id: action\.checkpointId/)
+  assert.match(storeBlock, /p_treasurer_member_id: String\(action\.treasurerMemberId \|\| state\.currentUserId\)/)
+  assert.match(storeBlock, /await refresh\(\)/)
+})
+
 test('AppV2 trusts resumed session identity before cached recent-session identity', () => {
   const block = appSource.slice(
     appSource.indexOf("if (type === 'resumeRecentSession')"),

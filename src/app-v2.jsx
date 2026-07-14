@@ -2511,6 +2511,23 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'undoSettlementCheckpoint') {
+      try {
+        if (!payload?.checkpointId) throw new Error('Không có lần nhận tiền để hoàn tác.')
+        await dispatch({
+          type: 'UNDO_SETTLEMENT_CHECKPOINT',
+          checkpointId: payload?.checkpointId,
+          treasurerMemberId: treasurerMemberIdForCheckpoint(state, payload?.checkpointId),
+        })
+        dispatch({ type: 'SHOW_TOAST', message: 'Đã hoàn tác lần nhận tiền. Các khoản đã quay lại chờ duyệt.' })
+      } catch (error) {
+        console.error('[app] undoSettlementCheckpoint:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa hoàn tác được lần nhận tiền.' })
+        throw error
+      }
+      return
+    }
+
     if (type === 'confirmPaymentNotice' || type === 'rejectPaymentNotice') {
       await dispatch({
         type: 'REVIEW_PAYMENT_NOTIFICATION',

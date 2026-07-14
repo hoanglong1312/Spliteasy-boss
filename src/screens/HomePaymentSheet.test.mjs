@@ -170,6 +170,13 @@ test('treasurer dashboard keeps confirmed checkpoint members as paid history', (
   assert.match(rowBuilderSource, /memberRow\.amountPaid = paymentItemsAmountDue/);
   assert.match(rowSource, /group\.items\.reduce\(\(sum, item\) => sum \+ \(Number\(item\.itemCount\) \|\| 1\), 0\)/);
   assert.match(rowSource, /`\$\{item\.monthLabel \|\| fullMonthLabel\(item\.month\) \|\| 'Không rõ tháng'\} · \$\{item\.itemCount\} khoản`/);
+  assert.match(dashboardSource, /onUndoPaid=\{\(item\) => withLoading\(\(\) => \{/);
+  assert.match(dashboardSource, /window\.confirm\('Hoàn tác lần nhận tiền này\? Các khoản đã chốt sẽ quay lại trạng thái chờ duyệt\.'\)/);
+  assert.match(dashboardSource, /item\.checkpoint \? onAction\?\.\('undoSettlementCheckpoint', \{ checkpointId: item\.checkpoint\.id \}\) : onAction\?\.\('cancelPaymentRecord', item\.record\)/);
+  assert.match(rowSource, /onUndoPaid\?\.\(item\)/);
+  assert.match(rowSource, />Đã nhận<\/span>/);
+  assert.match(rowSource, />Hoàn tác<\/button>/);
+  assert.doesNotMatch(rowSource, /if \(item\.paid\) return onCancelPaid\?\.\(item\.record\)/);
 });
 
 test('treasurer dashboard nets signed debt and credit items', () => {

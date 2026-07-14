@@ -2183,6 +2183,20 @@ export function AppProvider({ children }) {
         return data
       }
 
+      case 'UNDO_SETTLEMENT_CHECKPOINT': {
+        if (!sb || !state.currentUserId) return null
+        const { data, error } = await sb.rpc('undo_settlement_checkpoint', {
+          p_checkpoint_id: action.checkpointId,
+          p_treasurer_member_id: String(action.treasurerMemberId || state.currentUserId),
+        })
+        if (error) {
+          console.error('[store] UNDO_SETTLEMENT_CHECKPOINT:', error)
+          throw error
+        }
+        await refresh()
+        return data
+      }
+
       case 'DELETE_PAYMENT_NOTIFICATION': {
         if (!sb || !state.currentUserId) return null
         const notificationId = action.notificationId || action.id
