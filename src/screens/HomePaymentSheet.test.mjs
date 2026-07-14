@@ -160,13 +160,16 @@ test('treasurer dashboard keeps confirmed checkpoint members as paid history', (
   assert.match(rowBuilderSource, /safeArray\(confirmedCheckpoints\)\.forEach/);
   assert.match(rowBuilderSource, /const checkpointItems = safeArray\(checkpoint\.coveredItems \|\| checkpoint\.covered_items\)/);
   assert.match(rowBuilderSource, /paidPayableItemKeys/);
-  assert.match(rowBuilderSource, /coveredItems: checkpointItems/);
-  assert.match(rowBuilderSource, /itemCount: checkpointItems\.length/);
-  assert.match(rowBuilderSource, /amount: checkpointItems\.reduce/);
+  assert.match(rowBuilderSource, /const checkpointMonthBuckets = new Map\(\)/);
+  assert.match(rowBuilderSource, /const bucketKey = `\$\{sourceType\}:\$\{sourceId\}:\$\{itemMonth \|\| itemMonthLabel\}`/);
+  assert.match(rowBuilderSource, /checkpointMonthBuckets\.forEach/);
+  assert.match(rowBuilderSource, /coveredItems: bucket\.items/);
+  assert.match(rowBuilderSource, /itemCount: bucket\.items\.length/);
+  assert.match(rowBuilderSource, /amount: bucket\.items\.reduce/);
   assert.match(rowBuilderSource, /paid: true/);
   assert.match(rowBuilderSource, /memberRow\.amountPaid = paymentItemsAmountDue/);
   assert.match(rowSource, /group\.items\.reduce\(\(sum, item\) => sum \+ \(Number\(item\.itemCount\) \|\| 1\), 0\)/);
-  assert.match(rowSource, /Đã chốt \$\{item\.itemCount\} khoản/);
+  assert.match(rowSource, /`\$\{item\.monthLabel \|\| fullMonthLabel\(item\.month\) \|\| 'Không rõ tháng'\} · \$\{item\.itemCount\} khoản`/);
 });
 
 test('treasurer dashboard nets signed debt and credit items', () => {

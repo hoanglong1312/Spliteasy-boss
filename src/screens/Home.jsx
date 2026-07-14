@@ -1687,24 +1687,38 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedChe
       groupId: checkpoint.groupId || checkpoint.group_id || item.sourceId || item.source_id || '',
       name: item.memberName || item.member_name || checkpoint.memberName,
     });
-    memberRow.items.push({
-      ...item,
-      key: `checkpoint:${checkpoint.id}`,
-      sourceType: item.sourceType || item.source_type || 'group',
-      sourceId: item.sourceId || item.source_id || checkpoint.groupId || checkpoint.group_id || '',
-      sourceLabel: item.sourceLabel || item.source_label || 'Đã nhận',
-      memberId: item.memberId || item.member_id || checkpoint.memberId || checkpoint.member_id || '',
-      profileId: item.profileId || item.profile_id || '',
-      memberName: item.memberName || item.member_name || checkpoint.memberName,
-      month: '',
-      monthLabel,
-      amount: checkpointItems.reduce((sum, coveredItem) => sum + (Number(coveredItem.amount) || 0), 0),
-      coveredItems: checkpointItems,
-      itemCount: checkpointItems.length,
-      payableItemKey: '',
-      paid: true,
-      kind: 'collect',
-      checkpoint,
+    const checkpointMonthBuckets = new Map();
+    checkpointItems.forEach(coveredItem => {
+      const sourceType = coveredItem.sourceType || coveredItem.source_type || 'group';
+      const sourceId = coveredItem.sourceId || coveredItem.source_id || checkpoint.groupId || checkpoint.group_id || '';
+      const itemMonth = coveredItem.month || coveredItem.yearMonth || coveredItem.year_month || '';
+      const itemMonthLabel = coveredItem.monthLabel || coveredItem.month_label || fullMonthLabel(itemMonth) || monthLabel;
+      const bucketKey = `${sourceType}:${sourceId}:${itemMonth || itemMonthLabel}`;
+      const bucket = checkpointMonthBuckets.get(bucketKey) || { sourceType, sourceId, month: itemMonth, monthLabel: itemMonthLabel, items: [] };
+      bucket.items.push(coveredItem);
+      checkpointMonthBuckets.set(bucketKey, bucket);
+    });
+    checkpointMonthBuckets.forEach((bucket, bucketKey) => {
+      const bucketItem = bucket.items[0];
+      memberRow.items.push({
+        ...bucketItem,
+        key: `checkpoint:${checkpoint.id}:${bucketKey}`,
+        sourceType: bucket.sourceType,
+        sourceId: bucket.sourceId,
+        sourceLabel: bucketItem.sourceLabel || bucketItem.source_label || 'Đã nhận',
+        memberId: bucketItem.memberId || bucketItem.member_id || checkpoint.memberId || checkpoint.member_id || '',
+        profileId: bucketItem.profileId || bucketItem.profile_id || '',
+        memberName: bucketItem.memberName || bucketItem.member_name || checkpoint.memberName,
+        month: bucket.month,
+        monthLabel: bucket.monthLabel,
+        amount: bucket.items.reduce((sum, coveredItem) => sum + (Number(coveredItem.amount) || 0), 0),
+        coveredItems: bucket.items,
+        itemCount: bucket.items.length,
+        payableItemKey: '',
+        paid: true,
+        kind: 'collect',
+        checkpoint,
+      });
     });
     memberRow.amountPaid = paymentItemsAmountDue(memberRow.items.filter(row => row.paid && row.kind !== 'refund'));
   });
@@ -1866,7 +1880,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                       style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: selectable ? 'pointer' : 'default' }}
                     >
                       <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : item.pending ? '#fbbf24' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: item.pending ? '#fde68a' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : item.pending ? '·' : ''}</div>
-                      <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `Đã chốt ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
+                      <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'} · ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
                       <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
