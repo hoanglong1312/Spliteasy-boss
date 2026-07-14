@@ -2177,11 +2177,11 @@ export function buildGroupDetailData(group, currentUserId, members, currentUserN
   const currentBalanceGroup = groupDetailSettlementGroup(detailGroup, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
   const balanceMap = groupBalanceForMember(currentBalanceGroup, currentGroupMember?.id || currentUserId, members, currentUserName)
   const currentBalance = groupDetailSettlementBalance(detailGroup, currentGroupMember?.id || currentUserId, appState, endOfSelectedMonth)
-  const balance = currentBalance.amount
-  const memberBalanceMap = Object.fromEntries(
-    groupMembers.map(member => [member.id, groupDetailSettlementBalance(detailGroup, member.id, appState, endOfSelectedMonth)])
-  )
   const paymentTarget = buildGroupPaymentTarget(g, groupMembers)
+  const memberBalanceMap = balanceGroupDetailPaymentTarget(Object.fromEntries(
+    groupMembers.map(member => [member.id, groupDetailSettlementBalance(detailGroup, member.id, appState, endOfSelectedMonth)])
+  ), paymentTarget)
+  const balance = memberBalanceMap[currentGroupMember?.id || currentUserId]?.amount ?? currentBalance.amount
   const activities = safeArray(monthlyGroup.expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
@@ -2296,6 +2296,22 @@ function groupDetailSettlementBalance(group, memberId, state, endDate) {
       month: monthKey(expense.date || expense.expense_date),
       amount: groupNet({ ...balanceGroup, expenses: [expense] }, memberId),
     }))),
+  }
+}
+
+function balanceGroupDetailPaymentTarget(memberBalanceMap, paymentTarget) {
+  const targetId = String(paymentTarget?.memberId || '')
+  if (!targetId || !memberBalanceMap[targetId]) return memberBalanceMap
+  const otherBalances = Object.entries(memberBalanceMap).filter(([memberId]) => String(memberId) !== targetId)
+  return {
+    ...memberBalanceMap,
+    [targetId]: {
+      ...memberBalanceMap[targetId],
+      amount: -otherBalances.reduce((sum, [, balance]) => sum + balance.amount, 0),
+      monthBreakdown: sourceMonthBreakdown(otherBalances.flatMap(([, balance]) => (
+        balance.monthBreakdown.map(row => ({ month: row.month, amount: -row.amount }))
+      ))),
+    },
   }
 }
 

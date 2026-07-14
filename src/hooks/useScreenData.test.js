@@ -5684,4 +5684,51 @@ describe('buildGroupDetailData', () => {
       { month: '2026-06', label: 'Tháng 6', amount: -30000 },
     ])
   })
+
+  test('reduces treasurer receivable when another member month is settled', () => {
+    const members = [
+      { id: 'member-settled', profile_id: 'profile-1', group_id: 'group-1', name: 'Settled Member' },
+      { id: 'member-open', profile_id: 'profile-2', group_id: 'group-1', name: 'Open Member' },
+      { id: 'treasurer-1', profile_id: 'profile-3', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const group = {
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-settled', 'member-open', 'treasurer-1'],
+      expenses: [{
+        id: 'may-expense',
+        amount: 300000,
+        expense_date: '2026-05-20T12:00:00.000Z',
+        paid_by_member_id: 'treasurer-1',
+        participants: ['member-settled', 'member-open', 'treasurer-1'],
+      }],
+    }
+    const state = {
+      currentUserId: 'treasurer-1',
+      currentUserName: 'Treasurer One',
+      currentGroupId: 'group-1',
+      members,
+      groups: [group],
+      notifications: [],
+      settlementCheckpoints: [],
+      monthSettlements: [{
+        id: 'settlement-1',
+        member_id: 'member-settled',
+        group_id: 'group-1',
+        month: '2026-05',
+      }],
+    }
+
+    const result = buildGroupDetailData(group, 'treasurer-1', members, 'Treasurer One', '2026-05', [], state)
+
+    expect(result.balance).toBe(100000)
+    expect(result.members.map(member => [member.id, member.balance])).toEqual([
+      ['member-open', -100000],
+      ['member-settled', 0],
+      ['treasurer-1', 100000],
+    ])
+    expect(result.members.find(member => member.id === 'treasurer-1')?.monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: 100000 },
+    ])
+  })
 })
