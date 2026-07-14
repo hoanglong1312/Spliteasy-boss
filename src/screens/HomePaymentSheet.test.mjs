@@ -5,7 +5,7 @@ import test from 'node:test';
 const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8');
 
 test('member payment sheet uses full unpaid source breakdown, not month-capped hero data', () => {
-  assert.match(homeSource, /const heroSourceBreakdown = isTreasurer \? \(d\.sourceBreakdown \|\| \[\]\) : \(d\.cappedSourceBreakdown \|\| d\.sourceBreakdown \|\| \[\]\)/);
+  assert.match(homeSource, /const heroSourceBreakdown = isTreasurer[\s\S]*\? buildTreasurerOutstandingBreakdown\(progressRowsForHero\)[\s\S]*: \(d\.cappedSourceBreakdown \|\| d\.sourceBreakdown \|\| \[\]\)/);
   assert.match(homeSource, /const paymentSourceBreakdown = d\.paymentSummary\?\.sourceBreakdown \|\| d\.sourceBreakdown \|\| heroSourceBreakdown/);
   assert.match(homeSource, /sourceBreakdown: paymentSourceBreakdown/);
   assert.doesNotMatch(homeSource, /sourceBreakdown: heroSourceBreakdown/);

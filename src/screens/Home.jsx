@@ -55,7 +55,9 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
   const heroBalanceLabel = isTreasurer
     ? (outstandingAmount > 0 ? 'Còn cần thu' : 'Đã thu đủ')
     : balanceLabel;
-  const heroSourceBreakdown = isTreasurer ? (d.sourceBreakdown || []) : (d.cappedSourceBreakdown || d.sourceBreakdown || []);
+  const heroSourceBreakdown = isTreasurer
+    ? buildTreasurerOutstandingBreakdown(progressRowsForHero)
+    : (d.cappedSourceBreakdown || d.sourceBreakdown || []);
   const paymentSourceBreakdown = d.paymentSummary?.sourceBreakdown || d.sourceBreakdown || heroSourceBreakdown;
   const paymentNetBalance = Number(d.paymentSummary?.netBalance ?? d.totalBalance ?? memberHeroBalance) || 0;
   const paymentSheetData = {
@@ -2257,6 +2259,55 @@ function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
 
 function paymentRowCurrentAmount(row) {
   return Number(row?.payableAmount) || Math.abs(Number(row?.amount) || 0);
+}
+
+export function buildTreasurerOutstandingBreakdown(progressRows, currentProfileId = '') {
+  const sources = new Map();
+  const addAmount = (item, amount) => {
+    if (!amount) return;
+    const sourceType = item.sourceType || item.source_type || 'group';
+    const sourceId = item.sourceId || item.source_id || item.groupId || item.group_id || 'unallocated';
+    const sourceLabel = item.sourceLabel || item.source_label || item.label || item.name || 'Chưa phân nguồn';
+    const key = `${sourceType}:${sourceId}`;
+    const source = sources.get(key) || { sourceType, sourceId, sourceLabel, amount: 0, months: new Map() };
+    source.amount += amount;
+    const month = item.month || item.yearMonth || item.year_month || '';
+    if (month) {
+      const monthRow = source.months.get(month) || {
+        month,
+        label: item.monthLabel || item.month_label || fullMonthLabel(month),
+        amount: 0,
+      };
+      monthRow.amount += amount;
+      source.months.set(month, monthRow);
+    }
+    sources.set(key, source);
+  };
+
+  safeArray(progressRows)
+    .filter(row => ['pending', 'unpaid'].includes(String(row.status || '').toLowerCase()))
+    .filter(row => !currentProfileId || String(row.profileId || '') !== String(currentProfileId))
+    .forEach(row => {
+      const items = safeArray(row.paymentItems).length
+        ? safeArray(row.paymentItems)
+        : safeArray(row.payableSources || row.coveredSources || row.sources)
+          .flatMap((source, index) => sourcePaymentItems(source, { prefix: `hero:${row.profileId || index}` }));
+      let allocated = 0;
+      items.forEach(item => {
+        const amount = -(Number(item.amount) || 0);
+        allocated += amount;
+        addAmount(item, amount);
+      });
+      const residual = Math.abs(Number(row.amount) || 0) - allocated;
+      if (residual) addAmount({ sourceType: 'unallocated', sourceId: 'unallocated', sourceLabel: 'Chưa phân nguồn' }, residual);
+    });
+
+  return [...sources.values()]
+    .map(({ months, ...source }) => ({
+      ...source,
+      monthBreakdown: [...months.values()].filter(row => row.amount !== 0),
+    }))
+    .filter(source => source.amount !== 0);
 }
 
 function sourcePaymentItems(source, { prefix = 'source', memberId = '', profileId = '' } = {}) {

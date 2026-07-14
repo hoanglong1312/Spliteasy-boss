@@ -1,7 +1,57 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, test } from 'vitest'
-import { SourceBreakdown } from './Home.jsx'
+import { buildTreasurerOutstandingBreakdown, SourceBreakdown } from './Home.jsx'
+
+describe('buildTreasurerOutstandingBreakdown', () => {
+  test('matches outstanding member total while preserving source offsets', () => {
+    const sources = buildTreasurerOutstandingBreakdown([
+      {
+        profileId: 'profile-1',
+        status: 'unpaid',
+        amount: 70000,
+        paymentItems: [
+          { sourceType: 'group', sourceId: 'g1', sourceLabel: 'Nhóm ăn tối', month: '2026-07', monthLabel: 'Tháng 7', amount: -100000 },
+          { sourceType: 'pickleball', sourceId: 'pb', sourceLabel: 'Pickleball', month: '2026-07', monthLabel: 'Tháng 7', amount: 30000 },
+        ],
+      },
+      {
+        profileId: 'profile-2',
+        status: 'pending',
+        amount: 20000,
+        paymentItems: [
+          { sourceType: 'group', sourceId: 'g1', sourceLabel: 'Nhóm ăn tối', month: '2026-07', monthLabel: 'Tháng 7', amount: -20000 },
+        ],
+      },
+      { profileId: 'current', status: 'unpaid', amount: 50000, paymentItems: [] },
+      { profileId: 'profile-3', status: 'confirmed', amount: 40000, paymentItems: [] },
+    ], 'current')
+
+    expect(sources).toEqual([
+      expect.objectContaining({
+        sourceId: 'g1',
+        amount: 120000,
+        monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: 120000 }],
+      }),
+      expect.objectContaining({
+        sourceId: 'pb',
+        amount: -30000,
+        monthBreakdown: [{ month: '2026-07', label: 'Tháng 7', amount: -30000 }],
+      }),
+    ])
+    expect(sources.reduce((sum, source) => sum + source.amount, 0)).toBe(90000)
+  })
+
+  test('keeps total exact when legacy row has no source items', () => {
+    const sources = buildTreasurerOutstandingBreakdown([
+      { profileId: 'profile-1', name: 'Lê Cường', status: 'pending', amount: 70000 },
+    ])
+
+    expect(sources).toEqual([
+      expect.objectContaining({ sourceType: 'unallocated', sourceLabel: 'Chưa phân nguồn', amount: 70000 }),
+    ])
+  })
+})
 
 describe('SourceBreakdown', () => {
   test('renders redesigned hero with compact collapsed source toggle', () => {
