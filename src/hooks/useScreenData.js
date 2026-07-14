@@ -2012,7 +2012,10 @@ function buildAddExpenseData(state, params) {
   const requestedGroup = requestedGroupId ? safeArray(state?.groups).find(item => String(item.id) === String(requestedGroupId)) : null
   const expenseGroups = safeArray(state?.groups)
     .map(safeGroup)
-    .filter(group => groupKind(group) !== 'pickleball')
+    .filter(group => (
+      groupKind(group) !== 'pickleball' &&
+      (!(group.archivedAt || group.archived_at) || String(group.id) === String(expense?.groupId || expense?.group_id || ''))
+    ))
   const group = expense ? groupForExpense(state, expense) || resolveExpenseGroupContext(state, requestedGroup) : resolveExpenseGroupContext(state, requestedGroup)
   const currentMember = safeArray(state?.members).find(member => String(member.id) === String(state?.currentUserId))
   const selectedGroup = buildAddExpenseGroupOption(state, group)

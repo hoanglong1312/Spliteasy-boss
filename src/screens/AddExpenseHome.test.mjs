@@ -32,6 +32,13 @@ test('AddExpense lets new expenses switch between expense groups without using p
   assert.match(screenDataSource, /const expenseGroups = safeArray\(state\?\.groups\)[\s\S]*groupKind\(group\) !== 'pickleball'/);
 });
 
+test('AddExpense excludes archived groups from new expense options', () => {
+  assert.match(
+    screenDataSource,
+    /const expenseGroups = safeArray\(state\?\.groups\)[\s\S]*groupKind\(group\) !== 'pickleball'[\s\S]*!\(group\.archivedAt \|\| group\.archived_at\)/,
+  );
+});
+
 test('AddExpense empty amount keeps the zero placeholder visually centered', () => {
   assert.match(addExpenseSource, /const amountInputWidth = amount \? 220 : 54/);
   assert.match(addExpenseSource, /width: amountInputWidth/);
