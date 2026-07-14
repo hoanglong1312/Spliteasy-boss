@@ -176,6 +176,9 @@ test('treasurer dashboard keeps confirmed checkpoint members as paid history', (
   assert.match(rowSource, /onUndoPaid\?\.\(item\)/);
   assert.match(rowSource, />Đã nhận<\/span>/);
   assert.match(rowSource, />Hoàn tác<\/button>/);
+  assert.match(rowSource, /const paidActionRow = item\.paid && !isRefund/);
+  assert.match(rowSource, /gridTemplateColumns: paidActionRow \? '20px minmax\(0,1fr\) auto' : '20px minmax\(0,1fr\) auto auto'/);
+  assert.match(rowSource, /gridColumn: paidActionRow \? '2 \/ -1' : 'auto'/);
   assert.doesNotMatch(rowSource, /if \(item\.paid\) return onCancelPaid\?\.\(item\.record\)/);
 });
 

@@ -1867,6 +1867,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                   const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
                   const selected = !item.paid && !item.pending && !isRefund && selectedKeys?.has?.(item.key);
                   const selectable = !item.paid && !item.pending && !isRefund;
+                  const paidActionRow = item.paid && !isRefund;
                   return (
                     <div
                       key={item.key}
@@ -1879,12 +1880,12 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                           onToggleSelect?.(item);
                         }
                       }}
-                      style={{ display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: selectable ? 'pointer' : 'default' }}
+                      style={{ display: 'grid', gridTemplateColumns: paidActionRow ? '20px minmax(0,1fr) auto' : '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: selectable ? 'pointer' : 'default' }}
                     >
                       <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : item.pending ? '#fbbf24' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: item.pending ? '#fde68a' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : item.pending ? '·' : ''}</div>
                       <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'} · ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
                       <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
-                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', gridColumn: paidActionRow ? '2 / -1' : 'auto' }}>
                         {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
                         {!item.paid && !isRefund && <span style={{ padding: '5px 7px', borderRadius: 7, background: item.pending ? 'rgba(251,191,36,0.14)' : 'rgba(148,163,184,0.12)', color: item.pending ? '#fde68a' : '#cbd5e1', fontSize: 10, fontWeight: 850 }}>{item.pending ? 'Đang chờ nhận' : 'Chưa chốt'}</span>}
                         {!item.pending && item.paid && !isRefund && <>
