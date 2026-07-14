@@ -5329,7 +5329,7 @@ describe('buildHomeData', () => {
     ])
   })
 
-  test('exposes confirmed checkpoint snapshots to treasurer payment history', () => {
+  test('exposes confirmed checkpoint snapshots across months to treasurer payment history', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
       { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
@@ -5390,6 +5390,13 @@ describe('buildHomeData', () => {
           payableItemKey: 'expense:one',
           profileId: 'profile-1',
           amount: -40000,
+        })],
+      }),
+      expect.objectContaining({
+        id: 'checkpoint-old',
+        coveredItems: [expect.objectContaining({
+          payableItemKey: 'expense:old',
+          amount: -30000,
         })],
       }),
     ])

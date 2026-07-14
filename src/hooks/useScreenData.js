@@ -304,7 +304,7 @@ function pendingSettlementCheckpointsForTreasurer(state, members = [], currentPr
     .sort((a, b) => parseDateValue(a.createdAt) - parseDateValue(b.createdAt))
 }
 
-function confirmedSettlementCheckpointsForTreasurer(state, members = [], currentProfileId = '', yearMonth = '') {
+function confirmedSettlementCheckpointsForTreasurer(state, members = [], currentProfileId = '') {
   const profileId = currentProfileId || state?.currentProfileId || state?.currentProfile_id || profileIdForMember(state?.currentUserId, members)
   const managedGroupIds = new Set(safeArray(members)
     .filter(member => String(member.profileId || member.profile_id || '') === String(profileId || '') && isManagerRole(member.role))
@@ -315,7 +315,6 @@ function confirmedSettlementCheckpointsForTreasurer(state, members = [], current
     .filter(row => managedGroupIds.has(String(row.groupId || '')))
     .filter(row => String(row.status || '').toLowerCase() === 'confirmed')
     .filter(row => row.coveredItems.length > 0)
-    .filter(row => !yearMonth || row.coveredItems.some(item => String(item.month || item.yearMonth || item.year_month || '') === String(yearMonth)))
     .sort((a, b) => parseDateValue(b.confirmedAt || b.createdAt) - parseDateValue(a.confirmedAt || a.createdAt))
 }
 
@@ -796,7 +795,7 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
   const pendingSettlementCheckpoints = pendingSettlementCheckpointsForProfile(state, currentUserId, members, safeGroups)
   const pendingSettlementCheckpoint = pendingSettlementCheckpoints[0] || null
   const pendingCheckpointsForTreasurer = pendingSettlementCheckpointsForTreasurer(paymentState, members, currentProfileId)
-  const confirmedCheckpointsForTreasurer = confirmedSettlementCheckpointsForTreasurer(paymentState, members, currentProfileId, selectedYearMonth)
+  const confirmedCheckpointsForTreasurer = confirmedSettlementCheckpointsForTreasurer(paymentState, members, currentProfileId)
   const allTickets = [
     ...safeArray(pickleballState?._allPickle?.externalTickets),
   ]
