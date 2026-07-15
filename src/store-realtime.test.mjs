@@ -117,6 +117,18 @@ test('treasurer payment confirmation records settled source months', () => {
   assert.match(source, /p_covered_sources: coveredSources/)
 })
 
+test('treasurer refund confirmation records only selected source months', () => {
+  const match = storeSource.match(/case 'RECORD_MEMBER_MONTH_SETTLEMENTS': \{[\s\S]*?\n      \}/)
+  assert.ok(match, 'RECORD_MEMBER_MONTH_SETTLEMENTS case is available')
+  const source = match[0]
+
+  assert.match(source, /const coveredSources = safeArray\(action\.coveredSources\)/)
+  assert.match(source, /\.rpc\('record_member_month_payment_settlements'/)
+  assert.match(source, /p_treasurer_member_id: state\.currentUserId/)
+  assert.match(source, /p_covered_sources: coveredSources/)
+  assert.match(source, /await dispatch\(\{ type: 'REFRESH' \}\)/)
+})
+
 test('confirmed settlement checkpoints can only be reopened safely by their group treasurer', () => {
   assert.match(undoCheckpointMigrationSource, /create or replace function public\.undo_settlement_checkpoint/)
   assert.match(undoCheckpointMigrationSource, /role = 'treasurer'/)

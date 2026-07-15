@@ -892,16 +892,17 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
 
 function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate, progressProfileBreakdown = profileBreakdown) {
   const monthLabel = formatMonthLabel(monthDate)
+  const selectedMonth = monthKey(monthDate)
   const coverage = paymentCoverageForMember(state, me, monthLabel, sourceBreakdown)
   const adjustedSources = appendProfileGroupSources(suppressSettledSourceMonths(
     applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources),
     state?.monthSettlements,
     members,
     state?.groups,
+    selectedMonth,
   ), state, members, me)
   const netBalance = adjustedSources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const paymentNotice = latestPaymentNoticeForMember(state, me, monthLabel)
-  const selectedMonth = monthKey(monthDate)
   const selectedMonthNetBalance = capSourceBreakdownByMonth(adjustedSources, selectedMonth)
     .reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
   const hasConfirmedSelectedMonth = coverage.confirmedSources.some(source => (
@@ -912,7 +913,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     : selectedMonthNetBalance > 0 || (selectedMonthNetBalance < 0 && coverage.pendingAmount <= 0)
       ? ''
       : paymentNotice?.status || ''
-  const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, state?.monthSettlements, members, state?.groups)
+  const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, state?.monthSettlements, members, state?.groups, selectedMonth)
   return {
     monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
@@ -973,24 +974,24 @@ function appendProfileGroupSources(sourceBreakdown, state, members = [], member 
   return [...safeArray(sourceBreakdown), ...missingSources]
 }
 
-function profileRowsAfterSettledMonths(profileBreakdown, settlements, members = [], groups = []) {
+function profileRowsAfterSettledMonths(profileBreakdown, settlements, members = [], groups = [], selectedMonth = '') {
   return safeArray(profileBreakdown)
     .map(row => {
-      const sources = suppressSettledSourceMonths(row.sources, settlements, members, groups)
+      const sources = suppressSettledSourceMonths(row.sources, settlements, members, groups, selectedMonth)
       const amount = sources.reduce((sum, source) => sum + (Number(source.amount) || 0), 0)
       return { ...row, amount, sources }
     })
     .filter(row => Number(row.amount) !== 0)
 }
 
-function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = []) {
+function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = [], selectedMonth = '') {
   const settledMonths = new Set()
   safeArray(settlements).forEach(row => {
     const expenseId = row?.expenseId || row?.expense_id || ''
-    if (!expenseId) return
     const groupId = row?.groupId || row?.group_id || ''
     const memberId = row?.memberId || row?.member_id || ''
     const month = row?.month || ''
+    if (!expenseId && (!selectedMonth || month >= selectedMonth)) return
     if (!groupId || !memberId || !month) return
     const profileId = profileIdForMember(memberId, members)
     const memberIds = memberIdsForProfile(profileId, members)

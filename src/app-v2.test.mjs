@@ -273,6 +273,17 @@ test('AppV2 records each member in a multi-member treasurer payment separately',
   assert.match(block, /groupId: payment\?\.groupId/)
 })
 
+test('AppV2 persists the selected refund month before showing success', () => {
+  const block = appSource.slice(
+    appSource.indexOf("if (type === 'markRefundPaid')"),
+    appSource.indexOf("if (type === 'confirmPaymentSent')"),
+  )
+  assert.match(block, /const coveredSources = safeArray\(payload\?\.coveredSources\)/)
+  assert.match(block, /await dispatch\(\{ type: 'RECORD_MEMBER_MONTH_SETTLEMENTS', coveredSources \}\)/)
+  assert.match(block, /Đã đánh dấu hoàn tiền/)
+  assert.match(block, /Chưa lưu được khoản hoàn tiền/)
+})
+
 test('AppV2 forwards exact covered items when requesting settlement checkpoints', () => {
   const block = appSource.slice(
     appSource.indexOf("if (type === 'requestSettlementCheckpoint')"),

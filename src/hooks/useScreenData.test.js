@@ -4339,8 +4339,6 @@ describe('buildHomeData', () => {
         member_id: 'myt-pickle',
         group_id: 'pickle-1',
         month: '2026-05',
-        expense_id: 'myt-may-settlement',
-        expenses: { amount: 200000 },
       }],
     }
 

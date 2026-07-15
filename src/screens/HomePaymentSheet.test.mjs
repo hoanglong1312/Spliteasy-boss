@@ -229,7 +229,7 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
   assert.match(dashboardSource, /const \[refundBankItem, setRefundBankItem\] = useState\(null\)/);
   assert.match(dashboardSource, /const refundBillBankReady = refundBillItem \? Boolean\(resolveVietQrBank\(refundBillItem\.bank \|\| \{\}\) && refundBillItem\.bank\?\.account && refundBillItem\.bank\?\.holder\) : false/);
   assert.match(dashboardSource, /onRefundBill=\{\(item\) => setRefundBillItem\(item\)\}/);
-  assert.match(dashboardSource, /onCancelRefund=\{\(item\) => onCancelRefund\?\.\(item\.refundRow\)\}/);
+  assert.match(dashboardSource, /onCancelRefund=\{\(item\) => onCancelRefund\?\.\(item\)\}/);
   assert.match(rowSource, /onRefundBill/);
   assert.match(rowSource, /onCancelRefund/);
   assert.match(rowSource, /Thẻ bill/);
@@ -251,6 +251,14 @@ test('treasurer refund rows can open bill card and add missing bank info', () =>
   assert.match(homeSource, /const canSave = Boolean\(profileId && resolveVietQrBank\(\{ name: bankName \}\) && bankAccount\.trim\(\) && bankAccountName\.trim\(\)\)/);
   assert.match(homeSource, /onAction\?\.\('editMember'/);
   assert.match(billContentSource, /caption = 'Cần chuyển cho thủ quỹ'/);
+});
+
+test('treasurer refund confirmation sends selected month sources for persistence', () => {
+  const homeTopLevel = sliceBetween('export default function Home(', 'function PaymentManagementZone');
+  const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
+
+  assert.match(homeTopLevel, /onAction\?\.\('markRefundPaid', item\)/);
+  assert.match(dashboardSource, /onConfirmRefund=\{\(item\) => onConfirmRefund\?\.\(item\)\}/);
 });
 
 test('saving refund bank updates the open refund bill item so QR appears immediately', () => {

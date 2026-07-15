@@ -2140,6 +2140,22 @@ export function AppProvider({ children }) {
         return data
       }
 
+      case 'RECORD_MEMBER_MONTH_SETTLEMENTS': {
+        if (!sb || !state.currentUserId) return null
+        const coveredSources = safeArray(action.coveredSources)
+        if (!coveredSources.length) return null
+        const { data, error } = await sb.rpc('record_member_month_payment_settlements', {
+          p_treasurer_member_id: state.currentUserId,
+          p_covered_sources: coveredSources,
+        })
+        if (error) {
+          console.error('[store] RECORD_MEMBER_MONTH_SETTLEMENTS:', error)
+          throw error
+        }
+        await dispatch({ type: 'REFRESH' })
+        return data
+      }
+
       case 'REQUEST_SETTLEMENT_CHECKPOINT': {
         if (!sb || !state.currentUserId) return null
         const { data, error } = await sb.rpc('request_settlement_checkpoint', {

@@ -2412,7 +2412,16 @@ export default function AppV2() {
     }
 
     if (type === 'markRefundPaid') {
-      dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu hoàn tiền cho ${payload?.name || 'thành viên'}.` })
+      try {
+        const coveredSources = safeArray(payload?.coveredSources)
+        if (!coveredSources.length) throw new Error('Khoản hoàn chưa có dữ liệu nhóm và tháng.')
+        await dispatch({ type: 'RECORD_MEMBER_MONTH_SETTLEMENTS', coveredSources })
+        dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu hoàn tiền cho ${payload?.memberName || payload?.name || 'thành viên'}.` })
+      } catch (error) {
+        console.error('[app] markRefundPaid:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa lưu được khoản hoàn tiền.' })
+        throw error
+      }
       return
     }
 

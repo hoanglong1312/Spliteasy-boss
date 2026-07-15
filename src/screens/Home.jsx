@@ -210,13 +210,13 @@ export default function Home({ data, isTreasurer, isPickleballTreasurer = false,
         onAction={onAction}
         onViewPaymentRecord={setPaymentRecordDetail}
         onConfirmPayment={(payload) => onAction?.(isTreasurer ? 'markMemberPaid' : 'confirmPaymentSent', payload)}
-        onConfirmRefund={(row) => {
-          const key = String(row.profileId || row.name || 'member');
+        onConfirmRefund={(item) => {
+          const key = String(item.key || item.profileId || item.memberName || 'member');
           setConfirmedRefunds(prev => new Set([...prev, key]));
-          onAction?.('markRefundPaid', row);
+          onAction?.('markRefundPaid', item);
         }}
-        onCancelRefund={(row) => {
-          const key = String(row.profileId || row.name || 'member');
+        onCancelRefund={(item) => {
+          const key = String(item.key || item.profileId || item.memberName || 'member');
           setConfirmedRefunds(prev => {
             const next = new Set(prev);
             next.delete(key);
@@ -1469,8 +1469,8 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
               if (!window.confirm('Hoàn tác lần nhận tiền này? Các khoản đã chốt sẽ quay lại trạng thái chờ duyệt.')) return;
               return item.checkpoint ? onAction?.('undoSettlementCheckpoint', { checkpointId: item.checkpoint.id }) : onAction?.('cancelPaymentRecord', item.record);
             })}
-            onConfirmRefund={(item) => onConfirmRefund?.(item.refundRow)}
-            onCancelRefund={(item) => onCancelRefund?.(item.refundRow)}
+            onConfirmRefund={(item) => onConfirmRefund?.(item)}
+            onCancelRefund={(item) => onCancelRefund?.(item)}
             onRefundBill={(item) => setRefundBillItem(item)}
             onConfirmPending={(checkpointIds) => withLoading(() => onAction?.('confirmSettlementCheckpoint', { checkpointIds }))}
             onRejectPending={(checkpointIds) => withLoading(() => onAction?.('rejectSettlementCheckpoint', { checkpointIds }))}
@@ -1555,7 +1555,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   );
 }
 
-function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedCheckpoints, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel }) {
+export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedCheckpoints, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel }) {
   const byMember = new Map();
   const pendingItems = new Map();
   const paidPayableItemKeys = new Set(safeArray(confirmedRecords)
@@ -1728,30 +1728,42 @@ function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedChe
   });
 
   safeArray(refundRows).forEach(row => {
-    const amount = Math.max(0, Number(row.amount) || 0);
-    if (amount <= 0) return;
     const memberRow = ensureRow({
       profileId: row.profileId || row.profile_id || '',
       memberId: row.memberId || row.member_id || '',
       name: row.name || row.memberName || row.member_name,
     });
     const refundKey = String(row.profileId || row.profile_id || row.name || 'member');
-    memberRow.amountRefund += amount;
-    memberRow.items.push({
-      key: `refund:${refundKey}`,
-      kind: 'refund',
-      paid: Boolean(confirmedRefunds?.has?.(refundKey)),
+    const sourceItems = safeArray(row.sources).flatMap((source, index) => sourcePaymentItems(source, {
+      prefix: `refund:${refundKey}:${index}`,
+      memberId: row.memberId || row.member_id || '',
+      profileId: row.profileId || row.profile_id || '',
+    }));
+    const refundItems = sourceItems.length ? sourceItems : [{
       sourceType: 'refund',
       sourceId: refundKey,
       sourceLabel: 'Cần hoàn tiền',
       memberId: row.memberId || row.member_id || '',
       profileId: row.profileId || row.profile_id || '',
-      memberName: memberRow.name,
       month: row.month || row.yearMonth || row.year_month || '',
       monthLabel: row.monthLabel || row.month_label || monthLabel,
-      amount,
-      bank: row.bank || {},
-      refundRow: row,
+      amount: Number(row.amount) || 0,
+    }];
+    refundItems.filter(item => Number(item.amount) > 0).forEach((item, index) => {
+      const itemKey = `refund:${refundKey}:${item.sourceType}:${item.sourceId}:${item.month || index}`;
+      const amount = Number(item.amount) || 0;
+      memberRow.amountRefund += amount;
+      memberRow.items.push({
+        ...item,
+        key: itemKey,
+        kind: 'refund',
+        paid: Boolean(confirmedRefunds?.has?.(itemKey)),
+        memberName: memberRow.name,
+        amount,
+        coveredSources: [paymentItemToCoveredSource(item)],
+        bank: row.bank || {},
+        refundRow: row,
+      });
     });
   });
 
