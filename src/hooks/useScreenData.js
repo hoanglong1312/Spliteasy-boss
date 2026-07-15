@@ -2283,14 +2283,21 @@ function groupDetailSettlementBalance(group, memberId, state, endDate) {
   const profileId = profileIdForMember(memberId, state?.members)
   const memberIds = new Set(memberIdsForProfile(profileId, state?.members).map(String))
   if (memberId) memberIds.add(String(memberId))
+  const member = safeArray(state?.members).find(row => String(row?.id || '') === String(memberId || '')) || { id: memberId }
+  const paidItemKeys = new Set(confirmedSettlementCheckpointItems(state, memberId)
+    .filter(item => String(item?.sourceId || item?.source_id || '') === String(group?.id || ''))
+    .map(item => normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || buildPayableItemKey(item)))
+    .filter(Boolean))
   const settledMonths = new Set(safeArray(state?.monthSettlements)
     .filter(row => String(row?.groupId || row?.group_id || '') === String(group?.id || ''))
     .filter(row => memberIds.has(String(row?.memberId || row?.member_id || '')))
     .map(row => row?.month)
     .filter(Boolean))
-  const expenses = settledMonths.size
-    ? safeArray(checkpointGroup.expenses).filter(expense => !settledMonths.has(monthKey(expense.date || expense.expense_date)))
-    : safeArray(checkpointGroup.expenses)
+  const expenses = safeArray(checkpointGroup.expenses).filter(expense => {
+    if (settledMonths.has(monthKey(expense.date || expense.expense_date))) return false
+    const item = groupExpensePayableItem(group, expense, member, state?.members)
+    return !item || !paidItemKeys.has(item.payableItemKey)
+  })
   const balanceGroup = { ...checkpointGroup, expenses }
   return {
     amount: groupNet(balanceGroup, memberId),

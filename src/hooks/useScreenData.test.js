@@ -5638,6 +5638,84 @@ describe('buildGroupDetailData', () => {
     ])
   })
 
+  test('hides expenses covered by a confirmed item checkpoint from group detail balances', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
+      { id: 'treasurer-1', profile_id: 'profile-2', group_id: 'group-1', name: 'Treasurer One', role: 'treasurer' },
+    ]
+    const group = {
+      id: 'group-1',
+      name: 'Group',
+      members: ['member-1', 'treasurer-1'],
+      expenses: [
+        {
+          id: 'may-paid',
+          amount: 1200000,
+          expense_date: '2026-05-20T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'june-paid',
+          amount: 1422500,
+          expense_date: '2026-06-10T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+        {
+          id: 'july-open',
+          amount: 1062500,
+          expense_date: '2026-07-15T12:00:00.000Z',
+          paid_by_member_id: 'treasurer-1',
+          participants: ['member-1', 'treasurer-1'],
+        },
+      ],
+    }
+    const state = {
+      currentUserId: 'member-1',
+      currentUserName: 'Member One',
+      currentGroupId: 'group-1',
+      members,
+      groups: [group],
+      notifications: [],
+      settlementCheckpoints: [{
+        id: 'checkpoint-1',
+        group_id: 'group-1',
+        member_id: 'member-1',
+        status: 'confirmed',
+        confirmed_at: '2026-07-15T09:00:00.000Z',
+        covered_items: [
+          {
+            expense_id: 'may-paid',
+            member_id: 'member-1',
+            profile_id: 'profile-1',
+            source_id: 'group-1',
+            source_type: 'group',
+            month: '2026-05',
+            amount: -600000,
+          },
+          {
+            expense_id: 'june-paid',
+            member_id: 'member-1',
+            profile_id: 'profile-1',
+            source_id: 'group-1',
+            source_type: 'group',
+            month: '2026-06',
+            amount: -711250,
+          },
+        ],
+      }],
+    }
+
+    const result = buildGroupDetailData(group, 'member-1', members, 'Member One', '2026-07', [], state)
+    const member = result.members.find(row => row.id === 'member-1')
+
+    expect(member.balance).toBe(-531250)
+    expect(member.monthBreakdown).toEqual([
+      { month: '2026-07', label: 'Tháng 7', amount: -531250 },
+    ])
+  })
+
   test('hides settled source months from group detail balances', () => {
     const members = [
       { id: 'member-1', profile_id: 'profile-1', group_id: 'group-1', name: 'Member One' },
