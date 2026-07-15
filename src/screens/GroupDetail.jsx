@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { colors, type, formatVND } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, IconButton, Hero, Card, Button, Badge, SubTabs, Avatar,
-  ModuleHero, ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
+  ActionButton, SearchInput, SectionHeader, ListCard, BottomSheet,
   LoadingSpinner, loadingOverlayStyle, MemberPicker, MonthNav,
 } from '../primitives';
 
@@ -55,6 +55,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   const [deleteConfirmExpense, setDeleteConfirmExpense] = useState(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
+  const [activitySearch, setActivitySearch] = useState('');
   const pendingExpenses = d.pendingExpenses || [];
   const ownPendingExpenses = pendingExpenses.filter(expense => String(expense.submittedBy || '') === String(d.currentMemberId || ''));
   const heroBalanceLabel = d.balance > 0 ? 'Bạn cần thu' : d.balance < 0 ? 'Bạn cần nộp' : 'Bạn đã cân bằng';
@@ -66,6 +67,17 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
     if (!query) return true;
     return normalizeSearch(`${member.name} ${member.bankName} ${member.bankAccount}`).includes(query);
   });
+  const activityQuery = normalizeSearch(activitySearch);
+  const activityWeeks = safeArray(d.activitiesByWeek);
+  const visibleActivityWeeks = safeArray(d.activitiesByWeek)
+    .map(week => ({
+      ...week,
+      items: safeArray(week.items).filter(item => (
+        !activityQuery
+        || normalizeSearch(`${item.title || ''} ${item.payer?.name || item.payerName || ''}`).includes(activityQuery)
+      )),
+    }))
+    .filter(week => week.items.length > 0);
 
   useEffect(() => {
     const focusMemberId = d.focusMemberId || d.focus_member_id || '';
@@ -170,80 +182,95 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   return (
     <PhoneFrame>
       <Screen tabBar style={{ padding: 0 }}>
-        <div style={{ padding: '0 16px' }}>
-        {/* Compact nav: back | emoji + name | edit */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 8px' }}>
-          <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
-          <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{d.emoji || '👥'}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>
-          </div>
-          {canManageGroup ? <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton> : <div style={{ width: 44 }} />}
-        </div>
-
-        <MonthNav label={d.monthLabel || ''} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
-
-        <ModuleHero
-          tone="groups"
-          style={{ cursor: 'pointer' }}
-        >
-          {d.description && (
-            <div style={{
-              marginTop: 2,
-              padding: '9px 10px',
-              borderRadius: 12,
-              background: 'rgba(255,255,255,0.055)',
-              border: '1px solid rgba(255,255,255,0.09)',
-              color: colors.textSecondary,
-              fontSize: 12,
-              lineHeight: 1.45,
-              overflowWrap: 'anywhere',
-            }}>
-              {d.description}
+        <div style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          padding: '0 16px 7px',
+          background: colors.shellBg,
+          borderBottom: `1px solid ${colors.borderSubtle}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 4px' }}>
+            <IconButton onClick={() => onAction?.('back')}>‹</IconButton>
+            <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{d.emoji || '👥'}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</div>
             </div>
-          )}
-          <SummaryChipRow
-            memberCount={d.memberCount || (d.members || []).length}
-            expenseCount={d.expenseCount || 0}
-            totalSpent={d.totalSpent || 0}
-          />
-          <HeroBalancePanel
-            label={heroBalanceLabel}
-            balance={d.balance || 0}
-            tone={heroBalanceTone}
-            onOpen={currentMemberRow ? () => setSelectedMember(currentMemberRow) : null}
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 18 }}>
+            {canManageGroup ? <IconButton onClick={() => setEditingGroup(true)}>✎</IconButton> : <div style={{ width: 44 }} />}
+          </div>
+
+          <MonthNav label={d.monthLabel || ''} onPrev={() => onAction?.('monthPrev')} onNext={() => onAction?.('monthNext')} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 5 }}>
+            <div style={{
+              minWidth: 0,
+              padding: '7px 9px',
+              borderRadius: 8,
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${colors.borderSubtle}`,
+            }}>
+              <div style={{ fontSize: 8, fontWeight: 800, color: colors.textMuted, textTransform: 'uppercase' }}>Tổng chi</div>
+              <div style={{ marginTop: 3, fontSize: 15, fontWeight: 900, color: '#6ee7b7', overflowWrap: 'anywhere', ...type.mono }}>
+                {formatVND(d.totalSpent || 0)}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={!currentMemberRow}
+              onClick={() => currentMemberRow && setSelectedMember(currentMemberRow)}
+              style={{
+                minWidth: 0,
+                padding: '7px 9px',
+                borderRadius: 8,
+                background: 'rgba(255,255,255,0.05)',
+                border: `1px solid ${colors.borderSubtle}`,
+                color: colors.textPrimary,
+                fontFamily: 'inherit',
+                textAlign: 'left',
+                cursor: currentMemberRow ? 'pointer' : 'default',
+              }}
+            >
+              <div style={{ fontSize: 8, fontWeight: 800, color: colors.textMuted, textTransform: 'uppercase' }}>{heroBalanceLabel}</div>
+              <div style={{ marginTop: 3, fontSize: 15, fontWeight: 900, color: heroBalanceTone, overflowWrap: 'anywhere', ...type.mono }}>
+                {formatVND(Math.abs(d.balance || 0))}
+              </div>
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 7 }}>
             <Button variant="primary" style={{ padding: '7px 6px', fontSize: 11, color: '#7c2d12' }} onClick={() => onAction?.('addExpense', { groupId: d.id })}>+ Thêm chi tiêu</Button>
-            <Button variant="ghost" style={{ padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán hết nợ</Button>
-            <Button variant="ghost" style={{ gridColumn: '1 / -1', padding: '7px 6px', fontSize: 11 }} onClick={() => setExportMenuOpen(true)}>📤 Xuất Excel</Button>
+            <Button variant="ghost" style={{ padding: '7px 6px', fontSize: 11 }} onClick={() => onAction?.('settleAll')}>💳 Thanh toán nợ</Button>
           </div>
-          <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 7, lineHeight: 1.35 }}>
-            Thanh toán cho tất cả các tháng còn nợ đến hiện tại.
+
+          <SubTabs
+            items={[
+              { key: 'members',  label: `Thành viên · ${d.memberCount}` },
+              { key: 'activity', label: 'Hoạt động' },
+            ]}
+            active={activeTab}
+            onChange={setActiveTab}
+          />
+
+          <div style={{ marginTop: 5 }}>
+            {activeTab === 'activity' ? (
+              <SearchInput
+                value={activitySearch}
+                onChange={event => setActivitySearch(event.target.value)}
+                placeholder="Tìm giao dịch hoặc người trả..."
+              />
+            ) : (
+              <SearchInput
+                value={memberSearch}
+                onChange={event => setMemberSearch(event.target.value)}
+                placeholder="Tìm thành viên..."
+              />
+            )}
           </div>
-        </ModuleHero>
+        </div>
 
         {!isTreasurer && ownPendingExpenses.length > 0 && (
-          <PendingStatusAlert count={ownPendingExpenses.length} onClick={() => setActiveTab('activity')} />
-        )}
-
-        <SubTabs
-          items={[
-            { key: 'members',  label: `Thành viên · ${d.memberCount}` },
-            { key: 'activity', label: 'Hoạt động' },
-          ]}
-          active={activeTab}
-          onChange={setActiveTab}
-        />
-        </div>
-
-        {activeTab === 'members' && (
-          <div style={{ padding: '4px 16px 6px' }}>
-            <SearchInput
-              value={memberSearch}
-              onChange={event => setMemberSearch(event.target.value)}
-              placeholder="Tìm thành viên..."
-            />
+          <div style={{ padding: '0 16px' }}>
+            <PendingStatusAlert count={ownPendingExpenses.length} onClick={() => setActiveTab('activity')} />
           </div>
         )}
 
@@ -266,11 +293,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 </div>
               </section>
             )}
-            {d.activitiesByWeek.map(week => (
+            {visibleActivityWeeks.map(week => (
               <React.Fragment key={week.label}>
                 <SectionHeader>{week.label}</SectionHeader>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {week.items.map(it => (
+                  {safeArray(week.items).map(it => (
                     <ActivityCard
                       key={it.id}
                       item={it}
@@ -285,8 +312,11 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
             ))}
           </>
         )}
-        {activeTab === 'activity' && d.activitiesByWeek.length === 0 && (
+        {activeTab === 'activity' && activityWeeks.length === 0 && (
           <EmptyState title="Chưa có chi tiêu" sub="Bấm Thêm chi tiêu để ghi khoản đầu tiên của nhóm này." />
+        )}
+        {activeTab === 'activity' && activityWeeks.length > 0 && visibleActivityWeeks.length === 0 && (
+          <EmptyState title="Không tìm thấy giao dịch" sub="Thử tìm theo tên khoản chi hoặc người trả." />
         )}
 
         {activeTab === 'members' && (
@@ -322,6 +352,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
                 inviteCode={d.inviteCode}
                 onShare={() => onAction?.('createGroupInviteShare', { groupId: d.id, inviteCode: d.inviteCode })}
                 onCopyInviteCode={() => onAction?.('copyInviteCode', { inviteCode: d.inviteCode })}
+                onExport={() => setExportMenuOpen(true)}
               />
             </>
           ) : (
@@ -541,7 +572,7 @@ export default function GroupDetail({ data, isTreasurer = true, onAction }) {
   );
 }
 
-function GroupManagementPanel({ inviteCode, onShare, onCopyInviteCode }) {
+function GroupManagementPanel({ inviteCode, onShare, onCopyInviteCode, onExport }) {
   return (
     <Card style={{ marginTop: 10, padding: 11 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -574,6 +605,7 @@ function GroupManagementPanel({ inviteCode, onShare, onCopyInviteCode }) {
         }}>{inviteCode || '--'}</span>
         <button type="button" onClick={onCopyInviteCode} style={compactCopyButtonStyle()}>Sao chép</button>
       </div>
+      <button type="button" onClick={onExport} style={{ ...groupActionStyle(), width: '100%', marginTop: 9 }}>📤 Xuất dữ liệu</button>
     </Card>
   );
 }
@@ -621,85 +653,6 @@ function EmptyState({ title, sub }) {
       <div style={{ fontSize: 13, fontWeight: 800 }}>{title}</div>
       <div style={{ fontSize: 11, color: colors.textSecondary, marginTop: 5, lineHeight: 1.45 }}>{sub}</div>
     </Card>
-  );
-}
-
-function SummaryChipRow({ memberCount, expenseCount, totalSpent }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 7, marginTop: 12 }}>
-      <SummaryChip value={memberCount} label="Thành viên" tone={colors.textPrimary} />
-      <SummaryChip value={expenseCount} label="Khoản chi" tone={colors.warning} />
-      <SummaryChip value={formatVND(totalSpent)} label="Tổng chi" tone="#6ee7b7" />
-    </div>
-  );
-}
-
-function SummaryChip({ value, label, tone }) {
-  return (
-    <div style={{
-      minWidth: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'center',
-      gap: 3,
-      padding: '8px 7px',
-      borderRadius: 10,
-      background: 'rgba(255,255,255,0.08)',
-      border: '1px solid rgba(255,255,255,0.10)',
-    }}>
-      <div style={{
-        fontSize: 12,
-        fontWeight: 900,
-        color: tone,
-        lineHeight: 1.05,
-        overflowWrap: 'anywhere',
-        ...type.mono,
-      }}>{value}</div>
-      <div style={{
-        fontSize: 7,
-        fontWeight: 900,
-        letterSpacing: '0.6px',
-        textTransform: 'uppercase',
-        color: 'rgba(226,232,240,0.72)',
-        whiteSpace: 'nowrap',
-      }}>{label}</div>
-    </div>
-  );
-}
-
-function HeroBalancePanel({ label, balance, tone, onOpen }) {
-  const clickable = Boolean(onOpen);
-  const handleKeyDown = (event) => {
-    if (!clickable) return;
-    if (event.key === 'Enter' || event.key === ' ') onOpen();
-  };
-
-  return (
-    <div
-      role={clickable ? 'button' : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onClick={onOpen || undefined}
-      onKeyDown={handleKeyDown}
-      style={{
-      display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1fr) minmax(112px, auto)',
-      alignItems: 'end',
-      gap: 12,
-      marginTop: 10,
-      padding: '12px 12px',
-      borderRadius: 14,
-      background: 'rgba(15,23,42,0.22)',
-      border: '1px solid rgba(255,255,255,0.14)',
-      cursor: clickable ? 'pointer' : 'default',
-    }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1.2px', color: '#fcd34d' }}>SỐ DƯ CỦA BẠN</div>
-        <div style={{ marginTop: 7, fontSize: 12, fontWeight: 800, color: tone }}>{label}</div>
-      </div>
-      <div style={{ ...type.amountLg, ...type.mono, fontSize: 27, textAlign: 'right', lineHeight: 1.05, overflowWrap: 'anywhere', minWidth: 0 }}>
-        {formatVND(Math.abs(balance || 0))}
-      </div>
-    </div>
   );
 }
 

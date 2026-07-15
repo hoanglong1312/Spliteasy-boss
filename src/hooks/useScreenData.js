@@ -2188,7 +2188,6 @@ export function buildGroupDetailData(group, currentUserId, members, currentUserN
   const activities = safeArray(monthlyGroup.expenses)
     .slice()
     .sort((a, b) => parseDateValue(b.date) - parseDateValue(a.date))
-    .slice(0, 20)
     .map(expense => toActivity(expense, members))
   const monthlyExpenses = safeArray(monthlyGroup.expenses)
   const totalSpent = monthlyExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0)
@@ -4169,6 +4168,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
 function toActivity(expense, members) {
   const splitCount = safeArray(expense.participants).length || safeArray(expense.splits).length
   const submittedBy = expense.submittedBy || expense.submitted_by_member_id || expense.createdBy || expense.created_by || null
+  const payerName = memberName(expense.paidBy, members)
   return {
     id: expense.id,
     icon: expenseIcon(expense),
@@ -4177,11 +4177,12 @@ function toActivity(expense, members) {
     amount: Number(expense.amount) || 0,
     date: expense.date,
     paidBy: expense.paidBy,
+    payerName,
     submittedBy,
     submittedByName: submittedBy ? memberName(submittedBy, members) : '',
     status: expense.status,
     splits: safeArray(expense.splits),
-    sub: `${memberName(expense.paidBy, members)} trả · ${formatDayMonth(expense.date)}`,
+    sub: `${payerName} trả · ${formatDayMonth(expense.date)}`,
     tags: [
       { tone: 'muted', label: splitCount > 0 ? `Chia đều · ${splitCount} người` : 'Chưa có người chia' },
       statusBadge(expense.status),

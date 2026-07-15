@@ -64,8 +64,8 @@ test('AddExpense uses scroll date picker and supports receipt image previews', (
 test('GroupDetail menu, balances, and members tabs render real group data', () => {
   assert.match(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /onAction\?\.\('settleAll'\)/);
-  assert.match(groupDetailSource, />💳 Thanh toán hết nợ<\/Button>/);
-  assert.match(groupDetailSource, /Thanh toán cho tất cả các tháng còn nợ đến hiện tại\./);
+  assert.match(groupDetailSource, />💳 Thanh toán nợ<\/Button>/);
+  assert.doesNotMatch(groupDetailSource, /Thanh toán cho tất cả các tháng còn nợ đến hiện tại\./);
   assert.match(groupDetailSource, /function MonthBreakdown\(\{ rows \}\)/);
   assert.doesNotMatch(groupDetailSource, /⚡ Tất toán/);
   assert.doesNotMatch(groupDetailSource, /Gửi bill tháng/);
@@ -78,6 +78,8 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Sao chép/);
   assert.match(groupDetailSource, /gridTemplateColumns: 'auto minmax\(0, 1fr\) auto'/);
   assert.match(groupDetailSource, /onCopyInviteCode=\{\(\) => onAction\?\.\('copyInviteCode', \{ inviteCode: d\.inviteCode \}\)\}/);
+  assert.match(groupDetailSource, /onExport=\{\(\) => setExportMenuOpen\(true\)\}/);
+  assert.match(groupDetailSource, />📤 Xuất dữ liệu<\/button>/);
   assert.doesNotMatch(groupDetailSource, /⌨ Mã mời thủ công/);
   assert.match(groupDetailSource, /const canManageGroup = Boolean\(isTreasurer \|\| d\.isGroupCreator\)/);
   assert.match(groupDetailSource, /\{canManageGroup \? <IconButton onClick=\{\(\) => setEditingGroup\(true\)\}>✎<\/IconButton> : <div style=\{\{ width: 44 \}\} \/>\}/);
@@ -86,7 +88,7 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.doesNotMatch(groupDetailSource, /setMenuOpen/);
   assert.match(groupDetailSource, /onAction\?\.\('editGroup'/);
   assert.match(groupDetailSource, /onShare=\{\(\) => onAction\?\.\('createGroupInviteShare', \{ groupId: d\.id, inviteCode: d\.inviteCode \}\)\}/);
-  assert.match(groupDetailSource, /action=\{<div[\s\S]*\{d\.emoji \|\| '👥'\}/);
+  assert.match(groupDetailSource, /<span style=\{\{ fontSize: 18[\s\S]*\{d\.emoji \|\| '👥'\}<\/span>/);
   assert.match(groupDetailSource, /onAction\?\.\('deleteGroup', \{ groupId: d\.id \}\)/);
   assert.match(groupDetailSource, /<BottomSheet title="Xóa nhóm\?"/);
   assert.match(groupDetailSource, /setDeleteConfirmGroup\(true\)/);
@@ -97,23 +99,23 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.doesNotMatch(groupDetailSource, /label="Số dư"/);
   assert.doesNotMatch(groupDetailSource, /onAction\?\.\('addExpense', \{ groupId: d\.id \}\)\}>\s*<span>＋<\/span> Thêm/);
   assert.match(groupDetailSource, /const heroBalanceLabel = d\.balance > 0 \? 'Bạn cần thu' : d\.balance < 0 \? 'Bạn cần nộp' : 'Bạn đã cân bằng'/);
-  assert.match(groupDetailSource, /<SummaryChipRow[\s\S]*memberCount=\{d\.memberCount \|\| \(d\.members \|\| \[\]\)\.length\}[\s\S]*expenseCount=\{d\.expenseCount \|\| 0\}[\s\S]*totalSpent=\{d\.totalSpent \|\| 0\}/);
-  assert.match(groupDetailSource, /function SummaryChipRow/);
+  assert.match(groupDetailSource, /\{formatVND\(d\.totalSpent \|\| 0\)\}/);
+  assert.match(groupDetailSource, /\{formatVND\(Math\.abs\(d\.balance \|\| 0\)\)\}/);
+  assert.doesNotMatch(groupDetailSource, /function SummaryChipRow/);
   assert.doesNotMatch(groupDetailSource, /<GroupSummaryCard/);
   assert.doesNotMatch(groupDetailSource, /function GroupSummaryCard/);
   assert.match(groupDetailSource, /Thành viên/);
-  assert.match(groupDetailSource, /Khoản chi/);
   assert.match(groupDetailSource, /Tổng chi/);
   assert.match(groupDetailSource, /const \[activeTab, setActiveTab\] = useState\('members'\)/);
   assert.match(groupDetailSource, /items=\{\[\s*\{ key: 'members',\s+label: `Thành viên · \$\{d\.memberCount\}` \},\s*\{ key: 'activity', label: 'Hoạt động' \},\s*\]\}/);
   assert.match(groupDetailSource, /activeTab === 'members'/);
-  assert.match(groupDetailSource, /\+ Thêm thành viên/);
+  assert.match(groupDetailSource, /Thêm thành viên/);
   assert.match(groupDetailSource, /<MemberRow[\s\S]*key=\{member\.id\}[\s\S]*member=\{member\}[\s\S]*onMore=\{setMemberMenu\}/);
   assert.match(groupDetailSource, /Sửa thành viên/);
   assert.match(groupDetailSource, /Cấp quyền thủ quỹ/);
   assert.match(groupDetailSource, /Xóa khỏi nhóm/);
   assert.match(groupDetailSource, />✏️ Sửa thành viên<\/ActionButton>/);
-  assert.match(groupDetailSource, /\{memberMenu\.role === 'treasurer' \? '💳 Thu quyền thủ quỹ' : '💳 Cấp quyền thủ quỹ'\}/);
+  assert.match(groupDetailSource, /savingAction === 'setMemberRole' \? 'Đang xử lý…' : memberMenu\.role === 'treasurer' \? '💳 Thu quyền thủ quỹ' : '💳 Cấp quyền thủ quỹ'/);
   assert.match(groupDetailSource, />🗑️ Xóa khỏi nhóm<\/ActionButton>/);
   assert.match(groupDetailSource, /onAction\?\.\('setMemberRole', \{ memberId: memberMenu\.id, groupId: d\.id, role \}\)/);
   assert.doesNotMatch(groupDetailSource, /RolePill icon="👑" label="Trưởng nhóm"/);
@@ -121,6 +123,20 @@ test('GroupDetail menu, balances, and members tabs render real group data', () =
   assert.match(groupDetailSource, /Tên tài khoản/);
   assert.match(groupDetailSource, /Số tài khoản/);
   assert.match(screenDataSource, /balanceRows: groupMembers/);
+});
+
+test('GroupDetail keeps compact controls sticky and filters every activity by title or payer', () => {
+  assert.match(groupDetailSource, /const \[activitySearch, setActivitySearch\] = useState\(''\)/);
+  assert.match(groupDetailSource, /const visibleActivityWeeks = safeArray\(d\.activitiesByWeek\)/);
+  assert.match(groupDetailSource, /normalizeSearch\(`\$\{item\.title \|\| ''\} \$\{item\.payer\?\.name \|\| item\.payerName \|\| ''\}`\)/);
+  assert.match(groupDetailSource, /value=\{activitySearch\}/);
+  assert.match(groupDetailSource, /onChange=\{event => setActivitySearch\(event\.target\.value\)\}/);
+  assert.match(groupDetailSource, /position: 'sticky'/);
+  assert.match(groupDetailSource, /visibleActivityWeeks\.map\(week => \(/);
+  assert.doesNotMatch(groupDetailSource, /activitiesByWeek[\s\S]{0,80}\.slice\(/);
+  assert.doesNotMatch(screenDataSource, /\.slice\(0, 20\)[\s\S]{0,80}\.map\(expense => toActivity/);
+  assert.match(screenDataSource, /const payerName = memberName\(expense\.paidBy, members\)/);
+  assert.match(groupDetailSource, /Không tìm thấy giao dịch/);
 });
 
 test('GroupDetail places the group invite share panel at the bottom of the page content', () => {
@@ -245,37 +261,20 @@ test('Member payment QR groups selected own and pay-for debts with the same brea
   assert.doesNotMatch(paymentSheetSource, /Chi tiết khoản của \$\{group\.row\.name\}/);
 });
 
-test('GroupDetail hero balances amount on the right', () => {
-  const heroBalanceSource = groupDetailSource.slice(
-    groupDetailSource.indexOf('<ModuleHero'),
-    groupDetailSource.indexOf('{/* Treasurer actions */}')
-  );
+test('GroupDetail compact summary opens the current member balance', () => {
   assert.match(groupDetailSource, /const currentMemberRow = \(d\.members \|\| \[\]\)\.find\(member => String\(member\.id\) === String\(d\.currentMemberId \|\| ''\)\) \|\| null/);
-  assert.match(heroBalanceSource, /<HeroBalancePanel[\s\S]*label=\{heroBalanceLabel\}[\s\S]*balance=\{d\.balance \|\| 0\}[\s\S]*tone=\{heroBalanceTone\}[\s\S]*onOpen=\{currentMemberRow \? \(\) => setSelectedMember\(currentMemberRow\) : null\}/);
-  assert.match(heroBalanceSource, /<SummaryChipRow/);
+  assert.match(groupDetailSource, /disabled=\{!currentMemberRow\}/);
+  assert.match(groupDetailSource, /onClick=\{\(\) => currentMemberRow && setSelectedMember\(currentMemberRow\)\}/);
 });
 
-test('GroupDetail hero stats and personal balance avoid mobile overflow', () => {
-  const summarySource = groupDetailSource.slice(
-    groupDetailSource.indexOf('function SummaryChipRow'),
-    groupDetailSource.indexOf('function MemberRow')
-  );
-  assert.match(summarySource, /display: 'grid'/);
-  assert.match(summarySource, /gridTemplateColumns: 'repeat\(3, minmax\(0, 1fr\)\)'/);
-  assert.match(summarySource, /overflowWrap: 'anywhere'/);
-  assert.match(summarySource, /function HeroBalancePanel\(\{ label, balance, tone, onOpen \}\)/);
-  assert.match(summarySource, /SỐ DƯ CỦA BẠN/);
-  assert.match(summarySource, /role=\{clickable \? 'button' : undefined\}/);
-  assert.match(summarySource, /onClick=\{onOpen \|\| undefined\}/);
-  assert.match(summarySource, /formatVND\(Math\.abs\(balance \|\| 0\)\)/);
+test('GroupDetail compact totals avoid mobile overflow', () => {
+  assert.match(groupDetailSource, /gridTemplateColumns: '1fr 1fr'/);
+  assert.match(groupDetailSource, /overflowWrap: 'anywhere'/);
+  assert.match(groupDetailSource, /fontSize: 15/);
+  assert.match(groupDetailSource, /formatVND\(Math\.abs\(d\.balance \|\| 0\)\)/);
 });
 
 test('GroupDetail edit sheet uses group type picker and saves matching icon and description', () => {
-  const heroSource = groupDetailSource.slice(
-    groupDetailSource.indexOf('<ModuleHero'),
-    groupDetailSource.indexOf('<SummaryChipRow')
-  );
-
   assert.match(groupDetailSource, /const GROUP_TYPES = \[/);
   assert.match(groupDetailSource, /descriptionPlaceholder: 'Ví dụ: Ăn uống sau giờ chơi, cafe cuối tuần'/);
   assert.match(groupDetailSource, /const \[groupDescription, setGroupDescription\] = useState\(d\.description \|\| ''\)/);
@@ -283,8 +282,7 @@ test('GroupDetail edit sheet uses group type picker and saves matching icon and 
   assert.match(groupDetailSource, /emoji: selectedGroupType\.emoji \|\| '👥'/);
   assert.match(groupDetailSource, /groupType: selectedGroupType\.key/);
   assert.match(groupDetailSource, /description: groupDescription\.trim\(\)/);
-  assert.match(heroSource, /\{d\.description && \(/);
-  assert.match(heroSource, /\{d\.description\}/);
+  assert.doesNotMatch(groupDetailSource, /\{d\.description && \(/);
   assert.match(groupDetailSource, /function GroupTypePicker\(\{ value, options, onChange \}\)/);
   assert.match(groupDetailSource, /<GroupTypePicker value=\{groupTypeKey\} options=\{groupTypeOptions\} onChange=\{setGroupTypeKey\} \/>/);
   assert.match(groupDetailSource, /<TextArea label="Mô tả nhóm" value=\{groupDescription\} onChange=\{setGroupDescription\} placeholder=\{selectedGroupType\.descriptionPlaceholder\}/);
