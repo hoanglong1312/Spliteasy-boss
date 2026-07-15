@@ -2539,16 +2539,19 @@ export default function AppV2() {
     }
 
     if (type === 'markMemberPaid') {
-      await dispatch({
-        type: 'TREASURER_CONFIRM_PAYMENT',
-        memberId: payload?.memberId,
-        amount: payload?.amount,
-        monthLabel: payload?.monthLabel,
-        memberName: payload?.memberName,
-        coveredSources: payload?.coveredSources,
-        coveredItems: payload?.coveredItems,
-        groupId: payload?.groupId,
-      })
+      const payments = safeArray(payload?.payments).length ? payload.payments : [payload]
+      for (const payment of payments) {
+        await dispatch({
+          type: 'TREASURER_CONFIRM_PAYMENT',
+          memberId: payment?.memberId,
+          amount: payment?.amount,
+          monthLabel: payment?.monthLabel,
+          memberName: payment?.memberName,
+          coveredSources: payment?.coveredSources,
+          coveredItems: payment?.coveredItems,
+          groupId: payment?.groupId,
+        })
+      }
       dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu ${payload?.memberName || 'thành viên'} đã thanh toán.` })
       return
     }

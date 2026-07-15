@@ -84,7 +84,7 @@ test('payment confirm payloads preserve covered items for exact allocation', () 
   assert.match(sourceItemsSource, /coveredItems/);
   assert.match(paymentSheetSource, /const coveredItems = selectedPaymentItems\.flatMap\(paymentItemToCoveredItems\)/);
   assert.match(paymentSheetSource, /coveredItems,/);
-  assert.match(treasurerConfirmSource, /coveredItems: selectedItems\.flatMap\(paymentItemToCoveredItems\)/);
+  assert.match(treasurerConfirmSource, /coveredItems: group\.items\.flatMap\(paymentItemToCoveredItems\)/);
   assert.match(coveredItemSource, /function paymentItemToCoveredSource\(item\)/);
   assert.match(coveredItemSource, /function paymentItemToCoveredItems\(item\)/);
   assert.match(coveredItemSource, /payableItemKey/);
@@ -94,6 +94,7 @@ test('payment confirm payloads preserve covered items for exact allocation', () 
 test('treasurer dashboard can create one bill from selected items across members', () => {
   const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
   const rowBuilderSource = sliceBetween('function paymentRowFromTreasurerItems(', 'function TreasurerMemberPaymentRow');
+  const confirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
   assert.match(dashboardSource, /selectedTreasurerItems = memberRows\.flatMap/);
   assert.match(dashboardSource, /TT đã chọn/);
   assert.match(dashboardSource, /const selectedTreasurerTotal = paymentItemsAmountDue\(selectedTreasurerItems\)/);
@@ -103,6 +104,11 @@ test('treasurer dashboard can create one bill from selected items across members
   assert.match(rowBuilderSource, /defaultPaymentItemKeys: paymentItems\.map\(item => item\.key\)/);
   assert.match(rowBuilderSource, /const amount = paymentItemsAmountDue\(paymentItems\)/);
   assert.match(homeSource, /paymentDisplayGroups = row\?\.paymentGroups \|\| \[/);
+  assert.match(confirmSource, /const paymentGroups = new Map\(\)/);
+  assert.match(confirmSource, /const key = `\$\{groupId\}:\$\{memberId\}`/);
+  assert.match(confirmSource, /payments: \[\.\.\.paymentGroups\.values\(\)\]\.map/);
+  assert.match(confirmSource, /memberId: group\.memberId/);
+  assert.match(confirmSource, /coveredItems: group\.items\.flatMap\(paymentItemToCoveredItems\)/);
 });
 
 test('treasurer QR download does not change payment status', () => {

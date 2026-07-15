@@ -2004,16 +2004,34 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
 
   async function submit() {
     if (submitting || selectedTotal <= 0) return;
+    const paymentGroups = new Map();
+    selectedItems.forEach(item => {
+      const groupId = item.groupId || item.row?.linkGroupId || item.row?.groupId || row.linkGroupId || row.groupId || '';
+      const memberId = item.memberId || item.row?.linkMemberId || item.row?.memberId || row.linkMemberId || row.memberId || '';
+      if (!groupId || !memberId) return;
+      const key = `${groupId}:${memberId}`;
+      const group = paymentGroups.get(key) || {
+        groupId,
+        memberId,
+        memberName: item.memberName || item.row?.name || item.row?.memberName || row.name || row.memberName || 'Thành viên',
+        items: [],
+      };
+      group.items.push(item);
+      paymentGroups.set(key, group);
+    });
     setSubmitting(true);
     try {
       await onConfirm?.({
-        memberId: row.linkMemberId || row.memberId || '',
-        amount: selectedTotal,
-        monthLabel: payloadMonthLabel,
+        payments: [...paymentGroups.values()].map(group => ({
+          memberId: group.memberId,
+          amount: paymentItemsAmountDue(group.items),
+          monthLabel: payloadMonthLabel,
+          memberName: group.memberName,
+          coveredSources: group.items.map(paymentItemToCoveredSource),
+          coveredItems: group.items.flatMap(paymentItemToCoveredItems),
+          groupId: group.groupId,
+        })),
         memberName: row.name || row.memberName || 'Thành viên',
-        coveredSources: selectedItems.map(paymentItemToCoveredSource),
-        coveredItems: selectedItems.flatMap(paymentItemToCoveredItems),
-        groupId: row.linkGroupId || row.groupId || '',
       });
     } finally {
       setSubmitting(false);

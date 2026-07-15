@@ -260,6 +260,19 @@ test('AppV2 sends payment confirmations to treasurer notifications', () => {
   assert.match(appSource, /status: type === 'confirmPaymentNotice' \? 'confirmed' : 'rejected'/)
 })
 
+test('AppV2 records each member in a multi-member treasurer payment separately', () => {
+  const block = appSource.slice(
+    appSource.indexOf("if (type === 'markMemberPaid')"),
+    appSource.indexOf("if (type === 'cancelPaymentRecord')"),
+  )
+  assert.match(block, /const payments = safeArray\(payload\?\.payments\)\.length \? payload\.payments : \[payload\]/)
+  assert.match(block, /for \(const payment of payments\)/)
+  assert.match(block, /memberId: payment\?\.memberId/)
+  assert.match(block, /coveredSources: payment\?\.coveredSources/)
+  assert.match(block, /coveredItems: payment\?\.coveredItems/)
+  assert.match(block, /groupId: payment\?\.groupId/)
+})
+
 test('AppV2 forwards exact covered items when requesting settlement checkpoints', () => {
   const block = appSource.slice(
     appSource.indexOf("if (type === 'requestSettlementCheckpoint')"),
