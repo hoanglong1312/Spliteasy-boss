@@ -3858,7 +3858,7 @@ function buildExpenseDetailData(state, params) {
   const canEdit = role === 'treasurer' || canSubmitterRevise
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
     || (virtualGroup ? { id: '', name: 'Quỹ team' } : null)
-  const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state))
+  const splits = expenseSplits(expense, group, members, payer, currentUserId, buildPaidItemCoverageMap(state))
 
   return {
     id: expense.id,
@@ -4138,7 +4138,12 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
           amount,
         )
         : false
-      const isComplete = isExpenseInGroupBalance(expense)
+      const isPayer = String(paidBy || '') === String(meForGroup || '')
+      const isComplete = isExpenseInGroupBalance(expense) && (
+        isPayer ||
+        isPaid ||
+        groupSourceNet(group, meForGroup) > 0
+      )
 
       return {
         id: expense.id,
@@ -5925,7 +5930,7 @@ function groupForExpense(state, expense) {
   return safeArray(state?.groups).find(group => String(group.id) === String(groupId)) || null
 }
 
-function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage = new Map()) {
+function expenseSplits(expense, group, members, payer, currentUserId, paidItemCoverage = new Map()) {
   const amount = Number(expense?.amount) || 0
   const participants = safeArray(expense?.participants)
   const rows = safeArray(expense?.splits).length > 0
@@ -5951,7 +5956,11 @@ function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage 
       transactionPayableItemKey(expense, split.memberId, members, yearMonth),
       -Math.abs(split.amount),
     )
-    const isOffset = !isPayer && !isPaid && Number(split.amount) !== 0 && isExpenseInGroupBalance(expense)
+    const isOffset = !isPayer &&
+      !isPaid &&
+      Number(split.amount) !== 0 &&
+      isExpenseInGroupBalance(expense) &&
+      groupSourceNet(group, split.memberId) > 0
     return {
       initial: initials(member),
       name: member?.displayName || member?.name || 'Thành viên',
