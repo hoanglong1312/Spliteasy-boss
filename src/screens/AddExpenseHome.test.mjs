@@ -899,8 +899,8 @@ test('Home has a controlled Của tôi filter that composes with existing filter
   assert.match(homeSource, />Của tôi<\/button>/);
 });
 
-test('AllExpenses shows every group transaction by default', () => {
-  assert.match(allExpensesSource, /const \[mineOnly, setMineOnly\] = useState\(false\)/);
+test('AllExpenses defaults to personal transactions for members and all transactions for treasurers', () => {
+  assert.match(allExpensesSource, /const \[mineOnly, setMineOnly\] = useState\(!isTreasurer\)/);
   assert.match(allExpensesSource, /const mineMatches = !mineOnly \|\| transactionBelongsToCurrentUser\(tx, d\.currentUserId\)/);
 });
 
