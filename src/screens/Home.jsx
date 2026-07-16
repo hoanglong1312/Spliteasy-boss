@@ -1829,7 +1829,13 @@ function paymentRowFromTreasurerItems(items, data) {
 
 function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onUndoPaid, onConfirmRefund, onCancelRefund, onRefundBill, onConfirmPending, onRejectPending }) {
   const [expanded, setExpanded] = useState(false);
-  const groupedItems = groupPaymentItemsBySource(row.items);
+  const [settledExpanded, setSettledExpanded] = useState(false);
+  const settledItems = row.items.filter(item => item.paid && item.kind !== 'refund');
+  const activeItems = row.items.filter(item => !item.paid || item.kind === 'refund');
+  const groupedItems = groupPaymentItemsBySource(activeItems);
+  const settledGroups = groupPaymentItemsBySource(settledItems);
+  const settledCount = settledItems.reduce((sum, item) => sum + (Number(item.itemCount) || 1), 0);
+  const settledAmount = paymentItemsAmountDue(settledItems);
   const unpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund');
   const selectedUnpaidItems = row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedKeys?.has?.(item.key));
   const selectedUnpaidTotal = paymentItemsAmountDue(selectedUnpaidItems);
@@ -1837,6 +1843,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
   const pendingCheckpointIds = [...new Set(safeArray(pendingCheckpoints).map(checkpoint => checkpoint.id).filter(Boolean))];
   const pendingApprovalDisabled = safeArray(pendingCheckpoints).some(checkpoint => checkpoint.stale);
   useEffect(() => { if (collapseTick) setExpanded(false); }, [collapseTick]);
+  useEffect(() => { if (collapseTick) setSettledExpanded(false); }, [collapseTick]);
   return (
     <div style={{ padding: 10, borderRadius: 12, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)', minWidth: 0 }}>
       <button type="button" onClick={() => setExpanded(value => !value)} style={{ width: '100%', padding: 0, border: 'none', background: 'transparent', color: 'inherit', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
@@ -1923,6 +1930,43 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
               </div>
             </div>
           ))}
+          {settledItems.length > 0 && (
+            <div style={{ display: 'grid', gap: 6, borderTop: '1px solid rgba(148,163,184,0.16)', paddingTop: 8 }}>
+              <button
+                type="button"
+                aria-expanded={settledExpanded}
+                onClick={() => setSettledExpanded(value => !value)}
+                style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center', width: '100%', padding: '7px 8px', borderRadius: 9, border: '1px solid rgba(148,163,184,0.16)', background: 'rgba(148,163,184,0.06)', color: 'inherit', fontFamily: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span style={{ minWidth: 0, fontSize: 11, color: '#cbd5e1', fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Đã chốt trước đây · {settledCount} khoản · {formatVND(settledAmount)}</span>
+                <span style={{ color: colors.textMuted, fontSize: 14 }}>{settledExpanded ? '⌃' : '⌄'}</span>
+              </button>
+              {settledExpanded && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {settledGroups.map(group => (
+                    <div key={group.key} style={{ display: 'grid', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <div style={{ minWidth: 0, fontSize: 12, color: '#e2e8f0', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
+                        <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>{group.items.reduce((sum, item) => sum + (Number(item.itemCount) || 1), 0)} khoản</div>
+                      </div>
+                      <div style={{ display: 'grid', gap: 6, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(34,197,94,0.28)' }}>
+                        {group.items.map(item => (
+                          <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.22)' }}>
+                            <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'} · ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
+                            <div style={{ fontSize: 12, fontWeight: 950, color: '#6ee7b7', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
+                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', gridColumn: '1 / -1' }}>
+                              <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>
+                              <button type="button" onClick={() => onUndoPaid?.(item)} style={miniDashButton('rgba(248,113,113,0.14)', '#fca5a5')}>Hoàn tác</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

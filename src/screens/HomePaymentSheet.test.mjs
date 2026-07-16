@@ -188,6 +188,19 @@ test('treasurer dashboard keeps confirmed checkpoint members as paid history', (
   assert.doesNotMatch(rowSource, /if \(item\.paid\) return onCancelPaid\?\.\(item\.record\)/);
 });
 
+test('treasurer member rows collapse settled payment history by default', () => {
+  const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
+
+  assert.match(rowSource, /const \[settledExpanded, setSettledExpanded\] = useState\(false\)/);
+  assert.match(rowSource, /const settledItems = row\.items\.filter\(item => item\.paid && item\.kind !== 'refund'\)/);
+  assert.match(rowSource, /const activeItems = row\.items\.filter\(item => !item\.paid \|\| item\.kind === 'refund'\)/);
+  assert.match(rowSource, /groupPaymentItemsBySource\(activeItems\)/);
+  assert.match(rowSource, /Đã chốt trước đây/);
+  assert.match(rowSource, /setSettledExpanded\(value => !value\)/);
+  assert.match(rowSource, /\{settledExpanded && \(/);
+  assert.match(rowSource, /onUndoPaid\?\.\(item\)/);
+});
+
 test('treasurer dashboard nets signed debt and credit items', () => {
   const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
