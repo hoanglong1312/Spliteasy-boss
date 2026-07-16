@@ -3858,7 +3858,7 @@ function buildExpenseDetailData(state, params) {
   const canEdit = role === 'treasurer' || canSubmitterRevise
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
     || (virtualGroup ? { id: '', name: 'Quỹ team' } : null)
-  const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state), role === 'treasurer')
+  const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state))
 
   return {
     id: expense.id,
@@ -3872,7 +3872,7 @@ function buildExpenseDetailData(state, params) {
     },
     title: expense.title || 'Chi tiêu',
     amount: Number(expense.amount) || 0,
-    status: reviewStatus === 'rejected' || reviewStatus === 'declined' ? 'rejected' : isDoneStatus(expense.status) || reviewStatus === 'approved' ? 'settled' : 'pending',
+    status: reviewStatus === 'rejected' || reviewStatus === 'declined' ? 'rejected' : isExpenseInGroupBalance(expense) || isDoneStatus(expense.status) ? 'settled' : 'pending',
     dateLabel: fullExpenseDate(expense.date || expense.expense_date),
     payer: {
       id: payer?.id || expense.paidBy || expense.paid_by_member_id,
@@ -4108,6 +4108,10 @@ function isPayableItemCovered(coverage, key, requiredAmount) {
     Math.abs(coveredAmount) >= Math.abs(amount)
 }
 
+function isExpenseInGroupBalance(expense) {
+  return !expense?.status || expense.status === 'approved'
+}
+
 function buildTransactionRows(expenses, groups, currentUserId, members, currentUserName, paidItemCoverage = new Map()) {
   return safeArray(expenses)
     .slice()
@@ -4134,18 +4138,7 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
           amount,
         )
         : false
-      const debtorItems = [...new Set([
-        ...participants,
-        ...splits.map(split => split.memberId),
-      ].filter(Boolean))]
-        .map(memberId => ({
-          amount: expenseImpact(normalizedExpense, memberId),
-          key: transactionPayableItemKey(expense, memberId, members, yearMonth),
-        }))
-        .filter(item => item.amount < 0)
-      const isComplete = debtorItems.length > 0 && debtorItems.every(item => (
-        isPayableItemCovered(paidItemCoverage, item.key, item.amount)
-      ))
+      const isComplete = isExpenseInGroupBalance(expense)
 
       return {
         id: expense.id,
@@ -5932,7 +5925,7 @@ function groupForExpense(state, expense) {
   return safeArray(state?.groups).find(group => String(group.id) === String(groupId)) || null
 }
 
-function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage = new Map(), isTreasurer = false) {
+function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage = new Map()) {
   const amount = Number(expense?.amount) || 0
   const participants = safeArray(expense?.participants)
   const rows = safeArray(expense?.splits).length > 0
@@ -5958,7 +5951,7 @@ function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage 
       transactionPayableItemKey(expense, split.memberId, members, yearMonth),
       -Math.abs(split.amount),
     )
-    const isOffset = !isPayer && !isPaid && isMe && isTreasurer
+    const isOffset = !isPayer && !isPaid && Number(split.amount) !== 0 && isExpenseInGroupBalance(expense)
     return {
       initial: initials(member),
       name: member?.displayName || member?.name || 'Thành viên',

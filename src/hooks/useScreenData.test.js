@@ -119,7 +119,7 @@ describe('transaction per-item payment status', () => {
     }],
   })
 
-  test('marks only current member item paid while another member remains unpaid', () => {
+  test('marks approved transaction complete while preserving exact member payment status', () => {
     const result = buildAllExpensesData(
       stateWithCoverage([coveredItem('member-1', 'profile-1')]),
       'member-1',
@@ -130,11 +130,11 @@ describe('transaction per-item payment status', () => {
     expect(result.transactions[0]).toMatchObject({
       amount: -150000,
       isPaid: true,
-      isComplete: false,
+      isComplete: true,
     })
   })
 
-  test('does not mark item paid when covered amount is short', () => {
+  test('keeps exact item unpaid when coverage is short without reopening approved transaction', () => {
     const result = buildAllExpensesData(
       stateWithCoverage([coveredItem('member-1', 'profile-1', -100000)]),
       'member-1',
@@ -144,7 +144,7 @@ describe('transaction per-item payment status', () => {
 
     expect(result.transactions[0]).toMatchObject({
       isPaid: false,
-      isComplete: false,
+      isComplete: true,
     })
   })
 
@@ -165,10 +165,67 @@ describe('transaction per-item payment status', () => {
       isComplete: true,
     })
   })
+
+  test.each(['pending', 'rejected'])('does not complete a %s transaction through automatic balance offset', status => {
+    const pendingGroups = [{
+      ...groups[0],
+      expenses: [{ ...groups[0].expenses[0], status }],
+    }]
+    const result = buildAllExpensesData(
+      { groups: pendingGroups, members, notifications: [] },
+      'member-1',
+      members,
+      'Member One',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      isPaid: false,
+      isComplete: false,
+    })
+  })
+
+  test('completes an approved transaction without debtor splits', () => {
+    const payerOnlyGroups = [{
+      ...groups[0],
+      expenses: [{
+        ...groups[0].expenses[0],
+        amount: 150000,
+        participants: ['payer-1'],
+        splits: [{ memberId: 'payer-1', amount: 150000 }],
+        status: 'approved',
+      }],
+    }]
+    const result = buildAllExpensesData(
+      { groups: payerOnlyGroups, members, notifications: [] },
+      'payer-1',
+      members,
+      'Payer',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      amount: 0,
+      isComplete: true,
+    })
+  })
+
+  test('does not complete a status value excluded from the group balance', () => {
+    const mismatchedStatusGroups = [{
+      ...groups[0],
+      expenses: [{ ...groups[0].expenses[0], status: 'Approved' }],
+    }]
+    const result = buildAllExpensesData(
+      { groups: mismatchedStatusGroups, members, notifications: [] },
+      'member-1',
+      members,
+      'Member One',
+    )
+
+    expect(result.transactions[0].isComplete).toBe(false)
+  })
 })
 
 describe('expense detail per-item payment status', () => {
-  test('marks covered split rows paid while leaving uncovered member owing', () => {
+  test('marks covered split rows paid while offsetting uncovered approved splits', () => {
     const members = [
       { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Hùng', role: 'treasurer' },
       { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Long' },
@@ -210,13 +267,13 @@ describe('expense detail per-item payment status', () => {
 
     expect(result.splits.filter(split => split.name.startsWith('Minh')).map(split => split.tag)).toEqual(['paid', 'paid'])
     expect(splitTags.Long).toBe('paid')
-    expect(splitTags.Cường).toBe('owe')
+    expect(splitTags.Cường).toBe('offset')
     expect(splitTags.Hùng).toBe('mine')
   })
 
-  test('marks an uncovered treasurer split as included in the group balance', () => {
+  test('marks every uncovered approved split as included in the group balance', () => {
     const members = [
-      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Hoàng Long', role: 'treasurer' },
+      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Hoàng Long' },
       { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Mạnh Hùng' },
     ]
     const expense = {
@@ -231,7 +288,7 @@ describe('expense detail per-item payment status', () => {
       status: 'approved',
     }
     const state = {
-      currentUserId: 'long',
+      currentUserId: 'hung',
       currentGroup: { id: 'group-1', name: 'Lấy vk để trưởng thành', members: members.map(member => member.id), expenses: [expense] },
       groups: [{ id: 'group-1', name: 'Lấy vk để trưởng thành', members: members.map(member => member.id), expenses: [expense] }],
       members,
@@ -245,6 +302,92 @@ describe('expense detail per-item payment status', () => {
       sub: 'Đã tính vào số dư nhóm',
       tag: 'offset',
     })
+  })
+
+  test.each(['pending', 'rejected'])('keeps an uncovered %s split owing', status => {
+    const members = [
+      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Hoàng Long' },
+      { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Mạnh Hùng' },
+    ]
+    const expense = {
+      id: 'pending-pizza',
+      groupId: 'group-1',
+      title: 'Pizza chờ duyệt',
+      amount: 100000,
+      date: '2026-07-06',
+      paidBy: 'hung',
+      participants: members.map(member => member.id),
+      splits: members.map(member => ({ memberId: member.id, amount: 50000 })),
+      status,
+    }
+    const state = {
+      currentUserId: 'hung',
+      currentGroup: { id: 'group-1', name: 'Nhóm', members: members.map(member => member.id), expenses: [expense] },
+      groups: [{ id: 'group-1', name: 'Nhóm', members: members.map(member => member.id), expenses: [expense] }],
+      members,
+      notifications: [],
+    }
+
+    const result = buildExpenseDetailData(state, expense.id)
+    expect(result.splits.find(split => split.name === 'Hoàng Long')).toMatchObject({
+      tag: 'owe',
+    })
+  })
+
+  test('shows legacy approved expense detail as settled with automatic offset', () => {
+    const members = [
+      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Hoàng Long' },
+      { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Mạnh Hùng' },
+    ]
+    const expense = {
+      id: 'legacy-pizza',
+      groupId: 'group-1',
+      title: 'Pizza cũ',
+      amount: 100000,
+      date: '2026-07-06',
+      paidBy: 'hung',
+      participants: members.map(member => member.id),
+      splits: members.map(member => ({ memberId: member.id, amount: 50000 })),
+    }
+    const state = {
+      currentUserId: 'hung',
+      currentGroup: { id: 'group-1', name: 'Nhóm', members: members.map(member => member.id), expenses: [expense] },
+      groups: [{ id: 'group-1', name: 'Nhóm', members: members.map(member => member.id), expenses: [expense] }],
+      members,
+      notifications: [],
+    }
+
+    const result = buildExpenseDetailData(state, expense.id)
+    expect(result.status).toBe('settled')
+    expect(result.splits.find(split => split.name === 'Hoàng Long')?.tag).toBe('offset')
+  })
+
+  test('does not mark a zero-value split as offset', () => {
+    const members = [
+      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Hoàng Long' },
+      { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Mạnh Hùng' },
+    ]
+    const expense = {
+      id: 'zero-split',
+      groupId: 'group-1',
+      title: 'Không chia Long',
+      amount: 100000,
+      date: '2026-07-06',
+      paidBy: 'hung',
+      participants: members.map(member => member.id),
+      splits: [{ memberId: 'long', amount: 0 }, { memberId: 'hung', amount: 100000 }],
+      status: 'approved',
+    }
+    const state = {
+      currentUserId: 'hung',
+      currentGroup: { id: 'group-1', name: 'Nhóm', members: members.map(member => member.id), expenses: [expense] },
+      groups: [{ id: 'group-1', name: 'Nhóm', members: members.map(member => member.id), expenses: [expense] }],
+      members,
+      notifications: [],
+    }
+
+    const result = buildExpenseDetailData(state, expense.id)
+    expect(result.splits.find(split => split.name === 'Hoàng Long')?.tag).toBe('owe')
   })
 })
 
@@ -345,7 +488,7 @@ describe('pickleball transaction detail', () => {
     const result = buildExpenseDetailData(state, 'ticket-water:ticket-1')
     const splitTags = Object.fromEntries(result.splits.map(split => [split.name, split.tag]))
 
-    expect(splitTags).toEqual({ An: 'paid', Bình: 'paid', Cường: 'owe' })
+    expect(splitTags).toEqual({ An: 'paid', Bình: 'paid', Cường: 'offset' })
   })
 })
 
