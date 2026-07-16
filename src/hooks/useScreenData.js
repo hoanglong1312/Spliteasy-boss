@@ -4138,12 +4138,21 @@ function buildTransactionRows(expenses, groups, currentUserId, members, currentU
           amount,
         )
         : false
-      const isPayer = String(paidBy || '') === String(meForGroup || '')
-      const isComplete = isExpenseInGroupBalance(expense) && (
-        isPayer ||
-        isPaid ||
-        groupSourceNet(group, meForGroup) > 0
-      )
+      const debtorIds = [...new Set(
+        (splits.length ? splits.map(split => split.memberId) : participants)
+          .filter(memberId => memberId && String(memberId) !== String(paidBy || ''))
+          .map(String)
+      )]
+      const isComplete = isExpenseInGroupBalance(expense) && debtorIds.every(memberId => {
+        const share = memberShareAmount(normalizedExpense, memberId)
+        return share === 0 ||
+          isPayableItemCovered(
+            paidItemCoverage,
+            transactionPayableItemKey(expense, memberId, members, yearMonth),
+            -Math.abs(share),
+          ) ||
+          groupSourceNet(group, memberId) > 0
+      })
 
       return {
         id: expense.id,

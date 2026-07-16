@@ -119,7 +119,7 @@ describe('transaction per-item payment status', () => {
     }],
   })
 
-  test('marks approved transaction complete while preserving exact member payment status', () => {
+  test('keeps transaction incomplete while preserving exact member payment status', () => {
     const result = buildAllExpensesData(
       stateWithCoverage([coveredItem('member-1', 'profile-1')]),
       'member-1',
@@ -130,7 +130,7 @@ describe('transaction per-item payment status', () => {
     expect(result.transactions[0]).toMatchObject({
       amount: -150000,
       isPaid: true,
-      isComplete: true,
+      isComplete: false,
     })
   })
 
@@ -170,7 +170,10 @@ describe('transaction per-item payment status', () => {
       ],
     }]
     const result = buildAllExpensesData(
-      { groups: positiveBalanceGroups, members, notifications: [] },
+      {
+        ...stateWithCoverage([coveredItem('member-2', 'profile-2')]),
+        groups: positiveBalanceGroups,
+      },
       'member-1',
       members,
       'Member One',
@@ -197,6 +200,21 @@ describe('transaction per-item payment status', () => {
       amount: 300000,
       isPaid: false,
       isComplete: true,
+    })
+  })
+
+  test('keeps payer transaction incomplete while any debtor still owes', () => {
+    const result = buildAllExpensesData(
+      stateWithCoverage([coveredItem('member-1', 'profile-1')]),
+      'payer-1',
+      members,
+      'Payer',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      amount: 300000,
+      isPaid: false,
+      isComplete: false,
     })
   })
 
