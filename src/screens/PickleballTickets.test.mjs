@@ -163,11 +163,27 @@ test('PickleballCalendar preserves selected session id across data refreshes', (
 
   assert.match(calendarSource, /import React, \{ useEffect, useRef, useState \} from 'react'/)
   assert.match(topLevel, /const selectedSessionIdRef = useRef\(initialSession\?\.id \|\| null\)/)
+  assert.match(topLevel, /const selectedDateRef = useRef\(d\.selectedSessionDate \|\| initialSession\?\.date \|\| ''\)/)
+  assert.match(topLevel, /selectedDateRef\.current = day\.date/)
   assert.match(topLevel, /selectedSessionIdRef\.current = day\.sessionId \|\| null/)
   assert.match(topLevel, /const preservedSession = \(d\.sessions \|\| \[\]\)\.find\(session => String\(session\.id\) === String\(selectedSessionIdRef\.current\)\)/)
-  assert.match(topLevel, /setSelectedDate\(preservedSession\?\.date \|\| d\.selectedSessionDate \|\| nextSession\?\.date \|\| ''\)/)
+  assert.match(topLevel, /const preservedDate = \(d\.days \|\| \[\]\)\.some\(day => day\.date === selectedDateRef\.current\)[\s\S]*?\? selectedDateRef\.current[\s\S]*?: ''/)
+  assert.match(topLevel, /const nextSession = preservedSession \|\| \(preservedDate \? null : \(d\.selectedSession \|\| \(d\.sessions \|\| \[\]\)\[0\] \|\| null\)\)/)
+  assert.match(topLevel, /const nextDate = preservedSession\?\.date \|\| preservedDate \|\| d\.selectedSessionDate \|\| nextSession\?\.date \|\| ''/)
+  assert.match(topLevel, /setSelectedDate\(nextDate\)/)
+  assert.match(topLevel, /selectedDateRef\.current = nextDate/)
   assert.match(topLevel, /setSelectedSessionId\(nextSession\?\.id \|\| null\)/)
   assert.doesNotMatch(topLevel, /setSelectedSessionId\(nextSession\?\.id \|\| null\);\n\s*}\, \[d\.selectedSession\?\.id, d\.selectedSessionDate\]\)/)
+})
+
+test('calendar ticket save shows full-screen loading until refresh completes', () => {
+  const topLevel = calendarSource.slice(
+    calendarSource.indexOf('export default function PickleballCalendar'),
+    calendarSource.indexOf('function LegendChip')
+  )
+
+  assert.match(topLevel, /onSave=\{async \(payload\) => \{[\s\S]*?setSavingAction\(editingTicket \? 'updateTicket' : 'addTicket'\)/)
+  assert.match(topLevel, /try \{[\s\S]*?await onAction\?\.\('addTicket', payload\)[\s\S]*?\} finally \{[\s\S]*?setSavingAction\(''\)/)
 })
 
 test('loading overlays render at PhoneFrame level for full-screen coverage', () => {

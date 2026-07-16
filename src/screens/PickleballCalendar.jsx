@@ -33,6 +33,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
   const initialSession = d.selectedSession || (d.sessions || [])[0] || null;
   const [selectedDate, setSelectedDate] = useState(d.selectedSessionDate || initialSession?.date || '');
   const [selectedSessionId, setSelectedSessionId] = useState(initialSession?.id || null);
+  const selectedDateRef = useRef(d.selectedSessionDate || initialSession?.date || '');
   const selectedSessionIdRef = useRef(initialSession?.id || null);
   const [savingAction, setSavingAction] = useState('');
   const selectedSession = selectedSessionId
@@ -45,11 +46,16 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
 
   useEffect(() => {
     const preservedSession = (d.sessions || []).find(session => String(session.id) === String(selectedSessionIdRef.current));
-    const nextSession = preservedSession || d.selectedSession || (d.sessions || [])[0] || null;
-    setSelectedDate(preservedSession?.date || d.selectedSessionDate || nextSession?.date || '');
+    const preservedDate = (d.days || []).some(day => day.date === selectedDateRef.current)
+      ? selectedDateRef.current
+      : '';
+    const nextSession = preservedSession || (preservedDate ? null : (d.selectedSession || (d.sessions || [])[0] || null));
+    const nextDate = preservedSession?.date || preservedDate || d.selectedSessionDate || nextSession?.date || '';
+    setSelectedDate(nextDate);
     setSelectedSessionId(nextSession?.id || null);
+    selectedDateRef.current = nextDate;
     selectedSessionIdRef.current = nextSession?.id || null;
-  }, [d.selectedSession?.id, d.selectedSessionDate, d.sessions]);
+  }, [d.days, d.selectedSession?.id, d.selectedSessionDate, d.sessions]);
 
   useEffect(() => {
     if (editingTicket) setTicketFormOpen(true);
@@ -106,6 +112,7 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
               onClick={() => {
                 if (day.state === 'faded') return;
                 setSelectedDate(day.date);
+                selectedDateRef.current = day.date;
                 selectedSessionIdRef.current = day.sessionId || null;
                 setSelectedSessionId(day.sessionId || null);
               }}
@@ -151,13 +158,18 @@ export default function PickleballCalendar({ data, isTreasurer = true, onAction 
             setEditingTicket(null);
           }}
           onSave={async (payload) => {
-            if (editingTicket) {
-              await onAction?.('updateTicket', { ticketId: editingTicket.id, ...payload });
-            } else {
-              await onAction?.('addTicket', payload);
+            setSavingAction(editingTicket ? 'updateTicket' : 'addTicket');
+            try {
+              if (editingTicket) {
+                await onAction?.('updateTicket', { ticketId: editingTicket.id, ...payload });
+              } else {
+                await onAction?.('addTicket', payload);
+              }
+              setTicketFormOpen(false);
+              setEditingTicket(null);
+            } finally {
+              setSavingAction('');
             }
-            setTicketFormOpen(false);
-            setEditingTicket(null);
           }}
         />
       )}
