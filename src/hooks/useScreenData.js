@@ -3858,7 +3858,7 @@ function buildExpenseDetailData(state, params) {
   const canEdit = role === 'treasurer' || canSubmitterRevise
   const payer = members.find(member => String(member.id) === String(expense.paidBy || expense.paid_by_member_id))
     || (virtualGroup ? { id: '', name: 'Quỹ team' } : null)
-  const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state))
+  const splits = expenseSplits(expense, members, payer, currentUserId, buildPaidItemCoverageMap(state), role === 'treasurer')
 
   return {
     id: expense.id,
@@ -5932,7 +5932,7 @@ function groupForExpense(state, expense) {
   return safeArray(state?.groups).find(group => String(group.id) === String(groupId)) || null
 }
 
-function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage = new Map()) {
+function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage = new Map(), isTreasurer = false) {
   const amount = Number(expense?.amount) || 0
   const participants = safeArray(expense?.participants)
   const rows = safeArray(expense?.splits).length > 0
@@ -5958,13 +5958,14 @@ function expenseSplits(expense, members, payer, currentUserId, paidItemCoverage 
       transactionPayableItemKey(expense, split.memberId, members, yearMonth),
       -Math.abs(split.amount),
     )
+    const isOffset = !isPayer && !isPaid && isMe && isTreasurer
     return {
       initial: initials(member),
       name: member?.displayName || member?.name || 'Thành viên',
       isMe,
-      sub: isPayer ? 'Người ứng tiền' : isPaid ? 'Đã thanh toán' : `Còn nợ ${firstName(payer?.name)}`,
+      sub: isPayer ? 'Người ứng tiền' : isPaid ? 'Đã thanh toán' : isOffset ? 'Đã tính vào số dư nhóm' : `Còn nợ ${firstName(payer?.name)}`,
       amount: isPayer ? Math.abs(split.amount) : -Math.abs(split.amount),
-      tag: isPayer ? 'mine' : isPaid ? 'paid' : 'owe',
+      tag: isPayer ? 'mine' : isPaid ? 'paid' : isOffset ? 'offset' : 'owe',
     }
   })
 }

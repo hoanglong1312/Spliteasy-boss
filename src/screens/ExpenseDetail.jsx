@@ -18,6 +18,7 @@ const SPLIT_TAG = {
   owe:    { bg: 'rgba(248,113,113,0.12)', color: '#fca5a5', label: 'CÒN NỢ' },
   mine:   { bg: 'rgba(255,255,255,0.05)', color: '#94a3b8', label: '— PHẦN MÌNH' },
   paid:   { bg: 'rgba(52,211,153,0.12)', color: '#6ee7b7', label: '✓ ĐÃ TRẢ' },
+  offset: { bg: 'rgba(99,102,241,0.14)', color: '#c7d2fe', label: 'ĐÃ BÙ TRỪ' },
 };
 
 export default function ExpenseDetail({ data, onAction }) {

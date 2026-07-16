@@ -213,6 +213,39 @@ describe('expense detail per-item payment status', () => {
     expect(splitTags.Cường).toBe('owe')
     expect(splitTags.Hùng).toBe('mine')
   })
+
+  test('marks an uncovered treasurer split as included in the group balance', () => {
+    const members = [
+      { id: 'long', profile_id: 'profile-long', group_id: 'group-1', name: 'Hoàng Long', role: 'treasurer' },
+      { id: 'hung', profile_id: 'profile-hung', group_id: 'group-1', name: 'Mạnh Hùng' },
+    ]
+    const expense = {
+      id: 'pizza-hung',
+      groupId: 'group-1',
+      title: 'Pizza Hùng',
+      amount: 138500,
+      date: '2026-07-06',
+      paidBy: 'hung',
+      participants: members.map(member => member.id),
+      splits: members.map(member => ({ memberId: member.id, amount: 69250 })),
+      status: 'approved',
+    }
+    const state = {
+      currentUserId: 'long',
+      currentGroup: { id: 'group-1', name: 'Lấy vk để trưởng thành', members: members.map(member => member.id), expenses: [expense] },
+      groups: [{ id: 'group-1', name: 'Lấy vk để trưởng thành', members: members.map(member => member.id), expenses: [expense] }],
+      members,
+      notifications: [],
+    }
+
+    const result = buildExpenseDetailData(state, expense.id)
+    const longSplit = result.splits.find(split => split.name === 'Hoàng Long')
+
+    expect(longSplit).toMatchObject({
+      sub: 'Đã tính vào số dư nhóm',
+      tag: 'offset',
+    })
+  })
 })
 
 describe('pickleball transaction detail', () => {
