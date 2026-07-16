@@ -148,6 +148,47 @@ describe('transaction per-item payment status', () => {
     })
   })
 
+  test('uses confirmed settlement checkpoint coverage when RPC coverage contains other payments', () => {
+    const result = buildAllExpensesData(
+      {
+        ...stateWithCoverage([]),
+        paymentCoveredItems: [coveredItem('member-2', 'profile-2')],
+        settlementCheckpoints: [{
+          status: 'confirmed',
+          covered_items: [coveredItem('member-1', 'profile-1')],
+        }],
+      },
+      'member-1',
+      members,
+      'Member One',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      isPaid: true,
+      isComplete: true,
+    })
+  })
+
+  test('ignores pending settlement checkpoint coverage', () => {
+    const result = buildAllExpensesData(
+      {
+        ...stateWithCoverage([]),
+        settlementCheckpoints: [{
+          status: 'pending',
+          covered_items: [coveredItem('member-1', 'profile-1')],
+        }],
+      },
+      'member-1',
+      members,
+      'Member One',
+    )
+
+    expect(result.transactions[0]).toMatchObject({
+      isPaid: false,
+      isComplete: false,
+    })
+  })
+
   test('completes an uncovered transaction when member total balance is positive', () => {
     const positiveBalanceGroups = [{
       ...groups[0],

@@ -462,9 +462,13 @@ function buildPaidItemCoverageMap(state) {
     .filter(n => String(n.type || '').toLowerCase().includes('payment'))
     .filter(n => String((n.metadata || {}).status || '').toLowerCase() === 'confirmed')
     .flatMap(n => safeArray(n.metadata?.coveredItems || n.metadata?.covered_items))
-  const items = safeArray(state?.paymentCoveredItems).length
+  const paymentItems = safeArray(state?.paymentCoveredItems).length
     ? safeArray(state?.paymentCoveredItems)
     : notificationItems
+  const checkpointItems = safeArray(state?.settlementCheckpoints)
+    .filter(row => String(row?.status || '').toLowerCase() === 'confirmed')
+    .flatMap(row => safeArray(row?.coveredItems || row?.covered_items))
+  const items = [...paymentItems, ...checkpointItems]
   items
     .forEach(item => {
       const key = normalizePayableItemKey(item?.payableItemKey || item?.payable_item_key || '')
