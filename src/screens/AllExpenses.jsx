@@ -6,7 +6,7 @@ export default function AllExpenses({ data, isTreasurer, onAction }) {
   const d = data || { transactions: [], currentUserId: '' };
   const [filterText, setFilterText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [mineOnly, setMineOnly] = useState(true);
+  const [mineOnly, setMineOnly] = useState(false);
 
   const groupedTransactions = useMemo(() => {
     const matcher = makeMatcher(filterText);

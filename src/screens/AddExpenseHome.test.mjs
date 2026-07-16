@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const addExpenseSource = readFileSync(new URL('./AddExpense.jsx', import.meta.url), 'utf8');
+const allExpensesSource = readFileSync(new URL('./AllExpenses.jsx', import.meta.url), 'utf8');
 const groupDetailSource = readFileSync(new URL('./GroupDetail.jsx', import.meta.url), 'utf8');
 const homeSource = readFileSync(new URL('./Home.jsx', import.meta.url), 'utf8');
 const expenseDetailSource = readFileSync(new URL('./ExpenseDetail.jsx', import.meta.url), 'utf8');
@@ -896,6 +897,11 @@ test('Home has a controlled Của tôi filter that composes with existing filter
   assert.match(homeSource, /return titleMatches && statusMatches && categoryMatches && mineMatches/);
   assert.match(homeSource, /onClick=\{\(\) => setMineOnly\(value => !value\)\}/);
   assert.match(homeSource, />Của tôi<\/button>/);
+});
+
+test('AllExpenses shows every group transaction by default', () => {
+  assert.match(allExpensesSource, /const \[mineOnly, setMineOnly\] = useState\(false\)/);
+  assert.match(allExpensesSource, /const mineMatches = !mineOnly \|\| transactionBelongsToCurrentUser\(tx, d\.currentUserId\)/);
 });
 
 test('Home Của tôi helper falls back from isMine to paidBy, participants, and splits', () => {
