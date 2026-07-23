@@ -4815,7 +4815,14 @@ function toCalendarSessionDetail(state, session, allSessions, today) {
   const presentIds = effectiveSessionMemberIds(session, groupMembers, !isFutureSession)
   const presentSet = new Set(presentIds.map(String))
   const guests = sessionGuests(session)
-  const attendanceMembers = groupMembers.filter(member => isFixedForMonth(state, member, sessionYearMonth))
+  const attendanceMembersRaw = groupMembers.filter(member => isFixedForMonth(state, member, sessionYearMonth))
+  const memberSessionCount = new Map(
+    attendanceMembersRaw.map(m => [
+      String(m.id),
+      allSessions.filter(s => effectiveSessionMemberIds(s, groupMembers, false).some(id => String(id) === String(m.id))).length
+    ])
+  )
+  const attendanceMembers = [...attendanceMembersRaw].sort((a, b) => (memberSessionCount.get(String(b.id)) || 0) - (memberSessionCount.get(String(a.id)) || 0))
   const attendanceNames = attendanceDisplayNames(groupMembers)
   const calExplicitPresentIds = new Set([
     ...sessionMemberIds(session).map(String),
