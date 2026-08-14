@@ -1011,7 +1011,7 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
       if (!monthBreakdown.length) return source
       const sourceId = source.sourceId || source.source_id || ''
       const memberId = source.memberId || source.member_id || ''
-      const visibleMonths = monthBreakdown.filter(row => !settledMonths.has(`${sourceId}:${memberId}:${row?.month || ''}`))
+      const visibleMonths = monthBreakdown.filter(row => !settledMonths.has(`${sourceId}:${memberId}:${row?.month || ''}`) || Number(row.amount || 0) !== 0)
       if (visibleMonths.length === monthBreakdown.length) return source
       const amount = visibleMonths.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
       return amount === 0 ? null : { ...source, amount, monthBreakdown: visibleMonths }

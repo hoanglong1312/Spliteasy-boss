@@ -4579,7 +4579,7 @@ describe('buildHomeData', () => {
     })
   })
 
-  test('does not fallback to stale capped profile total when settled sources sum to zero', () => {
+  test('keeps nonzero debt from settled sources in capped totals', () => {
     const members = [
       { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
       { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'expense-1', name: 'Lê Tuấn' },
@@ -4626,15 +4626,15 @@ describe('buildHomeData', () => {
 
     const result = buildHomeData(state, 'life-tuan', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
 
-    expect(result.totalBalance).toBe(0)
+    expect(result.totalBalance).toBe(-2633082)
     expect(result.cappedSourceBreakdown).toEqual(expect.arrayContaining([
-      expect.objectContaining({ sourceId: 'life-1', amount: 0 }),
-      expect.objectContaining({ sourceId: 'expense-1', amount: 0 }),
+      expect.objectContaining({ sourceId: 'life-1', amount: -500000 }),
+      expect.objectContaining({ sourceId: 'expense-1', amount: -2133082 }),
     ]))
-    expect(result.cappedTotalBalance).toBe(0)
+    expect(result.cappedTotalBalance).toBe(-2633082)
   })
 
-  test('pay-for rows hide settled months the target profile no longer owes', () => {
+  test('pay-for rows keep settled pickleball months with remaining debt', () => {
     const members = [
       { id: 'tuan-pickle', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'myt-pickle', profile_id: 'profile-myt', group_id: 'pickle-1', name: 'Mýt' },
@@ -4682,15 +4682,17 @@ describe('buildHomeData', () => {
     const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
 
     expect(mytHome.sourceBreakdown.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -200000 },
       { month: '2026-06', label: 'Tháng 6', amount: -200000 },
     ])
-    expect(mytPayFor.amount).toBe(-200000)
-    expect(mytPayFor.sources.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
+    expect(mytPayFor.amount).toBe(-400000)
+    expect(mytPayFor.sources.filter(row => row.sourceType === 'pickleball').flatMap(row => row.monthBreakdown)).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -200000 },
       { month: '2026-06', label: 'Tháng 6', amount: -200000 },
     ])
   })
 
-  test('pay-for rows hide settled group months the target profile no longer owes', () => {
+  test('pay-for rows keep settled group months with remaining debt', () => {
     const members = [
       { id: 'tuan-halong', profile_id: 'profile-tuan', group_id: 'halong-1', name: 'Lê Tuấn' },
       { id: 'myt-halong', profile_id: 'profile-myt', group_id: 'halong-1', name: 'Mýt' },
@@ -4727,8 +4729,9 @@ describe('buildHomeData', () => {
     const tuanHome = buildHomeData(state, 'tuan-halong', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
     const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
 
-    expect(mytPayFor.amount).toBe(-100000)
+    expect(mytPayFor.amount).toBe(-200000)
     expect(mytPayFor.sources.find(row => row.sourceType === 'group').monthBreakdown).toEqual([
+      { month: '2026-05', label: 'Tháng 5', amount: -100000 },
       { month: '2026-06', label: 'Tháng 6', amount: -100000 },
     ])
   })
