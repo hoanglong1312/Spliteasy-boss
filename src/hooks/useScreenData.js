@@ -996,7 +996,7 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
     const groupId = row?.groupId || row?.group_id || ''
     const memberId = row?.memberId || row?.member_id || ''
     const month = row?.month || ''
-    if (!expenseId && (!selectedMonth || month >= selectedMonth)) return
+    if (!expenseId && !month) return
     if (!groupId || !memberId || !month) return
     const profileId = profileIdForMember(memberId, members)
     const memberIds = memberIdsForProfile(profileId, members)

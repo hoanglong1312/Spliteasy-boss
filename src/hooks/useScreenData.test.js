@@ -4697,10 +4697,16 @@ describe('buildHomeData', () => {
       }],
     }
 
+    const mytState = { ...state, currentUserId: 'myt-pickle', currentProfileId: 'profile-myt', currentUserName: 'Mýt' }
+    const mytJuneHome = buildHomeData(mytState, 'myt-pickle', members, groups, {}, pickleballState, '2026-06')
     const tuanHome = buildHomeData(state, 'tuan-pickle', members, groups, {}, pickleballState, '2026-08')
-    const mytHome = buildHomeData({ ...state, currentUserId: 'myt-pickle', currentProfileId: 'profile-myt', currentUserName: 'Mýt' }, 'myt-pickle', members, groups, {}, pickleballState, '2026-08')
+    const mytHome = buildHomeData(mytState, 'myt-pickle', members, groups, {}, pickleballState, '2026-08')
     const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
 
+    expect(mytJuneHome.sourceBreakdown.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
+      { month: '2026-07', label: 'Tháng 7', amount: -200000 },
+      { month: '2026-08', label: 'Tháng 8', amount: -200000 },
+    ])
     expect(mytHome.sourceBreakdown.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
       { month: '2026-07', label: 'Tháng 7', amount: -200000 },
       { month: '2026-08', label: 'Tháng 8', amount: -200000 },
