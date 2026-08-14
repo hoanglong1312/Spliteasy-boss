@@ -4276,14 +4276,13 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
   const waterSessions = sessionWaterCount + ticketWaterCount
   const currentYearMonth = monthKey(date || new Date())
   const isNonFlex = memberBalance.ticketType == null && !('ticketType' in memberBalance)
+  const ticketMember = members.find(m => String(m.id) === String(memberId))
+  const ticketProfileId = ticketMember?.profileId || ticketMember?.profile_id || ''
+  const ownerPayments = currentGroupOwnerPayments(state)
   const ticketPaid = isNonFlex
-    ? ownerPaymentCoversItem(currentGroupOwnerPayments(state), 'next_court', currentYearMonth)
+    ? ownerPaymentCoversItem(ownerPayments, 'next_court', currentYearMonth)
     : memberBalance.ticketType === 'monthly' && memberBalance.monthlyTicketFee > 0
-    ? isPayableItemCovered(
-        buildPaidItemCoverageMap(state),
-        normalizePayableItemKey(`pickleball-monthly-ticket:${state?.currentGroupId || state?.currentGroup?.id}:${currentYearMonth}`),
-        -memberBalance.monthlyTicketFee
-      )
+    ? ownerPaymentCoversItem(ownerPayments, 'flex_monthly', currentYearMonth)
     : false
   const ticketCostCard = isNonFlex
     ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn', paid: ticketPaid }
