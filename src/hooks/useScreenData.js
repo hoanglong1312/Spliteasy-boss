@@ -4274,13 +4274,24 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
     .filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
     .length : 0
   const waterSessions = sessionWaterCount + ticketWaterCount
-  const ticketCostCard = memberBalance.ticketType == null && !('ticketType' in memberBalance)
-    ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn' }
+  const currentYearMonth = monthKey(date || new Date())
+  const isNonFlex = memberBalance.ticketType == null && !('ticketType' in memberBalance)
+  const ticketPaid = isNonFlex
+    ? ownerPaymentCoversItem(currentGroupOwnerPayments(state), 'next_court', currentYearMonth)
+    : memberBalance.ticketType === 'monthly' && memberBalance.monthlyTicketFee > 0
+    ? isPayableItemCovered(
+        buildPaidItemCoverageMap(state),
+        normalizePayableItemKey(`pickleball-monthly-ticket:${state?.currentGroupId || state?.currentGroup?.id}:${currentYearMonth}`),
+        -memberBalance.monthlyTicketFee
+      )
+    : false
+  const ticketCostCard = isNonFlex
+    ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn', paid: ticketPaid }
     : memberBalance.ticketType === 'monthly'
-    ? { icon: '🏸', label: 'Vé tháng của bạn', amount: -memberBalance.monthlyTicketFee, sub: 'Vé tháng cố định' }
+    ? { icon: '🏸', label: 'Vé tháng của bạn', amount: -memberBalance.monthlyTicketFee, sub: 'Vé tháng cố định', paid: ticketPaid }
     : memberBalance.ticketType === 'per_session'
-    ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia' }
-    : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt' }
+    ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia', paid: false }
+    : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt', paid: false }
   return [
     ticketCostCard,
     { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows },

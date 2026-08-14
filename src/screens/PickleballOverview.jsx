@@ -256,12 +256,23 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: '100%' }}>
             {visibleSummaryCards.map(card => {
               const isExpandable = card.rows || card.key === 'ticket';
+              const isPaid = Boolean(card.paid);
               return (
                 <div key={card.label}
                   onClick={isExpandable ? () => setPopupCard(card) : undefined}
                   style={{ position: 'relative', cursor: isExpandable ? 'pointer' : 'default', flex: 1, display: 'flex', flexDirection: 'column' }}
                 >
-                  <CompactCostCard icon={card.icon} label={card.label} value={card.amount} sub={card.sub} style={{ flex: 1, paddingRight: isExpandable ? 28 : 9 }} />
+                  <CompactCostCard
+                    icon={card.icon}
+                    label={card.label}
+                    value={card.amount}
+                    sub={isPaid ? '✓ Đã thanh toán' : card.sub}
+                    style={{
+                      flex: 1,
+                      paddingRight: isExpandable ? 28 : 9,
+                      ...(isPaid ? { borderColor: 'rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.07)' } : {}),
+                    }}
+                  />
                   {isExpandable && (
                     <div style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: colors.textSecondary, fontWeight: 700 }}>›</div>
                   )}
