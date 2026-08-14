@@ -990,6 +990,7 @@ function profileRowsAfterSettledMonths(profileBreakdown, settlements, members = 
 
 function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [], groups = [], selectedMonth = '') {
   const settledMonths = new Set()
+  const maxSettledMonth = new Map()
   safeArray(settlements).forEach(row => {
     const expenseId = row?.expenseId || row?.expense_id || ''
     const groupId = row?.groupId || row?.group_id || ''
@@ -1002,6 +1003,8 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
     const settledMemberIds = memberIds.length ? memberIds : [memberId]
     settledMemberIds.forEach(settledMemberId => {
       settledMonths.add(`${groupId}:${settledMemberId}:${month}`)
+      const memberKey = `${groupId}:${settledMemberId}`
+      if (month > (maxSettledMonth.get(memberKey) || '')) maxSettledMonth.set(memberKey, month)
     })
   })
   if (!settledMonths.size) return sourceBreakdown
@@ -1011,7 +1014,15 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
       if (!monthBreakdown.length) return source
       const sourceId = source.sourceId || source.source_id || ''
       const memberId = source.memberId || source.member_id || ''
-      const visibleMonths = monthBreakdown.filter(row => !settledMonths.has(`${sourceId}:${memberId}:${row?.month || ''}`) || Number(row.amount || 0) !== 0)
+      const visibleMonths = monthBreakdown.filter(row => {
+        const rowMonth = row?.month || ''
+        const maxM = maxSettledMonth.get(`${sourceId}:${memberId}`) || ''
+        if (maxM && rowMonth < maxM) return false
+        if (settledMonths.has(`${sourceId}:${memberId}:${rowMonth}`)) {
+          return Number(row.amount || 0) !== 0
+        }
+        return true
+      })
       if (visibleMonths.length === monthBreakdown.length) return source
       const amount = visibleMonths.reduce((sum, row) => sum + (Number(row.amount) || 0), 0)
       return amount === 0 ? null : { ...source, amount, monthBreakdown: visibleMonths }

@@ -4579,7 +4579,7 @@ describe('buildHomeData', () => {
     })
   })
 
-  test('keeps nonzero debt from settled sources in capped totals', () => {
+  test('capped totals suppress prior months but keep checkpoint month debt', () => {
     const members = [
       { id: 'life-tuan', profile_id: 'profile-tuan', group_id: 'life-1', name: 'Lê Tuấn' },
       { id: 'expense-tuan', profile_id: 'profile-tuan', group_id: 'expense-1', name: 'Lê Tuấn' },
@@ -4590,24 +4590,42 @@ describe('buildHomeData', () => {
       id: 'life-1',
       name: 'Lấy vk để trưởng thành',
       members: ['life-tuan', 'life-treasurer'],
-      expenses: [{
-        id: 'life-june',
-        amount: 1000000,
-        expense_date: '2026-06-20T12:00:00.000Z',
-        paid_by_member_id: 'life-treasurer',
-        participants: ['life-tuan', 'life-treasurer'],
-      }],
+      expenses: [
+        {
+          id: 'life-may',
+          amount: 200000,
+          expense_date: '2026-05-20T12:00:00.000Z',
+          paid_by_member_id: 'life-treasurer',
+          participants: ['life-tuan', 'life-treasurer'],
+        },
+        {
+          id: 'life-june',
+          amount: 1000000,
+          expense_date: '2026-06-20T12:00:00.000Z',
+          paid_by_member_id: 'life-treasurer',
+          participants: ['life-tuan', 'life-treasurer'],
+        },
+      ],
     }, {
       id: 'expense-1',
       name: 'Chi tiêu Virgo 246',
       members: ['expense-tuan', 'expense-treasurer'],
-      expenses: [{
-        id: 'expense-june',
-        amount: 4266164,
-        expense_date: '2026-06-21T12:00:00.000Z',
-        paid_by_member_id: 'expense-treasurer',
-        participants: ['expense-tuan', 'expense-treasurer'],
-      }],
+      expenses: [
+        {
+          id: 'expense-may',
+          amount: 200000,
+          expense_date: '2026-05-21T12:00:00.000Z',
+          paid_by_member_id: 'expense-treasurer',
+          participants: ['expense-tuan', 'expense-treasurer'],
+        },
+        {
+          id: 'expense-june',
+          amount: 4266164,
+          expense_date: '2026-06-21T12:00:00.000Z',
+          paid_by_member_id: 'expense-treasurer',
+          participants: ['expense-tuan', 'expense-treasurer'],
+        },
+      ],
     }]
     const state = {
       currentUserId: 'life-tuan',
@@ -4634,7 +4652,7 @@ describe('buildHomeData', () => {
     expect(result.cappedTotalBalance).toBe(-2633082)
   })
 
-  test('pay-for rows keep settled pickleball months with remaining debt', () => {
+  test('pay-for rows suppress pickleball months before checkpoint and keep later debt', () => {
     const members = [
       { id: 'tuan-pickle', profile_id: 'profile-tuan', group_id: 'pickle-1', name: 'Lê Tuấn' },
       { id: 'myt-pickle', profile_id: 'profile-myt', group_id: 'pickle-1', name: 'Mýt' },
@@ -4655,6 +4673,8 @@ describe('buildHomeData', () => {
         externalTickets: [
           { id: 'myt-may-ticket', group_id: 'pickle-1', year_month: '2026-05', session_date: '2026-05-20', total_amount: 600000, member_ids: ['myt-pickle', 'treasurer-pickle', 'tuan-pickle'], advancer_id: 'treasurer-pickle', status: 'unpaid' },
           { id: 'myt-june-ticket', group_id: 'pickle-1', year_month: '2026-06', session_date: '2026-06-20', total_amount: 600000, member_ids: ['myt-pickle', 'treasurer-pickle', 'tuan-pickle'], advancer_id: 'treasurer-pickle', status: 'unpaid' },
+          { id: 'myt-july-ticket', group_id: 'pickle-1', year_month: '2026-07', session_date: '2026-07-20', total_amount: 600000, member_ids: ['myt-pickle', 'treasurer-pickle', 'tuan-pickle'], advancer_id: 'treasurer-pickle', status: 'unpaid' },
+          { id: 'myt-august-ticket', group_id: 'pickle-1', year_month: '2026-08', session_date: '2026-08-20', total_amount: 600000, member_ids: ['myt-pickle', 'treasurer-pickle', 'tuan-pickle'], advancer_id: 'treasurer-pickle', status: 'unpaid' },
         ],
       },
     }
@@ -4670,29 +4690,29 @@ describe('buildHomeData', () => {
       notifications: [],
       settlementCheckpoints: [],
       monthSettlements: [{
-        id: 'myt-settled-may',
+        id: 'myt-settled-july',
         member_id: 'myt-pickle',
         group_id: 'pickle-1',
-        month: '2026-05',
+        month: '2026-07',
       }],
     }
 
-    const tuanHome = buildHomeData(state, 'tuan-pickle', members, groups, {}, pickleballState, '2026-06')
-    const mytHome = buildHomeData({ ...state, currentUserId: 'myt-pickle', currentProfileId: 'profile-myt', currentUserName: 'Mýt' }, 'myt-pickle', members, groups, {}, pickleballState, '2026-06')
+    const tuanHome = buildHomeData(state, 'tuan-pickle', members, groups, {}, pickleballState, '2026-08')
+    const mytHome = buildHomeData({ ...state, currentUserId: 'myt-pickle', currentProfileId: 'profile-myt', currentUserName: 'Mýt' }, 'myt-pickle', members, groups, {}, pickleballState, '2026-08')
     const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
 
     expect(mytHome.sourceBreakdown.find(row => row.sourceType === 'pickleball').monthBreakdown).toEqual([
-      { month: '2026-05', label: 'Tháng 5', amount: -200000 },
-      { month: '2026-06', label: 'Tháng 6', amount: -200000 },
+      { month: '2026-07', label: 'Tháng 7', amount: -200000 },
+      { month: '2026-08', label: 'Tháng 8', amount: -200000 },
     ])
     expect(mytPayFor.amount).toBe(-400000)
     expect(mytPayFor.sources.filter(row => row.sourceType === 'pickleball').flatMap(row => row.monthBreakdown)).toEqual([
-      { month: '2026-05', label: 'Tháng 5', amount: -200000 },
-      { month: '2026-06', label: 'Tháng 6', amount: -200000 },
+      { month: '2026-07', label: 'Tháng 7', amount: -200000 },
+      { month: '2026-08', label: 'Tháng 8', amount: -200000 },
     ])
   })
 
-  test('pay-for rows keep settled group months with remaining debt', () => {
+  test('pay-for rows suppress group months before checkpoint and keep checkpoint debt', () => {
     const members = [
       { id: 'tuan-halong', profile_id: 'profile-tuan', group_id: 'halong-1', name: 'Lê Tuấn' },
       { id: 'myt-halong', profile_id: 'profile-myt', group_id: 'halong-1', name: 'Mýt' },
@@ -4705,6 +4725,7 @@ describe('buildHomeData', () => {
       expenses: [
         { id: 'myt-may', amount: 200000, expense_date: '2026-05-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
         { id: 'myt-june', amount: 200000, expense_date: '2026-06-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
+        { id: 'myt-july', amount: 200000, expense_date: '2026-07-10', paid_by_member_id: 'payer-halong', participants: ['myt-halong', 'payer-halong'] },
       ],
     }]
     const state = {
@@ -4717,22 +4738,22 @@ describe('buildHomeData', () => {
       notifications: [],
       settlementCheckpoints: [],
       monthSettlements: [{
-        id: 'myt-halong-may-settled',
+        id: 'myt-halong-june-settled',
         member_id: 'myt-halong',
         group_id: 'halong-1',
-        month: '2026-05',
-        expense_id: 'myt-halong-may-settlement',
+        month: '2026-06',
+        expense_id: 'myt-halong-june-settlement',
         expenses: { amount: 100000 },
       }],
     }
 
-    const tuanHome = buildHomeData(state, 'tuan-halong', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-06')
+    const tuanHome = buildHomeData(state, 'tuan-halong', members, groups, {}, { currentGroup: null, sessions: [], configs: [] }, '2026-07')
     const mytPayFor = tuanHome.paymentSummary.payForRows.find(row => row.profileId === 'profile-myt')
 
     expect(mytPayFor.amount).toBe(-200000)
     expect(mytPayFor.sources.find(row => row.sourceType === 'group').monthBreakdown).toEqual([
-      { month: '2026-05', label: 'Tháng 5', amount: -100000 },
       { month: '2026-06', label: 'Tháng 6', amount: -100000 },
+      { month: '2026-07', label: 'Tháng 7', amount: -100000 },
     ])
   })
 
