@@ -502,6 +502,16 @@ function ticketMembers(ticket) {
 function ticketMemberGroups(ticket) {
   const members = ticketMembers(ticket);
   const billedIds = new Set((ticket.billedMemberIds || []).map(id => String(id)));
+  const monthlyIds = new Set((ticket.monthlyMemberIds || []).map(id => String(id)));
+  const hasFlexData = ticket.billedMemberIds != null || ticket.monthlyMemberIds != null;
+  if (hasFlexData) {
+    const perSession = members.filter(m => !monthlyIds.has(String(m.id)));
+    const monthly = members.filter(m => monthlyIds.has(String(m.id)));
+    return [
+      perSession.length > 0 && { key: 'per_session', label: 'Vé ngày', members: perSession },
+      monthly.length > 0 && { key: 'monthly', label: 'Vé tháng', members: monthly },
+    ].filter(Boolean);
+  }
   const amount = Number(ticket.totalAmount || ticket.amount || 0);
   const waterOnly = billedIds.size === 0 && amount === 0 && Number(ticket.waterAmount || 0) > 0;
   const perSession = waterOnly ? [] : members.filter(member => billedIds.size === 0 || billedIds.has(String(member.id)));

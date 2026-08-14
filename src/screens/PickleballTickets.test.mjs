@@ -153,6 +153,9 @@ test('PickleballCalendar ticket day rows open full participant detail sheet', ()
   assert.doesNotMatch(detailSheet, />vé lẻ</)
   assert.match(calendarSource, /label: 'Vé ngày'/)
   assert.match(calendarSource, /label: 'Vé tháng'/)
+  assert.match(calendarSource, /const monthlyIds = new Set\(\(ticket\.monthlyMemberIds \|\| \[\]\)\.map\(id => String\(id\)\)\)/)
+  assert.match(calendarSource, /const hasFlexData = ticket\.billedMemberIds != null \|\| ticket\.monthlyMemberIds != null/)
+  assert.match(calendarSource, /const monthly = members\.filter\(m => monthlyIds\.has\(String\(m\.id\)\)\)/)
 })
 
 test('PickleballCalendar preserves selected session id across data refreshes', () => {

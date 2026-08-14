@@ -5114,6 +5114,7 @@ function toTicketRow(ticket, index, state) {
     displayAmountPerPerson: flexDisplay.amountPerPerson || amountPerPerson,
     displayAmountLabel: flexDisplay.amountPerPerson ? 'vé lượt' : 'người',
     billedMemberIds: flexDisplay.billedMemberIds,
+    monthlyMemberIds: flexDisplay.monthlyMemberIds || [],
     billedMemberCount: flexDisplay.billedMemberIds.length || memberIds.length,
     waterAmountPerPerson: memberIds.length > 0 ? Math.round(waterAmount / memberIds.length) : 0,
     memberIds,
@@ -5130,7 +5131,7 @@ function toTicketRow(ticket, index, state) {
 
 function flexTicketDisplay(ticket, state) {
   const yearMonth = ticket?.yearMonth || ticket?.year_month || monthKey(ticketDate(ticket))
-  if (!isBillingModeFlexForMonth(state, yearMonth)) return { amountPerPerson: 0, billedMemberIds: [] }
+  if (!isBillingModeFlexForMonth(state, yearMonth)) return { amountPerPerson: 0, billedMemberIds: [], monthlyMemberIds: [] }
   const monthlyConfig = currentMonthlyPickleConfig(state, yearMonth)
   const perSessionTicketPrice = Number(
     monthlyConfig?.perSessionTicketPrice ??
@@ -5141,9 +5142,12 @@ function flexTicketDisplay(ticket, state) {
   ) || 50000
   const billedMemberIds = ticketMemberIds(ticket)
     .filter(memberId => memberFlexTicketType(state, memberId, yearMonth) !== 'monthly')
+  const monthlyMemberIds = ticketMemberIds(ticket)
+    .filter(memberId => memberFlexTicketType(state, memberId, yearMonth) === 'monthly')
   return {
     amountPerPerson: billedMemberIds.length > 0 ? perSessionTicketPrice : 0,
     billedMemberIds,
+    monthlyMemberIds,
   }
 }
 

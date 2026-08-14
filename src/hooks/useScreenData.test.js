@@ -1644,6 +1644,28 @@ describe('buildPickleballCalendarData', () => {
     expect(ticket.waterAmountPerPerson).toBe(10714)
   })
 
+  test('ticket rows expose monthly members when every attendee uses a monthly ticket', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1', 'member-2', 'member-3'],
+    })
+    state.pickle.externalTickets = [{
+      id: 'ticket-monthly-only',
+      group_id: 'group-1',
+      year_month: '2026-07',
+      session_date: '2026-07-01',
+      status: 'team_fund',
+      total_amount: 0,
+      member_ids: ['member-1', 'member-2', 'member-3'],
+    }]
+
+    const data = buildPickleballCalendarData(state, { yearMonth: '2026-07', selectedDate: '2026-07-01' })
+    const ticket = data.selectedTickets.find(row => row.id === 'ticket-monthly-only')
+
+    expect(ticket.billedMemberIds).toEqual([])
+    expect(ticket.monthlyMemberIds).toEqual(['member-1', 'member-2', 'member-3'])
+  })
+
   test('ticket picker members keep fixed mode ticket types null', () => {
     const state = makeFlexState({
       billing_mode: 'fixed',
