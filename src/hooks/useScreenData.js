@@ -5140,7 +5140,7 @@ function flexTicketDisplay(ticket, state) {
     50000
   ) || 50000
   const billedMemberIds = ticketMemberIds(ticket)
-    .filter(memberId => memberFlexTicketType(state, memberId, yearMonth) === 'per_session')
+    .filter(memberId => memberFlexTicketType(state, memberId, yearMonth) !== 'monthly')
   return {
     amountPerPerson: billedMemberIds.length > 0 ? perSessionTicketPrice : 0,
     billedMemberIds,
