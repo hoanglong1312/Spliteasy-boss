@@ -3420,7 +3420,7 @@ function buildTicketPickerMembers(state, yearMonth) {
       initial: initials(member),
       color: member.color,
       ticketType: isFlex ? memberFlexTicketType(state, member.id, yearMonth) : null,
-      sessionsAttended: attendanceByMemberId(sessions, member.id, activeMembers, true),
+      sessionsAttended: attendanceByMemberId(sessions, member.id, activeMembers, false),
       _index: index,
     }))
     .sort((a, b) => b.sessionsAttended - a.sessionsAttended || a._index - b._index)
