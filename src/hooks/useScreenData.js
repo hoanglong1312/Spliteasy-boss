@@ -937,7 +937,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     paymentStatusLabel: netBalance < 0 && coverage.confirmedAmount > 0 ? 'Cần nộp thêm' : paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     memberBank: bankData(me, true),
-    paymentProgress: buildPaymentProgressRows(progressProfileBreakdown, members, state, monthLabel, safeArray(state?.monthSettlements), monthKey(monthDate)),
+    paymentProgress: buildPaymentProgressRows(progressProfileBreakdown, members, state, monthLabel, allSettlements, monthKey(monthDate)),
     payForRows: safeArray(proxyProfileBreakdown)
       .filter(row => Number(row.amount) < 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),
