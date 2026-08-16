@@ -2,7 +2,7 @@
 // Props: data { clubName, monthLabel, memberCount, todaySession, progress, monthCosts, yourBalance }, isTreasurer
 
 import React, { useState, useEffect } from 'react';
-import { colors, type, formatVND } from '../tokens';
+import { colors, type, formatVND, formatVNDShort } from '../tokens';
 import {
   PhoneFrame, Screen, TabBar, Card, Button, Badge, SubTabs, Avatar, MonthNav, BottomSheet,
 } from '../primitives';
@@ -265,19 +265,14 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   <CompactCostCard
                     icon={card.icon}
                     label={card.label}
-                    value={card.amount}
-                    sub={isPaid ? '✓ Đã thanh toán' : card.sub}
+                    value={card.coveredAmount > 0 ? card.amount + card.coveredAmount : card.amount}
+                    sub={isPaid ? '✓ Đã thanh toán' : card.coveredAmount > 0 ? `✓ Đã nộp: ${formatVNDShort(card.coveredAmount)}` : card.sub}
                     style={{
                       flex: 1,
                       paddingRight: isExpandable ? 28 : 9,
                       ...(isPaid ? { borderColor: 'rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.07)' } : {}),
                     }}
                   />
-                  {card.coveredAmount > 0 && (
-                    <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(52,211,153,0.85)', marginTop: 3, paddingLeft: 9 }}>
-                      ✓ Đã nộp: {formatVND(card.coveredAmount)}
-                    </div>
-                  )}
                   {isExpandable && (
                     <div style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: colors.textSecondary, fontWeight: 700 }}>›</div>
                   )}
