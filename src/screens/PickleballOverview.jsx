@@ -531,8 +531,8 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
           : (popupCard.rows || []);
         return (
           <BottomSheet title={`${popupCard.icon} ${popupCard.label}`} onClose={() => setPopupCard(null)} tone="pickleball">
-            <div style={{ fontSize: 22, fontWeight: 900, ...type.mono, marginBottom: 4 }}>{formatVND(popupCard.amount)}</div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 14 }}>{popupCard.sub}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, ...type.mono, marginBottom: 4 }}>{formatVND(popupCard.coveredAmount > 0 ? popupCard.amount + popupCard.coveredAmount : popupCard.amount)}</div>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 14 }}>{popupCard.coveredAmount > 0 ? `✓ Đã nộp: ${formatVNDShort(popupCard.coveredAmount)}` : popupCard.sub}</div>
             {rows.length === 0 ? (
               <div style={{ fontSize: 12, color: colors.textMuted, textAlign: 'center', padding: '16px 0' }}>Không có dữ liệu</div>
             ) : (
