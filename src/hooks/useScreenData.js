@@ -925,6 +925,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
       ? ''
       : paymentNotice?.status || ''
   const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, allSettlements, members, state?.groups, selectedMonth)
+  const proxyProgressProfileBreakdown = profileRowsAfterSettledMonths(progressProfileBreakdown, allSettlements, members, state?.groups, selectedMonth)
   return {
     monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',
@@ -937,7 +938,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     paymentStatusLabel: netBalance < 0 && coverage.confirmedAmount > 0 ? 'Cần nộp thêm' : paymentNotice?.label || '',
     paymentTarget: findAdminPaymentTarget(members, state),
     memberBank: bankData(me, true),
-    paymentProgress: buildPaymentProgressRows(progressProfileBreakdown, members, state, monthLabel, allSettlements, monthKey(monthDate)),
+    paymentProgress: buildPaymentProgressRows(proxyProgressProfileBreakdown, members, state, monthLabel, allSettlements, monthKey(monthDate)),
     payForRows: safeArray(proxyProfileBreakdown)
       .filter(row => Number(row.amount) < 0)
       .filter(row => String(row.profileId || '') !== String(me?.profileId || me?.profile_id || me?.id || '')),
