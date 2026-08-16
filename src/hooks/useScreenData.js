@@ -2644,7 +2644,7 @@ export function buildPickleballOverviewData(state, pickle, _allPickle, currentUs
       statusLabel: remainingBalance > 0 ? 'Được quỹ bù' : remainingBalance < 0 ? 'Cần nộp' : 'Đã thanh toán',
       ticketAdjustment,
       ticketType: memberBalance.ticketType ?? null,
-      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember), isFlexBilling, state, today),
+      summaryCards: buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, currentPickleballMemberId, currentGroupMembers(state).filter(isActiveMember), isFlexBilling, state, today, remainingBalance),
       breakdown,
     },
     yourTickets: buildPersonalTicketOverview(state, currentPickleballMemberId, today),
@@ -4263,7 +4263,7 @@ export function buildPersonalWaterSessionRows(monthSessions, memberId, members =
   return [...rows, ...ticketRows]
 }
 
-export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = [], useFlexAttendance = false, state, date) {
+export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = [], useFlexAttendance = false, state, date, remainingBalance) {
   const waterSessionRows = buildPersonalWaterSessionRows(monthSessions, memberId, members, useFlexAttendance, state, date)
   const sessionWaterCount = monthSessions.filter(s => (
     sessionWaterAmount(s) > 0 &&
@@ -4284,12 +4284,16 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
     : memberBalance.ticketType === 'monthly' && memberBalance.monthlyTicketFee > 0
     ? ownerPaymentCoversItem(ownerPayments, 'flex_monthly', currentYearMonth)
     : false
+  const grossBalance = memberBalance?.netBalance || 0
+  const coveredAmount = remainingBalance != null
+    ? Math.max(0, Math.round(Math.abs(grossBalance) - Math.abs(remainingBalance)))
+    : 0
   const ticketCostCard = isNonFlex
     ? { icon: '🏸', label: 'Sân của bạn', amount: -memberBalance.courtFee, sub: 'Phần của bạn', paid: ticketPaid }
     : memberBalance.ticketType === 'monthly'
     ? { icon: '🏸', label: 'Vé tháng của bạn', amount: -memberBalance.monthlyTicketFee, sub: 'Vé tháng cố định', paid: ticketPaid }
     : memberBalance.ticketType === 'per_session'
-    ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia', paid: false }
+    ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia', paid: false, coveredAmount }
     : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt', paid: false }
   return [
     ticketCostCard,
