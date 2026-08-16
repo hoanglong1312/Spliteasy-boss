@@ -897,10 +897,17 @@ export function buildHomeData(state, currentUserId, members, groups, pickle, pic
 function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, members, me, monthDate, progressProfileBreakdown = profileBreakdown) {
   const monthLabel = formatMonthLabel(monthDate)
   const selectedMonth = monthKey(monthDate)
+  const checkpointSettlements = safeArray(state?.settlementCheckpoints)
+    .filter(c => String(c?.status || '').toLowerCase() === 'confirmed')
+    .flatMap(c => {
+      const months = [...new Set(safeArray(c?.coveredItems || c?.covered_items).map(item => item?.month).filter(Boolean))]
+      return months.map(month => ({ group_id: c?.group_id || c?.groupId || '', member_id: c?.member_id || c?.memberId || '', month }))
+    })
+  const allSettlements = [...safeArray(state?.monthSettlements), ...checkpointSettlements]
   const coverage = paymentCoverageForMember(state, me, monthLabel, sourceBreakdown)
   const adjustedSources = appendProfileGroupSources(suppressSettledSourceMonths(
     applyConfirmedPaymentCoverage(sourceBreakdown, coverage.confirmedSources),
-    state?.monthSettlements,
+    allSettlements,
     members,
     state?.groups,
     selectedMonth,
@@ -917,7 +924,7 @@ function buildHomePaymentSummary(state, sourceBreakdown, profileBreakdown, membe
     : selectedMonthNetBalance > 0 || (selectedMonthNetBalance < 0 && coverage.pendingAmount <= 0)
       ? ''
       : paymentNotice?.status || ''
-  const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, state?.monthSettlements, members, state?.groups, selectedMonth)
+  const proxyProfileBreakdown = profileRowsAfterSettledMonths(profileBreakdown, allSettlements, members, state?.groups, selectedMonth)
   return {
     monthLabel,
     memberName: me?.displayName || me?.name || state?.currentUserName || 'Thành viên',

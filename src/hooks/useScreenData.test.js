@@ -1763,7 +1763,7 @@ describe('buildPersonalPickleSummaryCards', () => {
     })
     expect(result[1].rows).toHaveLength(1)
     expect(result[1].rows[0]).toMatchObject({
-      label: 'Vé lẻ · 01/07',
+      label: 'Tiền nước · 01/07',
       amount: 10714,
     })
   })
@@ -1903,7 +1903,7 @@ describe('buildPersonalWaterSessionRows', () => {
     const result = buildPersonalWaterSessionRows([], 'member-1', state.members, true, state, new Date('2026-07-10'))
 
     expect(result).toEqual([
-      { label: 'Vé lẻ · 01/07', amount: 10714 },
+      { label: 'Tiền nước · 01/07', amount: 10714, paid: false },
     ])
   })
 })
