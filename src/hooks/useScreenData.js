@@ -4252,13 +4252,22 @@ export function buildPersonalWaterSessionRows(monthSessions, memberId, members =
 
   if (!state) return rows
 
+  const waterCoverage = buildPaidItemCoverageMap(state)
+  const waterMember = members.find(m => String(m.id) === String(memberId))
+  const waterProfileId = waterMember?.profileId || waterMember?.profile_id || ''
   const ticketRows = monthTicketsForState(state, date || new Date())
     .filter(t => ticketStatus(t) !== 'pending_review' && Number(t?.waterAmount ?? t?.water_amount ?? 0) > 0)
     .filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
-    .map(t => ({
-      label: `Vé lẻ · ${formatDayMonth(ticketDate(t)) || ''}`,
-      amount: ticketWaterSharePerPerson(t),
-    }))
+    .map(t => {
+      const wYearMonth = monthKey(ticketDate(t))
+      const wKey = normalizePayableItemKey(`item:pickleball-ticket:${t.id}:water|member:${memberId}|profile:${waterProfileId}|month:${wYearMonth}`)
+      const wShare = ticketWaterSharePerPerson(t)
+      return {
+        label: `Tiền nước · ${formatDayMonth(ticketDate(t)) || ''}`,
+        amount: wShare,
+        paid: isPayableItemCovered(waterCoverage, wKey, wShare),
+      }
+    })
 
   return [...rows, ...ticketRows]
 }

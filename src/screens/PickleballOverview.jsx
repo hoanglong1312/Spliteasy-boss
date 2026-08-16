@@ -541,8 +541,10 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   <div key={idx}>
                     {idx > 0 && <div style={{ borderTop: `1px solid ${colors.borderSubtle}` }} />}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', fontSize: 13 }}>
-                      <div style={{ color: colors.textSecondary }}>{row.label}</div>
-                      <div style={{ fontWeight: 700, ...type.mono }}>{formatVND(row.amount)}</div>
+                      <div style={{ color: row.paid ? colors.textMuted : colors.textSecondary }}>{row.label}</div>
+                      <div style={{ fontWeight: 700, ...type.mono, color: row.paid ? 'rgb(34,197,94)' : 'inherit' }}>
+                        {row.paid ? '✓ ' : ''}{formatVND(row.amount)}
+                      </div>
                     </div>
                   </div>
                 ))}
