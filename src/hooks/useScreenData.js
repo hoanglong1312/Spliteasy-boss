@@ -466,7 +466,7 @@ function buildPaidItemCoverageMap(state) {
     ? safeArray(state?.paymentCoveredItems)
     : notificationItems
   const checkpointItems = safeArray(state?.settlementCheckpoints)
-    .filter(row => String(row?.status || '').toLowerCase() === 'confirmed')
+    .filter(row => { const s = String(row?.status || '').toLowerCase(); return !s || s === 'confirmed' })
     .flatMap(row => safeArray(row?.coveredItems || row?.covered_items))
   const items = [...paymentItems, ...checkpointItems]
   items
@@ -4304,9 +4304,10 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
     : memberBalance.ticketType === 'per_session'
     ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia', paid: false, coveredAmount }
     : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt', paid: false }
+  const waterCoveredAmount = waterSessionRows.reduce((sum, r) => r.paid ? sum + (r.amount || 0) : sum, 0)
   return [
     ticketCostCard,
-    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows },
+    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows, coveredAmount: waterCoveredAmount },
   ]
 }
 
