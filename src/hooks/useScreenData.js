@@ -4304,7 +4304,11 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
     : memberBalance.ticketType === 'per_session'
     ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia', paid: false, coveredAmount }
     : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt', paid: false }
-  const waterCoveredAmount = waterSessionRows.reduce((sum, r) => r.paid ? sum + (r.amount || 0) : sum, 0)
+  const waterCoveredFromRows = waterSessionRows.reduce((sum, r) => r.paid ? sum + (r.amount || 0) : sum, 0)
+  const waterCoveredFromDelta = (memberBalance.ticketType === 'monthly' && ticketPaid)
+    ? Math.max(0, coveredAmount - Math.abs(memberBalance.monthlyTicketFee || 0))
+    : 0
+  const waterCoveredAmount = Math.max(waterCoveredFromRows, waterCoveredFromDelta)
   return [
     ticketCostCard,
     { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows, coveredAmount: waterCoveredAmount },
