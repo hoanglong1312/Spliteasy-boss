@@ -1342,7 +1342,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   }
 
   function toggleTreasurerItemSelection(item) {
-    if (!item || item.paid || item.pending || item.kind === 'refund') return;
+    if (!item || item.paid || item.pending) return;
     setSelectedTreasurerItemKeys(prev => {
       const next = new Set(prev);
       next.has(item.key) ? next.delete(item.key) : next.add(item.key);
