@@ -1324,9 +1324,9 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const paidMemberCount = profileStatRows.filter(row => row.amountPaid > 0 && row.amountDue <= 0).length;
   const pendingMemberCount = new Set([...pendingRecordsRaw, ...pendingCheckpoints].map(treasurerProfileStatKey).filter(Boolean)).size;
   const unpaidMemberCount = profileStatRows.filter(row => row.amountDue > 0).length;
-  const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key)));
-  const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && !item.pending && item.kind !== 'refund' && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
-  const selectedTreasurerTotal = paymentItemsAmountDue(selectedTreasurerItems);
+  const selectedTreasurerItems = memberRows.flatMap(row => row.items.filter(item => !item.paid && !item.pending && selectedTreasurerItemKeys.has(item.key)));
+  const selectedTreasurerRowKeys = memberRows.filter(row => row.items.some(item => !item.paid && !item.pending && selectedTreasurerItemKeys.has(item.key))).map(row => row.key);
+  const selectedTreasurerTotal = Math.abs(selectedTreasurerItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0));
   const refundBillData = refundBillItem ? buildRefundBillData(refundBillItem) : null;
   const refundBillBankReady = refundBillItem ? Boolean(resolveVietQrBank(refundBillItem.bank || {}) && refundBillItem.bank?.account && refundBillItem.bank?.holder) : false;
   const isSearching = Boolean(searchQuery.trim());
@@ -1830,8 +1830,8 @@ function paymentRowFromTreasurerItems(items, data) {
 function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, collapseTick, onShare, onQr, onPayItem, onPaySelected, onToggleSelect, onToggleRowSelection, onUndoPaid, onConfirmRefund, onCancelRefund, onRefundBill, onConfirmPending, onRejectPending }) {
   const [expanded, setExpanded] = useState(false);
   const [settledExpanded, setSettledExpanded] = useState(false);
-  const settledItems = row.items.filter(item => item.paid && item.kind !== 'refund');
-  const activeItems = row.items.filter(item => !item.paid || item.kind === 'refund');
+  const settledItems = row.items.filter(item => item.paid);
+  const activeItems = row.items.filter(item => !item.paid);
   const groupedItems = groupPaymentItemsBySource(activeItems);
   const settledGroups = groupPaymentItemsBySource(settledItems);
   const settledCount = settledItems.reduce((sum, item) => sum + (Number(item.itemCount) || 1), 0);
@@ -1886,8 +1886,8 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                   const isCredit = Number(item.amount) > 0;
                   const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : isCredit ? 'Bù' : (item.paid ? 'Đã nhận' : 'TT');
                   const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
-                  const selected = !item.paid && !item.pending && !isRefund && selectedKeys?.has?.(item.key);
-                  const selectable = !item.paid && !item.pending && !isRefund;
+                  const selected = !item.paid && !item.pending && selectedKeys?.has?.(item.key);
+                  const selectable = !item.paid && !item.pending;
                   const paidActionRow = item.paid && !isRefund;
                   return (
                     <div
