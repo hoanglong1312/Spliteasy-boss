@@ -1013,6 +1013,12 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
       settledMonths.add(`${groupId}:${settledMemberId}:${month}`)
       const memberKey = `${groupId}:${settledMemberId}`
       if (month > (maxSettledMonth.get(memberKey) || '')) maxSettledMonth.set(memberKey, month)
+      const settledProfileId = profileIdForMember(settledMemberId, members)
+      if (settledProfileId) {
+        settledMonths.add(`${settledProfileId}:${settledMemberId}:${month}`)
+        const profileKey = `${settledProfileId}:${settledMemberId}`
+        if (month > (maxSettledMonth.get(profileKey) || '')) maxSettledMonth.set(profileKey, month)
+      }
     })
   })
   if (!settledMonths.size) return sourceBreakdown
