@@ -1291,7 +1291,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   const matchSearch = makeMatcher(searchQuery);
   const pendingRecordsRaw = pending.filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const pendingRecordsFiltered = pendingRecordsRaw.filter(record => matchSearch(record.memberName || record.name));
-  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, confirmedCheckpoints, refundRows: refunds, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel });
+  const memberRows = buildTreasurerMemberRows({ progressRows: rows, confirmedRecords, confirmedCheckpoints, refundRows: refunds, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel: data?.monthLabel, groupId: data?.currentGroupId || '' });
   const currentPayableItems = new Map(memberRows.flatMap(row => row.items)
     .filter(item => !item.paid && item.kind !== 'refund')
     .flatMap(item => paymentItemToCoveredItems(item))
@@ -1555,7 +1555,7 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
   );
 }
 
-export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedCheckpoints, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel }) {
+export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confirmedCheckpoints, refundRows, pendingCheckpoints, matchSearch, confirmedRefunds, monthLabel, groupId = '' }) {
   const byMember = new Map();
   const pendingItems = new Map();
   const paidPayableItemKeys = new Set(safeArray(confirmedRecords)
@@ -1745,6 +1745,7 @@ export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confi
       sourceLabel: 'Cần hoàn tiền',
       memberId: row.memberId || row.member_id || '',
       profileId: row.profileId || row.profile_id || '',
+      groupId: groupId || row.groupId || row.group_id || '',
       month: row.month || row.yearMonth || row.year_month || '',
       monthLabel: row.monthLabel || row.month_label || monthLabel,
       amount: Number(row.amount) || 0,
@@ -2892,6 +2893,7 @@ function paymentItemToCoveredSource(item) {
     sourceType: item.sourceType,
     sourceId: item.sourceId,
     sourceLabel: item.sourceLabel,
+    groupId: item.groupId || item.group_id || '',
     memberId: item.memberId,
     profileId: item.profileId,
     memberName: item.memberName,
