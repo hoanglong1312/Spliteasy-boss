@@ -1810,11 +1810,13 @@ function paymentRowFromTreasurerItems(items, data) {
   }));
   const memberNames = [...new Set([...profileGroups.values()].map(group => group.name).filter(Boolean))];
   const displayName = memberNames.length > 1 ? `${memberNames[0]} + ${memberNames.length - 1} người` : (memberNames[0] || firstItem.memberName || firstItem.row?.memberName || firstItem.row?.name || 'Thành viên');
-  const amount = paymentItemsAmountDue(paymentItems);
+  const netSignedAmount = paymentItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const amount = Math.abs(netSignedAmount);
+  const refundCreditorItem = netSignedAmount > 0 ? (paymentItems.find(item => item.kind === 'refund') || firstItem) : firstItem;
   return {
-    profileId: firstItem.profileId || firstItem.row?.profileId || '',
-    memberId: firstItem.memberId || firstItem.row?.linkMemberId || firstItem.row?.memberId || '',
-    linkMemberId: firstItem.memberId || firstItem.row?.linkMemberId || firstItem.row?.memberId || '',
+    profileId: refundCreditorItem.profileId || refundCreditorItem.row?.profileId || '',
+    memberId: refundCreditorItem.memberId || refundCreditorItem.row?.linkMemberId || refundCreditorItem.row?.memberId || '',
+    linkMemberId: refundCreditorItem.memberId || refundCreditorItem.row?.linkMemberId || refundCreditorItem.row?.memberId || '',
     groupId: firstItem.groupId || firstItem.row?.groupId || data?.currentGroupId || '',
     linkGroupId: firstItem.groupId || firstItem.row?.linkGroupId || firstItem.row?.groupId || data?.currentGroupId || '',
     name: displayName,
