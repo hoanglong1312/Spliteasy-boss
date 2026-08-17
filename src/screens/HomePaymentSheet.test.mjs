@@ -97,12 +97,13 @@ test('treasurer dashboard can create one bill from selected items across members
   const confirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
   assert.match(dashboardSource, /selectedTreasurerItems = memberRows\.flatMap/);
   assert.match(dashboardSource, /TT đã chọn/);
-  assert.match(dashboardSource, /const selectedTreasurerTotal = paymentItemsAmountDue\(selectedTreasurerItems\)/);
+  assert.match(dashboardSource, /const selectedTreasurerTotal = Math\.abs\(selectedTreasurerItems\.reduce/);
   assert.match(dashboardSource, /setPaymentRow\(\{ \.\.\.paymentRowFromTreasurerItems\(selectedTreasurerItems, data\), collapseRowKeys: selectedTreasurerRowKeys \}\)/);
   assert.match(rowBuilderSource, /profileGroups/);
   assert.match(rowBuilderSource, /paymentGroups/);
   assert.match(rowBuilderSource, /defaultPaymentItemKeys: paymentItems\.map\(item => item\.key\)/);
-  assert.match(rowBuilderSource, /const amount = paymentItemsAmountDue\(paymentItems\)/);
+  assert.match(rowBuilderSource, /const netSignedAmount = paymentItems\.reduce/);
+  assert.match(rowBuilderSource, /const amount = Math\.abs\(netSignedAmount\)/);
   assert.match(homeSource, /paymentDisplayGroups = row\?\.paymentGroups \|\| \[/);
   assert.match(confirmSource, /const paymentGroups = new Map\(\)/);
   assert.match(confirmSource, /const key = `\$\{groupId\}:\$\{memberId\}`/);
@@ -192,8 +193,8 @@ test('treasurer member rows collapse settled payment history by default', () => 
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
 
   assert.match(rowSource, /const \[settledExpanded, setSettledExpanded\] = useState\(false\)/);
-  assert.match(rowSource, /const settledItems = row\.items\.filter\(item => item\.paid && item\.kind !== 'refund'\)/);
-  assert.match(rowSource, /const activeItems = row\.items\.filter\(item => !item\.paid \|\| item\.kind === 'refund'\)/);
+  assert.match(rowSource, /const settledItems = row\.items\.filter\(item => item\.paid\)/);
+  assert.match(rowSource, /const activeItems = row\.items\.filter\(item => !item\.paid\)/);
   assert.match(rowSource, /groupPaymentItemsBySource\(activeItems\)/);
   assert.match(rowSource, /Đã chốt trước đây/);
   assert.match(rowSource, /setSettledExpanded\(value => !value\)/);
@@ -203,13 +204,25 @@ test('treasurer member rows collapse settled payment history by default', () => 
 
 test('treasurer dashboard nets signed debt and credit items', () => {
   const rowBuilderSource = sliceBetween('function buildTreasurerMemberRows', 'function paymentRowFromTreasurerItem');
+  const paymentRowSource = sliceBetween('function paymentRowFromTreasurerItems(', 'function TreasurerMemberPaymentRow');
   const rowSource = sliceBetween('function TreasurerMemberPaymentRow', 'function TreasurerConfirmPaymentSheet');
   const confirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
   assert.match(rowBuilderSource, /memberRow\.amountDue = paymentItemsAmountDue\(memberRow\.items\.filter\(item => !item\.paid && item\.kind !== 'refund'\)\)/);
   assert.match(rowSource, /const selectedUnpaidTotal = paymentItemsAmountDue\(selectedUnpaidItems\)/);
   assert.match(rowSource, /const isCredit = Number\(item\.amount\) > 0/);
   assert.match(rowSource, /\{signedVND\(item\.amount\)\}/);
-  assert.match(confirmSource, /const selectedTotal = paymentItemsAmountDue\(selectedItems\)/);
+  assert.match(paymentRowSource, /const creditorBank = netSignedAmount > 0 \? \(refundCreditorItem\.bank \|\| refundCreditorItem\.row\?\.bank \|\| null\) : null/);
+  assert.match(paymentRowSource, /payableAmount: amount,[\s\S]*creditorBank,/);
+  assert.match(confirmSource, /const netTotal = selectedItems\.reduce/);
+  assert.match(confirmSource, /const selectedTotal = Math\.abs\(netTotal\)/);
+  assert.match(confirmSource, /const isNetRefund = netTotal > 0/);
+  assert.match(confirmSource, /const refundBankTarget = isNetRefund \? \(row\?\.creditorBank \|\| \{\}\) : \{\}/);
+  assert.match(confirmSource, /const qrTarget = isNetRefund \? refundBankTarget : target/);
+  assert.match(confirmSource, /const qrBank = resolveVietQrBank\(qrTarget\)/);
+  assert.match(confirmSource, /account: qrTarget\.account/);
+  assert.match(confirmSource, /accountName: qrTarget\.holder/);
+  assert.match(confirmSource, /\{isNetRefund \? 'Cần hoàn lại' : 'Đang chọn thu'\}/);
+  assert.match(confirmSource, /\{isNetRefund \? 'Xác nhận đã hoàn' : 'Xác nhận đã thu'\} \{formatVND\(selectedTotal\)\}/);
 });
 
 test('treasurer member cards can bulk select, clear all, and collapse after confirmed payment', () => {

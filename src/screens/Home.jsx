@@ -1814,6 +1814,7 @@ function paymentRowFromTreasurerItems(items, data) {
   const netSignedAmount = paymentItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
   const amount = Math.abs(netSignedAmount);
   const refundCreditorItem = netSignedAmount > 0 ? (paymentItems.find(item => item.kind === 'refund') || firstItem) : firstItem;
+  const creditorBank = netSignedAmount > 0 ? (refundCreditorItem.bank || refundCreditorItem.row?.bank || null) : null;
   return {
     profileId: refundCreditorItem.profileId || refundCreditorItem.row?.profileId || '',
     memberId: refundCreditorItem.memberId || refundCreditorItem.row?.linkMemberId || refundCreditorItem.row?.memberId || '',
@@ -1827,6 +1828,7 @@ function paymentRowFromTreasurerItems(items, data) {
     defaultPaymentItemKeys: paymentItems.map(item => item.key),
     payableSources: paymentItems.map(paymentItemToCoveredSource),
     payableAmount: amount,
+    creditorBank,
   };
 }
 
@@ -1998,18 +2000,22 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
   const currentItems = fallbackItems.filter(item => !currentMonth || String(item.month || '') === String(currentMonth));
   const previousItems = fallbackItems.filter(item => currentMonth && String(item.month || '') !== String(currentMonth));
   const selectedItems = fallbackItems.filter(item => checkedKeys.has(item.key));
-  const selectedTotal = paymentItemsAmountDue(selectedItems);
+  const netTotal = selectedItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const selectedTotal = Math.abs(netTotal);
+  const isNetRefund = netTotal > 0;
   const selectedMonths = [...new Set(selectedItems.map(item => item.month).filter(Boolean))];
   const payloadMonthLabel = selectedMonths.length === 1 ? fullMonthLabel(selectedMonths[0]) : monthLabel;
   const memberName = row?.name || row?.memberName || 'Thành viên';
   const hasProfileGroups = safeArray(row?.paymentGroups).length > 1;
   const target = paymentTarget || {};
-  const qrBank = resolveVietQrBank(target);
+  const refundBankTarget = isNetRefund ? (row?.creditorBank || {}) : {};
+  const qrTarget = isNetRefund ? refundBankTarget : target;
+  const qrBank = resolveVietQrBank(qrTarget);
   const transferDescription = `${memberName} - Thanh toan ${paymentItemsPeriodLabel(selectedItems, monthLabel)}`.trim();
-  const qrUrl = selectedTotal > 0 && qrBank && target.account && target.holder ? generateQRUrl({
+  const qrUrl = selectedTotal > 0 && qrBank && qrTarget.account && qrTarget.holder ? generateQRUrl({
     bankId: qrBank.id,
-    account: target.account,
-    accountName: target.holder,
+    account: qrTarget.account,
+    accountName: qrTarget.holder,
     amount: selectedTotal,
     description: transferDescription,
   }) : '';
@@ -2101,7 +2107,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
     <BottomSheet title={`Xác nhận TT · ${row?.name || row?.memberName || 'Thành viên'}`} onClose={onClose}>
       <div style={{ display: 'grid', gap: 12 }}>
         <Card style={{ padding: 12, borderColor: 'rgba(34,197,94,0.24)', background: 'rgba(34,197,94,0.07)' }}>
-          <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750 }}>Đang chọn thu</div>
+          <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750 }}>{isNetRefund ? 'Cần hoàn lại' : 'Đang chọn thu'}</div>
           <div style={{ marginTop: 3, color: '#f8fafc', fontWeight: 950, fontSize: 21, ...type.mono }}>{formatVND(selectedTotal)}</div>
           <div style={{ marginTop: 2, color: '#94a3b8', fontSize: 11 }}>Tick khoản đã thu đủ. Không tick thì chưa trừ nợ.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
@@ -2177,7 +2183,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
             fontFamily: 'inherit',
           }}
         >
-          Xác nhận đã thu {formatVND(selectedTotal)}
+          {isNetRefund ? 'Xác nhận đã hoàn' : 'Xác nhận đã thu'} {formatVND(selectedTotal)}
         </button>
 
         {billShareOpen && (
