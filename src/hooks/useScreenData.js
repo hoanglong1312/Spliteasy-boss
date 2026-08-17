@@ -1036,7 +1036,7 @@ function suppressSettledSourceMonths(sourceBreakdown, settlements, members = [],
         const maxM = maxSettledMonth.get(`${sourceId}:${memberId}`) || ''
         if (maxM && rowMonth < maxM) return false
         if (settledMonths.has(`${sourceId}:${memberId}:${rowMonth}`)) {
-          return Number(row.amount || 0) !== 0
+          return Number(row.amount || 0) < 0
         }
         return true
       })
