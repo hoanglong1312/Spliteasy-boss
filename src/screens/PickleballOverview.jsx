@@ -171,48 +171,56 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
         </Card>
 
         {/* Progress + costs grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.28fr 0.72fr', gap: 10, marginTop: 10 }}>
-          <Card accent="pickleball" style={{ padding: '14px 14px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.12fr) minmax(0, 0.88fr)', gap: 8, marginTop: 10, alignItems: 'stretch' }}>
+          <Card accent="pickleball" style={{ padding: '12px 11px 14px', minWidth: 0, overflow: 'hidden' }}>
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '1px', color: colors.textSecondary, textTransform: 'uppercase' }}>
               Tiến độ tháng
             </div>
             <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              marginTop: 9, padding: '8px 10px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6,
+              marginTop: 8, padding: '7px 8px',
               borderRadius: 10,
               background: 'rgba(52,211,153,0.10)',
               border: '1px solid rgba(52,211,153,0.24)',
               color: '#a7f3d0',
+              minWidth: 0,
             }}>
-              <span style={{ fontSize: 10, fontWeight: 800 }}>Buổi CLB đã hoàn thành</span>
-              <span style={{ fontSize: 12, fontWeight: 900, ...type.mono }}>
+              <span style={{ fontSize: 9, fontWeight: 800, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Buổi CLB đã hoàn thành</span>
+              <span style={{ fontSize: 11, fontWeight: 900, flexShrink: 0, ...type.mono }}>
                 {d.progress.completed} buổi
               </span>
             </div>
-            {!isFlexMonthlyTicket && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
-                <ProgressDonut value={isFlexPerSessionTicket ? d.progress.attended : d.progress.completed} max={isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total} size={80} />
-                <div>
-                  <div style={{ fontSize: 28, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
-                    {Math.round((isFlexPerSessionTicket ? d.progress.attended : d.progress.completed) / (isFlexPerSessionTicket ? (d.progress.completed || 1) : d.progress.total) * 100)}%
+            {!isFlexMonthlyTicket && (() => {
+              const attended = Number(d.progress?.attended) || 0;
+              const completed = Number(d.progress?.completed) || 0;
+              const denom = Math.max(completed, 1);
+              const participationPct = Math.min(100, Math.round((attended / denom) * 100));
+              return (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, minWidth: 0 }}>
+                <ProgressDonut value={attended} max={denom} size={68} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 24, fontWeight: 900, color: '#34d399', lineHeight: 1, ...type.mono, letterSpacing: '-0.5px' }}>
+                    {participationPct}%
                   </div>
-                  <div style={{ fontSize: 9, color: colors.textSecondary, fontWeight: 700, marginTop: 5, letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                  <div style={{ fontSize: 8, color: colors.textSecondary, fontWeight: 700, marginTop: 4, letterSpacing: '0.6px', textTransform: 'uppercase' }}>
                     Tỷ lệ tham gia
                   </div>
                 </div>
               </div>
-            )}
+              );
+            })()}
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
               background: 'rgba(52,211,153,0.13)',
               border: '1.5px solid rgba(52,211,153,0.38)',
-              borderRadius: 11, padding: '10px 12px', marginTop: 12,
+              borderRadius: 11, padding: '8px 8px', marginTop: 10,
               boxShadow: 'inset 0 0 18px rgba(52,211,153,0.08)',
+              minWidth: 0,
             }}>
-              <span style={{ fontSize: 15 }}>🏸</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#6ee7b7', letterSpacing: '0.2px' }}>Bạn đã đánh</span>
-              <span style={{ fontSize: 26, fontWeight: 900, color: '#34d399', ...type.mono, lineHeight: 1, letterSpacing: '-0.5px' }}>{d.progress.attended}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#6ee7b7' }}>buổi</span>
+              <span style={{ fontSize: 13, flexShrink: 0 }}>🏸</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#6ee7b7', letterSpacing: '0.1px' }}>Bạn đã đánh</span>
+              <span style={{ fontSize: 22, fontWeight: 900, color: '#34d399', ...type.mono, lineHeight: 1, letterSpacing: '-0.5px' }}>{d.progress.attended}</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: '#6ee7b7' }}>buổi</span>
             </div>
             {isFlexMonthlyTicket && (
               <div style={{ fontSize: 10, color: colors.textSecondary, marginTop: 6, textAlign: 'center' }}>
@@ -233,19 +241,19 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                 display: 'flex',
               }}>
                 <div style={{ width: 4, background: '#fbbf24', flexShrink: 0 }} />
-                <div style={{ flex: 1, padding: '9px 11px', background: 'rgba(10,15,12,0.75)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#fbbf24' }}>
+                <div style={{ flex: 1, padding: '9px 11px', background: 'rgba(10,15,12,0.75)', minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#fbbf24', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {d.todaySession.statusLabel}
                     </div>
-                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(251,191,36,0.65)', ...type.mono }}>
+                    <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(251,191,36,0.65)', flexShrink: 0, ...type.mono }}>
                       Buổi #{d.todaySession.number}
                     </div>
                   </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginTop: 4, ...type.mono, letterSpacing: '-0.2px' }}>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginTop: 4, ...type.mono, letterSpacing: '-0.2px' }}>
                     {displayTimeRange(d.todaySession.timeRange)}
                   </div>
-                  <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.50)', marginTop: 3 }}>
+                  <div style={{ fontSize: 10, color: 'rgba(251,191,36,0.50)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {d.todaySession.dateLabel} · {d.todaySession.venue}
                   </div>
                 </div>
@@ -253,14 +261,14 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
             )}
           </Card>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, height: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, height: '100%', minWidth: 0 }}>
             {visibleSummaryCards.map(card => {
               const isExpandable = card.rows || card.key === 'ticket';
               const isPaid = Boolean(card.paid);
               return (
                 <div key={card.label}
                   onClick={isExpandable ? () => setPopupCard(card) : undefined}
-                  style={{ position: 'relative', cursor: isExpandable ? 'pointer' : 'default', flex: 1, display: 'flex', flexDirection: 'column' }}
+                  style={{ position: 'relative', cursor: isExpandable ? 'pointer' : 'default', flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}
                 >
                   <CompactCostCard
                     icon={card.icon}
@@ -269,12 +277,13 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                     sub={isPaid ? '✓ Đã thanh toán' : card.coveredAmount > 0 ? `✓ Đã nộp: ${formatVNDShort(card.coveredAmount)}` : card.sub}
                     style={{
                       flex: 1,
-                      paddingRight: isExpandable ? 28 : 9,
+                      minWidth: 0,
+                      paddingRight: isExpandable ? 22 : 9,
                       ...(isPaid ? { borderColor: 'rgba(34,197,94,0.35)', background: 'rgba(34,197,94,0.07)' } : {}),
                     }}
                   />
                   {isExpandable && (
-                    <div style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: colors.textSecondary, fontWeight: 700 }}>›</div>
+                    <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: colors.textSecondary, fontWeight: 700 }}>›</div>
                   )}
                 </div>
               );
@@ -631,17 +640,17 @@ function balanceHeroStyle(total) {
 
 function CompactCostCard({ icon, label, value, sub, style }) {
   return (
-    <Card style={{ padding: '11px 9px', display: 'flex', flexDirection: 'column', justifyContent: 'center', ...style }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span style={{ fontSize: 14 }}>{icon}</span>
-        <div style={{ fontSize: 8, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 800 }}>
+    <Card style={{ padding: '10px 8px', display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, overflow: 'hidden', ...style }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+        <span style={{ fontSize: 13, flexShrink: 0 }}>{icon}</span>
+        <div style={{ fontSize: 8, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.6px', fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
           {label}
         </div>
       </div>
-      <div style={{ fontSize: 14, fontWeight: 900, letterSpacing: 0, marginTop: 7, whiteSpace: 'nowrap', ...type.mono }}>
+      <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: 0, marginTop: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...type.mono }}>
         {formatVND(value)}
       </div>
-      <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, lineHeight: 1.25 }}>{sub}</div>
+      <div style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2, lineHeight: 1.25, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{sub}</div>
     </Card>
   );
 }
@@ -673,7 +682,9 @@ function displayTimeRange(value) {
 
 function ProgressDonut({ value, max, size = 100 }) {
   const circumference = 2 * Math.PI * 42; // 263.9, based on r=42 in 100-unit viewBox
-  const pct = value / max;
+  const safeMax = Math.max(Number(max) || 0, 1);
+  const safeValue = Math.max(0, Number(value) || 0);
+  const pct = Math.min(1, safeValue / safeMax);
   const offset = circumference * (1 - pct);
   const fs = size / 100;
   return (
@@ -689,7 +700,7 @@ function ProgressDonut({ value, max, size = 100 }) {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       }}>
         <div style={{ fontSize: Math.round(22 * fs), fontWeight: 900, letterSpacing: '-0.5px', ...type.mono }}>
-          {value}<span style={{ fontSize: Math.round(12 * fs), color: colors.textMuted }}>/{max}</span>
+          {safeValue}<span style={{ fontSize: Math.round(12 * fs), color: colors.textMuted }}>/{safeMax}</span>
         </div>
         <div style={{ fontSize: Math.round(9 * fs), color: colors.textSecondary, fontWeight: 600, letterSpacing: '0.5px' }}>BUỔI</div>
       </div>

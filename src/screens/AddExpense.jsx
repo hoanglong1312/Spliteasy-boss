@@ -1,7 +1,7 @@
 // Spliteasy Boss — Thêm chi tiêu (bottom sheet)
 // Props: data { groupName, amount, title, payer, category, dateLabel, participants[] }
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { colors, type } from '../tokens';
 import { Avatar, Button, Input, LoadingSpinner, loadingOverlayStyle } from '../primitives';
 
@@ -64,6 +64,9 @@ export default function AddExpense({ data, onAction }) {
   const selectedCategory = CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
   const allSelected = activeCount === participants.length && participants.length > 0;
   const amountInputWidth = amount ? 220 : 54;
+  const sortedParticipants = [...participants].sort((a, b) =>
+    String(a.name || '').localeCompare(String(b.name || ''), 'vi', { sensitivity: 'base' })
+  );
 
   return (
     <div data-spliteasy-phone-frame style={{
@@ -300,7 +303,7 @@ export default function AddExpense({ data, onAction }) {
             </button>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {participants.map(p => (
+            {sortedParticipants.map(p => (
               <ParticipantChip
                 key={p.id}
                 p={p}
@@ -612,6 +615,22 @@ function DateScrollPicker({ value, onChange, onClose }) {
 }
 
 function ScrollColumn({ label, value, items, onChange, render }) {
+  const listRef = useRef(null);
+  const activeRef = useRef(null);
+
+  useEffect(() => {
+    const active = activeRef.current;
+    const list = listRef.current;
+    if (!active || !list) return;
+    const frame = requestAnimationFrame(() => {
+      const listRect = list.getBoundingClientRect();
+      const activeRect = active.getBoundingClientRect();
+      const nextTop = list.scrollTop + (activeRect.top - listRect.top) - (listRect.height / 2) + (activeRect.height / 2);
+      list.scrollTo({ top: Math.max(0, nextTop), behavior: 'auto' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [value, items.length, items[0], items[items.length - 1]]);
+
   return (
     <div>
       <div style={{
@@ -623,19 +642,23 @@ function ScrollColumn({ label, value, items, onChange, render }) {
         textAlign: 'center',
         marginBottom: 6,
       }}>{label}</div>
-      <div style={{
-        height: 156,
-        overflowY: 'auto',
-        borderRadius: 14,
-        background: colors.inputBg,
-        border: `1px solid ${colors.borderSubtle}`,
-        padding: 6,
-      }}>
+      <div
+        ref={listRef}
+        style={{
+          height: 156,
+          overflowY: 'auto',
+          borderRadius: 14,
+          background: colors.inputBg,
+          border: `1px solid ${colors.borderSubtle}`,
+          padding: 6,
+        }}
+      >
         {items.map(item => {
           const active = Number(item) === Number(value);
           return (
             <button
               key={item}
+              ref={active ? activeRef : undefined}
               type="button"
               onClick={() => onChange(item)}
               style={{

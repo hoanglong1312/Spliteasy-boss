@@ -49,9 +49,14 @@ test('AddExpense empty amount keeps the zero placeholder visually centered', () 
 test('AddExpense uses scroll date picker and supports receipt image previews', () => {
   assert.match(addExpenseSource, /const \[datePickerOpen, setDatePickerOpen\] = useState\(false\)/);
   assert.match(addExpenseSource, /function DateScrollPicker\(\{ value, onChange, onClose \}\)/);
+  assert.match(addExpenseSource, /function ScrollColumn\(/);
+  assert.match(addExpenseSource, /list\.scrollTo\(/);
+  assert.match(addExpenseSource, /activeRef/);
   assert.match(addExpenseSource, /const years = Array\.from\(\{ length: 7 \}/);
   assert.match(addExpenseSource, /overflowY: 'auto'/);
   assert.match(addExpenseSource, /setDatePickerOpen\(true\)/);
+  assert.match(addExpenseSource, /sortedParticipants\.map\(p =>/);
+  assert.match(addExpenseSource, /localeCompare\(String\(b\.name \|\| ''\), 'vi'/);
   assert.match(addExpenseSource, /function ReceiptImages\(\{ images, onAdd, onRemove \}\)/);
   assert.match(addExpenseSource, /accept="image\/\*"/);
   assert.match(addExpenseSource, /readImageDataUrl\(file\)/);

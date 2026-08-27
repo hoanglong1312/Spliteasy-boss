@@ -10,6 +10,7 @@ import {
   LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
+import { isCheckpointTimeStale, settlementAsOfDate } from '../hooks/useScreenData.js';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -1297,14 +1298,24 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
     .flatMap(item => paymentItemToCoveredItems(item))
     .filter(item => item.payableItemKey)
     .map(item => [item.payableItemKey, item]));
-  const pendingCheckpointsWithState = pendingCheckpoints.map(row => ({
-    ...row,
-    stale: safeArray(row.coveredItems || row.covered_items).some(snapshotItem => {
+  const pendingCheckpointsWithState = pendingCheckpoints.map(row => {
+    const itemStale = safeArray(row.coveredItems || row.covered_items).some(snapshotItem => {
       const key = snapshotItem.payableItemKey || snapshotItem.payable_item_key || '';
       const currentItem = currentPayableItems.get(key);
       return !currentItem || Math.round(Number(currentItem.amount) || 0) !== Math.round(Number(snapshotItem.amount) || 0);
-    }),
-  }));
+    });
+    const timeStale = isCheckpointTimeStale(row, settlementAsOfDate());
+    return {
+      ...row,
+      timeStale,
+      stale: itemStale || timeStale,
+      staleReason: itemStale
+        ? 'Có khoản đã thay đổi hoặc bị xóa'
+        : timeStale
+          ? 'Phiếu chốt đến ngày đã qua — hãy thay phiếu'
+          : '',
+    };
+  });
   const pendingCheckpointById = new Map(pendingCheckpointsWithState.map(row => [String(row.id), row]));
   const totalNeedCollect = memberRows.reduce((sum, row) => sum + row.amountDue, 0);
   const totalReceived = memberRows.reduce((sum, row) => sum + row.amountPaid, 0);
@@ -1495,8 +1506,15 @@ function TreasurerPaymentDashboard({ data, progressRows, pendingRecords, refundR
           monthLabel={data?.monthLabel || ''}
           currentMonth={data?.yearMonth || ''}
           paymentTarget={data?.paymentTarget}
+          existingPendingCheckpoints={pendingCheckpointsWithState.filter(checkpoint => {
+            const memberIds = new Set(safeArray(paymentRow?.paymentItems).flatMap(item => [item.memberId, item.row?.memberId, item.row?.linkMemberId]).filter(Boolean).map(String))
+            memberIds.add(String(paymentRow?.memberId || ''))
+            memberIds.add(String(paymentRow?.linkMemberId || ''))
+            return memberIds.has(String(checkpoint.memberId || checkpoint.member_id || ''))
+          })}
           onClose={() => setPaymentRow(null)}
           onRequestSnapshot={(payload) => onAction?.('requestSettlementCheckpoint', payload)}
+          onReplaceSnapshot={(payload) => onAction?.('replaceSettlementCheckpoint', payload)}
           onConfirm={(payload) => withLoading(async () => {
             await onAction?.('markMemberPaid', payload);
             setCollapsedTreasurerRows(prev => ({ keys: safeArray(paymentRow?.collapseRowKeys), tick: prev.tick + 1 }));
@@ -1630,7 +1648,8 @@ export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confi
             paid: false,
             kind: 'collect',
             memberName: memberRow.name,
-            groupId: item.groupId || item.group_id || item.sourceId || row.linkGroupId || row.groupId || '',
+            // Prefer treasurer link group over sourceId (pickleball sourceId can differ from the group where actor is treasurer).
+            groupId: item.groupId || item.group_id || row.linkGroupId || row.groupId || item.sourceId || '',
             row,
           });
         });
@@ -1817,10 +1836,10 @@ function paymentRowFromTreasurerItems(items, data) {
   const creditorBank = netSignedAmount > 0 ? (refundCreditorItem.bank || refundCreditorItem.row?.bank || null) : null;
   return {
     profileId: refundCreditorItem.profileId || refundCreditorItem.row?.profileId || '',
-    memberId: refundCreditorItem.memberId || refundCreditorItem.row?.linkMemberId || refundCreditorItem.row?.memberId || '',
-    linkMemberId: refundCreditorItem.memberId || refundCreditorItem.row?.linkMemberId || refundCreditorItem.row?.memberId || '',
-    groupId: firstItem.groupId || firstItem.row?.groupId || data?.currentGroupId || '',
-    linkGroupId: firstItem.groupId || firstItem.row?.linkGroupId || firstItem.row?.groupId || data?.currentGroupId || '',
+    memberId: refundCreditorItem.row?.linkMemberId || refundCreditorItem.memberId || refundCreditorItem.row?.memberId || '',
+    linkMemberId: refundCreditorItem.row?.linkMemberId || refundCreditorItem.memberId || refundCreditorItem.row?.memberId || '',
+    groupId: firstItem.row?.linkGroupId || firstItem.row?.groupId || firstItem.groupId || data?.currentGroupId || '',
+    linkGroupId: firstItem.row?.linkGroupId || firstItem.row?.groupId || firstItem.groupId || data?.currentGroupId || '',
     name: displayName,
     memberName: displayName,
     paymentItems,
@@ -1872,7 +1891,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
       {expanded && (
         <div style={{ display: 'grid', gap: 8, marginTop: 9 }}>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-            {pendingCheckpointIds.length > 0 && <button type="button" disabled={pendingApprovalDisabled} title={pendingApprovalDisabled ? 'Có khoản đã thay đổi hoặc bị xóa' : undefined} onClick={() => onConfirmPending?.(pendingCheckpointIds)} style={{ ...miniDashButton('#22c55e', '#052e16'), opacity: pendingApprovalDisabled ? 0.45 : 1, cursor: pendingApprovalDisabled ? 'not-allowed' : 'pointer' }}>Duyệt tất cả</button>}
+            {pendingCheckpointIds.length > 0 && <button type="button" disabled={pendingApprovalDisabled} title={safeArray(pendingCheckpoints).find(checkpoint => checkpoint.stale)?.staleReason || (pendingApprovalDisabled ? 'Có khoản đã thay đổi hoặc bị xóa' : undefined)} onClick={() => onConfirmPending?.(pendingCheckpointIds)} style={{ ...miniDashButton('#22c55e', '#052e16'), opacity: pendingApprovalDisabled ? 0.45 : 1, cursor: pendingApprovalDisabled ? 'not-allowed' : 'pointer' }}>Duyệt tất cả</button>}
             {pendingCheckpointIds.length > 0 && <button type="button" onClick={() => onRejectPending?.(pendingCheckpointIds)} style={miniDashButton(colors.danger, '#fff')}>Từ chối tất cả</button>}
             <button type="button" onClick={() => onShare?.({ name: row.name, memberId: row.memberId, groupId: row.groupId })} style={miniDashButton('#334155', '#94a3b8')}>Link</button>
             {row.unsettledAmount > 0 && <button type="button" onClick={() => onQr?.({ name: row.name, memberId: row.memberId, groupId: row.groupId, amount: row.unsettledAmount })} style={miniDashButton('#4f46e5', '#f8fafc')}>QR</button>}
@@ -1978,7 +1997,7 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
   );
 }
 
-function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTarget, onClose, onRequestSnapshot, onConfirm }) {
+function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTarget, existingPendingCheckpoints = [], onClose, onRequestSnapshot, onReplaceSnapshot, onConfirm }) {
   const items = safeArray(row?.paymentItems);
   const fallbackItems = items.length ? items : safeArray(row?.coveredSources).map((source, index) => ({
     key: `fallback:${index}`,
@@ -1997,6 +2016,22 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
   const [submitting, setSubmitting] = useState(false);
   const [snapshotting, setSnapshotting] = useState(false);
   const [billShareOpen, setBillShareOpen] = useState(false);
+  const [replacePrompt, setReplacePrompt] = useState(null);
+  const monthBuckets = (() => {
+    const map = new Map();
+    fallbackItems.forEach(item => {
+      const key = String(item.month || item.monthLabel || item.key);
+      const bucket = map.get(key) || {
+        key,
+        month: item.month,
+        label: item.monthLabel || fullMonthLabel(item.month) || monthLabel || 'Tháng',
+        items: [],
+      };
+      bucket.items.push(item);
+      map.set(key, bucket);
+    });
+    return [...map.values()];
+  })();
   const currentItems = fallbackItems.filter(item => !currentMonth || String(item.month || '') === String(currentMonth));
   const previousItems = fallbackItems.filter(item => currentMonth && String(item.month || '') !== String(currentMonth));
   const selectedItems = fallbackItems.filter(item => checkedKeys.has(item.key));
@@ -2007,6 +2042,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
   const payloadMonthLabel = selectedMonths.length === 1 ? fullMonthLabel(selectedMonths[0]) : monthLabel;
   const memberName = row?.name || row?.memberName || 'Thành viên';
   const hasProfileGroups = safeArray(row?.paymentGroups).length > 1;
+  const pendingForMember = safeArray(existingPendingCheckpoints);
   const target = paymentTarget || {};
   const refundBankTarget = isNetRefund ? (row?.creditorBank || {}) : {};
   const qrTarget = isNetRefund ? refundBankTarget : target;
@@ -2019,6 +2055,26 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
     amount: selectedTotal,
     description: transferDescription,
   }) : '';
+
+  function toggleItem(key) {
+    setCheckedKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function toggleMonth(monthKey, selected) {
+    setCheckedKeys(prev => {
+      const next = new Set(prev);
+      const bucket = monthBuckets.find(row => row.key === monthKey);
+      safeArray(bucket?.items).forEach(item => {
+        selected ? next.add(item.key) : next.delete(item.key);
+      });
+      return next;
+    });
+  }
+
   let paymentDisplayGroups = row?.paymentGroups || [{
     key: 'treasurer',
     title: `Các khoản của ${memberName}`,
@@ -2030,16 +2086,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
     onToggle: toggleItem,
   }));
 
-  function toggleItem(key) {
-    setCheckedKeys(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  }
-
-  async function requestPaymentSnapshot() {
-    if (snapshotting || selectedTotal <= 0) return;
+  function buildSnapshotGroups() {
     const snapshotGroups = new Map();
     selectedItems.forEach(item => {
       const groupId = item.groupId || item.row?.linkGroupId || item.row?.groupId || row.linkGroupId || row.groupId || '';
@@ -2050,30 +2097,77 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
       group.items.push(item);
       snapshotGroups.set(key, group);
     });
-    setSnapshotting(true);
-    try {
-      await onRequestSnapshot?.({
-        groups: [...snapshotGroups.values()].map(group => ({
-          groupId: group.groupId,
-          groupName: group.groupName,
-          memberId: group.memberId,
-          amount: paymentItemsAmountDue(group.items),
-          coveredItems: group.items.flatMap(paymentItemToCoveredItems),
+    return [...snapshotGroups.values()].map(group => ({
+      groupId: group.groupId,
+      groupName: group.groupName,
+      memberId: group.memberId,
+      amount: paymentItemsAmountDue(group.items),
+      coveredItems: group.items.flatMap(paymentItemToCoveredItems),
+    }));
+  }
+
+  async function requestPaymentSnapshot({ replace = false } = {}) {
+    if (snapshotting || selectedTotal <= 0) return;
+    const groups = buildSnapshotGroups();
+    if (!groups.length) return;
+    if (!replace && pendingForMember.length > 0) {
+      setReplacePrompt({
+        checkpointIds: pendingForMember.map(checkpoint => checkpoint.id).filter(Boolean),
+        groups,
+        summary: pendingForMember.map(checkpoint => ({
+          amount: Number(checkpoint.amount) || 0,
+          months: [...new Set(safeArray(checkpoint.coveredItems || checkpoint.covered_items).map(item => item.monthLabel || item.month_label || fullMonthLabel(item.month)).filter(Boolean))],
+          createdAt: checkpoint.createdAt || checkpoint.created_at,
+          timeStale: Boolean(checkpoint.timeStale),
         })),
       });
+      return;
+    }
+    setSnapshotting(true);
+    try {
+      if (replace) {
+        await onReplaceSnapshot?.({
+          checkpointIds: replacePrompt?.checkpointIds || pendingForMember.map(checkpoint => checkpoint.id).filter(Boolean),
+          groups,
+        });
+      } else {
+        await onRequestSnapshot?.({ groups });
+      }
+      setReplacePrompt(null);
       onClose?.();
+    } catch (error) {
+      const message = String(error?.message || '');
+      if (!replace && /pending|đã có|Already has/i.test(message)) {
+        setReplacePrompt({
+          checkpointIds: pendingForMember.map(checkpoint => checkpoint.id).filter(Boolean),
+          groups,
+          summary: pendingForMember.map(checkpoint => ({
+            amount: Number(checkpoint.amount) || 0,
+            months: [...new Set(safeArray(checkpoint.coveredItems || checkpoint.covered_items).map(item => item.monthLabel || item.month_label || fullMonthLabel(item.month)).filter(Boolean))],
+            createdAt: checkpoint.createdAt || checkpoint.created_at,
+            timeStale: Boolean(checkpoint.timeStale),
+          })),
+        });
+      } else {
+        throw error;
+      }
     } finally {
       setSnapshotting(false);
     }
   }
 
   async function submit() {
-    if (submitting || selectedTotal <= 0) return;
+    if (submitting || selectedTotal <= 0) {
+      return;
+    }
     const paymentGroups = new Map();
     selectedItems.forEach(item => {
-      const groupId = item.groupId || item.row?.linkGroupId || item.row?.groupId || row.linkGroupId || row.groupId || '';
-      const memberId = item.memberId || item.row?.linkMemberId || item.row?.memberId || row.linkMemberId || row.memberId || '';
-      if (!groupId || !memberId) return;
+      // Auth group = treasurer link group; keep item.sourceId only as last resort (pickleball source ≠ actor group).
+      const groupId = item.row?.linkGroupId || row.linkGroupId || item.row?.groupId || row.groupId || item.groupId || item.sourceId || '';
+      const memberId = item.row?.linkMemberId || row.linkMemberId || item.memberId || item.row?.memberId || row.memberId || '';
+      if (!groupId || !memberId) {
+        return;
+      }
       const key = `${groupId}:${memberId}`;
       const group = paymentGroups.get(key) || {
         groupId,
@@ -2084,20 +2178,23 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
       group.items.push(item);
       paymentGroups.set(key, group);
     });
+    const paymentsPayload = [...paymentGroups.values()].map(group => ({
+      memberId: group.memberId,
+      amount: paymentItemsAmountDue(group.items),
+      monthLabel: payloadMonthLabel,
+      memberName: group.memberName,
+      coveredSources: group.items.map(paymentItemToCoveredSource),
+      coveredItems: group.items.flatMap(paymentItemToCoveredItems),
+      groupId: group.groupId,
+    }));
     setSubmitting(true);
     try {
       await onConfirm?.({
-        payments: [...paymentGroups.values()].map(group => ({
-          memberId: group.memberId,
-          amount: paymentItemsAmountDue(group.items),
-          monthLabel: payloadMonthLabel,
-          memberName: group.memberName,
-          coveredSources: group.items.map(paymentItemToCoveredSource),
-          coveredItems: group.items.flatMap(paymentItemToCoveredItems),
-          groupId: group.groupId,
-        })),
+        payments: paymentsPayload,
         memberName: row.name || row.memberName || 'Thành viên',
       });
+    } catch (error) {
+      throw error;
     } finally {
       setSubmitting(false);
     }
@@ -2109,9 +2206,9 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
         <Card style={{ padding: 12, borderColor: 'rgba(34,197,94,0.24)', background: 'rgba(34,197,94,0.07)' }}>
           <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 750 }}>{isNetRefund ? 'Cần hoàn lại' : 'Đang chọn thu'}</div>
           <div style={{ marginTop: 3, color: '#f8fafc', fontWeight: 950, fontSize: 21, ...type.mono }}>{formatVND(selectedTotal)}</div>
-          <div style={{ marginTop: 2, color: '#94a3b8', fontSize: 11 }}>Tick khoản đã thu đủ. Không tick thì chưa trừ nợ.</div>
+          <div style={{ marginTop: 2, color: '#94a3b8', fontSize: 11 }}>Chọn tháng cần thu. Bỏ tick tháng để để lại lần sau.</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
-            <button type="button" onClick={requestPaymentSnapshot} disabled={selectedTotal <= 0 || snapshotting} style={{
+            <button type="button" onClick={() => requestPaymentSnapshot()} disabled={selectedTotal <= 0 || snapshotting} style={{
               minHeight: 36,
               borderRadius: 10,
               background: 'rgba(99,102,241,0.18)',
@@ -2137,6 +2234,43 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
             }}>Thẻ bill</button>
           </div>
         </Card>
+
+        {monthBuckets.length > 1 && (
+          <Card style={{ padding: 10, displayColor: 'rgba(148,163,184,0.18)', background: 'rgba(255,255,255,0.03)' }}>
+            <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 800, marginBottom: 8 }}>Tháng cần thanh toán</div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {monthBuckets.map(bucket => {
+                const selected = bucket.items.every(item => checkedKeys.has(item.key));
+                const amount = paymentItemsAmountDue(bucket.items);
+                return (
+                  <button
+                    key={bucket.key}
+                    type="button"
+                    onClick={() => toggleMonth(bucket.key, !selected)}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '18px minmax(0,1fr) auto',
+                      gap: 8,
+                      alignItems: 'center',
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      border: `1px solid ${selected ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.08)'}`,
+                      background: selected ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+                      color: 'inherit',
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ width: 16, height: 16, borderRadius: 5, border: `1px solid ${selected ? '#22c55e' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : ''}</span>
+                    <span style={{ fontSize: 12, fontWeight: 850, color: '#e2e8f0' }}>{bucket.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: 950, color: '#fca5a5', ...type.mono }}>{formatVND(amount)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
         {hasProfileGroups ? paymentDisplayGroups.map(group => (
           <PaymentItemSection
@@ -2185,6 +2319,25 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
         >
           {isNetRefund ? 'Xác nhận đã hoàn' : 'Xác nhận đã thu'} {formatVND(selectedTotal)}
         </button>
+
+        {replacePrompt && (
+          <Card style={{ padding: 12, borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.1)' }}>
+            <div style={{ fontSize: 13, fontWeight: 950, color: '#fde68a' }}>Đã có phiếu chờ nhận</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: '#f8fafc', lineHeight: 1.45 }}>
+              {safeArray(replacePrompt.summary).map((row, index) => (
+                <div key={index}>
+                  {formatVND(row.amount)} · {(row.months || []).join(', ') || 'Không rõ tháng'}
+                  {row.timeStale ? ' · đã qua ngày chốt' : ''}
+                </div>
+              ))}
+              <div style={{ marginTop: 6, color: '#cbd5e1' }}>Thay phiếu sẽ hủy phiếu cũ (khoản về Chưa chốt) rồi tạo phiếu mới theo tháng đang chọn.</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 10 }}>
+              <button type="button" onClick={() => setReplacePrompt(null)} style={{ ...miniDashButton('rgba(148,163,184,0.16)', '#e2e8f0'), minHeight: 36 }}>Giữ phiếu cũ</button>
+              <button type="button" disabled={snapshotting} onClick={() => requestPaymentSnapshot({ replace: true })} style={{ ...miniDashButton('#f59e0b', '#422006'), minHeight: 36, opacity: snapshotting ? 0.6 : 1 }}>{snapshotting ? 'Đang thay...' : 'Thay phiếu'}</button>
+            </div>
+          </Card>
+        )}
 
         {billShareOpen && (
           <PaymentBillCardSheet

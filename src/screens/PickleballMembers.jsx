@@ -99,7 +99,11 @@ export default function PickleballMembers({ data, isTreasurer = true, onAction }
 
       for (const candidate of candidatesToAdd) {
         if (candidate.isInactive) {
-          await onAction?.('reactivateMember', { memberId: candidate.memberId || candidate.id, groupId: d.groupId });
+          const memberId = candidate.memberId || candidate.id
+          await onAction?.('reactivateMember', { memberId, groupId: d.groupId });
+          if (isFlexBilling && memberId) {
+            await onAction?.('setMemberTicketType', { memberId, groupId: d.groupId, yearMonth: d.currentYearMonth, ticketType: 'per_session' });
+          }
           continue;
         }
         await addMemberWithTicketType({

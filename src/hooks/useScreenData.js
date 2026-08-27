@@ -125,7 +125,7 @@ export function useScreenData() {
       getPickleballSettingsData: () => buildPickleballSettingsData(pickleballState, selectedYearMonth),
       getMemberDetailData: (memberId) => buildMemberDetailData(pickleballState, memberId, selectedYearMonth),
       getPickleballTicketsData: () => buildPickleballTicketsData(pickleballState),
-      getPickleballTeamFundData: (params) => buildPickleballTeamFundData(pickleballState, params?.yearMonth || selectedYearMonth),
+      getPickleballTeamFundData: (params) => buildPickleballTeamFundData(pickleballState, selectedYearMonth || params?.yearMonth),
       getBatchEntryData: (params) => buildBatchEntryData(pickleballState, params),
       getPaymentFlowData: (memberId) => buildPaymentFlowData(pickleballState, memberId),
       getJoinGroupData: () => buildJoinGroupData(state),
@@ -402,6 +402,87 @@ function inputDateKey(value) {
   return match ? match[1] : dateKey(value)
 }
 
+export function settlementAsOfDate(now = new Date()) {
+  return inputDateKey(now) || dateKey(now)
+}
+
+function payableItemActivityDateKey(item) {
+  return inputDateKey(
+    item?.date
+    || item?.expense_date
+    || item?.expenseDate
+    || item?.sessionDate
+    || item?.session_date
+    || item?.ticketDate
+    || item?.ticket_date
+  )
+}
+
+export function filterPayableItemsAsOf(items, asOfDate = settlementAsOfDate(), currentMonth = monthKey(asOfDate || new Date())) {
+  const asOf = inputDateKey(asOfDate) || settlementAsOfDate()
+  const current = String(currentMonth || monthKey(asOf) || '')
+  return safeArray(items).filter(item => {
+    const month = String(item?.month || monthKey(payableItemActivityDateKey(item) || item?.date) || '')
+    if (!month) return true
+    if (current && month > current) return false
+    if (current && month < current) return true
+    const activity = payableItemActivityDateKey(item)
+    if (!activity) return true
+    return activity <= asOf
+  })
+}
+
+export function groupUnpaidItemsByMonth(items) {
+  const byMonth = new Map()
+  safeArray(items).forEach(item => {
+    const month = String(item?.month || monthKey(payableItemActivityDateKey(item)) || '')
+    if (!month) return
+    const bucket = byMonth.get(month) || {
+      month,
+      monthLabel: sourceMonthLabel(month),
+      amount: 0,
+      itemCount: 0,
+      items: [],
+    }
+    bucket.amount += Number(item.amount) || 0
+    bucket.itemCount += 1
+    bucket.items.push(item)
+    byMonth.set(month, bucket)
+  })
+  return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
+}
+
+export function checkpointAsOfDate(checkpoint) {
+  const explicit = inputDateKey(
+    checkpoint?.asOfDate
+    || checkpoint?.as_of_date
+    || checkpoint?.metadata?.asOfDate
+    || checkpoint?.metadata?.as_of_date
+  )
+  if (explicit) return explicit
+  const created = inputDateKey(checkpoint?.createdAt || checkpoint?.created_at)
+  if (created) return created
+  const items = safeArray(checkpoint?.coveredItems || checkpoint?.covered_items)
+  const activityDates = items.map(payableItemActivityDateKey).filter(Boolean).sort()
+  if (activityDates.length) return activityDates[activityDates.length - 1]
+  return inputDateKey(checkpoint?.periodEnd || checkpoint?.period_end)
+}
+
+export function isCheckpointTimeStale(checkpoint, todayKey = settlementAsOfDate()) {
+  const today = inputDateKey(todayKey) || settlementAsOfDate()
+  if (!today) return false
+  const todayMonth = monthKey(today)
+  const items = safeArray(checkpoint?.coveredItems || checkpoint?.covered_items)
+  const coversCurrentMonthPartial = items.some(item => {
+    const month = String(item?.month || monthKey(payableItemActivityDateKey(item)) || '')
+    return month && month === todayMonth
+  })
+  if (!coversCurrentMonthPartial) return false
+  const asOf = checkpointAsOfDate(checkpoint)
+  if (!asOf) return false
+  return today > asOf
+}
+
 function valueInSettlementRange(value, startDate, endDate = null) {
   const time = parseDateValue(value)
   if (!time) return false
@@ -585,7 +666,7 @@ function buildPickleballPayableItems(state, pickle, sessions, member, members, m
       const ticketId = ticket?.id || dateKey(ticketDate(ticket))
       const includesMember = ticketMemberIds(ticket).some(id => String(id) === String(memberId))
       if (ticketStatus(ticket) === 'team_fund' && includesMember) {
-        if (ticketType === 'per_session') {
+        if (ticketType === 'per_session' || ticketType == null) {
           add(`pickleball-ticket:${ticketId}:fee`, -perSessionTicketPrice, 'Vé buổi')
         }
         add(`pickleball-ticket:${ticketId}:water`, -ticketWaterSharePerPerson(ticket), 'Tiền nước')
@@ -1152,22 +1233,40 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
     .sort((a, b) => paymentProgressStatusRank(b.status) - paymentProgressStatusRank(a.status) || b.amount - a.amount || a.name.localeCompare(b.name, 'vi'))
 }
 
-function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearMonth = '') {
+function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearMonth = '', asOfDate = settlementAsOfDate()) {
+  const asOf = inputDateKey(asOfDate) || settlementAsOfDate()
+  const currentMonth = monthKey(asOf)
   return safeArray(sources)
     .flatMap(source => {
       const sourceType = source.sourceType || source.source_type || 'group'
       const sourceId = source.sourceId || source.source_id || ''
       const sourceLabel = source.sourceLabel || source.source_label || source.label || 'Nguồn tiền'
       const memberId = source.memberId || source.member_id || memberIds?.[0] || ''
-      const sourcePayableItems = safeArray(source.payableItems || source.payable_items).map(item => withPayableItemKey({
-        ...item,
-        sourceType: item.sourceType || item.source_type || sourceType,
-        sourceId: item.sourceId || item.source_id || sourceId,
-        sourceLabel: item.sourceLabel || item.source_label || sourceLabel,
-        memberId: item.memberId || item.member_id || memberId,
-        profileId: item.profileId || item.profile_id || profileId,
-      }))
-      const monthRows = safeArray(source.monthBreakdown || source.month_breakdown)
+      const sourcePayableItems = filterPayableItemsAsOf(
+        safeArray(source.payableItems || source.payable_items).map(item => withPayableItemKey({
+          ...item,
+          sourceType: item.sourceType || item.source_type || sourceType,
+          sourceId: item.sourceId || item.source_id || sourceId,
+          sourceLabel: item.sourceLabel || item.source_label || sourceLabel,
+          memberId: item.memberId || item.member_id || memberId,
+          profileId: item.profileId || item.profile_id || profileId,
+        })),
+        asOf,
+        currentMonth,
+      )
+      const coverageMonthRows = safeArray(source.monthBreakdown || source.month_breakdown)
+        .map(row => {
+          const month = row.month || source.month || source.yearMonth || source.year_month || selectedYearMonth
+          const coveredItems = sourcePayableItems.filter(item => !month || String(item.month || '') === String(month))
+          const amount = coveredItems.length
+            ? coveredItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+            : (Number(row.amount) || 0)
+          return { ...row, month, amount }
+        })
+        .filter(row => Number(row?.amount) !== 0)
+      const monthRows = coverageMonthRows.length
+        ? coverageMonthRows
+        : sourceMonthBreakdown(sourcePayableItems)
       const rows = monthRows.length
         ? monthRows
         : [{ month: source.month || source.yearMonth || source.year_month || selectedYearMonth, label: '', amount: source.amount }]
@@ -1175,9 +1274,14 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
         .filter(row => Number(row?.amount) !== 0)
         .map(row => {
           const month = row.month || source.month || source.yearMonth || source.year_month || ''
-          const amount = Number(row.amount) || 0
-          const key = [sourceType, sourceId || sourceLabel, memberId, profileId, month, Math.abs(amount)].join(':')
           const coveredItems = sourcePayableItems.filter(item => !month || String(item.month || '') === String(month))
+          const amount = coveredItems.length
+            ? coveredItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+            : (Number(row.amount) || 0)
+          if (!amount) return null
+          const monthLabel = row.label || (month ? sourceMonthLabel(month) : '')
+          const asOfSuffix = month && month === currentMonth ? ` · đến ${formatDayMonth(asOf)}` : ''
+          const key = [sourceType, sourceId || sourceLabel, memberId, profileId, month, Math.abs(amount)].join(':')
           return {
             key,
             sourceType,
@@ -1186,13 +1290,15 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
             memberId,
             profileId,
             month,
-            monthLabel: row.label || (month ? sourceMonthLabel(month) : ''),
+            monthLabel: `${monthLabel}${asOfSuffix}`,
             amount,
             payableItemKey: coveredItems.length === 1 ? coveredItems[0].payableItemKey : buildPayableItemKey({ sourceType, sourceId, sourceLabel, memberId, profileId, month, amount }),
-            coveredItems: coveredItems.length ? coveredItems : [withPayableItemKey({ sourceType, sourceId, sourceLabel, memberId, profileId, month, monthLabel: row.label || (month ? sourceMonthLabel(month) : ''), amount })],
-            defaultSelected: Boolean(selectedYearMonth && month === selectedYearMonth),
+            coveredItems: coveredItems.length ? coveredItems : [withPayableItemKey({ sourceType, sourceId, sourceLabel, memberId, profileId, month, monthLabel: `${monthLabel}${asOfSuffix}`, amount })],
+            defaultSelected: true,
+            asOfDate: month === currentMonth ? asOf : undefined,
           }
         })
+        .filter(Boolean)
     })
 }
 
@@ -4135,9 +4241,30 @@ function transactionPayableItemKey(expense, memberId, members, yearMonth) {
 function isPayableItemCovered(coverage, key, requiredAmount) {
   const coveredAmount = Number(coverage.get(key)) || 0
   const amount = Math.round(Number(requiredAmount) || 0)
-  return amount !== 0 &&
-    Math.sign(coveredAmount) === Math.sign(amount) &&
-    Math.abs(coveredAmount) >= Math.abs(amount)
+  // Coverage rows store debt as negative; UI shares are often positive — compare abs only.
+  return amount !== 0 && Math.abs(coveredAmount) >= Math.abs(amount)
+}
+
+function applyWaterPaidFifo(rows, targetCovered) {
+  const list = safeArray(rows).map(row => ({ ...row }))
+  const target = Math.max(0, Math.round(Number(targetCovered) || 0))
+  let covered = list.reduce((sum, row) => sum + (row.paid ? Math.abs(Number(row.amount) || 0) : 0), 0)
+  if (covered >= target) return list
+  const order = list
+    .map((row, index) => ({
+      index,
+      time: Date.parse(row.sortDate || row.date || '') || 0,
+    }))
+    .sort((a, b) => a.time - b.time || a.index - b.index)
+  for (const { index } of order) {
+    if (covered >= target) break
+    if (list[index].paid) continue
+    const amount = Math.abs(Number(list[index].amount) || 0)
+    if (!amount || covered + amount > target) continue
+    list[index] = { ...list[index], paid: true }
+    covered += amount
+  }
+  return list
 }
 
 function isExpenseInGroupBalance(expense) {
@@ -4253,25 +4380,31 @@ function buildPickleBreakdown(pickle, monthSessions, currentUserId, summary, tic
 }
 
 export function buildPersonalWaterSessionRows(monthSessions, memberId, members = [], useFlexAttendance = false, state, date) {
-  const rows = monthSessions
+  const waterCoverage = state ? buildPaidItemCoverageMap(state) : new Map()
+  const waterMember = members.find(m => String(m.id) === String(memberId))
+  const waterProfileId = waterMember?.profileId || waterMember?.profile_id || ''
+
+  const sessionRows = monthSessions
     .filter(s => sessionWaterAmount(s) > 0)
     .map(s => {
       const attendees = useFlexAttendance ? effectiveSessionMemberIdsFlex(s) : effectiveSessionMemberIds(s, members)
       const memberPresent = attendees.some(id => String(id) === String(memberId))
       if (!memberPresent) return null
       const share = Math.round(sessionWaterAmount(s) / attendees.length)
+      const sessionId = s?.id || dateKey(sessionDate(s))
+      const wYearMonth = monthKey(sessionDate(s))
+      const wKey = normalizePayableItemKey(`item:pickleball-session:${sessionId}:water|member:${memberId}|profile:${waterProfileId}|month:${wYearMonth}`)
       return {
         label: `Buổi #${sessionNumber(s, monthSessions) || ''} · ${formatDayMonth(sessionDate(s)) || ''}`,
         amount: share,
+        sortDate: dateKey(sessionDate(s)),
+        paid: state ? isPayableItemCovered(waterCoverage, wKey, share) : false,
       }
     })
     .filter(Boolean)
 
-  if (!state) return rows
+  if (!state) return sessionRows
 
-  const waterCoverage = buildPaidItemCoverageMap(state)
-  const waterMember = members.find(m => String(m.id) === String(memberId))
-  const waterProfileId = waterMember?.profileId || waterMember?.profile_id || ''
   const ticketRows = monthTicketsForState(state, date || new Date())
     .filter(t => ticketStatus(t) !== 'pending_review' && Number(t?.waterAmount ?? t?.water_amount ?? 0) > 0)
     .filter(t => ticketMemberIds(t).some(id => String(id) === String(memberId)))
@@ -4282,11 +4415,12 @@ export function buildPersonalWaterSessionRows(monthSessions, memberId, members =
       return {
         label: `Tiền nước · ${formatDayMonth(ticketDate(t)) || ''}`,
         amount: wShare,
+        sortDate: dateKey(ticketDate(t)),
         paid: isPayableItemCovered(waterCoverage, wKey, wShare),
       }
     })
 
-  return [...rows, ...ticketRows]
+  return [...sessionRows, ...ticketRows]
 }
 
 export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ticketAdjustment, memberId, members = [], useFlexAttendance = false, state, date, remainingBalance) {
@@ -4320,15 +4454,19 @@ export function buildPersonalPickleSummaryCards(monthSessions, memberBalance, ti
     ? { icon: '🏸', label: 'Vé tháng của bạn', amount: -memberBalance.monthlyTicketFee, sub: 'Vé tháng cố định', paid: ticketPaid }
     : memberBalance.ticketType === 'per_session'
     ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi tham gia', paid: false, coveredAmount }
+    : Number(memberBalance.perSessionTicketFee) > 0
+    ? { icon: '🏸', label: 'Vé lượt của bạn', amount: -memberBalance.perSessionTicketFee, sub: 'Theo buổi xé vé · chưa gán nhóm', paid: false, coveredAmount }
     : { icon: '🏸', label: 'Chưa phân nhóm vé', amount: 0, sub: 'Vào Thành viên để chọn vé tháng/lượt', paid: false }
   const waterCoveredFromRows = waterSessionRows.reduce((sum, r) => r.paid ? sum + (r.amount || 0) : sum, 0)
   const waterCoveredFromDelta = (memberBalance.ticketType === 'monthly' && ticketPaid)
     ? Math.max(0, coveredAmount - Math.abs(memberBalance.monthlyTicketFee || 0))
     : 0
-  const waterCoveredAmount = Math.max(waterCoveredFromRows, waterCoveredFromDelta)
+  const waterCoveredTarget = Math.max(waterCoveredFromRows, waterCoveredFromDelta)
+  const waterRowsWithPaid = applyWaterPaidFifo(waterSessionRows, waterCoveredTarget)
+  const waterCoveredAmount = waterRowsWithPaid.reduce((sum, r) => r.paid ? sum + (r.amount || 0) : sum, 0)
   return [
     ticketCostCard,
-    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterSessionRows, coveredAmount: waterCoveredAmount },
+    { icon: '💧', label: 'Nước của bạn', amount: -memberBalance.waterFee, sub: `${waterSessions} buổi có nước`, key: 'water', rows: waterRowsWithPaid, coveredAmount: waterCoveredAmount },
   ]
 }
 
@@ -5377,13 +5515,49 @@ function currentPickleConfig(state) {
     .find(config => String(config?.groupId || config?.group_id || '') === String(groupId || '')) || {}
 }
 
-function currentMonthlyPickleConfig(state, yearMonth) {
-  const groupId = state?.currentGroupId || state?.currentGroup?.id
+function listMonthlyPickleConfigs(state) {
   return safeArray(state?._allPickle?.monthlyConfigs || state?.pickle?.monthlyConfigs || state?.pickleballMonthlyConfigs)
-    .find(config => (
-      String(config?.groupId || config?.group_id || '') === String(groupId || '') &&
-      String(config?.yearMonth || config?.year_month || '') === String(yearMonth || '')
-    )) || {}
+}
+
+function monthlyConfigMatchesGroupMonth(config, groupId, yearMonth) {
+  return String(config?.groupId || config?.group_id || '') === String(groupId || '')
+    && String(config?.yearMonth || config?.year_month || '') === String(yearMonth || '')
+}
+
+function isSparseMonthlyPickleConfig(config) {
+  if (!config || typeof config !== 'object') return true
+  const mode = config.billingMode ?? config.billing_mode
+  return mode == null || mode === ''
+}
+
+function findPreviousMonthlyPickleConfig(state, yearMonth, groupId = state?.currentGroupId || state?.currentGroup?.id) {
+  let cursor = String(yearMonth || '')
+  if (!/^\d{4}-\d{2}$/.test(cursor)) return null
+  const configs = listMonthlyPickleConfigs(state)
+  for (let step = 0; step < 36; step += 1) {
+    cursor = shiftMonthKey(cursor, -1)
+    const prev = configs.find(config => monthlyConfigMatchesGroupMonth(config, groupId, cursor))
+    if (prev && !isSparseMonthlyPickleConfig(prev)) return prev
+  }
+  return null
+}
+
+/** Exact month row if present; otherwise inherit nearest prior full config (read-only until user saves that month). */
+export function currentMonthlyPickleConfig(state, yearMonth) {
+  const groupId = state?.currentGroupId || state?.currentGroup?.id
+  const exact = listMonthlyPickleConfigs(state).find(config => monthlyConfigMatchesGroupMonth(config, groupId, yearMonth))
+  if (exact && !isSparseMonthlyPickleConfig(exact)) return exact
+
+  const previous = findPreviousMonthlyPickleConfig(state, yearMonth, groupId)
+  if (!previous) return exact || {}
+
+  return {
+    ...previous,
+    ...(exact || {}),
+    yearMonth,
+    year_month: yearMonth,
+    inheritedFromYearMonth: previous.yearMonth || previous.year_month,
+  }
 }
 
 export function isBillingModeFlexForMonth(state, yearMonth) {
@@ -5397,6 +5571,8 @@ export function memberFlexTicketType(state, memberId, yearMonth) {
   if (monthlyIds.some(id => String(id) === String(memberId))) return 'monthly'
   const perSessionIds = safeArray(monthlyConfig?.perSessionTicketMemberIds ?? monthlyConfig?.per_session_ticket_member_ids)
   if (perSessionIds.some(id => String(id) === String(memberId))) return 'per_session'
+  // Flex default: unassigned members bill as vé lượt (matches Members stats/UI).
+  if (isBillingModeFlexForMonth(state, yearMonth)) return 'per_session'
   return null
 }
 
@@ -5438,7 +5614,9 @@ export function buildMemberMonthBalanceFlex(state, pickle, sessions, memberId, d
   const teamFundTickets = myTickets.filter(t => ticketStatus(t) === 'team_fund')
   const ticketWaterFee = teamFundTickets.reduce((sum, t) => sum + ticketWaterSharePerPerson(t), 0)
   const ticketAttendedCount = myTickets.length
-  const ticketPerSessionFee = ticketType === 'per_session'
+  // Unassigned (null) members are billed on xé-vé like per_session — matches flexTicketDisplay billedMemberIds.
+  const billsTeamFundPerSession = ticketType === 'per_session' || ticketType == null
+  const ticketPerSessionFee = billsTeamFundPerSession
     ? teamFundTickets.length * perSessionTicketPrice
     : 0
   const combinedAttendedSessionsCount = attendedSessionsCount + ticketAttendedCount

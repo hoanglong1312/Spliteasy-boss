@@ -96,6 +96,22 @@ describe('PickleballOverview flex billing', () => {
     expect(markup).toContain('vé lẻ tháng này')
   })
 
+  test('shows participation as attended over completed club sessions', () => {
+    const markup = renderToStaticMarkup(React.createElement(PickleballOverview, {
+      data: {
+        ...baseData,
+        isFlexBilling: false,
+        progress: { attended: 1, completed: 11, total: 1, ticketDatesInMonth: 0 },
+      },
+      isTreasurer: true,
+    }))
+
+    expect(markup).toContain('1')
+    expect(markup).toContain('/11')
+    expect(markup).toContain('9%')
+    expect(markup).not.toContain('1100%')
+  })
+
   test('shows completed group sessions in the overview progress card', () => {
     const markup = renderToStaticMarkup(React.createElement(PickleballOverview, {
       data: {

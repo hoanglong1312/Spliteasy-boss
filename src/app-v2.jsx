@@ -5,7 +5,7 @@ import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
 import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession, getTokenAfterPinVerify, profilePinRequired, verifyProfilePin } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
-import { useScreenData } from './hooks/useScreenData'
+import { useScreenData, currentMonthlyPickleConfig } from './hooks/useScreenData'
 import Home from './screens/Home'
 import AllExpenses from './screens/AllExpenses'
 import GroupsList from './screens/GroupsList'
@@ -625,6 +625,9 @@ export default function AppV2() {
         : { screen: payload?.screen, params: payload?.params }
       const isPickleballRoute = route.screen && String(route.screen).startsWith('pickleball-')
       if (isPickleballRoute) setActiveTab('pickleball')
+      if (route.params?.yearMonth) {
+        await dispatch({ type: 'SET_SELECTED_MONTH', selectedYearMonth: route.params.yearMonth })
+      }
       if (route.screen) setStack((s) => [...s, route])
       return
     }
@@ -866,7 +869,8 @@ export default function AppV2() {
 
     if (type === 'monthPrev' || type === 'monthNext') {
       const route = stack[stack.length - 1]
-      const currentYearMonth = state.selectedYearMonth || route?.params?.yearMonth || monthKey(new Date())
+      // Prefer route params when present so screens like team-fund/calendar shift from the displayed month
+      const currentYearMonth = route?.params?.yearMonth || state.selectedYearMonth || monthKey(new Date())
       const nextYearMonth = shiftYearMonth(currentYearMonth, type === 'monthNext' ? 1 : -1)
       await dispatch({ type: 'SET_SELECTED_MONTH', selectedYearMonth: nextYearMonth })
       if (route?.screen === 'pickleball-calendar') {
@@ -885,6 +889,10 @@ export default function AppV2() {
       }
       if (route?.screen === 'batch-entry') {
         const nextRoute = { screen: 'batch-entry', params: { ...route.params, yearMonth: nextYearMonth } }
+        setStack((s) => s.map((item, index) => index === s.length - 1 ? nextRoute : item))
+      }
+      if (route?.screen === 'pickleball-team-fund') {
+        const nextRoute = { screen: 'pickleball-team-fund', params: { ...route.params, yearMonth: nextYearMonth } }
         setStack((s) => s.map((item, index) => index === s.length - 1 ? nextRoute : item))
       }
       return
@@ -1141,13 +1149,9 @@ export default function AppV2() {
         if (error) throw error
       }
       if (isPickleballGroup) {
-        const currentMonthlyConfig = safeArray(state?.pickle?.monthlyConfigs)
-          .concat(safeArray(state?._allPickle?.monthlyConfigs), safeArray(state?.pickleballMonthlyConfigs))
-          .find(config => (
-            String(config?.groupId || config?.group_id || '') === String(targetGroupId || '') &&
-            String(config?.yearMonth || config?.year_month || '') === String(yearMonth || '')
-          )) || {}
-        const currentFixedMemberIds = safeArray(currentMonthlyConfig?.fixedMemberIds ?? currentMonthlyConfig?.fixed_member_ids)
+        const scopedState = { ...state, currentGroupId: targetGroupId }
+        const baseMonthlyConfig = currentMonthlyPickleConfig(scopedState, yearMonth)
+        const currentFixedMemberIds = safeArray(baseMonthlyConfig?.fixedMemberIds ?? baseMonthlyConfig?.fixed_member_ids)
         const baseFixedMemberIds = currentFixedMemberIds.length > 0
           ? currentFixedMemberIds
           : safeArray(state?.members)
@@ -1176,7 +1180,13 @@ export default function AppV2() {
           .upsert({
             group_id: targetGroupId,
             year_month: yearMonth,
+            billing_mode: baseMonthlyConfig?.billing_mode ?? baseMonthlyConfig?.billingMode ?? 'fixed',
+            court_fee: Number(baseMonthlyConfig?.court_fee ?? baseMonthlyConfig?.courtFee) || 0,
             fixed_member_ids: nextFixedMemberIds,
+            monthly_ticket_price: Number(baseMonthlyConfig?.monthly_ticket_price ?? baseMonthlyConfig?.monthlyTicketPrice) || 0,
+            per_session_ticket_price: Number(baseMonthlyConfig?.per_session_ticket_price ?? baseMonthlyConfig?.perSessionTicketPrice ?? baseMonthlyConfig?.ticket_price ?? baseMonthlyConfig?.ticketPrice) || 0,
+            monthly_ticket_member_ids: safeArray(baseMonthlyConfig?.monthly_ticket_member_ids ?? baseMonthlyConfig?.monthlyTicketMemberIds),
+            per_session_ticket_member_ids: safeArray(baseMonthlyConfig?.per_session_ticket_member_ids ?? baseMonthlyConfig?.perSessionTicketMemberIds),
           }, { onConflict: 'group_id,year_month' })
         if (monthlyError) throw monthlyError
       }
@@ -1237,18 +1247,23 @@ export default function AppV2() {
         .eq('year_month', yearMonth)
         .maybeSingle()
       if (configError) throw configError
-      const monthlyIds = safeArray(currentConfig?.monthly_ticket_member_ids ?? currentConfig?.monthlyTicketMemberIds)
-      const perSessionIds = safeArray(currentConfig?.per_session_ticket_member_ids ?? currentConfig?.perSessionTicketMemberIds)
+      const scopedState = { ...state, currentGroupId: targetGroupId }
+      const inherited = currentMonthlyPickleConfig(scopedState, yearMonth)
+      const baseConfig = currentConfig && (currentConfig.billing_mode || currentConfig.billingMode)
+        ? currentConfig
+        : { ...inherited, ...currentConfig }
+      const monthlyIds = safeArray(baseConfig?.monthly_ticket_member_ids ?? baseConfig?.monthlyTicketMemberIds)
+      const perSessionIds = safeArray(baseConfig?.per_session_ticket_member_ids ?? baseConfig?.perSessionTicketMemberIds)
       const { error } = await sb
         .from('pickleball_monthly_config')
         .upsert({
           group_id: targetGroupId,
           year_month: yearMonth,
-          billing_mode: currentConfig?.billing_mode ?? currentConfig?.billingMode ?? 'flex',
-          court_fee: currentConfig?.court_fee ?? currentConfig?.courtFee ?? 0,
-          fixed_member_ids: safeArray(currentConfig?.fixed_member_ids ?? currentConfig?.fixedMemberIds),
-          monthly_ticket_price: currentConfig?.monthly_ticket_price ?? currentConfig?.monthlyTicketPrice ?? 0,
-          per_session_ticket_price: currentConfig?.per_session_ticket_price ?? currentConfig?.perSessionTicketPrice ?? 0,
+          billing_mode: baseConfig?.billing_mode ?? baseConfig?.billingMode ?? 'flex',
+          court_fee: Number(baseConfig?.court_fee ?? baseConfig?.courtFee) || 0,
+          fixed_member_ids: safeArray(baseConfig?.fixed_member_ids ?? baseConfig?.fixedMemberIds),
+          monthly_ticket_price: Number(baseConfig?.monthly_ticket_price ?? baseConfig?.monthlyTicketPrice) || 0,
+          per_session_ticket_price: Number(baseConfig?.per_session_ticket_price ?? baseConfig?.perSessionTicketPrice ?? baseConfig?.ticket_price ?? baseConfig?.ticketPrice) || 0,
           monthly_ticket_member_ids: ticketType === 'monthly' ? addUnique(monthlyIds, memberId) : removeValue(monthlyIds, memberId),
           per_session_ticket_member_ids: ticketType === 'per_session' ? addUnique(perSessionIds, memberId) : removeValue(perSessionIds, memberId),
         }, { onConflict: 'group_id,year_month' })
@@ -2484,6 +2499,43 @@ export default function AppV2() {
       return
     }
 
+    if (type === 'replaceSettlementCheckpoint') {
+      try {
+        const checkpointIds = [...new Set(safeArray(payload?.checkpointIds).concat(payload?.checkpointId || []).filter(Boolean))]
+        const groups = Array.isArray(payload?.groups) && payload.groups.length > 0
+          ? payload.groups.filter(row => row?.groupId && row?.memberId)
+          : []
+        if (checkpointIds.length === 0) throw new Error('Không có phiếu cũ để thay.')
+        if (groups.length === 0) throw new Error('Không có nhóm cần gửi yêu cầu thanh toán.')
+        await Promise.all(checkpointIds.map(checkpointId => dispatch({
+          type: 'REJECT_SETTLEMENT_CHECKPOINT',
+          checkpointId,
+          treasurerMemberId: treasurerMemberIdForCheckpoint(state, checkpointId),
+        })))
+        const results = await Promise.allSettled(groups.map(row => dispatch({
+          type: 'REQUEST_SETTLEMENT_CHECKPOINT',
+          groupId: row.groupId,
+          memberId: row.memberId,
+          amount: row.amount,
+          coveredItems: row.coveredItems,
+        })))
+        const successCount = results.filter(result => result.status === 'fulfilled').length
+        const failedGroups = results.flatMap((result, index) => result.status === 'rejected'
+          ? [groups[index]?.groupName || groups[index]?.groupId]
+          : [])
+        await dispatch({ type: 'REFRESH' })
+        if (successCount > 0) {
+          dispatch({ type: 'SHOW_TOAST', message: `Đã thay phiếu và gửi lại ${successCount} nhóm.` })
+        }
+        if (failedGroups.length > 0) throw new Error(`Đã hủy phiếu cũ nhưng chưa tạo lại: ${failedGroups.join(', ')}.`)
+      } catch (error) {
+        console.error('[app] replaceSettlementCheckpoint:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa thay được phiếu thanh toán.' })
+        throw error
+      }
+      return
+    }
+
     if (type === 'confirmSettlementCheckpoint') {
       try {
         const checkpointIds = [...new Set(safeArray(payload?.checkpointIds).concat(payload?.checkpointId || []).filter(Boolean))]
@@ -2549,19 +2601,25 @@ export default function AppV2() {
 
     if (type === 'markMemberPaid') {
       const payments = safeArray(payload?.payments).length ? payload.payments : [payload]
-      for (const payment of payments) {
-        await dispatch({
-          type: 'TREASURER_CONFIRM_PAYMENT',
-          memberId: payment?.memberId,
-          amount: payment?.amount,
-          monthLabel: payment?.monthLabel,
-          memberName: payment?.memberName,
-          coveredSources: payment?.coveredSources,
-          coveredItems: payment?.coveredItems,
-          groupId: payment?.groupId,
-        })
+      try {
+        for (const payment of payments) {
+          await dispatch({
+            type: 'TREASURER_CONFIRM_PAYMENT',
+            memberId: payment?.memberId,
+            amount: payment?.amount,
+            monthLabel: payment?.monthLabel,
+            memberName: payment?.memberName,
+            coveredSources: payment?.coveredSources,
+            coveredItems: payment?.coveredItems,
+            groupId: payment?.groupId,
+          })
+        }
+        dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu ${payload?.memberName || 'thành viên'} đã thanh toán.` })
+      } catch (error) {
+        console.error('[app] markMemberPaid:', error)
+        dispatch({ type: 'SHOW_TOAST', message: error?.message || 'Chưa xác nhận được thanh toán.' })
+        throw error
       }
-      dispatch({ type: 'SHOW_TOAST', message: `Đã đánh dấu ${payload?.memberName || 'thành viên'} đã thanh toán.` })
       return
     }
 

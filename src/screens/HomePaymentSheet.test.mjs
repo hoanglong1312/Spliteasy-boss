@@ -63,12 +63,13 @@ test('treasurer confirm payment sheet can snapshot selected items and share bill
   const dashboardSource = sliceBetween('function TreasurerPaymentDashboard(', 'function buildTreasurerMemberRows');
   const treasurerConfirmSource = sliceBetween('function TreasurerConfirmPaymentSheet(', 'function groupPaymentItemsBySource');
   assert.match(dashboardSource, /onRequestSnapshot=\{\(payload\) => onAction\?\.\('requestSettlementCheckpoint', payload\)\}/);
-  assert.match(treasurerConfirmSource, /async function requestPaymentSnapshot\(\)/);
-  assert.match(treasurerConfirmSource, /groups: \[\.\.\.snapshotGroups\.values\(\)\]/);
-  assert.match(treasurerConfirmSource, /const groupId = item\.groupId \|\| item\.row\?\.linkGroupId \|\| item\.row\?\.groupId/);
-  assert.match(treasurerConfirmSource, /const memberId = item\.memberId \|\| item\.row\?\.linkMemberId \|\| item\.row\?\.memberId/);
-  assert.match(treasurerConfirmSource, /amount: paymentItemsAmountDue\(group\.items\)/);
+  assert.match(dashboardSource, /onReplaceSnapshot=\{\(payload\) => onAction\?\.\('replaceSettlementCheckpoint', payload\)\}/);
+  assert.match(treasurerConfirmSource, /async function requestPaymentSnapshot\(\{ replace = false \} = \{\}\)/);
+  assert.match(treasurerConfirmSource, /function buildSnapshotGroups\(\)/);
   assert.match(treasurerConfirmSource, /coveredItems: group\.items\.flatMap\(paymentItemToCoveredItems\)/);
+  assert.match(treasurerConfirmSource, /Tháng cần thanh toán/);
+  assert.match(treasurerConfirmSource, /Thay phiếu/);
+  assert.match(treasurerConfirmSource, /Giữ phiếu cũ/);
   assert.match(treasurerConfirmSource, /Chờ nhận tiền/);
   assert.doesNotMatch(treasurerConfirmSource, /Copy nội dung/);
   assert.match(treasurerConfirmSource, /Thẻ bill/);
@@ -131,6 +132,8 @@ test('treasurer dashboard derives pending state per payable item', () => {
   assert.match(dashboardSource, /flatMap\(item => paymentItemToCoveredItems\(item\)\)/);
   assert.doesNotMatch(dashboardSource, /pendingCheckpointMemberIds/);
   assert.match(dashboardSource, /const pendingCheckpointsWithState = pendingCheckpoints\.map/);
+  assert.match(dashboardSource, /isCheckpointTimeStale/);
+  assert.match(dashboardSource, /timeStale/);
   assert.match(dashboardSource, /const pendingCheckpointById = new Map\(pendingCheckpointsWithState\.map/);
   assert.doesNotMatch(dashboardSource, /Checkpoint chờ duyệt/);
   assert.match(dashboardSource, /pendingCheckpoints=\{\[\.\.\.new Set\(row\.items\.map\(item => item\.pendingCheckpointId\)\.filter\(Boolean\)\)\]/);

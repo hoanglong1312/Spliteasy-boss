@@ -19,10 +19,16 @@ import {
   buildSettlementPeriodData,
   buildPersonalPickleSummaryCards,
   buildPersonalWaterSessionRows,
+  checkpointAsOfDate,
   effectiveSessionMemberIds,
+  filterPayableItemsAsOf,
+  groupUnpaidItemsByMonth,
   isBillingModeFlexForMonth,
+  isCheckpointTimeStale,
   memberFlexTicketType,
   memberWaterShare,
+  settlementAsOfDate,
+  currentMonthlyPickleConfig,
 } from './useScreenData.js'
 
 const fixedMembers = [
@@ -857,15 +863,90 @@ describe('flex billing helpers', () => {
     expect(isBillingModeFlexForMonth(makeFlexState(), '2026-07')).toBe(false)
   })
 
-  test('memberFlexTicketType returns monthly, per_session, or null', () => {
+  test('memberFlexTicketType returns monthly, per_session, or flex default per_session', () => {
     const state = makeFlexState({
+      billing_mode: 'flex',
       monthlyTicketMemberIds: ['member-1'],
       per_session_ticket_member_ids: ['member-2'],
     })
 
     expect(memberFlexTicketType(state, 'member-1', '2026-07')).toBe('monthly')
     expect(memberFlexTicketType(state, 'member-2', '2026-07')).toBe('per_session')
-    expect(memberFlexTicketType(state, 'member-3', '2026-07')).toBeNull()
+    expect(memberFlexTicketType(state, 'member-3', '2026-07')).toBe('per_session')
+  })
+
+  test('currentMonthlyPickleConfig inherits previous month when target month has no row', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      per_session_ticket_price: 50000,
+      monthly_ticket_member_ids: ['member-1'],
+      per_session_ticket_member_ids: ['member-2'],
+    })
+
+    const september = currentMonthlyPickleConfig(state, '2026-09')
+
+    expect(september).toMatchObject({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      per_session_ticket_price: 50000,
+      year_month: '2026-09',
+      yearMonth: '2026-09',
+      inheritedFromYearMonth: '2026-07',
+    })
+    expect(isBillingModeFlexForMonth(state, '2026-09')).toBe(true)
+    expect(memberFlexTicketType(state, 'member-1', '2026-09')).toBe('monthly')
+    expect(memberFlexTicketType(state, 'member-2', '2026-09')).toBe('per_session')
+  })
+
+  test('currentMonthlyPickleConfig prefers exact month over inherited previous', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      per_session_ticket_price: 50000,
+      monthly_ticket_member_ids: ['member-1'],
+    })
+    state.pickle.monthlyConfigs.push({
+      group_id: 'group-1',
+      year_month: '2026-09',
+      billing_mode: 'fixed',
+      court_fee: 123000,
+      fixed_member_ids: ['member-1'],
+    })
+
+    const september = currentMonthlyPickleConfig(state, '2026-09')
+
+    expect(september).toMatchObject({
+      billing_mode: 'fixed',
+      court_fee: 123000,
+      year_month: '2026-09',
+    })
+    expect(september.inheritedFromYearMonth).toBeUndefined()
+    expect(isBillingModeFlexForMonth(state, '2026-09')).toBe(false)
+  })
+
+  test('currentMonthlyPickleConfig merges sparse exact row with previous full config', () => {
+    const state = makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      per_session_ticket_price: 50000,
+      monthly_ticket_member_ids: ['member-1'],
+    })
+    state.pickle.monthlyConfigs.push({
+      group_id: 'group-1',
+      year_month: '2026-09',
+      fixed_member_ids: ['member-2'],
+    })
+
+    const september = currentMonthlyPickleConfig(state, '2026-09')
+
+    expect(september).toMatchObject({
+      billing_mode: 'flex',
+      monthly_ticket_price: 700000,
+      fixed_member_ids: ['member-2'],
+      year_month: '2026-09',
+      inheritedFromYearMonth: '2026-07',
+    })
   })
 
   test('buildPickleballMembersData counts missing ticket config as per-session', () => {
@@ -1277,12 +1358,12 @@ describe('flex billing helpers', () => {
     const result = buildMemberMonthBalanceFlex(state, {}, [], 'member-2', new Date('2026-07-10'))
 
     expect(result).toMatchObject({
-      ticketType: null,
-      perSessionTicketFee: 0,
+      ticketType: 'per_session',
+      perSessionTicketFee: 50000,
       waterFee: 10000,
       ticketShare: 0,
-      netBalance: -10000,
-      totalOwed: 10000,
+      netBalance: -60000,
+      totalOwed: 60000,
     })
   })
 
@@ -1506,7 +1587,7 @@ describe('flex billing helpers', () => {
       flexMonthlyTicketPrice: 700_000,
       flexPerSessionTicketPrice: 120_000,
       flexMonthlyMemberCount: 1,
-      flexPerSessionMemberCount: 1,
+      flexPerSessionMemberCount: 2,
       flexMonthlyRevenue: 700_000,
       flexPerSessionRevenue: 240_000,
       flexTotalDue: 940_000,
@@ -1623,7 +1704,7 @@ describe('buildPickleballCalendarData', () => {
     }))).toEqual([
       { id: 'member-1', ticketType: 'monthly', sessionsAttended: 3 },
       { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
-      { id: 'member-3', ticketType: null, sessionsAttended: 0 },
+      { id: 'member-3', ticketType: 'per_session', sessionsAttended: 0 },
     ])
   })
 
@@ -1731,6 +1812,12 @@ describe('buildPersonalPickleSummaryCards', () => {
       perSessionTicketFee: 0,
       waterFee: 0,
     }, 0, 'member-1', [])
+    const unassignedWithTickets = buildPersonalPickleSummaryCards([], {
+      ticketType: null,
+      monthlyTicketFee: 0,
+      perSessionTicketFee: 50000,
+      waterFee: 0,
+    }, 0, 'member-1', [])
 
     expect(perSession[0]).toMatchObject({
       label: 'Vé lượt của bạn',
@@ -1741,6 +1828,11 @@ describe('buildPersonalPickleSummaryCards', () => {
       label: 'Chưa phân nhóm vé',
       amount: 0,
       sub: 'Vào Thành viên để chọn vé tháng/lượt',
+    })
+    expect(unassignedWithTickets[0]).toMatchObject({
+      label: 'Vé lượt của bạn',
+      amount: -50000,
+      sub: 'Theo buổi xé vé · chưa gán nhóm',
     })
   })
 
@@ -1799,7 +1891,7 @@ describe('buildPickleballTicketsData', () => {
     }))).toEqual([
       { id: 'member-1', ticketType: 'monthly', sessionsAttended: 3 },
       { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
-      { id: 'member-3', ticketType: null, sessionsAttended: 0 },
+      { id: 'member-3', ticketType: 'per_session', sessionsAttended: 0 },
     ])
   })
 })
@@ -1902,8 +1994,139 @@ describe('buildPersonalWaterSessionRows', () => {
 
     const result = buildPersonalWaterSessionRows([], 'member-1', state.members, true, state, new Date('2026-07-10'))
 
-    expect(result).toEqual([
+    expect(result).toMatchObject([
       { label: 'Tiền nước · 01/07', amount: 10714, paid: false },
+    ])
+  })
+
+  test('marks ticket water paid when confirmed coverage uses negative debt amounts', () => {
+    const state = addJulyFlexTickets(makeFlexState({ billing_mode: 'flex' }))
+    state.members = state.members.map(m => (
+      String(m.id) === 'member-1' ? { ...m, profile_id: 'profile-1' } : m
+    ))
+    state.notifications = [{
+      type: 'payment_confirmed',
+      member_id: 'member-1',
+      metadata: {
+        status: 'confirmed',
+        coveredItems: [{
+          payableItemKey: 'item:pickleball-ticket:ticket-1:water|member:member-1|profile:profile-1|month:2026-07',
+          amount: -10714,
+        }],
+      },
+    }]
+
+    const result = buildPersonalWaterSessionRows([], 'member-1', state.members, true, state, new Date('2026-07-10'))
+
+    expect(result[0]).toMatchObject({
+      label: 'Tiền nước · 01/07',
+      amount: 10714,
+      paid: true,
+    })
+  })
+
+  test('marks session water paid from coverage with opposite sign', () => {
+    const members = [
+      { id: 'member-1', profile_id: 'profile-1', name: 'Member One' },
+      { id: 'member-2', profile_id: 'profile-2', name: 'Member Two' },
+    ]
+    const sessions = [{
+      id: 'sess-1',
+      date: '2026-08-03',
+      water_amount: 65000,
+      attendance_records: [
+        { member_id: 'member-1', status: 'present' },
+        { member_id: 'member-2', status: 'present' },
+      ],
+    }]
+    const state = {
+      notifications: [{
+        type: 'payment_confirmed',
+        member_id: 'member-1',
+        metadata: {
+          status: 'confirmed',
+          coveredItems: [{
+            payableItemKey: 'item:pickleball-session:sess-1:water|member:member-1|profile:profile-1|month:2026-08',
+            amount: -32500,
+          }],
+        },
+      }],
+    }
+
+    const result = buildPersonalWaterSessionRows(sessions, 'member-1', members, false, state)
+
+    expect(result[0]).toMatchObject({ amount: 32500, paid: true })
+  })
+})
+
+describe('buildPersonalPickleSummaryCards water paid fifo', () => {
+  test('FIFO-marks oldest unpaid water rows from monthly leftover covered amount', () => {
+    const state = addJulyFlexTickets(makeFlexState({
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+    }))
+    state.pickle.externalTickets = [
+      {
+        id: 'ticket-a',
+        group_id: 'group-1',
+        year_month: '2026-08',
+        session_date: '2026-08-03',
+        status: 'team_fund',
+        water_amount: 32500,
+        member_ids: ['member-1'],
+      },
+      {
+        id: 'ticket-b',
+        group_id: 'group-1',
+        year_month: '2026-08',
+        session_date: '2026-08-05',
+        status: 'team_fund',
+        water_amount: 15600,
+        member_ids: ['member-1'],
+      },
+      {
+        id: 'ticket-c',
+        group_id: 'group-1',
+        year_month: '2026-08',
+        session_date: '2026-08-07',
+        status: 'team_fund',
+        water_amount: 9600,
+        member_ids: ['member-1'],
+      },
+    ]
+    state.pickle.monthlyConfigs = [{
+      group_id: 'group-1',
+      year_month: '2026-08',
+      billing_mode: 'flex',
+      monthly_ticket_member_ids: ['member-1'],
+    }]
+    state.pickle.ownerPayments = [{
+      group_id: 'group-1',
+      items: [{ key: 'flex_monthly', year_month: '2026-08' }],
+    }]
+
+    // gross 700k + 57.7k water; remaining after payments leaves 72k water covered via delta
+    // monthly 700000 paid via owner; coveredAmount = gross - remaining
+    // waterFee 32500+15600+9600 = 57700; leftover covered for water = 48100 → FIFO first two rows
+    const waterFee = 57700
+    const monthlyTicketFee = 700000
+    const grossBalance = -(monthlyTicketFee + waterFee)
+    const remainingBalance = -(waterFee - 48100) // 9600 unpaid water left
+    const coveredAmount = Math.abs(grossBalance) - Math.abs(remainingBalance) // 700000 + 48100
+
+    const result = buildPersonalPickleSummaryCards([], {
+      ticketType: 'monthly',
+      monthlyTicketFee,
+      waterFee,
+      netBalance: grossBalance,
+    }, 0, 'member-1', state.members, true, state, new Date('2026-08-10'), remainingBalance)
+
+    const waterCard = result[1]
+    expect(waterCard.coveredAmount).toBe(48100)
+    expect(waterCard.rows.map(r => ({ amount: r.amount, paid: r.paid }))).toEqual([
+      { amount: 32500, paid: true },
+      { amount: 15600, paid: true },
+      { amount: 9600, paid: false },
     ])
   })
 })
@@ -2136,7 +2359,7 @@ describe('buildPaymentProgressRows', () => {
     expect(rows).toEqual([])
   })
 
-  test('splits treasurer payment items by source month and defaults current month only', () => {
+  test('splits treasurer payment items by source month and defaults all unpaid months', () => {
     const rows = buildPaymentProgressRows(
       [{
         profileId: 'profile-tuan',
@@ -2168,20 +2391,29 @@ describe('buildPaymentProgressRows', () => {
     )
 
     expect(rows[0].paymentItems).toHaveLength(2)
-    expect(rows[0].defaultPaymentItemKeys).toEqual([rows[0].paymentItems[1].key])
-    expect(rows[0].payableAmount).toBe(200000)
-    expect(rows[0].payableSources).toMatchObject([{
-      sourceId: 'life-1',
-      sourceLabel: 'Lấy vk để trưởng thành',
-      memberId: 'life-tuan',
-      month: '2026-07',
-      amount: -200000,
-    }])
+    expect(rows[0].defaultPaymentItemKeys).toEqual(rows[0].paymentItems.map(item => item.key))
+    expect(rows[0].payableAmount).toBe(300000)
+    expect(rows[0].payableSources).toMatchObject([
+      {
+        sourceId: 'life-1',
+        sourceLabel: 'Lấy vk để trưởng thành',
+        memberId: 'life-tuan',
+        month: '2026-06',
+        amount: -100000,
+      },
+      {
+        sourceId: 'life-1',
+        sourceLabel: 'Lấy vk để trưởng thành',
+        memberId: 'life-tuan',
+        month: '2026-07',
+        amount: -200000,
+      },
+    ])
     expect(rows[0].paymentItems[0]).toMatchObject({
       sourceLabel: 'Lấy vk để trưởng thành',
       month: '2026-06',
       amount: -100000,
-      defaultSelected: false,
+      defaultSelected: true,
     })
     expect(rows[0].paymentItems[1]).toMatchObject({
       month: '2026-07',
@@ -6193,5 +6425,83 @@ describe('buildGroupDetailData', () => {
     expect(result.members.find(member => member.id === 'treasurer-1')?.monthBreakdown).toEqual([
       { month: '2026-05', label: 'Tháng 5', amount: 100000 },
     ])
+  })
+})
+
+describe('month-bucket settlement helpers', () => {
+  test('filterPayableItemsAsOf keeps past months fully and current month only through asOf', () => {
+    const items = [
+      { payableItemKey: 'a', month: '2026-07', date: '2026-07-20', amount: -100 },
+      { payableItemKey: 'b', month: '2026-08', date: '2026-08-10', amount: -50 },
+      { payableItemKey: 'c', month: '2026-08', date: '2026-08-20', amount: -30 },
+      { payableItemKey: 'd', month: '2026-09', date: '2026-09-01', amount: -10 },
+    ]
+    const filtered = filterPayableItemsAsOf(items, '2026-08-12', '2026-08')
+    expect(filtered.map(item => item.payableItemKey).sort()).toEqual(['a', 'b'])
+  })
+
+  test('groupUnpaidItemsByMonth aggregates by calendar month', () => {
+    const buckets = groupUnpaidItemsByMonth([
+      { month: '2026-08', amount: -50 },
+      { month: '2026-07', amount: -100 },
+      { month: '2026-08', amount: -30 },
+    ])
+    expect(buckets.map(bucket => [bucket.month, bucket.amount, bucket.itemCount])).toEqual([
+      ['2026-07', -100, 1],
+      ['2026-08', -80, 2],
+    ])
+  })
+
+  test('isCheckpointTimeStale only for partial current-month slips after asOf', () => {
+    const partial = {
+      created_at: '2026-08-12T10:00:00.000Z',
+      covered_items: [{ month: '2026-08', amount: -50, date: '2026-08-10' }],
+    }
+    const julyOnly = {
+      created_at: '2026-08-12T10:00:00.000Z',
+      covered_items: [{ month: '2026-07', amount: -100, date: '2026-07-20' }],
+    }
+    expect(checkpointAsOfDate(partial)).toBe('2026-08-12')
+    expect(isCheckpointTimeStale(partial, '2026-08-13')).toBe(true)
+    expect(isCheckpointTimeStale(partial, '2026-08-12')).toBe(false)
+    expect(isCheckpointTimeStale(julyOnly, '2026-08-20')).toBe(false)
+  })
+
+  test('buildPaymentProgressRows defaults all unpaid months and respects asOf filter', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-12T12:00:00.000Z'))
+    const members = [
+      { id: 'member-1', name: 'Member One', profile_id: 'profile-1', group_id: 'group-1' },
+    ]
+    const profileBreakdown = [{
+      profileId: 'profile-1',
+      name: 'Member One',
+      amount: -180,
+      memberIds: ['member-1'],
+      sources: [{
+        sourceType: 'group',
+        sourceId: 'group-1',
+        sourceLabel: 'Nhóm A',
+        memberId: 'member-1',
+        amount: -180,
+        monthBreakdown: [
+          { month: '2026-07', label: 'Tháng 7', amount: -100 },
+          { month: '2026-08', label: 'Tháng 8', amount: -80 },
+        ],
+        payableItems: [
+          { payableItemKey: 'july', month: '2026-07', date: '2026-07-20', amount: -100, memberId: 'member-1' },
+          { payableItemKey: 'aug-early', month: '2026-08', date: '2026-08-10', amount: -50, memberId: 'member-1' },
+          { payableItemKey: 'aug-late', month: '2026-08', date: '2026-08-20', amount: -30, memberId: 'member-1' },
+        ],
+      }],
+    }]
+
+    const rows = buildPaymentProgressRows(profileBreakdown, members, { notifications: [] }, 'Tháng 8 · 2026', [], '2026-08')
+    const paymentItems = rows[0].paymentItems
+    expect(paymentItems.map(item => item.month).sort()).toEqual(['2026-07', '2026-08'])
+    expect(paymentItems.every(item => item.defaultSelected)).toBe(true)
+    expect(paymentItems.find(item => item.month === '2026-08')?.amount).toBe(-50)
+    expect(settlementAsOfDate()).toBe('2026-08-12')
+    vi.useRealTimers()
   })
 })
