@@ -7,6 +7,12 @@ import {
   PhoneFrame, Screen, TabBar, MonthNav, Card, Button, Badge, SubTabs, Input,
   BottomSheet, LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
+import {
+  TICKET_WATER_DRINKS,
+  hasWaterItemQuantities,
+  normalizeWaterItems,
+  resolveTicketWaterAmount,
+} from '../lib/ticketWaterItems';
 
 const DAYS_OF_WEEK = ['T2','T3','T4','T5','T6','T7','CN'];
 
@@ -533,9 +539,13 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
   const [memberIds, setMemberIds] = useState(editingTicket?.memberIds || []);
   const [paymentMode, setPaymentMode] = useState(initialPaymentMode);
   const [advancerId, setAdvancerId] = useState(editingTicket?.advancerId || '');
-  const [waterInput, setWaterInput] = useState(
-    editingTicket?.waterAmount > 0 ? formatAmountInput(editingTicket.waterAmount) : ''
-  );
+  const [waterItems, setWaterItems] = useState(() => normalizeWaterItems(editingTicket?.waterItems || editingTicket?.water_items));
+  const initialItemized = hasWaterItemQuantities(editingTicket?.waterItems || editingTicket?.water_items);
+  const initialLegacyWater = Number(editingTicket?.waterAmount ?? editingTicket?.water_amount) || 0;
+  const [showManualWater, setShowManualWater] = useState(() => !initialItemized && initialLegacyWater > 0);
+  const [manualWaterInput, setManualWaterInput] = useState(() => (
+    !initialItemized && initialLegacyWater > 0 ? formatAmountInput(initialLegacyWater) : ''
+  ));
   const [error, setError] = useState('');
   const selectedMembers = members.filter(member => memberIds.some(id => String(id) === String(member.id)));
   const ticketPrice = Number(editingTicket?.amountPerPerson || data.ticketPricePerPerson || data.ticketPrice || 50000) || 50000;
@@ -548,7 +558,15 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
     return member?.ticketType === 'monthly';
   });
   const totalSelected = memberIds.length;
-  const waterAmount = parseAmount(waterInput) || 0;
+  const legacyWaterAmount = Number(editingTicket?.waterAmount ?? editingTicket?.water_amount) || 0;
+  const itemized = hasWaterItemQuantities(waterItems);
+  const manualWaterAmount = parseAmount(manualWaterInput) || 0;
+  const useManualWater = showManualWater && manualWaterAmount > 0 && !itemized;
+  const waterAmount = itemized
+    ? resolveTicketWaterAmount(waterItems, 0)
+    : useManualWater
+      ? manualWaterAmount
+      : resolveTicketWaterAmount(waterItems, legacyWaterAmount);
   const waterPerPerson = totalSelected > 0 ? Math.round(waterAmount / totalSelected) : 0;
   const perLegPersonAmount = ticketPrice + waterPerPerson;
   const perMonthlyPersonAmount = waterPerPerson;
@@ -569,19 +587,37 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
         : [...current, memberId]
     ));
   };
+
+  const setWaterQty = (key, nextQty) => {
+    setError('');
+    setManualWaterInput('');
+    setWaterItems(current => normalizeWaterItems({
+      ...current,
+      [key]: Math.max(0, Math.round(Number(nextQty) || 0)),
+    }));
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     if (!selectedDate) return setError('Chọn ngày chơi.');
     if (memberIds.length === 0) return setError('Chọn ít nhất một người.');
     if (paymentMode === 'advancer' && !advancerId) return setError('Chọn người ứng tiền.');
+    const items = itemized ? normalizeWaterItems(waterItems) : normalizeWaterItems({});
+    const amount = itemized
+      ? resolveTicketWaterAmount(items, 0)
+      : useManualWater
+        ? manualWaterAmount
+        : resolveTicketWaterAmount(items, legacyWaterAmount);
     try {
       await onSave({
         session_date: selectedDate,
         session_time: time,
         member_ids: memberIds,
         total_amount: totalAmount,
-        water_amount: parseAmount(waterInput) || 0,
-        waterAmount: parseAmount(waterInput) || 0,
+        water_amount: amount,
+        waterAmount: amount,
+        water_items: items,
+        waterItems: items,
         advancer_id: paymentMode === 'advancer' ? advancerId : null,
         paymentMode,
       });
@@ -688,26 +724,161 @@ function AddTicketSheet({ data, selectedDate, editingTicket = null, onClose, onS
           <div style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>
             Tiền nước (tuỳ chọn)
           </div>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={waterInput}
-            onChange={e => setWaterInput(e.target.value)}
-            placeholder="0"
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              background: colors.inputBg,
-              border: `1px solid ${colors.borderSubtle}`,
-              borderRadius: 10,
-              color: colors.textPrimary,
-              fontSize: 16,
-              fontWeight: 900,
-              fontFamily: 'inherit',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {TICKET_WATER_DRINKS.map(drink => {
+              const qty = Number(waterItems[drink.key]) || 0;
+              return (
+                <div
+                  key={drink.key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    padding: '8px 10px',
+                    borderRadius: 10,
+                    background: colors.inputBg,
+                    border: `1px solid ${colors.borderSubtle}`,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800 }}>{drink.label}</div>
+                    <div style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{formatVNDShort(drink.unitPrice)}/chai</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
+                    <button
+                      type="button"
+                      onClick={() => setWaterQty(drink.key, qty - 1)}
+                      disabled={qty <= 0}
+                      style={waterQtyButtonStyle(qty <= 0)}
+                      aria-label={`Giảm ${drink.label}`}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={qty === 0 ? '' : String(qty)}
+                      placeholder="0"
+                      onChange={e => setWaterQty(drink.key, e.target.value.replace(/\D/g, ''))}
+                      style={{
+                        width: 42,
+                        textAlign: 'center',
+                        padding: '6px 4px',
+                        background: 'rgba(0,0,0,0.25)',
+                        border: `1px solid ${colors.borderSubtle}`,
+                        borderRadius: 8,
+                        color: colors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: 900,
+                        fontFamily: 'inherit',
+                        outline: 'none',
+                      }}
+                      aria-label={`Số chai ${drink.label}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setWaterQty(drink.key, qty + 1)}
+                      style={waterQtyButtonStyle(false)}
+                      aria-label={`Tăng ${drink.label}`}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 12, fontWeight: 800 }}>
+            <span style={{ color: colors.textSecondary }}>
+              {itemized
+                ? `Tổng nước · ${TICKET_WATER_DRINKS.reduce((n, d) => n + (waterItems[d.key] || 0), 0)} chai`
+                : useManualWater
+                  ? 'Tổng nước (nhập tay)'
+                  : 'Tổng nước'}
+            </span>
+            <span style={{ ...type.mono }}>{formatVNDShort(waterAmount)}</span>
+          </div>
+          {!showManualWater ? (
+            <button
+              type="button"
+              onClick={() => setShowManualWater(true)}
+              style={{
+                marginTop: 8,
+                border: 'none',
+                background: 'transparent',
+                color: colors.textMuted,
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                padding: 0,
+                textDecoration: 'underline',
+                textUnderlineOffset: 2,
+              }}
+            >
+              Hoặc nhập tổng tiền…
+            </button>
+          ) : (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+                  Tổng tiền nước
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualWater(false);
+                    setManualWaterInput('');
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  Ẩn
+                </button>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={manualWaterInput}
+                onChange={e => {
+                  setError('');
+                  setWaterItems(normalizeWaterItems({}));
+                  setManualWaterInput(formatAmountInput(e.target.value));
+                }}
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  background: colors.inputBg,
+                  border: `1px solid ${colors.borderSubtle}`,
+                  borderRadius: 10,
+                  color: colors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: 900,
+                  fontFamily: 'inherit',
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ marginTop: 4, fontSize: 10, color: colors.textMuted }}>
+                Dùng khi không khớp 3 loại nước ở trên
+              </div>
+            </div>
+          )}
+          {!itemized && !useManualWater && legacyWaterAmount > 0 && (
+            <div style={{ marginTop: 4, fontSize: 10, color: colors.textMuted }}>
+              Vé cũ chưa phân loại — chọn số chai hoặc nhập tổng để cập nhật
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
@@ -1525,6 +1696,23 @@ function ticketNameChipStyle(typeKey) {
     color: monthly ? '#c7d2fe' : '#fde68a',
     fontSize: 11,
     fontWeight: 850,
+  };
+}
+
+function waterQtyButtonStyle(disabled) {
+  return {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    border: `1px solid ${colors.borderSubtle}`,
+    background: disabled ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.08)',
+    color: disabled ? colors.textMuted : colors.textPrimary,
+    fontSize: 18,
+    fontWeight: 900,
+    fontFamily: 'inherit',
+    cursor: disabled ? 'default' : 'pointer',
+    lineHeight: 1,
+    padding: 0,
   };
 }
 

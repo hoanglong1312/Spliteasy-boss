@@ -7,6 +7,14 @@ import {
   pickleSummary,
 } from '../data.jsx'
 import { getRecentInvites } from '../lib/auth.js'
+import {
+  formatWaterDayExportText,
+  mergeWaterDayRow,
+  applyOwnerPaidFifoToWaterDays,
+  hasWaterItemQuantities,
+  normalizeWaterItems,
+  resolveTicketWaterAmount,
+} from '../lib/waterDayExport.js'
 
 const WEEKDAYS = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
 const WEEKDAYS_SHORT = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
@@ -2916,6 +2924,10 @@ export function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(
     }),
   ]
 
+  const waterDayRows = buildMonthWaterDayRows(state, today)
+  const waterPaidToOwner = ownerPaymentPaidAmount(ownerPayments, 'water', currentYearMonth, waterTotal)
+  const waterDayExportRows = applyOwnerPaidFifoToWaterDays(waterDayRows, waterPaidToOwner)
+
   return {
     groupId: currentGroup(state)?.id,
     clubName: currentGroupName(state, 'CLB Pickleball'),
@@ -2957,7 +2969,52 @@ export function buildPickleballTeamFundData(state, selectedYearMonth = monthKey(
       note: payment.note || '',
     })),
     costRows,
+    waterDayRows,
+    waterDayExportRows,
+    waterDayExportText: formatWaterDayExportText({
+      clubName: currentGroupName(state, 'CLB Pickleball'),
+      monthLabel: formatMonthLabel(today),
+      rows: waterDayExportRows,
+    }),
   }
+}
+
+function buildMonthWaterDayRows(state, date) {
+  const byDate = new Map()
+  const addRow = (row) => {
+    if (!row?.date || !(Number(row.amount) > 0)) return
+    const prev = byDate.get(row.date)
+    byDate.set(row.date, prev ? mergeWaterDayRow(prev, row) : mergeWaterDayRow(null, row))
+  }
+
+  getStateMonthSessions(state, date).forEach(session => {
+    const amount = sessionWaterAmount(session)
+    if (amount <= 0) return
+    const when = sessionDate(session)
+    addRow({
+      date: dateKey(when),
+      dateLabel: formatDayMonth(when),
+      amount,
+      waterItems: null,
+    })
+  })
+
+  monthTicketsForState(state, date)
+    .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+    .forEach(ticket => {
+      const items = ticket?.waterItems ?? ticket?.water_items
+      const amount = resolveTicketWaterAmount(items, ticket?.waterAmount ?? ticket?.water_amount)
+      if (amount <= 0) return
+      const when = ticketDate(ticket)
+      addRow({
+        date: dateKey(when),
+        dateLabel: formatDayMonth(when),
+        amount,
+        waterItems: hasWaterItemQuantities(items) ? normalizeWaterItems(items) : null,
+      })
+    })
+
+  return [...byDate.values()].sort((a, b) => String(a.date).localeCompare(String(b.date)))
 }
 
 function buildTeamFundTicketRows(state, date) {
@@ -3532,10 +3589,22 @@ export function buildPickleballTicketsData(state) {
   }
 }
 
+function previousMonthAttendanceSessions(state, yearMonth) {
+  const previousMonth = shiftMonthKey(yearMonth, -1)
+  if (!/^\d{4}-\d{2}$/.test(String(previousMonth || ''))) return []
+  if (isBillingModeFlexForMonth(state, previousMonth)) {
+    return monthTicketsForState(state, previousMonth)
+      .filter(ticket => ticketStatus(ticket) !== 'pending_review')
+      .map(ticket => ({ attendees: ticketMemberIds(ticket) }))
+  }
+  return getStateMonthSessions(state, previousMonth)
+    .filter(session => isDoneStatus(session?.status) && !isMovedSession(session))
+}
+
 function buildTicketPickerMembers(state, yearMonth) {
   const activeMembers = currentGroupMembers(state).filter(isActiveMember)
   const isFlex = isBillingModeFlexForMonth(state, yearMonth)
-  const sessions = [0, -1, -2].flatMap(delta => getStateMonthSessions(state, shiftMonthKey(yearMonth, delta)))
+  const sessions = previousMonthAttendanceSessions(state, yearMonth)
   return activeMembers
     .map((member, index) => ({
       id: member.id,
@@ -5267,6 +5336,7 @@ function toTicketRow(ticket, index, state) {
   const totalAmount = ticketTotalAmount(ticket)
   const amountPerPerson = ticketPersonalShare(state, ticket)
   const waterAmount = Number(ticket?.waterAmount ?? ticket?.water_amount ?? 0) || 0
+  const waterItems = ticket?.waterItems ?? ticket?.water_items ?? {}
   const flexDisplay = flexTicketDisplay(ticket, state)
   const advancerId = ticketAdvancerId(ticket)
   const advancerName = advancerId ? memberName(advancerId, safeArray(state?.members)) : null
@@ -5283,6 +5353,8 @@ function toTicketRow(ticket, index, state) {
     amount: totalAmount,
     totalAmount,
     waterAmount,
+    waterItems,
+    water_items: waterItems,
     amountPerPerson,
     displayAmountPerPerson: flexDisplay.amountPerPerson || amountPerPerson,
     displayAmountLabel: flexDisplay.amountPerPerson ? 'vé lượt' : 'người',

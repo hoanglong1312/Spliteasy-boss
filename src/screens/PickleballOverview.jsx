@@ -365,19 +365,51 @@ export default function PickleballOverview({ data, isTreasurer = true, onAction 
                   Chi phí team và khoản đã trả chủ sân
                 </div>
               </div>
-              <button type="button" onClick={() => onAction?.('push', { screen: 'pickleball-team-fund', params: { yearMonth: d.currentYearMonth } })} style={{
-                border: 'none',
-                background: 'rgba(96,165,250,0.13)',
-                color: '#bfdbfe',
-                borderRadius: 999,
-                padding: '8px 10px',
-                fontSize: 11,
-                fontWeight: 900,
-                fontFamily: 'inherit',
-                cursor: 'pointer',
-              }}>
-                Mở quỹ
-              </button>
+              <div style={{ display: 'flex', gap: 6, flex: '0 0 auto' }}>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const text = teamFundOverview.waterDayExportText || ''
+                    if (!text) {
+                      onAction?.('toast', 'Chưa có tiền nước trong tháng.')
+                      return
+                    }
+                    try {
+                      if (!navigator?.clipboard?.writeText) throw new Error('no_clipboard')
+                      await navigator.clipboard.writeText(text)
+                      onAction?.('toast', 'Đã copy tiền nước theo ngày.')
+                    } catch {
+                      onAction?.('toast', 'Không copy được. Thử lại trên trình duyệt.')
+                    }
+                  }}
+                  style={{
+                    border: 'none',
+                    background: 'rgba(251,191,36,0.12)',
+                    color: '#fde68a',
+                    borderRadius: 999,
+                    padding: '8px 10px',
+                    fontSize: 11,
+                    fontWeight: 900,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                  }}
+                >
+                  📋 Copy nước
+                </button>
+                <button type="button" onClick={() => onAction?.('push', { screen: 'pickleball-team-fund', params: { yearMonth: d.currentYearMonth } })} style={{
+                  border: 'none',
+                  background: 'rgba(96,165,250,0.13)',
+                  color: '#bfdbfe',
+                  borderRadius: 999,
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  fontWeight: 900,
+                  fontFamily: 'inherit',
+                  cursor: 'pointer',
+                }}>
+                  Mở quỹ
+                </button>
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginTop: 12 }}>
               {(teamFundOverview.costRows || []).map(row => (

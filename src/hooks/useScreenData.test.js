@@ -1681,18 +1681,50 @@ describe('buildPickleballCalendarData', () => {
     expect(data.selectedSession.attendees.map(member => member.name)).toEqual(['Anh Quân'])
   })
 
-  test('ticket picker members include flex ticket type and sort by 3-month attendance', () => {
+  test('ticket picker members sort by previous-month attendance', () => {
     const state = makeFlexState({
       billing_mode: 'flex',
       monthly_ticket_member_ids: ['member-1'],
       per_session_ticket_member_ids: ['member-2'],
     })
+    // Viewing July → sort by June sessions only
     state.pickle.sessions = [
-      { date: '2026-05-12', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
-      { date: '2026-06-10', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
-      { date: '2026-07-02', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
-      { date: '2026-07-09', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
-      { date: '2026-07-16', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
+      { date: '2026-05-12', status: 'completed', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'present' }] },
+      { date: '2026-06-10', status: 'completed', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
+      { date: '2026-06-20', status: 'completed', attendance_records: [{ member_id: 'member-2', status: 'present' }, { member_id: 'member-3', status: 'present' }] },
+      { date: '2026-07-02', status: 'completed', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
+    ]
+    // June is flex too via inherited/config — add June flex config + tickets so flex path uses tickets
+    state.pickle.monthlyConfigs.push({
+      group_id: 'group-1',
+      year_month: '2026-06',
+      billing_mode: 'flex',
+    })
+    state.pickle.externalTickets = [
+      {
+        id: 'june-t1',
+        group_id: 'group-1',
+        year_month: '2026-06',
+        session_date: '2026-06-10',
+        status: 'team_fund',
+        member_ids: ['member-1', 'member-3'],
+      },
+      {
+        id: 'june-t2',
+        group_id: 'group-1',
+        year_month: '2026-06',
+        session_date: '2026-06-20',
+        status: 'team_fund',
+        member_ids: ['member-2', 'member-3'],
+      },
+      {
+        id: 'june-t3',
+        group_id: 'group-1',
+        year_month: '2026-06',
+        session_date: '2026-06-25',
+        status: 'team_fund',
+        member_ids: ['member-3'],
+      },
     ]
 
     const data = buildPickleballCalendarData(state, { yearMonth: '2026-07' })
@@ -1702,9 +1734,9 @@ describe('buildPickleballCalendarData', () => {
       ticketType: member.ticketType,
       sessionsAttended: member.sessionsAttended,
     }))).toEqual([
-      { id: 'member-1', ticketType: 'monthly', sessionsAttended: 3 },
-      { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
-      { id: 'member-3', ticketType: 'per_session', sessionsAttended: 0 },
+      { id: 'member-3', ticketType: 'per_session', sessionsAttended: 3 },
+      { id: 'member-1', ticketType: 'monthly', sessionsAttended: 1 },
+      { id: 'member-2', ticketType: 'per_session', sessionsAttended: 1 },
     ])
   })
 
@@ -1866,7 +1898,7 @@ describe('buildPickleballTicketsData', () => {
     vi.useRealTimers()
   })
 
-  test('members include flex ticket type and sort by 3-month attendance', () => {
+  test('members include flex ticket type and sort by previous-month attendance', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-20'))
     const state = makeFlexState({
@@ -1874,12 +1906,22 @@ describe('buildPickleballTicketsData', () => {
       monthly_ticket_member_ids: ['member-1'],
       per_session_ticket_member_ids: ['member-2'],
     })
+    // June stays fixed so session attendance counts for previous-month sort
+    state.pickle.monthlyConfigs = [
+      { group_id: 'group-1', year_month: '2026-06', billing_mode: 'fixed' },
+      {
+        group_id: 'group-1',
+        year_month: '2026-07',
+        billing_mode: 'flex',
+        monthly_ticket_member_ids: ['member-1'],
+        per_session_ticket_member_ids: ['member-2'],
+      },
+    ]
     state.pickle.sessions = [
-      { date: '2026-05-12', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
-      { date: '2026-06-10', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
-      { date: '2026-07-02', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
-      { date: '2026-07-09', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
-      { date: '2026-07-16', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
+      { date: '2026-05-12', status: 'completed', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'present' }] },
+      { date: '2026-06-10', status: 'completed', attendance_records: [{ member_id: 'member-1', status: 'present' }, { member_id: 'member-2', status: 'absent' }] },
+      { date: '2026-06-18', status: 'completed', attendance_records: [{ member_id: 'member-2', status: 'present' }, { member_id: 'member-3', status: 'present' }] },
+      { date: '2026-07-02', status: 'completed', attendance_records: [{ member_id: 'member-1', status: 'absent' }, { member_id: 'member-2', status: 'present' }] },
     ]
 
     const data = buildPickleballTicketsData(state)
@@ -1889,9 +1931,9 @@ describe('buildPickleballTicketsData', () => {
       ticketType: member.ticketType,
       sessionsAttended: member.sessionsAttended,
     }))).toEqual([
-      { id: 'member-1', ticketType: 'monthly', sessionsAttended: 3 },
-      { id: 'member-2', ticketType: 'per_session', sessionsAttended: 2 },
-      { id: 'member-3', ticketType: 'per_session', sessionsAttended: 0 },
+      { id: 'member-1', ticketType: 'monthly', sessionsAttended: 1 },
+      { id: 'member-2', ticketType: 'per_session', sessionsAttended: 1 },
+      { id: 'member-3', ticketType: 'per_session', sessionsAttended: 1 },
     ])
   })
 })

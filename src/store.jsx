@@ -1383,6 +1383,8 @@ function normalize(raw, currentMemberId, preferredGroupId = null, preferredMembe
     amount: Number(ticket.total_amount) || 0,
     waterAmount: Number(ticket.water_amount) || 0,
     water_amount: Number(ticket.water_amount) || 0,
+    waterItems: ticket.water_items && typeof ticket.water_items === 'object' ? ticket.water_items : {},
+    water_items: ticket.water_items && typeof ticket.water_items === 'object' ? ticket.water_items : {},
     memberIds: safeArray(ticket.member_ids),
     member_ids: safeArray(ticket.member_ids),
     advancerId: ticket.advancer_id,

@@ -5,7 +5,8 @@ import { colors, type } from './tokens'
 import { useApp } from './store.jsx'
 import { getRecentSessions, getStoredAuth, joinGroup, removeRecentSession, getPinnedSession, getTokenAfterPinVerify, profilePinRequired, verifyProfilePin } from './lib/auth.js'
 import { createSupabase } from './lib/supabase.js'
-import { useScreenData, currentMonthlyPickleConfig } from './hooks/useScreenData'
+import { useScreenData, currentMonthlyPickleConfig, isBillingModeFlexForMonth, memberFlexTicketType } from './hooks/useScreenData'
+import { normalizeWaterItems, resolveTicketWaterAmount } from './lib/ticketWaterItems.js'
 import Home from './screens/Home'
 import AllExpenses from './screens/AllExpenses'
 import GroupsList from './screens/GroupsList'
@@ -1379,6 +1380,7 @@ export default function AppV2() {
           session_time: sessionTime,
           total_amount: totalAmount,
           water_amount: Number(payload?.waterAmount ?? payload?.water_amount) || 0,
+          water_items: normalizeWaterItems(payload?.waterItems ?? payload?.water_items),
           member_ids: memberIds,
           advancer_id: advancerId,
           status: ticketStatus,
@@ -1434,6 +1436,12 @@ export default function AppV2() {
       }
       if (payload?.waterAmount !== undefined || payload?.water_amount !== undefined) {
         updates.water_amount = Number(payload?.waterAmount ?? payload?.water_amount) || 0
+      }
+      if (payload?.waterItems !== undefined || payload?.water_items !== undefined) {
+        updates.water_items = normalizeWaterItems(payload?.waterItems ?? payload?.water_items)
+        if (payload?.waterAmount === undefined && payload?.water_amount === undefined) {
+          updates.water_amount = resolveTicketWaterAmount(updates.water_items, 0)
+        }
       }
       const { error } = await sb
         .from('pickleball_tickets')
@@ -3148,13 +3156,12 @@ function normalizeTicketDate(value) {
 }
 
 function selectedTicketMemberIdsHavePerSessionMember(state, memberIds, sessionDate) {
-  const groupId = activePickleballGroupId(state)
-  const config = findMonthlyPickleConfig(state, groupId, monthKey(sessionDate || new Date()))
-  const monthlyIds = new Set(safeArray(config?.monthlyTicketMemberIds ?? config?.monthly_ticket_member_ids).map(String))
-  const perSessionIds = new Set(safeArray(config?.perSessionTicketMemberIds ?? config?.per_session_ticket_member_ids).map(String))
-  const hasFlexTicketConfig = String(config?.billingMode || config?.billing_mode || '').toLowerCase() === 'flex' || monthlyIds.size > 0 || perSessionIds.size > 0
-  if (!hasFlexTicketConfig) return true
-  return safeArray(memberIds).map(String).filter(Boolean).some(id => perSessionIds.has(id) || !monthlyIds.has(id))
+  const yearMonth = monthKey(sessionDate || new Date())
+  // Match AddTicketSheet / memberFlexTicketType (inherits prior-month config).
+  if (!isBillingModeFlexForMonth(state, yearMonth)) return true
+  return safeArray(memberIds).map(String).filter(Boolean).some(id => (
+    memberFlexTicketType(state, id, yearMonth) === 'per_session'
+  ))
 }
 
 function normalizeTicketMemberIds(value, state) {
