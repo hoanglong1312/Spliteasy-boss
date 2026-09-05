@@ -460,6 +460,96 @@ export function groupUnpaidItemsByMonth(items) {
   return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
 }
 
+const PICKLEBALL_FEE_CATEGORY_ORDER = { court: 0, water: 1, session: 2, other: 3 }
+
+function pickleballPayableItemId(item) {
+  const explicit = String(item?.itemId || item?.item_id || '')
+  if (explicit) return explicit
+  const key = String(item?.payableItemKey || item?.payable_item_key || '')
+  const match = key.match(/^item:([^|]+)/)
+  return match ? match[1] : key
+}
+
+/** Phân nhóm chi phí pickleball: court | water | session | other */
+export function pickleballPayableFeeCategory(item) {
+  const id = pickleballPayableItemId(item)
+  if (id.includes('pickleball-court:') || id.includes('pickleball-monthly-ticket:')) return 'court'
+  if (id.includes(':water')) return 'water'
+  if (id.includes(':fee') || id.includes(':team-fund')) return 'session'
+  return 'other'
+}
+
+export function pickleballFeeCategoryLabel(category, { monthLabel = '', asOfSuffix = '', items = [] } = {}) {
+  const base = monthLabel || 'Tháng'
+  if (category === 'court') {
+    const ids = safeArray(items).map(pickleballPayableItemId)
+    const hasMonthlyTicket = ids.some(id => id.includes('pickleball-monthly-ticket:'))
+    const hasCourt = ids.some(id => id.includes('pickleball-court:'))
+    const title = hasMonthlyTicket && !hasCourt ? 'Vé tháng' : 'Tiền sân'
+    return `${base} · ${title}`
+  }
+  if (category === 'water') return `${base} · Tiền nước${asOfSuffix}`
+  if (category === 'session') return `${base} · Vé buổi${asOfSuffix}`
+  return `${base} · Chi phí${asOfSuffix}`
+}
+
+function groupPickleballPayableItemsByFeeCategory(items, {
+  sourceType,
+  sourceId,
+  sourceLabel,
+  memberId,
+  profileId,
+  currentMonth = '',
+  asOf = '',
+} = {}) {
+  const buckets = new Map()
+  safeArray(items).forEach(item => {
+    const month = item.month || item.yearMonth || item.year_month || ''
+    const category = pickleballPayableFeeCategory(item)
+    const bucketKey = `${month}|${category}`
+    const bucket = buckets.get(bucketKey) || { month, category, coveredItems: [] }
+    bucket.coveredItems.push(item)
+    buckets.set(bucketKey, bucket)
+  })
+  return [...buckets.values()]
+    .sort((a, b) => String(a.month).localeCompare(String(b.month))
+      || (PICKLEBALL_FEE_CATEGORY_ORDER[a.category] ?? 9) - (PICKLEBALL_FEE_CATEGORY_ORDER[b.category] ?? 9))
+    .map(bucket => {
+      const amount = bucket.coveredItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
+      if (!amount) return null
+      const month = bucket.month
+      const monthLabel = month ? sourceMonthLabel(month) : ''
+      const asOfSuffix = month && currentMonth && month === currentMonth && asOf
+        ? ` · đến ${formatDayMonth(asOf)}`
+        : ''
+      const displayLabel = pickleballFeeCategoryLabel(bucket.category, {
+        monthLabel,
+        asOfSuffix: bucket.category === 'court' ? '' : asOfSuffix,
+        items: bucket.coveredItems,
+      })
+      return {
+        month,
+        feeCategory: bucket.category,
+        monthLabel: displayLabel,
+        amount,
+        coveredItems: bucket.coveredItems,
+        payableItemKey: bucket.coveredItems.length === 1
+          ? bucket.coveredItems[0].payableItemKey
+          : buildPayableItemKey({
+            sourceType,
+            sourceId,
+            sourceLabel,
+            memberId,
+            profileId,
+            month,
+            amount,
+            itemId: `pickleball-${bucket.category}`,
+          }),
+      }
+    })
+    .filter(Boolean)
+}
+
 export function checkpointAsOfDate(checkpoint) {
   const explicit = inputDateKey(
     checkpoint?.asOfDate
@@ -1148,8 +1238,31 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
     const amount = Math.abs(Number(row.amount) || 0)
     if (!current || nextRank > currentRank || amount > Math.abs(Number(current.amount) || 0)) {
       const memberIds = row.memberIds || row.member_ids || memberIdsForProfile(profileId, members)
-      const groupSource = safeArray(row.sources).find(source => (source?.sourceType || source?.source_type || 'group') === 'group')
-        || safeArray(row.sources).find(source => !!(source?.sourceId || source?.source_id))
+      const expenseSource = safeArray(row.sources).find(source => (source?.sourceType || source?.source_type || 'group') === 'group')
+      const anySource = expenseSource || safeArray(row.sources).find(source => !!(source?.sourceId || source?.source_id))
+      const pickleSource = safeArray(row.sources).find(source => (source?.sourceType || source?.source_type) === 'pickleball')
+      const pickleSourceId = pickleSource?.sourceId || pickleSource?.source_id || ''
+      const linkedExpenseGroup = pickleSourceId
+        ? safeArray(state?.groups).find(group => (
+          String(group?.linkedPickleballGroupId || group?.linked_pickleball_group_id || '') === String(pickleSourceId)
+        ))
+        : null
+      // Auth group for treasurer RPC: expense source → linked expense group → current group → pickleball source (last resort).
+      const linkGroupId = row.linkGroupId
+        || expenseSource?.sourceId || expenseSource?.source_id
+        || linkedExpenseGroup?.id
+        || state?.currentGroupId || state?.currentGroup?.id
+        || anySource?.sourceId || anySource?.source_id
+        || ''
+      const linkMemberId = row.linkMemberId
+        || expenseSource?.memberId || expenseSource?.member_id
+        || memberIdsForProfile(profileId, members).find(id => {
+          const member = safeArray(members).find(row => String(row?.id || '') === String(id || ''))
+          return String(member?.groupId || member?.group_id || '') === String(linkGroupId || '')
+        })
+        || anySource?.memberId || anySource?.member_id
+        || memberIds[0]
+        || ''
       const paymentItems = buildTreasurerPaymentItems(row.sources, profileId, memberIds, selectedYearMonth)
       const defaultPaymentItemKeys = paymentItems.filter(item => item.defaultSelected).map(item => item.key)
       const payableSources = paymentItems.filter(item => item.defaultSelected).map(paymentItemToCoveredSource)
@@ -1159,9 +1272,9 @@ export function buildPaymentProgressRows(profileBreakdown, members, state, month
       rowsByProfile.set(profileId, {
         profileId,
         memberIds,
-        memberId: row.memberId || row.member_id || groupSource?.memberId || groupSource?.member_id || memberIds[0] || '',
-        linkGroupId: row.linkGroupId || groupSource?.sourceId || groupSource?.source_id || '',
-        linkMemberId: row.linkMemberId || groupSource?.memberId || groupSource?.member_id || memberIds[0] || '',
+        memberId: row.memberId || row.member_id || linkMemberId || memberIds[0] || '',
+        linkGroupId,
+        linkMemberId,
         name: row.name || row.memberName || row.member_name || findProfileMember(profileId, members)?.displayName || findProfileMember(profileId, members)?.name || 'Thành viên',
         amount,
         status: nextStatus,
@@ -1262,6 +1375,38 @@ function buildTreasurerPaymentItems(sources, profileId, memberIds, selectedYearM
         asOf,
         currentMonth,
       )
+
+      // Pickleball: tách dòng theo nhóm chi phí (Tiền sân / Tiền nước / Vé buổi) trong cùng tháng.
+      if (sourceType === 'pickleball' && sourcePayableItems.length) {
+        return groupPickleballPayableItemsByFeeCategory(sourcePayableItems, {
+          sourceType,
+          sourceId,
+          sourceLabel,
+          memberId,
+          profileId,
+          currentMonth,
+          asOf,
+        }).map(row => {
+          const key = [sourceType, sourceId || sourceLabel, memberId, profileId, row.month, row.feeCategory, Math.abs(row.amount)].join(':')
+          return {
+            key,
+            sourceType,
+            sourceId,
+            sourceLabel,
+            memberId,
+            profileId,
+            month: row.month,
+            feeCategory: row.feeCategory,
+            monthLabel: row.monthLabel,
+            amount: row.amount,
+            payableItemKey: row.payableItemKey,
+            coveredItems: row.coveredItems,
+            defaultSelected: true,
+            asOfDate: row.month === currentMonth ? asOf : undefined,
+          }
+        })
+      }
+
       const coverageMonthRows = safeArray(source.monthBreakdown || source.month_breakdown)
         .map(row => {
           const month = row.month || source.month || source.yearMonth || source.year_month || selectedYearMonth

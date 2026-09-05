@@ -701,7 +701,7 @@ test('Home hero review chip is an explicit settle-all action', () => {
   assert.match(homeSource, /onConfirmPayment\?\.\(\{[\s\S]*amount: amountToPay,[\s\S]*coveredMembers: selectedPayForRows/);
   assert.match(homeSource, /const selectedPaymentItems = \[\.\.\.selectedOwnPaymentItems, \.\.\.selectedPayForPaymentItems\]/);
   assert.match(homeSource, /const paymentPeriodLabel = paymentItemsPeriodLabel\(selectedPaymentItems, data\?\.monthLabel\)/);
-  assert.match(homeSource, /const transferDescription = `\$\{paymentNames\.join\(', '\)\} - Thanh toan \$\{paymentPeriodLabel\}`\.trim\(\)/);
+  assert.match(homeSource, /const transferDescription = `\$\{paymentNames\.join\(', '\)\} TT`\.trim\(\)/);
   assert.match(homeSource, /return months\.join\(', '\)/);
   assert.match(homeSource, /const groupedItems = groupPaymentItemsBySource\(items\)/);
   assert.match(homeSource, /function groupPaymentItemsBySource\(items\)/);

@@ -27,6 +27,8 @@ import {
   isCheckpointTimeStale,
   memberFlexTicketType,
   memberWaterShare,
+  pickleballFeeCategoryLabel,
+  pickleballPayableFeeCategory,
   settlementAsOfDate,
   currentMonthlyPickleConfig,
 } from './useScreenData.js'
@@ -6544,6 +6546,78 @@ describe('month-bucket settlement helpers', () => {
     expect(paymentItems.every(item => item.defaultSelected)).toBe(true)
     expect(paymentItems.find(item => item.month === '2026-08')?.amount).toBe(-50)
     expect(settlementAsOfDate()).toBe('2026-08-12')
+    vi.useRealTimers()
+  })
+
+  test('pickleballPayableFeeCategory maps court/water/session/other from itemId', () => {
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-court:g1:2026-09' })).toBe('court')
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-monthly-ticket:g1:2026-09' })).toBe('court')
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-session:s1:water' })).toBe('water')
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-ticket:t1:water' })).toBe('water')
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-session:s1:fee' })).toBe('session')
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-ticket:t1:team-fund' })).toBe('session')
+    expect(pickleballPayableFeeCategory({ itemId: 'pickleball-session:s1:extras' })).toBe('other')
+    expect(pickleballFeeCategoryLabel('court', { monthLabel: 'Tháng 9' })).toBe('Tháng 9 · Tiền sân')
+    expect(pickleballFeeCategoryLabel('court', {
+      monthLabel: 'Tháng 9',
+      items: [{ itemId: 'pickleball-monthly-ticket:g1:2026-09' }],
+    })).toBe('Tháng 9 · Vé tháng')
+    expect(pickleballFeeCategoryLabel('water', { monthLabel: 'Tháng 9', asOfSuffix: ' · đến 05/09' }))
+      .toBe('Tháng 9 · Tiền nước · đến 05/09')
+  })
+
+  test('buildPaymentProgressRows splits pickleball court and water into separate payment rows', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-05T12:00:00.000Z'))
+    const members = [
+      { id: 'member-1', name: 'Member One', profile_id: 'profile-1', group_id: 'pickle-1' },
+    ]
+    const profileBreakdown = [{
+      profileId: 'profile-1',
+      name: 'Member One',
+      amount: -561600,
+      memberIds: ['member-1'],
+      sources: [{
+        sourceType: 'pickleball',
+        sourceId: 'pickle-1',
+        sourceLabel: 'CLB Pickleball',
+        memberId: 'member-1',
+        amount: -561600,
+        monthBreakdown: [
+          { month: '2026-09', label: 'Tháng 9', amount: -561600 },
+        ],
+        payableItems: [
+          {
+            itemId: 'pickleball-court:pickle-1:2026-09',
+            payableItemKey: 'item:pickleball-court:pickle-1:2026-09|member:member-1|profile:profile-1|month:2026-09',
+            month: '2026-09',
+            amount: -500000,
+            memberId: 'member-1',
+            profileId: 'profile-1',
+          },
+          {
+            itemId: 'pickleball-session:sess-1:water',
+            payableItemKey: 'item:pickleball-session:sess-1:water|member:member-1|profile:profile-1|month:2026-09',
+            month: '2026-09',
+            date: '2026-09-03',
+            amount: -61600,
+            memberId: 'member-1',
+            profileId: 'profile-1',
+          },
+        ],
+      }],
+    }]
+
+    const rows = buildPaymentProgressRows(profileBreakdown, members, { notifications: [] }, 'Tháng 9 · 2026', [], '2026-09')
+    const paymentItems = rows[0].paymentItems
+    expect(paymentItems).toHaveLength(2)
+    expect(paymentItems.map(item => [item.feeCategory, item.amount, item.monthLabel])).toEqual([
+      ['court', -500000, 'Tháng 9 · Tiền sân'],
+      ['water', -61600, 'Tháng 9 · Tiền nước · đến 05/09'],
+    ])
+    expect(paymentItems.reduce((sum, item) => sum + item.amount, 0)).toBe(-561600)
+    expect(paymentItems.find(item => item.feeCategory === 'court')?.coveredItems).toHaveLength(1)
+    expect(paymentItems.find(item => item.feeCategory === 'water')?.coveredItems).toHaveLength(1)
     vi.useRealTimers()
   })
 })

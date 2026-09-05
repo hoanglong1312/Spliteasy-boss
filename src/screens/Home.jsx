@@ -10,7 +10,12 @@ import {
   LoadingSpinner, loadingOverlayStyle,
 } from '../primitives';
 import { BANK_LIST, generateQRUrl } from '../lib/vietqr.js';
-import { isCheckpointTimeStale, settlementAsOfDate } from '../hooks/useScreenData.js';
+import {
+  isCheckpointTimeStale,
+  pickleballFeeCategoryLabel,
+  pickleballPayableFeeCategory,
+  settlementAsOfDate,
+} from '../hooks/useScreenData.js';
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -884,7 +889,7 @@ function PaymentSheet({ open, data, paymentRecords = [], isTreasurer, confirmedR
   const payForSummary = selectedPayForRows.length
     ? `${selectedPayForRows.length} người · ${formatVND(selectedPayForTotal)}`
     : 'Chưa chọn ai';
-  const transferDescription = `${paymentNames.join(', ')} - Thanh toan ${paymentPeriodLabel}`.trim();
+  const transferDescription = `${paymentNames.join(', ')} TT`.trim();
   const refundRows = safeArray(data?.refundRows);
   const pendingPaymentRecords = safeArray(paymentRecords).filter(record => String(record.status || 'pending').toLowerCase() === 'pending');
   const qrUrl = canShowQr ? generateQRUrl({
@@ -1615,7 +1620,7 @@ export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confi
       const base = {
         profileId,
         memberId,
-        groupId: row.linkGroupId || row.groupId || '',
+        groupId: row.linkGroupId || row.groupId || groupId || '',
         name: row.name || row.memberName,
       };
       const memberRow = ensureRow(base);
@@ -1648,8 +1653,8 @@ export function buildTreasurerMemberRows({ progressRows, confirmedRecords, confi
             paid: false,
             kind: 'collect',
             memberName: memberRow.name,
-            // Prefer treasurer link group over sourceId (pickleball sourceId can differ from the group where actor is treasurer).
-            groupId: item.groupId || item.group_id || row.linkGroupId || row.groupId || item.sourceId || '',
+            // Settlement group follows sourceId. Auth group lives on row.linkGroupId (expense/linked), not here.
+            groupId: item.groupId || item.group_id || item.sourceId || '',
             row,
           });
         });
@@ -1904,53 +1909,64 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                 <div style={{ minWidth: 0, fontSize: 12, color: '#e2e8f0', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
                 <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>{group.items.reduce((sum, item) => sum + (Number(item.itemCount) || 1), 0)} khoản</div>
               </div>
-              <div style={{ display: 'grid', gap: 6, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(147,197,253,0.34)' }}>
-                {group.items.map(item => {
-                  const isRefund = item.kind === 'refund';
-                  const isCredit = Number(item.amount) > 0;
-                  const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : isCredit ? 'Bù' : (item.paid ? 'Đã nhận' : 'TT');
-                  const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
-                  const selected = !item.paid && !item.pending && selectedKeys?.has?.(item.key);
-                  const selectable = !item.paid && !item.pending;
-                  const paidActionRow = item.paid && !isRefund;
-                  return (
-                    <div
-                      key={item.key}
-                      role={selectable ? 'button' : undefined}
-                      tabIndex={selectable ? 0 : undefined}
-                      onClick={() => selectable ? onToggleSelect?.(item) : undefined}
-                      onKeyDown={(event) => {
-                        if ((event.key === 'Enter' || event.key === ' ') && selectable) {
-                          event.preventDefault();
-                          onToggleSelect?.(item);
-                        }
-                      }}
-                      style={{ display: 'grid', gridTemplateColumns: paidActionRow ? '20px minmax(0,1fr) auto' : '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, cursor: selectable ? 'pointer' : 'default' }}
-                    >
-                      <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : item.pending ? '#fbbf24' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: item.pending ? '#fde68a' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : item.pending ? '·' : ''}</div>
-                      <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'} · ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
-                      <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
-                      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', gridColumn: paidActionRow ? '2 / -1' : 'auto' }}>
-                        {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
-                        {!item.paid && !isRefund && <span style={{ padding: '5px 7px', borderRadius: 7, background: item.pending ? 'rgba(251,191,36,0.14)' : 'rgba(148,163,184,0.12)', color: item.pending ? '#fde68a' : '#cbd5e1', fontSize: 10, fontWeight: 850 }}>{item.pending ? 'Đang chờ nhận' : 'Chưa chốt'}</span>}
-                        {!item.pending && item.paid && !isRefund && <>
-                          <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>
-                          <button type="button" onClick={(event) => { event.stopPropagation(); onUndoPaid?.(item); }} style={miniDashButton('rgba(248,113,113,0.14)', '#fca5a5')}>Hoàn tác</button>
-                        </>}
-                        {!item.pending && (!item.paid || isRefund) && <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            if (isRefund && item.paid) return onCancelRefund?.(item);
-                            if (isRefund) return onConfirmRefund?.(item);
-                            return onPayItem?.(item);
-                          }}
-                          style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
-                        >{label}</button>}
-                      </div>
+              <div style={{ display: 'grid', gap: 8, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(147,197,253,0.34)' }}>
+                {groupPaymentItemsByMonth(group.items).map(monthBucket => (
+                  <div key={monthBucket.key} style={{ display: 'grid', gap: 5 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+                      <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{monthBucket.label}</div>
+                      <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 850, ...type.mono }}>{signedVND(monthBucket.amount)}</div>
                     </div>
-                  );
-                })}
+                    <div style={{ display: 'grid', gap: 5 }}>
+                      {monthBucket.items.map(item => {
+                        const isRefund = item.kind === 'refund';
+                        const isCredit = Number(item.amount) > 0;
+                        const label = isRefund ? (item.paid ? 'Đã chuyển' : 'Hoàn') : isCredit ? 'Bù' : (item.paid ? 'Đã nhận' : 'TT');
+                        const amountColor = isRefund || isCredit ? '#6ee7b7' : item.paid ? '#6ee7b7' : '#fca5a5';
+                        const selected = !item.paid && !item.pending && selectedKeys?.has?.(item.key);
+                        const selectable = !item.paid && !item.pending;
+                        const paidActionRow = item.paid && !isRefund;
+                        const accent = paymentItemRowAccent(item);
+                        return (
+                          <div
+                            key={item.key}
+                            role={selectable ? 'button' : undefined}
+                            tabIndex={selectable ? 0 : undefined}
+                            onClick={() => selectable ? onToggleSelect?.(item) : undefined}
+                            onKeyDown={(event) => {
+                              if ((event.key === 'Enter' || event.key === ' ') && selectable) {
+                                event.preventDefault();
+                                onToggleSelect?.(item);
+                              }
+                            }}
+                            style={{ display: 'grid', gridTemplateColumns: paidActionRow ? '20px minmax(0,1fr) auto' : '20px minmax(0,1fr) auto auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: selected ? 'rgba(34,197,94,0.13)' : item.pending ? 'rgba(251,191,36,0.08)' : item.paid ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.035)', border: `1px solid ${selected ? 'rgba(34,197,94,0.48)' : item.pending ? 'rgba(251,191,36,0.24)' : item.paid ? 'rgba(34,197,94,0.22)' : 'rgba(255,255,255,0.07)'}`, boxShadow: accent ? `inset 3px 0 0 ${accent}` : 'none', cursor: selectable ? 'pointer' : 'default' }}
+                          >
+                            <div style={{ width: 17, height: 17, borderRadius: 6, border: `1px solid ${selected ? '#22c55e' : item.pending ? '#fbbf24' : 'rgba(148,163,184,0.35)'}`, background: selected ? '#22c55e' : 'transparent', color: item.pending ? '#fde68a' : '#052e16', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 950 }}>{selected ? '✓' : item.pending ? '·' : ''}</div>
+                            <PaymentFeeItemLabel item={item} hideMonth />
+                            <div style={{ fontSize: 12, fontWeight: 950, color: amountColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
+                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', gridColumn: paidActionRow ? '2 / -1' : 'auto' }}>
+                              {isRefund && <button type="button" onClick={(event) => { event.stopPropagation(); onRefundBill?.(item); }} style={miniDashButton('rgba(251,191,36,0.14)', '#fde68a')}>Thẻ bill</button>}
+                              {!item.paid && !isRefund && <span style={{ padding: '5px 7px', borderRadius: 7, background: item.pending ? 'rgba(251,191,36,0.14)' : 'rgba(148,163,184,0.12)', color: item.pending ? '#fde68a' : '#cbd5e1', fontSize: 10, fontWeight: 850 }}>{item.pending ? 'Đang chờ nhận' : 'Chưa chốt'}</span>}
+                              {!item.pending && item.paid && !isRefund && <>
+                                <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>
+                                <button type="button" onClick={(event) => { event.stopPropagation(); onUndoPaid?.(item); }} style={miniDashButton('rgba(248,113,113,0.14)', '#fca5a5')}>Hoàn tác</button>
+                              </>}
+                              {!item.pending && (!item.paid || isRefund) && <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (isRefund && item.paid) return onCancelRefund?.(item);
+                                  if (isRefund) return onConfirmRefund?.(item);
+                                  return onPayItem?.(item);
+                                }}
+                                style={miniDashButton(item.paid ? 'rgba(34,197,94,0.18)' : '#22c55e', item.paid ? '#6ee7b7' : '#052e16')}
+                              >{label}</button>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -1973,15 +1989,23 @@ function TreasurerMemberPaymentRow({ row, pendingCheckpoints, selectedKeys, coll
                         <div style={{ minWidth: 0, fontSize: 12, color: '#e2e8f0', fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
                         <div style={{ fontSize: 11, color: colors.textSecondary, fontWeight: 850 }}>{group.items.reduce((sum, item) => sum + (Number(item.itemCount) || 1), 0)} khoản</div>
                       </div>
-                      <div style={{ display: 'grid', gap: 6, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(34,197,94,0.28)' }}>
-                        {group.items.map(item => (
-                          <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.22)' }}>
-                            <div style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.checkpoint ? `${item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'} · ${item.itemCount} khoản` : item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</div>
-                            <div style={{ fontSize: 12, fontWeight: 950, color: '#6ee7b7', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
-                            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', gridColumn: '1 / -1' }}>
-                              <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>
-                              <button type="button" onClick={() => onUndoPaid?.(item)} style={miniDashButton('rgba(248,113,113,0.14)', '#fca5a5')}>Hoàn tác</button>
+                      <div style={{ display: 'grid', gap: 8, marginLeft: 8, paddingLeft: 10, borderLeft: '2px solid rgba(34,197,94,0.28)' }}>
+                        {groupPaymentItemsByMonth(group.items).map(monthBucket => (
+                          <div key={monthBucket.key} style={{ display: 'grid', gap: 5 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+                              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{monthBucket.label}</div>
+                              <div style={{ fontSize: 10, color: '#6ee7b7', fontWeight: 850, ...type.mono }}>{signedVND(monthBucket.amount)}</div>
                             </div>
+                            {monthBucket.items.map(item => (
+                              <div key={item.key} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 7, alignItems: 'center', padding: '7px 8px', borderRadius: 9, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.22)', boxShadow: paymentItemRowAccent(item) ? `inset 3px 0 0 ${paymentItemRowAccent(item)}` : 'none' }}>
+                                <PaymentFeeItemLabel item={item} hideMonth />
+                                <div style={{ fontSize: 12, fontWeight: 950, color: '#6ee7b7', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</div>
+                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end', gridColumn: '1 / -1' }}>
+                                  <span style={{ padding: '5px 7px', borderRadius: 7, background: 'rgba(34,197,94,0.18)', color: '#6ee7b7', fontSize: 10, fontWeight: 850 }}>Đã nhận</span>
+                                  <button type="button" onClick={() => onUndoPaid?.(item)} style={miniDashButton('rgba(248,113,113,0.14)', '#fca5a5')}>Hoàn tác</button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         ))}
                       </div>
@@ -2047,7 +2071,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
   const refundBankTarget = isNetRefund ? (row?.creditorBank || {}) : {};
   const qrTarget = isNetRefund ? refundBankTarget : target;
   const qrBank = resolveVietQrBank(qrTarget);
-  const transferDescription = `${memberName} - Thanh toan ${paymentItemsPeriodLabel(selectedItems, monthLabel)}`.trim();
+  const transferDescription = `${memberName} TT`.trim();
   const qrUrl = selectedTotal > 0 && qrBank && qrTarget.account && qrTarget.holder ? generateQRUrl({
     bankId: qrBank.id,
     account: qrTarget.account,
@@ -2162,7 +2186,7 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
     }
     const paymentGroups = new Map();
     selectedItems.forEach(item => {
-      // Auth group = treasurer link group; keep item.sourceId only as last resort (pickleball source ≠ actor group).
+      // Auth group = treasurer link / current expense group; pickleball sourceId is only last resort.
       const groupId = item.row?.linkGroupId || row.linkGroupId || item.row?.groupId || row.groupId || item.groupId || item.sourceId || '';
       const memberId = item.row?.linkMemberId || row.linkMemberId || item.memberId || item.row?.memberId || row.memberId || '';
       if (!groupId || !memberId) {
@@ -2357,9 +2381,11 @@ function TreasurerConfirmPaymentSheet({ row, monthLabel, currentMonth, paymentTa
 function groupPaymentItemsBySource(items) {
   const groups = new Map();
   safeArray(items).forEach(item => {
-    const key = `${item.sourceType || 'group'}:${item.sourceId || item.sourceLabel || 'source'}`;
+    const sourceType = item.sourceType || item.source_type || 'group';
+    const key = `${sourceType}:${item.sourceId || item.sourceLabel || 'source'}`;
     const existing = groups.get(key) || {
       key,
+      sourceType,
       label: item.sourceLabel || 'Nguồn tiền',
       items: [],
     };
@@ -2440,49 +2466,59 @@ function PaymentItemSection({ title, items, checkedKeys, onToggle }) {
                   <div style={{ minWidth: 0, fontSize: 13, color: '#f8fafc', fontWeight: 950, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{group.label}</div>
                   <div style={{ fontSize: 12, fontWeight: 950, color: groupTotalColor, ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(groupTotal)}</div>
                 </div>
-                <div style={{ display: 'grid', gap: 6, marginLeft: 7, paddingLeft: 12, borderLeft: '4px solid rgba(96,165,250,0.54)' }}>
-                  {group.items.map(item => {
-                    const checked = checkedKeys.has(item.key);
-                    const isCredit = Number(item.amount) > 0;
-                    return (
-                      <label key={item.key} style={{
-                        display: 'grid',
-                        gridTemplateColumns: '22px minmax(0,1fr) auto',
-                        alignItems: 'center',
-                        gap: 8,
-                        minHeight: 38,
-                        padding: '7px 10px',
-                        borderRadius: 11,
-                        border: `1px solid ${checked ? 'rgba(34,197,94,0.58)' : 'rgba(255,255,255,0.09)'}`,
-                        background: checked ? 'rgba(34,197,94,0.13)' : 'rgba(255,255,255,0.045)',
-                        cursor: onToggle ? 'pointer' : 'default',
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          readOnly={!onToggle}
-                          onChange={() => onToggle?.(item.key)}
-                          style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
-                        />
-                        <span style={{
-                          width: 18,
-                          height: 18,
-                          borderRadius: 6,
-                          border: `1.5px solid ${checked ? '#22c55e' : 'rgba(148,163,184,0.48)'}`,
-                          background: checked ? '#22c55e' : 'transparent',
-                          color: checked ? '#052e16' : 'transparent',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 13,
-                          fontWeight: 950,
-                          lineHeight: 1,
-                        }}>✓</span>
-                        <span style={{ minWidth: 0, fontSize: 12, color: colors.textSecondary, fontWeight: 900, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.monthLabel || fullMonthLabel(item.month)}</span>
-                        <span style={{ fontSize: 12, fontWeight: 950, color: isCredit ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</span>
-                      </label>
-                    );
-                  })}
+                <div style={{ display: 'grid', gap: 8, marginLeft: 7, paddingLeft: 12, borderLeft: '4px solid rgba(96,165,250,0.54)' }}>
+                  {groupPaymentItemsByMonth(group.items).map(monthBucket => (
+                    <div key={monthBucket.key} style={{ display: 'grid', gap: 5 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
+                        <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{monthBucket.label}</div>
+                        <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 850, ...type.mono }}>{signedVND(monthBucket.amount)}</div>
+                      </div>
+                      {monthBucket.items.map(item => {
+                        const checked = checkedKeys.has(item.key);
+                        const isCredit = Number(item.amount) > 0;
+                        const accent = paymentItemRowAccent(item);
+                        return (
+                          <label key={item.key} style={{
+                            display: 'grid',
+                            gridTemplateColumns: '22px minmax(0,1fr) auto',
+                            alignItems: 'center',
+                            gap: 8,
+                            minHeight: 42,
+                            padding: '7px 10px',
+                            borderRadius: 11,
+                            border: `1px solid ${checked ? 'rgba(34,197,94,0.58)' : 'rgba(255,255,255,0.09)'}`,
+                            background: checked ? 'rgba(34,197,94,0.13)' : 'rgba(255,255,255,0.045)',
+                            boxShadow: accent ? `inset 3px 0 0 ${accent}` : 'none',
+                            cursor: onToggle ? 'pointer' : 'default',
+                          }}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              readOnly={!onToggle}
+                              onChange={() => onToggle?.(item.key)}
+                              style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}
+                            />
+                            <span style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: 6,
+                              border: `1.5px solid ${checked ? '#22c55e' : 'rgba(148,163,184,0.48)'}`,
+                              background: checked ? '#22c55e' : 'transparent',
+                              color: checked ? '#052e16' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 13,
+                              fontWeight: 950,
+                              lineHeight: 1,
+                            }}>✓</span>
+                            <PaymentFeeItemLabel item={item} hideMonth />
+                            <span style={{ fontSize: 12, fontWeight: 950, color: isCredit ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -2564,7 +2600,59 @@ function sourcePaymentItems(source, { prefix = 'source', memberId = '', profileI
     amount: Number(item.amount) || 0,
     payableItemKey: item.payableItemKey || item.payable_item_key || '',
     expenseId: item.expenseId || item.expense_id || '',
+    expenseTitle: item.expenseTitle || item.expense_title || item.title || '',
+    itemId: item.itemId || item.item_id || '',
   }));
+
+  // Pickleball: tách Tiền sân / Tiền nước / Vé buổi trong cùng tháng (đồng bộ treasurer view).
+  if (sourceType === 'pickleball' && sourcePayableItems.length) {
+    const asOf = settlementAsOfDate();
+    const currentMonth = String(asOf || '').slice(0, 7);
+    const categoryOrder = { court: 0, water: 1, session: 2, other: 3 };
+    const buckets = new Map();
+    sourcePayableItems.forEach(item => {
+      const month = item.month || '';
+      const category = pickleballPayableFeeCategory(item);
+      const bucketKey = `${month}|${category}`;
+      const bucket = buckets.get(bucketKey) || { month, category, coveredItems: [] };
+      bucket.coveredItems.push(item);
+      buckets.set(bucketKey, bucket);
+    });
+    return [...buckets.values()]
+      .sort((a, b) => String(a.month).localeCompare(String(b.month))
+        || (categoryOrder[a.category] ?? 9) - (categoryOrder[b.category] ?? 9))
+      .map((bucket, index) => {
+        const amount = bucket.coveredItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        if (!amount) return null;
+        const month = bucket.month;
+        const asOfSuffix = month && currentMonth && month === currentMonth && asOf
+          ? ` · đến ${String(asOf).slice(8, 10)}/${String(asOf).slice(5, 7)}`
+          : '';
+        const monthLabel = pickleballFeeCategoryLabel(bucket.category, {
+          monthLabel: shortMonthLabel(month) || (month ? `Tháng ${Number(String(month).slice(5, 7))}` : 'Tháng'),
+          asOfSuffix: bucket.category === 'court' ? '' : asOfSuffix,
+          items: bucket.coveredItems,
+        });
+        return {
+          key: `${prefix}:${sourceType}:${sourceId}:${baseMemberId}:${baseProfileId}:${month || index}:${bucket.category}`,
+          sourceType,
+          sourceId,
+          sourceLabel,
+          memberId: baseMemberId,
+          profileId: baseProfileId,
+          month,
+          feeCategory: bucket.category,
+          monthLabel,
+          amount,
+          payableItemKey: bucket.coveredItems.length === 1 ? bucket.coveredItems[0].payableItemKey : source.payableItemKey || source.payable_item_key || '',
+          expenseId: bucket.coveredItems.length === 1 ? bucket.coveredItems[0].expenseId : source.expenseId || source.expense_id || '',
+          coveredItems: bucket.coveredItems,
+          defaultSelected: true,
+        };
+      })
+      .filter(item => item && Number(item.amount) !== 0);
+  }
+
   const months = safeArray(source.monthBreakdown).length
     ? safeArray(source.monthBreakdown)
     : [{ month: source.month || source.yearMonth || source.year_month || '', label: source.monthLabel || source.month_label || '', amount: source.amount }];
@@ -2721,12 +2809,39 @@ function billQrOnlyUrl(value) {
   return String(value || '').replace(/-compact2\.(png|jpg|jpeg)(?=(?:\?|$))/i, '-qr_only.$1');
 }
 
+function billSourceAccent(sourceType) {
+  if (sourceType === 'pickleball') {
+    return {
+      bar: 'rgba(129,140,248,0.72)',
+      panel: 'rgba(99,102,241,0.10)',
+      border: 'rgba(129,140,248,0.32)',
+      title: '#e0e7ff',
+      total: '#c7d2fe',
+    };
+  }
+  return {
+    bar: 'rgba(56,189,248,0.72)',
+    panel: 'rgba(14,165,233,0.08)',
+    border: 'rgba(56,189,248,0.28)',
+    title: '#e0f2fe',
+    total: '#7dd3fc',
+  };
+}
+
+function billMonthPrefix(item) {
+  const monthNumber = Number(String(item?.month || '').slice(5, 7));
+  if (monthNumber) return `T${monthNumber}`;
+  const match = String(item?.monthLabel || '').match(/Tháng\s+(\d+)/i);
+  return match ? `T${match[1]}` : '';
+}
+
 function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, selectable = false, actions = null, qrFallbackAction = null, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5' }) {
   const [qrPreviewOpen, setQrPreviewOpen] = useState(false);
   const displayQrUrl = billQrOnlyUrl(qrUrl);
   const groups = safeArray(paymentDisplayGroups)
     .map(group => ({ ...group, items: selectable ? group.items : group.items.filter(item => group.checkedKeys?.has?.(item.key)) }))
     .filter(group => group.items.length > 0);
+  const showProfileHeaders = groups.length > 1;
 
   return (
     <Card style={{ padding: 14, borderColor: 'rgba(96,165,250,0.30)', background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(30,41,59,0.92))' }}>
@@ -2735,6 +2850,12 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
           <div style={{ display: 'inline-flex', maxWidth: '100%', padding: '4px 9px', borderRadius: 999, background: 'rgba(96,165,250,0.16)', border: '1px solid rgba(96,165,250,0.42)', color: '#bfdbfe', fontSize: 11, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{memberName}</div>
           <div style={{ marginTop: 7, fontSize: 26, fontWeight: 950, color: amountColor, ...type.mono }}>{formatVND(amount)}</div>
           <div style={{ marginTop: 4, fontSize: 11, color: colors.textSecondary, fontWeight: 800 }}>{caption}</div>
+          {transferDescription ? (
+            <div style={{ marginTop: 8, padding: '7px 9px', borderRadius: 10, background: 'rgba(251,191,36,0.10)', border: '1px solid rgba(251,191,36,0.32)' }}>
+              <div style={{ fontSize: 9, color: '#fde68a', fontWeight: 900, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Nội dung CK</div>
+              <div style={{ marginTop: 2, fontSize: 11, color: '#fef3c7', fontWeight: 800, lineHeight: 1.35, wordBreak: 'break-word' }}>{transferDescription}</div>
+            </div>
+          ) : null}
         </div>
         {displayQrUrl ? (
           <button type="button" aria-label="Phóng to QR thanh toán" onClick={() => setQrPreviewOpen(true)} style={{ width: 128, height: 128, padding: 5, boxSizing: 'border-box', border: 0, borderRadius: 14, background: '#fff', cursor: 'pointer', overflow: 'hidden' }}>
@@ -2750,42 +2871,63 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
 
       {actions && <div style={{ marginTop: 10 }}>{actions}</div>}
 
-      <div style={{ display: 'grid', gap: 10, marginTop: 10 }}>
+      <div style={{ display: 'grid', gap: 10, marginTop: 12 }}>
         {groups.map(group => {
           const selectedItems = group.items.filter(item => group.checkedKeys?.has?.(item.key));
           const profileName = /^Các khoản của\s+(.+)$/i.exec(group.title)?.[1] || group.title;
+          const visibleItems = selectable ? group.items : selectedItems;
           return (
-            <div key={group.key} style={{ display: 'grid', gap: 8, padding: 10, borderRadius: 13, background: 'rgba(15,23,42,0.62)', border: '1px solid rgba(96,165,250,0.24)', boxShadow: 'inset 3px 0 0 rgba(96,165,250,0.52)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
-                <span style={{ fontSize: 10, color: '#bfdbfe', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap' }}>Các khoản của</span>
-                <span style={{ minWidth: 0, maxWidth: '100%', padding: '2px 7px', borderRadius: 999, background: 'rgba(96,165,250,0.22)', border: '1px solid rgba(147,197,253,0.48)', color: '#eff6ff', fontSize: 10, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName}</span>
-              </div>
-              {groupPaymentItemsBySource(selectable ? group.items : selectedItems).map(sourceGroup => {
-                const sourceTotal = sourceGroup.items
-                  .filter(item => !selectable || group.checkedKeys?.has?.(item.key))
-                  .reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            <div key={group.key} style={{ display: 'grid', gap: 8 }}>
+              {showProfileHeaders && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                  <span style={{ fontSize: 10, color: '#bfdbfe', fontWeight: 950, textTransform: 'uppercase', letterSpacing: '0.6px', whiteSpace: 'nowrap' }}>Các khoản của</span>
+                  <span style={{ minWidth: 0, maxWidth: '100%', padding: '2px 7px', borderRadius: 999, background: 'rgba(96,165,250,0.22)', border: '1px solid rgba(147,197,253,0.48)', color: '#eff6ff', fontSize: 10, fontWeight: 950, textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profileName}</span>
+                </div>
+              )}
+              {groupPaymentItemsBySource(visibleItems).map(sourceGroup => {
+                const sourceItems = sourceGroup.items.filter(item => !selectable || group.checkedKeys?.has?.(item.key));
+                const sourceTotal = sourceItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+                const accent = billSourceAccent(sourceGroup.sourceType || sourceItems[0]?.sourceType);
+                const flatItems = [...sourceItems].sort((a, b) => (
+                  String(a.month || '').localeCompare(String(b.month || ''))
+                  || (FEE_CATEGORY_META[resolvePaymentItemFeeCategory(a)] ? 0 : 1) - (FEE_CATEGORY_META[resolvePaymentItemFeeCategory(b)] ? 0 : 1)
+                  || String(a.monthLabel || '').localeCompare(String(b.monthLabel || ''), 'vi')
+                ));
                 return (
-                  <div key={sourceGroup.key} style={{ display: 'grid', gap: 6 }}>
+                  <div key={sourceGroup.key} style={{
+                    display: 'grid',
+                    gap: 7,
+                    padding: '10px 10px 9px',
+                    borderRadius: 13,
+                    background: accent.panel,
+                    border: `1px solid ${accent.border}`,
+                    boxShadow: `inset 3px 0 0 ${accent.bar}`,
+                  }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
-                      <div style={{ minWidth: 0, fontSize: 12, fontWeight: 950, color: colors.textPrimary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sourceGroup.label}</div>
-                      <div style={{ fontSize: 12, fontWeight: 950, color: sourceTotal > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(sourceTotal)}</div>
+                      <div style={{ minWidth: 0, fontSize: 12, fontWeight: 950, color: accent.title, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sourceGroup.label}</div>
+                      <div style={{ fontSize: 12, fontWeight: 950, color: sourceTotal > 0 ? '#6ee7b7' : accent.total, ...type.mono, whiteSpace: 'nowrap' }}>{formatVND(Math.abs(sourceTotal))}</div>
                     </div>
-                    <div style={{ display: 'grid', gap: 5, marginLeft: 7, paddingLeft: 10, borderLeft: '3px solid rgba(148,163,184,0.38)' }}>
-                      {sourceGroup.items.map(item => {
+                    <div style={{ display: 'grid', gap: 5 }}>
+                      {flatItems.map(item => {
                         const checked = group.checkedKeys?.has?.(item.key);
                         const selectableItem = selectable && group.onToggle;
                         const ItemRow = selectableItem ? 'label' : 'div';
+                        const rowAccent = paymentItemRowAccent(item) || accent.bar;
+                        const itemAmount = Number(item.amount) || 0;
                         return (
                           <ItemRow key={item.key} style={{
                             display: 'grid',
                             gridTemplateColumns: selectableItem ? '20px minmax(0,1fr) auto' : 'minmax(0,1fr) auto',
                             gap: 8,
                             alignItems: 'center',
-                            minHeight: selectableItem ? 36 : 'auto',
-                            padding: selectableItem ? '5px 7px' : 0,
-                            borderRadius: selectableItem ? 9 : 0,
-                            border: selectableItem ? `1px solid ${checked ? 'rgba(34,197,94,0.52)' : 'rgba(255,255,255,0.08)'}` : 'none',
-                            background: selectableItem && checked ? 'rgba(34,197,94,0.12)' : 'transparent',
+                            minHeight: 34,
+                            padding: '6px 8px',
+                            borderRadius: 10,
+                            border: selectableItem
+                              ? `1px solid ${checked ? 'rgba(34,197,94,0.52)' : 'rgba(255,255,255,0.08)'}`
+                              : '1px solid rgba(255,255,255,0.06)',
+                            background: selectableItem && checked ? 'rgba(34,197,94,0.12)' : 'rgba(15,23,42,0.45)',
+                            boxShadow: `inset 3px 0 0 ${rowAccent}`,
                             cursor: selectableItem ? 'pointer' : 'default',
                           }}>
                             {selectableItem && (
@@ -2806,8 +2948,8 @@ function PaymentBillCardContent({ memberName, amount, transferDescription, qrUrl
                                 }}>✓</span>
                               </>
                             )}
-                            <span style={{ minWidth: 0, fontSize: 11, color: colors.textSecondary, fontWeight: 800, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.monthLabel || fullMonthLabel(item.month) || 'Không rõ tháng'}</span>
-                            <span style={{ fontSize: 11, fontWeight: 950, color: Number(item.amount) > 0 ? '#6ee7b7' : '#fca5a5', ...type.mono, whiteSpace: 'nowrap' }}>{signedVND(item.amount)}</span>
+                            <PaymentFeeItemLabel item={item} hideMonth showMonthPrefix />
+                            <span style={{ fontSize: 12, fontWeight: 950, color: itemAmount > 0 ? '#6ee7b7' : '#fda4af', ...type.mono, whiteSpace: 'nowrap' }}>{formatVND(Math.abs(itemAmount))}</span>
                           </ItemRow>
                         );
                       })}
@@ -3048,11 +3190,18 @@ function signedVND(value) {
 }
 
 function paymentItemToCoveredSource(item) {
+  const sourceType = item.sourceType || item.source_type || 'group';
+  const sourceId = item.sourceId || item.source_id || '';
+  // Never send treasurer auth/link group as settlement groupId for pickleball —
+  // RPC prefers groupId over sourceId and would settle against the wrong group.
+  const settlementGroupId = sourceType === 'pickleball'
+    ? sourceId
+    : (item.groupId || item.group_id || sourceId || '');
   return {
-    sourceType: item.sourceType,
-    sourceId: item.sourceId,
+    sourceType,
+    sourceId,
     sourceLabel: item.sourceLabel,
-    groupId: item.groupId || item.group_id || '',
+    groupId: settlementGroupId,
     memberId: item.memberId,
     profileId: item.profileId,
     memberName: item.memberName,
@@ -3072,6 +3221,7 @@ function paymentItemToCoveredItems(item) {
     sourceId: row.sourceId || row.source_id || item.sourceId,
     sourceLabel: row.sourceLabel || row.source_label || item.sourceLabel,
     expenseId: row.expenseId || row.expense_id || item.expenseId || '',
+    expenseTitle: row.expenseTitle || row.expense_title || row.title || item.expenseTitle || item.expense_title || item.title || '',
     memberId: row.memberId || row.member_id || item.memberId,
     profileId: row.profileId || row.profile_id || item.profileId,
     memberName: row.memberName || row.member_name || item.memberName,
@@ -3393,6 +3543,220 @@ function fullMonthLabel(yearMonth) {
   const [year, month] = String(yearMonth || '').split('-');
   const monthNumber = Number(month);
   return year && monthNumber ? `Tháng ${monthNumber} · ${year}` : '';
+}
+
+function shortMonthLabel(yearMonth) {
+  const monthNumber = Number(String(yearMonth || '').slice(5, 7));
+  return monthNumber ? `Tháng ${monthNumber}` : '';
+}
+
+const FEE_CATEGORY_META = {
+  court: { title: 'Tiền sân', altTitle: 'Vé tháng', bg: 'rgba(99,102,241,0.18)', border: 'rgba(129,140,248,0.48)', color: '#c7d2fe', accent: 'rgba(129,140,248,0.55)' },
+  water: { title: 'Tiền nước', bg: 'rgba(34,211,238,0.14)', border: 'rgba(34,211,238,0.45)', color: '#a5f3fc', accent: 'rgba(34,211,238,0.5)' },
+  session: { title: 'Vé buổi', bg: 'rgba(251,191,36,0.14)', border: 'rgba(251,191,36,0.42)', color: '#fde68a', accent: 'rgba(251,191,36,0.45)' },
+  other: { title: 'Chi phí', bg: 'rgba(148,163,184,0.14)', border: 'rgba(148,163,184,0.38)', color: '#cbd5e1', accent: 'rgba(148,163,184,0.4)' },
+};
+
+function resolvePaymentItemFeeCategory(item) {
+  if (item?.feeCategory) return item.feeCategory;
+  const sourceType = item?.sourceType || item?.source_type || '';
+  // Chỉ suy category pickleball cho nguồn pickleball — expense group không mặc định thành "Chi phí".
+  if (sourceType === 'pickleball') {
+    const covered = safeArray(item?.coveredItems || item?.covered_items);
+    if (covered.length) {
+      const cats = covered.map(row => pickleballPayableFeeCategory(row));
+      if (cats.every(cat => cat === cats[0])) return cats[0];
+    }
+    const label = String(item?.monthLabel || item?.month_label || '');
+    if (/Vé tháng/i.test(label)) return 'court';
+    if (/Tiền sân/i.test(label)) return 'court';
+    if (/Tiền nước/i.test(label)) return 'water';
+    if (/Vé buổi/i.test(label)) return 'session';
+    if (/Chi phí|Phụ phí|Khoản phụ|Vé trả hộ|Điều chỉnh/i.test(label)) return 'other';
+  }
+  return '';
+}
+
+function paymentItemTitleSummary(item) {
+  const rows = safeArray(item?.coveredItems || item?.covered_items);
+  const titles = (rows.length ? rows : [item])
+    .map(row => String(
+      row?.expenseTitle
+      || row?.expense_title
+      || row?.title
+      || ''
+    ).trim())
+    .filter(Boolean);
+  return [...new Set(titles)].join(', ');
+}
+
+function feeCategoryBadgeTitle(category, item) {
+  const meta = FEE_CATEGORY_META[category];
+  if (!meta) return '';
+  if (category === 'court') {
+    const ids = [
+      item?.itemId,
+      item?.item_id,
+      ...safeArray(item?.coveredItems || item?.covered_items).flatMap(row => [row?.itemId, row?.item_id, row?.payableItemKey]),
+    ].map(String);
+    if (ids.some(id => id.includes('pickleball-monthly-ticket:')) && !ids.some(id => id.includes('pickleball-court:'))) {
+      return meta.altTitle;
+    }
+    return meta.title;
+  }
+  if (category === 'other') {
+    const ids = [
+      item?.itemId,
+      item?.item_id,
+      ...safeArray(item?.coveredItems || item?.covered_items).flatMap(row => [row?.itemId, row?.item_id, row?.payableItemKey, row?.expenseTitle]),
+    ].map(String);
+    const isAll = (needle) => ids.length > 0 && ids.every(id => id.includes(needle));
+    if (isAll(':extras') || ids.every(id => /Khoản phụ/i.test(id))) return 'Khoản phụ';
+    if (isAll(':p2p') || ids.every(id => /Vé trả hộ/i.test(id))) return 'Vé trả hộ';
+    if (isAll('pickleball-adjustment:') || ids.every(id => /Điều chỉnh/i.test(id))) return 'Điều chỉnh';
+    return meta.title;
+  }
+  return meta.title;
+}
+
+function PaymentFeeItemLabel({ item, fallback = 'Không rõ tháng', hideMonth = false, showMonthPrefix = false }) {
+  const category = resolvePaymentItemFeeCategory(item);
+  const meta = FEE_CATEGORY_META[category];
+  const month = shortMonthLabel(item?.month) || String(item?.monthLabel || '').match(/Tháng\s+\d+/)?.[0] || '';
+  const asOf = String(item?.monthLabel || '').match(/đến\s+\d{2}\/\d{2}/)?.[0] || '';
+  const checkpointExtra = item?.checkpoint ? ` · ${item.itemCount} khoản` : '';
+  const titleSummary = paymentItemTitleSummary(item);
+  const monthPrefix = showMonthPrefix ? billMonthPrefix(item) : '';
+
+  const monthPrefixEl = monthPrefix ? (
+    <span style={{
+      flexShrink: 0,
+      padding: '2px 6px',
+      borderRadius: 6,
+      background: 'rgba(148,163,184,0.16)',
+      border: '1px solid rgba(148,163,184,0.28)',
+      color: '#cbd5e1',
+      fontSize: 9,
+      fontWeight: 950,
+      letterSpacing: '0.04em',
+      whiteSpace: 'nowrap',
+    }}>{monthPrefix}</span>
+  ) : null;
+
+  if (!meta) {
+    if (item?.checkpoint) {
+      const label = `${item.monthLabel || fullMonthLabel(item.month) || fallback} · ${item.itemCount} khoản`;
+      return (
+        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {monthPrefixEl}
+          <div style={{ minWidth: 0, fontSize: 11, color: '#e2e8f0', fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>
+            {label}
+          </div>
+        </div>
+      );
+    }
+    const label = titleSummary || item?.monthLabel || fullMonthLabel(item?.month) || fallback;
+    if (titleSummary) {
+      return (
+        <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {monthPrefixEl}
+          <span style={{
+            minWidth: 0,
+            maxWidth: '100%',
+            padding: '3px 8px',
+            borderRadius: 999,
+            background: 'rgba(241,245,249,0.10)',
+            border: '1px solid rgba(226,232,240,0.28)',
+            color: '#f8fafc',
+            fontSize: 11,
+            fontWeight: 950,
+            lineHeight: 1.35,
+            letterSpacing: '0.01em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }} title={label}>{label}</span>
+          {asOf ? <span style={{ fontSize: 9, color: colors.textMuted, fontWeight: 750, whiteSpace: 'nowrap' }}>{asOf}</span> : null}
+        </div>
+      );
+    }
+    return (
+      <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {monthPrefixEl}
+        <div style={{ minWidth: 0, fontSize: 11, color: '#cbd5e1', fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={label}>
+          {label}
+        </div>
+      </div>
+    );
+  }
+
+  // Chi phí / other: hiện 1 dòng tên khoản (Tiền bóng, Cafe) thay vì chỉ badge chung.
+  const badgeTitle = (category === 'other' && titleSummary) ? titleSummary : feeCategoryBadgeTitle(category, item);
+  const isTitleChip = category === 'other' && Boolean(titleSummary);
+
+  return (
+    <div style={{ minWidth: 0, display: 'grid', gap: hideMonth ? 0 : 3, alignContent: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, flexWrap: 'wrap' }}>
+        {monthPrefixEl}
+        <span style={{
+          flexShrink: 1,
+          minWidth: 0,
+          maxWidth: '100%',
+          padding: isTitleChip ? '3px 8px' : '2px 7px',
+          borderRadius: 999,
+          background: isTitleChip ? 'rgba(241,245,249,0.10)' : meta.bg,
+          border: `1px solid ${isTitleChip ? 'rgba(226,232,240,0.28)' : meta.border}`,
+          color: isTitleChip ? '#f8fafc' : meta.color,
+          fontSize: isTitleChip ? 11 : 10,
+          fontWeight: 950,
+          lineHeight: 1.35,
+          letterSpacing: isTitleChip ? '0.01em' : undefined,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }} title={badgeTitle}>{badgeTitle}</span>
+        {asOf ? <span style={{ fontSize: 9, color: colors.textMuted, fontWeight: 750, whiteSpace: 'nowrap' }}>{asOf}</span> : null}
+      </div>
+      {!hideMonth && (
+        <div style={{ fontSize: 10, color: colors.textSecondary, fontWeight: 750, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {month || fallback}{checkpointExtra}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function paymentItemRowAccent(item) {
+  const meta = FEE_CATEGORY_META[resolvePaymentItemFeeCategory(item)];
+  return meta?.accent || null;
+}
+
+function groupPaymentItemsByMonth(items) {
+  const categoryOrder = { court: 0, water: 1, session: 2, other: 3 };
+  const buckets = new Map();
+  safeArray(items).forEach(item => {
+    const month = String(item?.month || '');
+    const key = month || item?.monthLabel || 'unknown';
+    const bucket = buckets.get(key) || {
+      key,
+      month,
+      label: shortMonthLabel(month) || item?.monthLabel || 'Không rõ tháng',
+      amount: 0,
+      items: [],
+    };
+    bucket.amount += Number(item?.amount) || 0;
+    bucket.items.push(item);
+    buckets.set(key, bucket);
+  });
+  return [...buckets.values()]
+    .map(bucket => ({
+      ...bucket,
+      items: [...bucket.items].sort((a, b) => (
+        (categoryOrder[resolvePaymentItemFeeCategory(a)] ?? 9) - (categoryOrder[resolvePaymentItemFeeCategory(b)] ?? 9)
+        || String(a.monthLabel || '').localeCompare(String(b.monthLabel || ''), 'vi')
+      )),
+    }))
+    .sort((a, b) => String(a.month || a.key).localeCompare(String(b.month || b.key)));
 }
 
 function normalizeSearch(value) {

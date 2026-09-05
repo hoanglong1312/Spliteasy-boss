@@ -19,6 +19,14 @@ const sliceBetween = (start, end) => {
   return homeSource.slice(startIndex, endIndex);
 };
 
+test('payment fee labels summarize expense titles for bill/list rows', () => {
+  assert.match(homeSource, /function paymentItemTitleSummary\(item\)/);
+  assert.match(homeSource, /row\?\.expenseTitle[\s\S]*\.join\(', '\)/);
+  assert.match(homeSource, /sourceType === 'pickleball'/);
+  assert.match(homeSource, /category === 'other' && titleSummary/);
+  assert.match(homeSource, /expenseTitle: row\.expenseTitle \|\| row\.expense_title \|\| row\.title/);
+});
+
 test('member payment sheet uses bill card layout without share buttons', () => {
   const paymentSheetSource = sliceBetween('function PaymentSheet(', 'function treasurerProfileStatKey');
   const billContentSource = sliceBetween('function PaymentBillCardContent(', 'function PaymentBillCardSheet');
@@ -108,7 +116,8 @@ test('treasurer dashboard can create one bill from selected items across members
   assert.match(homeSource, /paymentDisplayGroups = row\?\.paymentGroups \|\| \[/);
   assert.match(confirmSource, /const paymentGroups = new Map\(\)/);
   assert.match(confirmSource, /const key = `\$\{groupId\}:\$\{memberId\}`/);
-  assert.match(confirmSource, /payments: \[\.\.\.paymentGroups\.values\(\)\]\.map/);
+  assert.match(confirmSource, /paymentsPayload = \[\.\.\.paymentGroups\.values\(\)\]\.map/);
+  assert.match(confirmSource, /payments: paymentsPayload/);
   assert.match(confirmSource, /memberId: group\.memberId/);
   assert.match(confirmSource, /coveredItems: group\.items\.flatMap\(paymentItemToCoveredItems\)/);
 });
@@ -179,7 +188,7 @@ test('treasurer dashboard keeps confirmed checkpoint members as paid history', (
   assert.match(rowBuilderSource, /paid: true/);
   assert.match(rowBuilderSource, /memberRow\.amountPaid = paymentItemsAmountDue/);
   assert.match(rowSource, /group\.items\.reduce\(\(sum, item\) => sum \+ \(Number\(item\.itemCount\) \|\| 1\), 0\)/);
-  assert.match(rowSource, /`\$\{item\.monthLabel \|\| fullMonthLabel\(item\.month\) \|\| 'Không rõ tháng'\} · \$\{item\.itemCount\} khoản`/);
+  assert.match(homeSource, /item\.monthLabel \|\| fullMonthLabel\(item\.month\) \|\| fallback\} · \$\{item\.itemCount\} khoản/);
   assert.match(dashboardSource, /onUndoPaid=\{\(item\) => withLoading\(\(\) => \{/);
   assert.match(dashboardSource, /window\.confirm\('Hoàn tác lần nhận tiền này\? Các khoản đã chốt sẽ quay lại trạng thái chờ duyệt\.'\)/);
   assert.match(dashboardSource, /item\.checkpoint \? onAction\?\.\('undoSettlementCheckpoint', \{ checkpointId: item\.checkpoint\.id \}\) : onAction\?\.\('cancelPaymentRecord', item\.record\)/);
@@ -307,14 +316,18 @@ test('bill card only renders checked payment items grouped by profile source and
   assert.match(homeSource, /function PaymentBillCardSheet\(\{ memberName, amount, transferDescription, qrUrl, paymentDisplayGroups, caption = 'Cần chuyển cho thủ quỹ', amountColor = '#fca5a5', footerActions = null, onClose \}\)/);
   assert.match(billCardSource, /<PaymentBillCardContent[\s\S]*paymentDisplayGroups=\{paymentDisplayGroups\}/);
   assert.match(homeSource, /group\.items\.filter\(item => group\.checkedKeys\?\.has\?\.\(item\.key\)\)/);
-  assert.match(billContentSource, /groupPaymentItemsBySource\(selectable \? group\.items : selectedItems\)/);
+  assert.match(billContentSource, /groupPaymentItemsBySource\(visibleItems\)/);
   assert.match(homeSource, /item\.monthLabel \|\| fullMonthLabel\(item\.month\)/);
+  assert.match(billContentSource, /showProfileHeaders/);
   assert.match(billContentSource, /Các khoản của<\/span>/);
+  assert.match(billContentSource, /Nội dung CK/);
+  assert.match(billContentSource, /showMonthPrefix/);
+  assert.match(billContentSource, /billSourceAccent/);
   assert.match(billContentSource, /border: '1px solid rgba\(147,197,253,0\.48\)'/);
   assert.doesNotMatch(billContentSource, /paymentTarget/);
   assert.doesNotMatch(billContentSource, /STK|Chủ TK|NH/);
-  assert.doesNotMatch(billContentSource, /Nội dung CK/);
   assert.match(billContentSource, /\{actions && <div style=\{\{ marginTop: 10 \}\}>\{actions\}<\/div>\}/);
+  assert.doesNotMatch(billContentSource, /groupPaymentItemsByMonth/);
   assert.doesNotMatch(billContentSource, /width: 230, height: 230/);
   assert.match(billContentSource, /width: 128, height: 128, padding: 5/);
   assert.match(billContentSource, /aria-label="Phóng to QR thanh toán"/);
