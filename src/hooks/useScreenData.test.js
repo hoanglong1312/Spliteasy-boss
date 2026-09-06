@@ -6499,16 +6499,55 @@ describe('month-bucket settlement helpers', () => {
   test('isCheckpointTimeStale only for partial current-month slips after asOf', () => {
     const partial = {
       created_at: '2026-08-12T10:00:00.000Z',
-      covered_items: [{ month: '2026-08', amount: -50, date: '2026-08-10' }],
+      covered_items: [{
+        month: '2026-08',
+        amount: -50,
+        date: '2026-08-10',
+        sourceType: 'pickleball',
+        payableItemKey: 'item:pickleball-ticket:t1:water|member:m1|profile:p1|month:2026-08',
+        itemId: 'pickleball-ticket:t1:water',
+      }],
     }
     const julyOnly = {
       created_at: '2026-08-12T10:00:00.000Z',
-      covered_items: [{ month: '2026-07', amount: -100, date: '2026-07-20' }],
+      covered_items: [{ month: '2026-07', amount: -100, date: '2026-07-20', sourceType: 'pickleball' }],
+    }
+    const courtOnly = {
+      created_at: '2026-09-05T10:00:00.000Z',
+      covered_items: [{
+        month: '2026-09',
+        amount: -550000,
+        sourceType: 'pickleball',
+        expenseTitle: 'Vé tháng',
+        payableItemKey: 'item:pickleball-monthly-ticket:g1:2026-09|member:m1|profile:p1|month:2026-09',
+        itemId: 'pickleball-monthly-ticket:g1:2026-09',
+      }],
+    }
+    const courtPlusPastWater = {
+      created_at: '2026-09-05T10:00:00.000Z',
+      covered_items: [
+        {
+          month: '2026-08',
+          amount: -11000,
+          sourceType: 'pickleball',
+          payableItemKey: 'item:pickleball-ticket:t1:water|member:m1|profile:p1|month:2026-08',
+          itemId: 'pickleball-ticket:t1:water',
+        },
+        {
+          month: '2026-09',
+          amount: -550000,
+          sourceType: 'pickleball',
+          payableItemKey: 'item:pickleball-monthly-ticket:g1:2026-09|member:m1|profile:p1|month:2026-09',
+          itemId: 'pickleball-monthly-ticket:g1:2026-09',
+        },
+      ],
     }
     expect(checkpointAsOfDate(partial)).toBe('2026-08-12')
     expect(isCheckpointTimeStale(partial, '2026-08-13')).toBe(true)
     expect(isCheckpointTimeStale(partial, '2026-08-12')).toBe(false)
     expect(isCheckpointTimeStale(julyOnly, '2026-08-20')).toBe(false)
+    expect(isCheckpointTimeStale(courtOnly, '2026-09-06')).toBe(false)
+    expect(isCheckpointTimeStale(courtPlusPastWater, '2026-09-06')).toBe(false)
   })
 
   test('buildPaymentProgressRows defaults all unpaid months and respects asOf filter', () => {

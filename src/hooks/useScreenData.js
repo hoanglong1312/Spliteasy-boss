@@ -571,9 +571,17 @@ export function isCheckpointTimeStale(checkpoint, todayKey = settlementAsOfDate(
   if (!today) return false
   const todayMonth = monthKey(today)
   const items = safeArray(checkpoint?.coveredItems || checkpoint?.covered_items)
+  // Chỉ phiếu có khoản biến thiên theo ngày trong tháng hiện tại (nước / vé buổi / phụ phí)
+  // mới time-stale. Vé tháng / tiền sân cố định và chi tiêu group không khóa duyệt theo lịch.
   const coversCurrentMonthPartial = items.some(item => {
     const month = String(item?.month || monthKey(payableItemActivityDateKey(item)) || '')
-    return month && month === todayMonth
+    if (!month || month !== todayMonth) return false
+    const sourceType = item?.sourceType || item?.source_type || ''
+    if (sourceType === 'group') return false
+    if (sourceType === 'pickleball' || sourceType === '') {
+      return pickleballPayableFeeCategory(item) !== 'court'
+    }
+    return true
   })
   if (!coversCurrentMonthPartial) return false
   const asOf = checkpointAsOfDate(checkpoint)
