@@ -3157,10 +3157,12 @@ function normalizeTicketDate(value) {
 
 function selectedTicketMemberIdsHavePerSessionMember(state, memberIds, sessionDate) {
   const yearMonth = monthKey(sessionDate || new Date())
+  const groupId = activePickleballGroupId(state)
+  const billingState = groupId ? { ...state, currentGroupId: groupId } : state
   // Match AddTicketSheet / memberFlexTicketType (inherits prior-month config).
-  if (!isBillingModeFlexForMonth(state, yearMonth)) return true
+  if (!isBillingModeFlexForMonth(billingState, yearMonth)) return true
   return safeArray(memberIds).map(String).filter(Boolean).some(id => (
-    memberFlexTicketType(state, id, yearMonth) === 'per_session'
+    memberFlexTicketType(billingState, id, yearMonth) === 'per_session'
   ))
 }
 

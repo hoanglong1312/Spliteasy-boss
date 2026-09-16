@@ -884,6 +884,14 @@ test('app-v2 handles markAttendance and validates addTicket payloads before inse
   assert.match(appSource, /member_ids: memberIds/)
 })
 
+test('ticket total validation reads monthly config from the active pickleball group', () => {
+  const validatorBlock = appSource.match(/function selectedTicketMemberIdsHavePerSessionMember\([\s\S]*?\n\}/)?.[0] || ''
+  assert.match(validatorBlock, /const groupId = activePickleballGroupId\(state\)/)
+  assert.match(validatorBlock, /const billingState = groupId \? \{ \.\.\.state, currentGroupId: groupId \} : state/)
+  assert.match(validatorBlock, /isBillingModeFlexForMonth\(billingState, yearMonth\)/)
+  assert.match(validatorBlock, /memberFlexTicketType\(billingState, id, yearMonth\)/)
+})
+
 test('calendar guest chips expose treasurer-only delete without changing member toggle behavior', () => {
   assert.match(calendarSource, /onToggle=\{canManageSession && a\.kind !== 'guest' \? \(\) => onAction\?\.\('markAttendance'/)
   assert.match(calendarSource, /isTreasurer=\{canManageSession\}/)
